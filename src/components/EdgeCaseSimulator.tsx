@@ -95,7 +95,7 @@ export default function EdgeCaseSimulator() {
   const handleCta = () => window.dispatchEvent(new CustomEvent('open-agent-qualifier'));
 
   return (
-    <section id="edge-case-simulator" ref={sectionRef} className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full">
+    <section id="edge-case-simulator" ref={sectionRef} data-field-form="wave" className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full">
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <div className="text-center mb-12 max-w-2xl mx-auto">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">

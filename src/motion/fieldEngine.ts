@@ -86,9 +86,11 @@ const TAU = Math.PI * 2;
 // from a fresh live re-inspection of latitudeform.com (not guessed): 'helix' = the two
 // counter-rotating strands seen climbing their "03/STUDIO" section (reads as a DNA double-helix),
 // 'rings' = the concentric drifting rings formation, 'scatter' = the ambient wander already in use
-// site-wide, 'contact' = the converging halo around their circular "Let's talk" CTA, confirmed live
-// (a dashed rotating ring with a dense particle halo assembling around it).
-export type FieldForm = 'hero' | 'helix' | 'rings' | 'scatter' | 'contact';
+// site-wide, 'wave' = the wide horizontal rolling wave bands seen behind their "independent digital
+// studio" section (spans the full viewport width edge-to-edge, unlike every other formation which
+// clusters around a point), 'contact' = the converging halo around their circular "Let's talk" CTA,
+// confirmed live (a dashed rotating ring with a dense particle halo assembling around it).
+export type FieldForm = 'hero' | 'helix' | 'rings' | 'scatter' | 'wave' | 'contact';
 
 // Precomputed "rgb(r,g,b," prefix — each particle's actual draw call appends only its own alpha and
 // closing paren (`STAR_RGB + alpha.toFixed(3) + ')'`), which is materially cheaper per particle than
@@ -240,15 +242,24 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   interface FormStop {
     y: number;
     form: FieldForm;
+    /** -1 (hugs the left edge) .. 0 (centered) .. 1 (hugs the right edge) — from `data-field-anchor`,
+     * defaults to centered. This is what makes the field feel like it's flowing asymmetrically through
+     * the page instead of every formation stacking on the same dead-center point as the one before it;
+     * see ANCHOR_MAX below for how it's turned into an actual pixel offset. */
+    anchor: number;
   }
   let stops: FormStop[] = [];
   function measureStops() {
     const els = document.querySelectorAll<HTMLElement>('[data-field-form]');
     stops = Array.from(els)
-      .map((el) => ({
-        y: el.getBoundingClientRect().top + window.scrollY + el.offsetHeight / 2,
-        form: (el.dataset.fieldForm as FieldForm) || 'scatter',
-      }))
+      .map((el) => {
+        const a = el.dataset.fieldAnchor;
+        return {
+          y: el.getBoundingClientRect().top + window.scrollY + el.offsetHeight / 2,
+          form: (el.dataset.fieldForm as FieldForm) || 'scatter',
+          anchor: a === 'left' ? -1 : a === 'right' ? 1 : 0,
+        };
+      })
       .sort((a, b) => a.y - b.y);
   }
   measureStops();
@@ -261,20 +272,20 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
    * coordinates went mathematically unreachable off-screen once scrolled past. `* 1.5` gain mirrors
    * Latitude's own `T.lead`: a formation should visibly start answering the first flick of the
    * wheel, not wait until the visitor is already halfway to the next section. */
-  function pickFormation(): { A: FieldForm; B: FieldForm; t: number } {
-    if (!stops.length) return { A: 'hero', B: 'hero', t: 0 };
+  function pickFormation(): { A: FieldForm; B: FieldForm; t: number; anchorA: number; anchorB: number } {
+    if (!stops.length) return { A: 'hero', B: 'hero', t: 0, anchorA: 0, anchorB: 0 };
     const sc = window.scrollY + H / 2;
-    if (sc <= stops[0].y) return { A: stops[0].form, B: stops[0].form, t: 0 };
+    if (sc <= stops[0].y) return { A: stops[0].form, B: stops[0].form, t: 0, anchorA: stops[0].anchor, anchorB: stops[0].anchor };
     const last = stops[stops.length - 1];
-    if (sc >= last.y) return { A: last.form, B: last.form, t: 0 };
+    if (sc >= last.y) return { A: last.form, B: last.form, t: 0, anchorA: last.anchor, anchorB: last.anchor };
     for (let i = 0; i < stops.length - 1; i++) {
       const a = stops[i], b = stops[i + 1];
       if (sc >= a.y && sc < b.y) {
         const raw = (sc - a.y) / (b.y - a.y);
-        return { A: a.form, B: b.form, t: smoothstep(clamp(raw * 1.5, 0, 1)) };
+        return { A: a.form, B: b.form, t: smoothstep(clamp(raw * 1.5, 0, 1)), anchorA: a.anchor, anchorB: b.anchor };
       }
     }
-    return { A: last.form, B: last.form, t: 0 };
+    return { A: last.form, B: last.form, t: 0, anchorA: last.anchor, anchorB: last.anchor };
   }
 
   // ---------- readability guard ----------
@@ -455,21 +466,49 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         F.s = (0.9 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
         break;
       }
+      case 'wave': {
+        // Wide horizontal rolling wave bands, full viewport width edge-to-edge — confirmed live as
+        // the ambient field behind Latitude's "independent digital studio" section. Deliberately the
+        // one formation that ISN'T a point-cluster: fixed x per particle spread across the whole
+        // width (not scroll- or time-coupled, same reasoning as scatter's own flow — see the
+        // file-level note above), each row's y undulating via a travelling sine so the bands read as
+        // a rolling wave rather than static horizontal lines.
+        const ROWS = 6;
+        const row = i % ROWS;
+        const rowT = ROWS > 1 ? row / (ROWS - 1) : 0.5;
+        F.x = (rnd1[i] * 1.08 - 0.04) * W;
+        const baseY = H * (0.22 + rowT * 0.54);
+        const amp = 24 + row * 5;
+        const speed = 0.22 + row * 0.03;
+        const wave = Math.sin(F.x * 0.011 + time * speed + row * 1.3 + rnd2[i] * TAU * 0.4) * amp;
+        const swell = Math.sin(F.x * 0.0035 - time * speed * 0.55 + rnd3[i] * TAU) * 12;
+        F.y = baseY + wave + swell;
+        const edgeFade =
+          smoothstep(clamp((F.x / W) * 9, 0, 1)) * (1 - smoothstep(clamp((F.x / W - 0.93) * 9, 0, 1)));
+        F.a = (0.09 + rnd2[i] * 0.17) * edgeFade;
+        F.s = 0.8 + rnd3[i] * 0.7;
+        break;
+      }
       case 'contact': {
-        // Converges into a halo around ContactPortal.tsx's circular CTA — confirmed live as
-        // Latitude's own "everything gathers on whatever is marked as the target" CTA formation.
+        // Converges into a dense magnetic halo around ContactPortal.tsx's circular CTA — confirmed
+        // live as Latitude's own "everything gathers on whatever is marked as the target" CTA
+        // formation, tuned tighter/denser than a first pass (higher power on the radial falloff packs
+        // far more particles into the near-core ring instead of spreading them evenly out to the
+        // edge) plus a slow radial "breathing" pull so it reads as an active magnetic attraction
+        // rather than a static ring of dots.
         const tgtX = targetRect ? targetRect.left + targetRect.width / 2 : cx;
         const tgtY = targetRect ? targetRect.top + targetRect.height / 2 : cy;
         const tgtW = targetRect ? targetRect.width / 2 : Math.min(W, H) * 0.15;
         const tgtH = targetRect ? targetRect.height / 2 : Math.min(W, H) * 0.15;
-        const a = rnd1[i] * TAU + time * 0.11;
-        const spread = Math.pow(rnd2[i], 1.7) * Math.min(W, H) * 0.3;
-        const rw = tgtW * 1.2 + spread, rh = tgtH * 1.2 + spread * 0.85;
+        const pull = 1 - 0.08 * (0.5 + 0.5 * Math.sin(time * 0.45 + rnd3[i] * TAU));
+        const a = rnd1[i] * TAU + time * 0.16;
+        const spread = Math.pow(rnd2[i], 3.2) * Math.min(W, H) * 0.2 * pull;
+        const rw = tgtW * 1.04 + spread, rh = tgtH * 1.04 + spread * 0.85;
         F.x = tgtX + Math.cos(a) * rw;
         F.y = tgtY + Math.sin(a) * rh;
-        const near = 1 - Math.pow(rnd2[i], 1.7);
-        F.a = 0.06 + near * near * 0.6;
-        F.s = 0.9 + near * 1.8;
+        const near = 1 - Math.pow(rnd2[i], 3.2);
+        F.a = 0.1 + near * near * 0.78;
+        F.s = 0.9 + near * 2.6;
         break;
       }
       case 'scatter':
@@ -535,7 +574,17 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     // Which two named formations are active right now, and how far blended between them — see
     // pickFormation() above. Computed once per frame (cheap: a handful of stop comparisons), not
     // per particle.
-    const { A: formA, B: formB, t: formT } = pickFormation();
+    const { A: formA, B: formB, t: formT, anchorA, anchorB } = pickFormation();
+    // Turns each stop's -1/0/1 `anchor` into an actual pixel offset applied to every particle's
+    // target x this frame — this is what makes formations feel like they're flowing asymmetrically
+    // through the page (hugging a side, then the next section pulling toward the other side) instead
+    // of every single one stacking on the same dead-center point. Capped rather than a flat fraction
+    // of W so it stays a tasteful shift on an ultrawide monitor instead of dragging particles off
+    // past the visible margins. Blended by the same formT as the formation blend itself, uniformly
+    // across all particles (not per-particle staggered like the shape blend) since it's a whole-field
+    // translation, not a shape change.
+    const ANCHOR_MAX = Math.min(W * 0.18, 220);
+    const anchorOffsetPx = (anchorA + (anchorB - anchorA) * formT) * ANCHOR_MAX;
 
     yaw += T.idleSpin * dt * 0.5;
     if (!dragging) {
@@ -586,6 +635,7 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         alpha = aa + (F.a - aa) * e;
         size = asz + (F.s - asz) * e;
       }
+      tx += anchorOffsetPx;
 
       // Cursor repulsion — displaces the TARGET, never the point directly; the point then springs
       // toward that displaced target below. Skipping this indirection is what makes most

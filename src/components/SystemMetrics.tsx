@@ -81,6 +81,7 @@ export default function SystemMetrics() {
       id="system-metrics"
       ref={dissolveRef}
       data-field-form="helix"
+      data-field-anchor="left"
       className="py-12 md:py-16 border-t border-white/5 relative overflow-hidden"
     >
       {!reduceMotion && (

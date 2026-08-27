@@ -20,7 +20,7 @@ export default function ContactPortal() {
     <section
       id="contact-portal"
       data-field-form="contact"
-      className="relative min-h-[70dvh] flex items-center justify-center py-20 md:py-28 border-t border-white/5 overflow-hidden"
+      className="relative min-h-[70dvh] flex flex-col items-center justify-center py-20 md:py-28 border-t border-white/5 overflow-hidden"
     >
       <button
         type="button"
@@ -58,12 +58,16 @@ export default function ContactPortal() {
           <span className="block font-display font-black text-3xl md:text-5xl text-white mb-3 [text-shadow:0_2px_18px_rgba(0,0,0,0.85)]">
             בואו נדבר
           </span>
-          <span className="inline-flex items-center gap-3 font-mono text-[11px] tracking-[0.28em] uppercase text-zinc-300 transition-colors group-hover:text-white">
+          <span className="inline-flex items-center gap-3 font-sans text-sm font-medium tracking-wide text-zinc-300 transition-colors group-hover:text-white">
             <span className="block h-px w-6 bg-brand-500 transition-[width] duration-500 group-hover:w-10" aria-hidden="true" />
             צור קשר
           </span>
         </div>
       </button>
+
+      <p className="relative z-10 font-sans text-sm md:text-base text-zinc-400 mt-9 max-w-sm mx-auto text-center leading-relaxed px-6">
+        מענה אישי תוך 24 שעות — לא בוט, לא מוקד שירות. ספרו לי מה אתם בונים ונמצא יחד את הדרך הנכונה.
+      </p>
     </section>
   );
 }

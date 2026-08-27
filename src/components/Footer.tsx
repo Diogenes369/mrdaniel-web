@@ -103,7 +103,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-8 mb-8">
           <div className="col-span-2 md:col-span-1">
             <Link to="/" onClick={handleLogoClick} className="inline-flex rounded-lg outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
-              <Logo className="mb-3" iconClassName="h-7 drop-shadow-[0_0_8px_rgba(0,255,102,0.35)]" textClassName="text-sm" />
+              <Logo className="mb-3" iconClassName="h-7 md:h-9 drop-shadow-[0_0_8px_rgba(0,255,102,0.35)]" textClassName="text-sm md:text-base" />
             </Link>
             <p className="text-zinc-400 text-sm font-light leading-relaxed max-w-xs mb-3">
               ארכיטקטורת AI וסייבר ברמת Zero-Trust עבור ארגונים שדורשים חדשנות חסרת פשרות.

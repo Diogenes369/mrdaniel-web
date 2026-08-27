@@ -86,6 +86,7 @@ export default function CyberAuditMatrix() {
       id="cyber-audit"
       ref={sectionRef}
       data-field-form="rings"
+      data-field-anchor="right"
       className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full"
     >
       <div className="container mx-auto px-4 md:px-6 relative z-10">

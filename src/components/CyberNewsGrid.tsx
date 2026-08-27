@@ -20,7 +20,7 @@ export default function CyberNewsGrid() {
   const items = allItems?.slice(0, PREVIEW_COUNT);
 
   return (
-    <section id="news" data-field-form="rings" className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden cv-auto">
+    <section id="news" data-field-form="rings" data-field-anchor="left" className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden cv-auto">
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center mb-12 md:mb-16 relative z-10">
           <motion.h2
