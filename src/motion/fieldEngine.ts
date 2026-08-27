@@ -31,7 +31,9 @@ const T = {
   radiusH: 0.30,
   axisCam: 3.1,
   tiltBase: -0.38,
-  idleSpin: 0.05,
+  // Raised from 0.05 — "rotating at an optimal speed upon initial load" per explicit request; still
+  // slow enough to read as a stately drift rather than a spinning toy.
+  idleSpin: 0.085,
   breathAmp: 0.02,
   breathHz: 0.05,
   K: 42,
@@ -185,6 +187,11 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   // the way a fresh literal would, which would otherwise make every later reassignment a type error.
   let yaw = 0, yawVel = 0, tilt: number = T.tiltBase, tiltVel = 0, tiltTarget: number = T.tiltBase;
   let mx = -1e4, my = -1e4, fieldAmt = 0;
+  // Smoothed cursor-driven rotation offset — separate from `yaw` itself (which keeps accumulating via
+  // idle spin / drag independently) so hovering near the globe tilts/turns it toward the cursor as a
+  // gentle passive influence, without fighting or resetting whatever the drag/idle-spin state is doing.
+  // See the hover block in frame() below for how the target it damps toward is computed.
+  let hoverYaw = 0;
 
   // Arrow-function *expression*, not a `function` declaration — TS's null-narrowing of `ctx` above
   // only survives into closures defined textually after the guard; a hoisted `function` declaration
@@ -333,7 +340,9 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   // per-particle spring below), so this just makes that assembly READ as a deliberate entrance
   // rather than a flash. One-way ramp, not looped.
   const bootAt = performance.now();
-  const BOOT_MS = 1100;
+  // Shortened from 1100 — the globe should be "immediately visible, crisp, bright" on load, not
+  // fade in over a full second-plus.
+  const BOOT_MS = 650;
 
   // ---------- pointer / drag (window-level hit-testing, exactly like usePointer.ts already does
   // for the R3F scene — the canvas stays pointer-events:none so it can never intercept a real click
@@ -461,7 +470,7 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         // double helix. `strand` (even/odd particle index) offsets one strand by π so they wind
         // opposite each other around the same axis instead of overlapping.
         const strand = i % 2;
-        const amp = Math.min(W, H) * 0.09;
+        const amp = Math.min(W, H) * 0.09 * breathe;
         const ph = rnd1[i] * Math.PI * 4.4 + time * 0.55 + strand * Math.PI;
         let climb = (rnd1[i] + time * 0.035) % 1;
         if (climb < 0) climb += 1;
@@ -477,7 +486,7 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         // Three concentric rings drifting at slightly different rates (the middle ring reversed) —
         // confirmed live as a real Latitude formation (their "case 6").
         const ring = i % 3;
-        const rr = Math.min(W, H) * (0.16 + ring * 0.11);
+        const rr = Math.min(W, H) * (0.16 + ring * 0.11) * breathe;
         const ph = rnd1[i] * TAU + time * (0.06 - ring * 0.015) * (ring === 1 ? -1 : 1);
         const tl = 0.34 + ring * 0.3;
         const X = Math.cos(ph) * rr, Z = Math.sin(ph) * rr;
@@ -502,10 +511,10 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         const baseY = H * (0.2 + rowT * 0.58);
         // Amplitude and speed both raised markedly (was 24-49px/0.22-0.37) — explicitly requested to
         // read as "clearly defined, high-amplitude, sweeping" rather than a subtle ripple.
-        const amp = 46 + row * 9;
+        const amp = (46 + row * 9) * breathe;
         const speed = 0.32 + row * 0.045;
         const wave = Math.sin(F.x * 0.011 + time * speed + row * 1.3 + rnd2[i] * TAU * 0.4) * amp;
-        const swell = Math.sin(F.x * 0.0035 - time * speed * 0.55 + rnd3[i] * TAU) * 18;
+        const swell = Math.sin(F.x * 0.0035 - time * speed * 0.55 + rnd3[i] * TAU) * 18 * breathe;
         F.y = baseY + wave + swell;
         const edgeFade =
           smoothstep(clamp((F.x / W) * 9, 0, 1)) * (1 - smoothstep(clamp((F.x / W - 0.93) * 9, 0, 1)));
@@ -565,6 +574,59 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     }
   }
 
+  // ---------- hero wireframe ----------
+  // Ultra-thin latitude rings + a handful of longitude meridians, stroked as actual paths (not
+  // approximated by particle density) so the globe reads as a structure the points are orbiting ON,
+  // not just a point cloud that happens to be sphere-shaped — confirmed live as the wireframe visible
+  // under Latitude's own hero sphere. Shares the exact same projection math (and the exact same `ct`,
+  // `st`, `ang[]`, `breathe`) as the 'hero' particle case above, so it automatically tilts/rotates in
+  // lockstep with both idle spin, drag, AND the new hover effect — no separate state to keep in sync.
+  const WIRE_SEG = 56;
+  const drawHeroWireframe = (ct: number, st: number, breathe: number, alphaMul: number) => {
+    if (alphaMul <= 0.003) return;
+    const rr = R * breathe;
+    ctx.lineWidth = 0.55;
+    ctx.strokeStyle = STAR_RGB + (0.09 * alphaMul).toFixed(3) + ')';
+    // Latitude rings — every other ring only, so the wireframe reads as a grid rather than a solid
+    // shaded ball (13 rings all stroked would visually merge into a filled sphere at this radius).
+    for (let r = 0; r < NR; r += 2) {
+      const la = lat[r];
+      const ringR = rr * Math.cos(la);
+      const ringY = rr * Math.sin(la);
+      ctx.beginPath();
+      for (let s = 0; s <= WIRE_SEG; s++) {
+        const ph = (s / WIRE_SEG) * TAU + ang[r];
+        const X = ringR * Math.cos(ph), Z = ringR * Math.sin(ph);
+        const Y2 = ringY * ct - Z * st, Z3 = ringY * st + Z * ct;
+        const sc = FOCAL / Math.max(Z3 + FOCAL, R * 0.35);
+        const x = cx + X * sc, y = cy - Y2 * sc;
+        if (s === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    // Longitude meridians — pole-to-pole great circles, spun by the same mid-ring angle so they turn
+    // with the rest of the sphere as one rigid structure.
+    const MER = 6;
+    const spin = ang[Math.floor(NR / 2)];
+    for (let m = 0; m < MER; m++) {
+      const baseAng = (m / MER) * TAU + spin;
+      ctx.beginPath();
+      for (let s = 0; s <= WIRE_SEG; s++) {
+        const la = -Math.PI / 2 + (s / WIRE_SEG) * Math.PI;
+        const ringR = rr * Math.cos(la);
+        const ringY = rr * Math.sin(la);
+        const X = ringR * Math.cos(baseAng), Z = ringR * Math.sin(baseAng);
+        const Y2 = ringY * ct - Z * st, Z3 = ringY * st + Z * ct;
+        const sc = FOCAL / Math.max(Z3 + FOCAL, R * 0.35);
+        const x = cx + X * sc, y = cy - Y2 * sc;
+        if (s === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  };
+
   // ---------- main loop ----------
   let last = performance.now();
   let raf = 0;
@@ -617,14 +679,34 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     // uniformly across all particles (not per-particle staggered like the shape blend) since it's a
     // whole-field translation, not a shape change.
     const anchorOffsetPx = anchorA + (anchorB - anchorA) * formT;
+    // How much of the *current* blend is 'hero' (0..1) — used both to fade the wireframe rings in/out
+    // in step with the particle formation blend, and to gate the hover-tilt effect below so it only
+    // engages while the globe is actually the thing on screen.
+    const heroWeight = (formA === 'hero' ? 1 - formT : 0) + (formB === 'hero' ? formT : 0);
 
     yaw += T.idleSpin * dt * 0.5;
     if (!dragging) {
       yaw += yawVel * dt;
       yawVel -= yawVel * Math.min(T.spinDamp * dt, 1);
     }
+
+    // Hover interaction: moving the cursor near the globe (without clicking) gently turns and tilts
+    // it toward the pointer — dragging still overrides this via `dragging` below, and it fades out by
+    // heroWeight/distance so it never does anything on sections where no sphere is actually visible.
+    let hoverYawTarget = 0;
+    let hoverTiltTarget = T.tiltBase;
+    if (!dragging && FINE && heroWeight > 0.03 && mx > -1e3) {
+      const hdx = clamp((mx - cx) / (R * 2.4 || 1), -1, 1);
+      const hdy = clamp((my - cy) / (R * 2.4 || 1), -1, 1);
+      const reach = clamp(1 - Math.hypot(hdx, hdy) * 0.5, 0, 1);
+      hoverYawTarget = hdx * 0.55 * reach * heroWeight;
+      hoverTiltTarget = T.tiltBase - hdy * 0.24 * reach * heroWeight;
+    }
+    hoverYaw = damp(hoverYaw, hoverYawTarget, 6, dt);
+    if (!dragging) tiltTarget = hoverTiltTarget;
+
     for (let r = 0; r < NR; r++) {
-      const torque = -T.K * (ang[r] - yaw) - T.C * (wv[r] - yawVel);
+      const torque = -T.K * (ang[r] - (yaw + hoverYaw)) - T.C * (wv[r] - yawVel);
       wv[r] += (torque / inert[r]) * dt;
       ang[r] += wv[r] * dt;
     }
@@ -649,6 +731,10 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     const guardRect = guardEl ? guardEl.getBoundingClientRect() : null;
     const targetRect = targetEl ? targetEl.getBoundingClientRect() : null;
 
+    // Wireframe drawn before the particle pass so the points read as sitting ON the structure, not
+    // floating in front of it.
+    drawHeroWireframe(ct, st, breathe, heroWeight * bootFade);
+
     for (let i = 0; i < N; i++) {
       // Target position: sample the active formation(s) for this particle — a straight sample when
       // fully settled on one (formT===0 or A===B, the common case away from a transition), or a
@@ -662,8 +748,13 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         sampleForm(formB, i, time, ct, st, breathe, targetRect);
         const tt = clamp((formT - stag[i]) / (1 - STAGGER), 0, 1);
         const e = smoothstep(tt);
+        // "Liquid pour" sag — a hump that's 0 at both ends of the transition and peaks mid-blend, so a
+        // particle dips down as if gravity briefly took hold before it settles precisely into the
+        // target shape, rather than sliding in a perfectly straight line. Reads as particles being
+        // poured and cast into formation instead of just cross-fading between two positions.
+        const pour = (1 - e) * e * 4 * (16 + rnd3[i] * 14);
         tx = ax + (F.x - ax) * e;
-        ty = ay + (F.y - ay) * e;
+        ty = ay + (F.y - ay) * e + pour;
         alpha = aa + (F.a - aa) * e;
         size = asz + (F.s - asz) * e;
       }
