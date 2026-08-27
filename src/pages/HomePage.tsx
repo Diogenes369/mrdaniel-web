@@ -1,5 +1,4 @@
 import Hero from '../components/Hero';
-import MotionPreviewSection from '../components/MotionPreviewSection';
 import SystemMetrics from '../components/SystemMetrics';
 import TechComparisonMatrix from '../components/TechComparisonMatrix';
 import TechCapabilitiesMatrix from '../components/TechCapabilitiesMatrix';
@@ -11,12 +10,12 @@ import AdvancedRoiCalculator from '../components/AdvancedRoiCalculator';
 import PremiumAdvantage from '../components/PremiumAdvantage';
 import CyberNewsGrid from '../components/CyberNewsGrid';
 import Magazines from '../components/Magazines';
+import ContactPortal from '../components/ContactPortal';
 
 export default function HomePage() {
   return (
     <>
       <Hero />
-      <MotionPreviewSection />
       <SystemMetrics />
       <TechComparisonMatrix />
       <TechCapabilitiesMatrix />
@@ -28,6 +27,7 @@ export default function HomePage() {
       <PremiumAdvantage />
       <CyberNewsGrid />
       <Magazines />
+      <ContactPortal />
     </>
   );
 }

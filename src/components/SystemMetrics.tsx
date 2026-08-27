@@ -77,7 +77,12 @@ export default function SystemMetrics() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section id="system-metrics" ref={dissolveRef} className="py-12 md:py-16 border-t border-white/5 relative overflow-hidden">
+    <section
+      id="system-metrics"
+      ref={dissolveRef}
+      data-field-form="helix"
+      className="py-12 md:py-16 border-t border-white/5 relative overflow-hidden"
+    >
       {!reduceMotion && (
         <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden="true">
           {PARTICLES.map((p, i) => (

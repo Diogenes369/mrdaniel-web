@@ -79,6 +79,17 @@ const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 const smoothstep = (x: number) => x * x * (3 - 2 * x);
 const TAU = Math.PI * 2;
 
+// ---------- formations ----------
+// Named shapes the field morphs between as the visitor scrolls — see pickFormation() below for how
+// a scroll position picks/blends two of these. 'hero' is the ring-sphere (unchanged, has its own
+// drag/spring physics); the rest are new, each a verified real Latitude formation re-implemented
+// from a fresh live re-inspection of latitudeform.com (not guessed): 'helix' = the two
+// counter-rotating strands seen climbing their "03/STUDIO" section (reads as a DNA double-helix),
+// 'rings' = the concentric drifting rings formation, 'scatter' = the ambient wander already in use
+// site-wide, 'contact' = the converging halo around their circular "Let's talk" CTA, confirmed live
+// (a dashed rotating ring with a dense particle halo assembling around it).
+export type FieldForm = 'hero' | 'helix' | 'rings' | 'scatter' | 'contact';
+
 // Precomputed "rgb(r,g,b," prefix — each particle's actual draw call appends only its own alpha and
 // closing paren (`STAR_RGB + alpha.toFixed(3) + ')'`), which is materially cheaper per particle than
 // template-literal-interpolating all three channels every frame across N particles.
@@ -116,6 +127,13 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   const vx = new Float32Array(N), vy = new Float32Array(N);
   const rnd1 = new Float32Array(N), rnd2 = new Float32Array(N), rnd3 = new Float32Array(N);
   const kmul = new Float32Array(N);
+  // Per-particle offset into the 0..1 progress of a formation-to-formation transition — mirrors
+  // Latitude's own `stag[i] = r4[i] * T.stagger` exactly: without it every particle would start AND
+  // finish morphing in lockstep, which reads as "one shape sliding into another," not organic. With
+  // it, particles begin their individual morph at staggered points across the transition, arriving
+  // as a soft wave rather than a snap — see STAGGER/the blend math in the main loop below.
+  const stag = new Float32Array(N);
+  const STAGGER = 0.22;
   const ringOf = new Uint8Array(N);
   const scatterX = new Float32Array(N), scatterY = new Float32Array(N);
 
@@ -124,6 +142,7 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     rnd2[i] = hash(i * 4 + 2311);
     rnd3[i] = hash(i * 4 + 90001);
     kmul[i] = 1 - T.pKvar * 0.5 + rnd2[i] * T.pKvar;
+    stag[i] = hash(i * 4 + 424242) * STAGGER;
   }
 
   const NR = T.rings;
@@ -210,6 +229,54 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   };
   layout();
 
+  // ---------- scroll-driven formation state machine ----------
+  // Any element flagged data-field-form="hero|helix|rings|scatter|contact" is a "stop" — mirrors
+  // Latitude's own pickStop()/data-form mechanism precisely (confirmed via the original teardown's
+  // source read): each stop's PAGE-space vertical midpoint is measured once, then every frame the
+  // stop nearest the current viewport CENTER (not top) is found and blended with its neighbor by how
+  // far scroll has moved between them. Stops are measured once here rather than every frame (their
+  // own vertical position is what moves, via scrollY, not the elements themselves), but re-measured
+  // on resize since layout changes can shift a section's height.
+  interface FormStop {
+    y: number;
+    form: FieldForm;
+  }
+  let stops: FormStop[] = [];
+  function measureStops() {
+    const els = document.querySelectorAll<HTMLElement>('[data-field-form]');
+    stops = Array.from(els)
+      .map((el) => ({
+        y: el.getBoundingClientRect().top + window.scrollY + el.offsetHeight / 2,
+        form: (el.dataset.fieldForm as FieldForm) || 'scatter',
+      }))
+      .sort((a, b) => a.y - b.y);
+  }
+  measureStops();
+  window.addEventListener('resize', measureStops);
+
+  /** Which two formations are active right now, and how far blended between them (0=fully A,
+   * 1=fully B) — the *only* thing scroll position controls; every formation's own coordinates below
+   * are otherwise purely functions of viewport size + elapsed time, never of scroll or page
+   * position, which is the specific, hard-won fix for an earlier bug where scroll-coupled particle
+   * coordinates went mathematically unreachable off-screen once scrolled past. `* 1.5` gain mirrors
+   * Latitude's own `T.lead`: a formation should visibly start answering the first flick of the
+   * wheel, not wait until the visitor is already halfway to the next section. */
+  function pickFormation(): { A: FieldForm; B: FieldForm; t: number } {
+    if (!stops.length) return { A: 'hero', B: 'hero', t: 0 };
+    const sc = window.scrollY + H / 2;
+    if (sc <= stops[0].y) return { A: stops[0].form, B: stops[0].form, t: 0 };
+    const last = stops[stops.length - 1];
+    if (sc >= last.y) return { A: last.form, B: last.form, t: 0 };
+    for (let i = 0; i < stops.length - 1; i++) {
+      const a = stops[i], b = stops[i + 1];
+      if (sc >= a.y && sc < b.y) {
+        const raw = (sc - a.y) / (b.y - a.y);
+        return { A: a.form, B: b.form, t: smoothstep(clamp(raw * 1.5, 0, 1)) };
+      }
+    }
+    return { A: last.form, B: last.form, t: 0 };
+  }
+
   // ---------- readability guard ----------
   // Any element flagged [data-field-guard] (Hero.tsx's headline block, currently the only one) gets
   // the field dimmed specifically behind it, feathered so there's no visible rectangle — this is
@@ -227,6 +294,11 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     if (d >= GUARD_FEATHER) return 1;
     return GUARD_MIN + (1 - GUARD_MIN) * smoothstep(d / GUARD_FEATHER);
   }
+
+  // Convergence point for the 'contact' formation (ContactPortal.tsx's circular CTA) — same
+  // query-once/read-rect-every-frame contract as guardEl above, for the same reason (a normal-flow
+  // element that moves as the page scrolls).
+  const targetEl = document.querySelector<HTMLElement>('[data-field-target]');
 
   // ---------- boot entrance ----------
   // A brief materialize-in rather than the field snapping to full brightness the instant physics
@@ -247,6 +319,12 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   const onBall = (x: number, y: number) => Math.hypot(x - cx, y - cy) < R * 1.3;
 
   function onDown(x: number, y: number) {
+    // Only draggable while the hero ring-sphere is actually part of what's on screen — elsewhere on
+    // the page this exact viewport-center point has no visible sphere at all (a different formation
+    // occupies it), so "dragging" there would silently spin an invisible shape, which reads as a bug
+    // rather than an interaction.
+    const active = pickFormation();
+    if (active.A !== 'hero' && active.B !== 'hero') return false;
     if (!onBall(x, y)) return false;
     lastX = startX = x;
     lastY = startY = firstY = y;
@@ -319,6 +397,100 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   const onResize = () => layout();
   window.addEventListener('resize', onResize);
 
+  // ---------- formation sampler ----------
+  // Mutates the shared `F` scratch object rather than returning a fresh one — same technique
+  // Latitude's own engine uses for this exact purpose (their `o`/`oa` objects), since this runs up
+  // to 2x per particle per frame (once for the outgoing formation, once for the incoming one during
+  // a blend) and allocating a fresh object there would mean up to 2,800 short-lived objects/frame.
+  const F = { x: 0, y: 0, a: 0, s: 0 };
+  function sampleForm(form: FieldForm, i: number, time: number, ct: number, st: number, breathe: number, targetRect: DOMRect | null) {
+    switch (form) {
+      case 'hero': {
+        const r = ringOf[i];
+        const la = lat[r];
+        const rr = R * breathe;
+        const ringR = rr * Math.cos(la);
+        const ringY = rr * Math.sin(la);
+        const ph = rnd1[i] * TAU + ang[r];
+        const X = ringR * Math.cos(ph), Z = ringR * Math.sin(ph);
+        const Y2 = ringY * ct - Z * st, Z3 = ringY * st + Z * ct;
+        const s = FOCAL / Math.max(Z3 + FOCAL, R * 0.35);
+        F.x = cx + X * s;
+        F.y = cy - Y2 * s;
+        const front = clamp(0.5 - (Z3 / (R || 1)) * 0.5, 0, 1);
+        F.a = (0.14 + front * 0.55) * (0.7 + rnd2[i] * 0.4);
+        F.s = (1.1 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
+        break;
+      }
+      case 'helix': {
+        // Two counter-rotating strands wrapping a shared vertical axis, continuously climbing —
+        // confirmed live on latitudeform.com's "03/STUDIO" section, reads unmistakably as a DNA
+        // double helix. `strand` (even/odd particle index) offsets one strand by π so they wind
+        // opposite each other around the same axis instead of overlapping.
+        const strand = i % 2;
+        const amp = Math.min(W, H) * 0.09;
+        const ph = rnd1[i] * Math.PI * 4.4 + time * 0.55 + strand * Math.PI;
+        let climb = (rnd1[i] + time * 0.035) % 1;
+        if (climb < 0) climb += 1;
+        F.x = cx + Math.cos(ph) * amp + (rnd3[i] - 0.5) * 8;
+        F.y = climb * H + (rnd2[i] - 0.5) * 9;
+        const front = clamp(0.5 - Math.sin(ph) * 0.5, 0, 1);
+        const edge = smoothstep(clamp(climb * 10, 0, 1)) * (1 - smoothstep(clamp((climb - 0.9) * 10, 0, 1)));
+        F.a = (0.1 + front * 0.5) * (0.6 + rnd2[i] * 0.6) * edge;
+        F.s = (0.9 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
+        break;
+      }
+      case 'rings': {
+        // Three concentric rings drifting at slightly different rates (the middle ring reversed) —
+        // confirmed live as a real Latitude formation (their "case 6").
+        const ring = i % 3;
+        const rr = Math.min(W, H) * (0.16 + ring * 0.11);
+        const ph = rnd1[i] * TAU + time * (0.06 - ring * 0.015) * (ring === 1 ? -1 : 1);
+        const tl = 0.34 + ring * 0.3;
+        const X = Math.cos(ph) * rr, Z = Math.sin(ph) * rr;
+        F.x = cx + X + Math.sin(time * 0.33 + rnd2[i] * TAU) * 7;
+        F.y = cy + Z * Math.sin(tl) * 0.92 + (rnd3[i] - 0.5) * 9;
+        const front = clamp(0.5 - (Z / rr) * 0.5, 0, 1);
+        F.a = (0.14 + front * 0.45) * (0.55 + rnd2[i] * 0.7);
+        F.s = (0.9 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
+        break;
+      }
+      case 'contact': {
+        // Converges into a halo around ContactPortal.tsx's circular CTA — confirmed live as
+        // Latitude's own "everything gathers on whatever is marked as the target" CTA formation.
+        const tgtX = targetRect ? targetRect.left + targetRect.width / 2 : cx;
+        const tgtY = targetRect ? targetRect.top + targetRect.height / 2 : cy;
+        const tgtW = targetRect ? targetRect.width / 2 : Math.min(W, H) * 0.15;
+        const tgtH = targetRect ? targetRect.height / 2 : Math.min(W, H) * 0.15;
+        const a = rnd1[i] * TAU + time * 0.11;
+        const spread = Math.pow(rnd2[i], 1.7) * Math.min(W, H) * 0.3;
+        const rw = tgtW * 1.2 + spread, rh = tgtH * 1.2 + spread * 0.85;
+        F.x = tgtX + Math.cos(a) * rw;
+        F.y = tgtY + Math.sin(a) * rh;
+        const near = 1 - Math.pow(rnd2[i], 1.7);
+        F.a = 0.06 + near * near * 0.6;
+        F.s = 0.9 + near * 1.8;
+        break;
+      }
+      case 'scatter':
+      default: {
+        // Continuous upward flow, wrapped modulo viewport height — see the file-level note on why
+        // this is stateless-and-time-based rather than scroll-coupled.
+        const flowSpeed = 6 + rnd1[i] * 10;
+        let flowY = (scatterY[i] - time * flowSpeed) % H;
+        if (flowY < 0) flowY += H;
+        const q = flowY / H;
+        const edgeFade = smoothstep(clamp(q * 8, 0, 1)) * (1 - smoothstep(clamp((q - 0.88) * 8, 0, 1)));
+        const wx = Math.sin(time * (0.05 + rnd3[i] * 0.06) + rnd1[i] * TAU) * (10 + rnd2[i] * 16);
+        F.x = scatterX[i] + wx;
+        F.y = flowY;
+        F.a = (0.05 + rnd2[i] * 0.06) * edgeFade;
+        F.s = 0.7;
+        break;
+      }
+    }
+  }
+
   // ---------- main loop ----------
   let last = performance.now();
   let raf = 0;
@@ -360,14 +532,10 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     // backgrounded — without this a stale delta can send the ring physics into a visible "explosion".
     const time = now / 1000;
 
-    // Hero-to-scatter dissolve — how much of the page has scrolled past the hero's own height. Reads
-    // window.scrollY directly (not Lenis's document-wide progress, which is the wrong unit for "how
-    // far past THIS one section" on a long page). The dissolve runs over 1.4 hero-heights rather than
-    // exactly one, and is smoothstep-eased rather than linear — both changes exist purely so the
-    // globe reads as gradually dissolving into the ambient field rather than visibly running out of
-    // road right at the section boundary and snapping into its final rate of change.
-    const heroPx = document.getElementById('hero')?.offsetHeight || window.innerHeight;
-    const globeWeight = smoothstep(clamp(1 - window.scrollY / (heroPx * 1.4), 0, 1));
+    // Which two named formations are active right now, and how far blended between them — see
+    // pickFormation() above. Computed once per frame (cheap: a handful of stop comparisons), not
+    // per particle.
+    const { A: formA, B: formB, t: formT } = pickFormation();
 
     yaw += T.idleSpin * dt * 0.5;
     if (!dragging) {
@@ -383,7 +551,9 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     tilt += tiltVel * dt;
     const ct = Math.cos(tilt), st = Math.sin(tilt);
 
-    const wantField = FINE && globeWeight > 0.15 ? 1 : 0;
+    // Cursor reactivity is available in every formation now, not hero-only — it's a nice ambient
+    // touch wherever a fine pointer happens to be, not something worth gating by scroll position.
+    const wantField = FINE ? 1 : 0;
     fieldAmt = damp(fieldAmt, wantField, 1 / T.fieldTau, dt);
 
     ctx.clearRect(0, 0, W, H);
@@ -396,54 +566,25 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     const breathe = 1 + Math.sin(time * TAU * T.breathHz) * T.breathAmp;
     const bootFade = smoothstep(clamp((now - bootAt) / BOOT_MS, 0, 1));
     const guardRect = guardEl ? guardEl.getBoundingClientRect() : null;
+    const targetRect = targetEl ? targetEl.getBoundingClientRect() : null;
 
     for (let i = 0; i < N; i++) {
-      // Target position: blend between the ring/globe formation and this particle's scattered
-      // "ambient wash" home, driven by how far the visitor has scrolled past the hero.
+      // Target position: sample the active formation(s) for this particle — a straight sample when
+      // fully settled on one (formT===0 or A===B, the common case away from a transition), or a
+      // per-particle-staggered blend between two adjacent ones while scrolling through a transition.
       let tx: number, ty: number, alpha: number, size: number;
-      if (globeWeight > 0.01) {
-        const r = ringOf[i];
-        const la = lat[r];
-        const rr = R * breathe;
-        const ringR = rr * Math.cos(la);
-        const ringY = rr * Math.sin(la);
-        const ph = rnd1[i] * TAU + ang[r];
-        const X = ringR * Math.cos(ph), Z = ringR * Math.sin(ph);
-        const Y2 = ringY * ct - Z * st, Z3 = ringY * st + Z * ct;
-        const s = FOCAL / Math.max(Z3 + FOCAL, R * 0.35);
-        const gx = cx + X * s, gy = cy - Y2 * s;
-        const front = clamp(0.5 - (Z3 / (R || 1)) * 0.5, 0, 1);
-        const galpha = (0.14 + front * 0.55) * (0.7 + rnd2[i] * 0.4);
-        // A pure dimensionless multiplier — turned into an actual on-screen radius once, at the
-        // draw call below (`size * 3.5`), never here.
-        const gsize = (1.1 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
-        // Straight linear blend between this particle's scattered "ambient" home and its globe
-        // position — globeWeight is already eased by the scroll-distance clamp above, so a second
-        // easing pass here isn't needed.
-        tx = scatterX[i] * (1 - globeWeight) + gx * globeWeight;
-        ty = scatterY[i] * (1 - globeWeight) + gy * globeWeight;
-        alpha = 0.04 * (1 - globeWeight) + galpha * globeWeight;
-        size = 0.8 * (1 - globeWeight) + gsize * globeWeight;
+      sampleForm(formA, i, time, ct, st, breathe, targetRect);
+      if (formT <= 0 || formA === formB) {
+        tx = F.x; ty = F.y; alpha = F.a; size = F.s;
       } else {
-        // Continuous upward FLOW, not just in-place wander — a stateless function of elapsed time
-        // (not scroll or accumulated state), wrapped modulo the viewport height, so each particle
-        // endlessly rises and loops seamlessly forever, at any scroll depth, without ever needing to
-        // be "re-seeded". This is what makes the field read as genuinely flowing across the full
-        // height of the page rather than a fixed scatter that merely jitters around a static home.
-        const flowSpeed = 6 + rnd1[i] * 10; // px/sec — varies per particle so the field never rises
-        // as one visible sheet.
-        let flowY = (scatterY[i] - time * flowSpeed) % H;
-        if (flowY < 0) flowY += H;
-        const q = flowY / H;
-        // Fades in over the bottom 12% and out over the top 12% of its travel — without this, a
-        // particle wrapping from y≈0 back to y≈H would visibly "pop" in/out at the seam every cycle.
-        const edgeFade = smoothstep(clamp(q * 8, 0, 1)) * (1 - smoothstep(clamp((q - 0.88) * 8, 0, 1)));
-
-        const wx = Math.sin(time * (0.05 + rnd3[i] * 0.06) + rnd1[i] * TAU) * (10 + rnd2[i] * 16);
-        tx = scatterX[i] + wx;
-        ty = flowY;
-        alpha = (0.05 + rnd2[i] * 0.06) * edgeFade;
-        size = 0.7;
+        const ax = F.x, ay = F.y, aa = F.a, asz = F.s;
+        sampleForm(formB, i, time, ct, st, breathe, targetRect);
+        const tt = clamp((formT - stag[i]) / (1 - STAGGER), 0, 1);
+        const e = smoothstep(tt);
+        tx = ax + (F.x - ax) * e;
+        ty = ay + (F.y - ay) * e;
+        alpha = aa + (F.a - aa) * e;
+        size = asz + (F.s - asz) * e;
       }
 
       // Cursor repulsion — displaces the TARGET, never the point directly; the point then springs

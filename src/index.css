@@ -466,6 +466,25 @@ html.motion-v2 main [class*="rounded-["] {
   background-color: rgba(10, 11, 15, 0.3) !important;
 }
 
+/* ContactPortal's outer dashed ring — a plain, unscoped keyframe (not motion-v2-gated): it's a
+   harmless, cheap CSS rotation that reads fine as a static circular CTA accent even on the default
+   background where there's no particle field to converge around it. 26s — matches the reference's
+   own rotation speed exactly (measured, not guessed): slow enough to feel alive without reading as
+   an obvious loop. */
+@keyframes contact-portal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.contact-portal-dial {
+  animation: contact-portal-spin 26s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .contact-portal-dial {
+    animation: none;
+  }
+}
+
 /* Mobile horizontal-swipe carousel track/item pair — the shared pattern behind every "long
    vertical card list → compact swipe row on phones" conversion. Every flex/scroll declaration here
    is scoped inside the max-width query on purpose: call sites pair this class with a plain

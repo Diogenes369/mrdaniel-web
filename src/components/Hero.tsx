@@ -10,7 +10,13 @@ export default function Hero() {
   };
 
   return (
-    <section id="hero" className="relative min-h-[100dvh] flex items-center pt-28 pb-16 overflow-hidden">
+    <section
+      id="hero"
+      // Read by the motion=2d particle engine's scroll-driven formation state machine — see
+      // pickFormation() in fieldEngine.ts. This is the first "stop": the ring-sphere formation.
+      data-field-form="hero"
+      className="relative min-h-[100dvh] flex items-center pt-28 pb-16 overflow-hidden"
+    >
       <div className="container mx-auto px-6 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

@@ -15,7 +15,12 @@ export default function Magazines() {
   const navigate = useNavigate();
 
   return (
-    <section id="magazines" ref={dissolveRef} className="py-12 md:py-20 border-t border-white/5 overflow-hidden relative cv-auto">
+    <section
+      id="magazines"
+      ref={dissolveRef}
+      data-field-form="scatter"
+      className="py-12 md:py-20 border-t border-white/5 overflow-hidden relative cv-auto"
+    >
       <div className="container mx-auto px-4 md:px-6">
         <TiltCard strength={4} className="max-w-5xl mx-auto">
           <div className="relative overflow-hidden bg-[#0D0E12] border border-white/10 rounded-[2.5rem] p-8 md:p-14 text-center">
