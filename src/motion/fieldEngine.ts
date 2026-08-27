@@ -102,6 +102,11 @@ export type FieldForm = 'hero' | 'helix' | 'rings' | 'scatter' | 'wave' | 'conta
 // template-literal-interpolating all three channels every frame across N particles.
 const STAR_RGB = `rgba(${STAR[0]},${STAR[1]},${STAR[2]},`;
 
+// A single ~28% brightness lift across the entire field (particles + wireframe) — "increase global
+// brightness/luminance ~25-30%" per explicit request, for a more vivid, high-end presence than the
+// original deliberately-subdued starfield-matching tuning.
+const GLOBAL_BRIGHT = 1.28;
+
 export interface FieldEngineOptions {
   fieldCanvas: HTMLCanvasElement;
   /** Fewer particles, capped draw rate — see useDeviceTier.ts. */
@@ -586,7 +591,7 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     if (alphaMul <= 0.003) return;
     const rr = R * breathe;
     ctx.lineWidth = 0.55;
-    ctx.strokeStyle = STAR_RGB + (0.09 * alphaMul).toFixed(3) + ')';
+    ctx.strokeStyle = STAR_RGB + Math.min(1, 0.09 * alphaMul * GLOBAL_BRIGHT).toFixed(3) + ')';
     // Latitude rings — every other ring only, so the wireframe reads as a grid rather than a solid
     // shaded ball (13 rings all stroked would visually merge into a filled sphere at this radius).
     for (let r = 0; r < NR; r += 2) {
@@ -750,10 +755,14 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         const e = smoothstep(tt);
         // "Liquid pour" sag — a hump that's 0 at both ends of the transition and peaks mid-blend, so a
         // particle dips down as if gravity briefly took hold before it settles precisely into the
-        // target shape, rather than sliding in a perfectly straight line. Reads as particles being
-        // poured and cast into formation instead of just cross-fading between two positions.
-        const pour = (1 - e) * e * 4 * (16 + rnd3[i] * 14);
-        tx = ax + (F.x - ax) * e;
+        // target shape, rather than sliding in a perfectly straight line. A smaller per-particle
+        // sideways sway rides along with it (phase offset by rnd2 so neighbors don't sway in lockstep)
+        // for a slight swirl to the fall rather than a purely vertical drop — reads as particles being
+        // actively poured and cast into formation, not just cross-fading between two positions.
+        const pourHump = (1 - e) * e * 4;
+        const pour = pourHump * (16 + rnd3[i] * 14);
+        const swayPour = Math.sin(e * Math.PI * 1.6 + rnd2[i] * TAU) * pourHump * (7 + rnd1[i] * 6);
+        tx = ax + (F.x - ax) * e + swayPour;
         ty = ay + (F.y - ay) * e + pour;
         alpha = aa + (F.a - aa) * e;
         size = asz + (F.s - asz) * e;
@@ -787,8 +796,13 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
       if (drawStride > 1 && i % drawStride !== 0) continue;
       const x = px[i], y = py[i];
       if (x < -40 || x > W + 40 || y < -40 || y > H + 40) continue;
-      alpha *= bootFade * guardFactorAt(x, y, guardRect);
+      // GLOBAL_BRIGHT applied here (once, post-formation-math) rather than tuned into every
+      // formation's own alpha constants individually — a single dial for "the whole field reads
+      // ~28% brighter", per explicit request, without having to keep a dozen scattered alpha
+      // formulas in proportion with each other.
+      alpha *= bootFade * guardFactorAt(x, y, guardRect) * GLOBAL_BRIGHT;
       if (alpha < 0.01) continue;
+      if (alpha > 1) alpha = 1;
       // A directly-filled circle, not a scaled sprite bitmap — zero gradient, zero soft edge, only
       // the canvas's own ~1px edge anti-aliasing (which is sub-pixel smoothing, not a visible glow).
       // Radius deliberately tiny — down from an earlier ×3.5 (which gave ~5-20px dots, plainly too
