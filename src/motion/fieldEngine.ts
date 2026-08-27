@@ -303,16 +303,15 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   // finish traveling before the visitor's eye/viewport actually arrives there.
   const DWELL = 0.32;
   const DWELL_SPAN = 1 - DWELL * 2;
-  // Transitions landing on 'contact' get a much earlier resolve point instead of the general dwell
-  // curve — that formation's target is a REAL on-screen element (the CTA ring), not an abstract point
-  // cluster, so it specifically needs generous runway for the particle spring physics to have fully
-  // arrived by the time the visitor's viewport reaches the section (confirmed via live pixel-density
-  // testing: the general symmetric DWELL above, which only resolves at 70% of the way through the
-  // gap, left just 30% of the scroll distance for particles to travel from wherever they were —
-  // nowhere near enough, and is what was producing a visibly empty/sparse halo right as the section
-  // centers). Resolving by 35% here instead leaves 65% of the gap as settling runway — comfortably
-  // more than even the old flat-lead approach had (50%).
-  const CONTACT_START = 0.05, CONTACT_END = 0.35;
+  // Transitions landing on 'contact' resolve almost immediately instead of following the general
+  // dwell curve — that formation's target is a REAL on-screen element (the CTA ring), not an
+  // abstract point cluster, so per explicit request the halo must already be fully converged and
+  // orbiting well before the section is even centered, not merely "before the footer". Resolving by
+  // 12% here leaves 88% of the entire magazines->contact scroll distance as pure "already fully
+  // formed and holding" runway — the section is typically still only partway into the viewport (its
+  // own height means it starts entering the screen before this segment even begins) at that point,
+  // so the halo is locked in well ahead of the ring reaching mid-viewport.
+  const CONTACT_START = 0, CONTACT_END = 0.12;
   const CONTACT_SPAN = CONTACT_END - CONTACT_START;
 
   /** Which two formations are active right now, and how far blended between them (0=fully A,
