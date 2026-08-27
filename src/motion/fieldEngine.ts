@@ -48,8 +48,11 @@ const T = {
   fieldR: 190,
   fieldStr: 40,
   fieldTau: 0.14,
-  pK: 26,
-  pC: 7.6,
+  // Raised from 26/7.6 (same ratio, scaled up) so particles physically snap toward a moved target
+  // faster — paired with pickFormation()'s higher lead gain, this is what makes the whole field feel
+  // "instantly reactive" to scroll instead of visibly playing catch-up a beat behind the wheel.
+  pK: 34,
+  pC: 10,
   pKvar: 0.5,
 } as const;
 
@@ -242,11 +245,13 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   interface FormStop {
     y: number;
     form: FieldForm;
-    /** -1 (hugs the left edge) .. 0 (centered) .. 1 (hugs the right edge) — from `data-field-anchor`,
-     * defaults to centered. This is what makes the field feel like it's flowing asymmetrically through
-     * the page instead of every formation stacking on the same dead-center point as the one before it;
-     * see ANCHOR_MAX below for how it's turned into an actual pixel offset. */
-    anchor: number;
+    /** Actual pixel offset applied to every particle's target x while this stop is active — 0 for an
+     * unanchored (centered) stop. Unlike a flat fraction-of-viewport-width shift, this is measured
+     * once per stop against that section's own `.container` child: it sits in the middle of whatever
+     * empty margin genuinely exists between the viewport edge and the content column at the CURRENT
+     * viewport size, so the field lands beside whatever card/text block is actually there instead of
+     * an arbitrary distance that might cut across it on a narrower window. See measureStops() below. */
+    anchorPx: number;
   }
   let stops: FormStop[] = [];
   function measureStops() {
@@ -254,38 +259,49 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     stops = Array.from(els)
       .map((el) => {
         const a = el.dataset.fieldAnchor;
+        const dir = a === 'left' ? -1 : a === 'right' ? 1 : 0;
+        let anchorPx = 0;
+        if (dir !== 0) {
+          const content = el.querySelector<HTMLElement>('.container');
+          const cr = content ? content.getBoundingClientRect() : null;
+          // Fallback (no .container found) assumes a typical centered content column rather than 0,
+          // so an anchor never silently no-ops if a section's markup ever changes shape.
+          const margin = cr ? (dir < 0 ? cr.left : W - cr.right) : W * 0.14;
+          anchorPx = dir * clamp(margin * 0.55, 36, 240);
+        }
         return {
           y: el.getBoundingClientRect().top + window.scrollY + el.offsetHeight / 2,
           form: (el.dataset.fieldForm as FieldForm) || 'scatter',
-          anchor: a === 'left' ? -1 : a === 'right' ? 1 : 0,
+          anchorPx,
         };
       })
       .sort((a, b) => a.y - b.y);
   }
   measureStops();
-  window.addEventListener('resize', measureStops);
 
   /** Which two formations are active right now, and how far blended between them (0=fully A,
    * 1=fully B) — the *only* thing scroll position controls; every formation's own coordinates below
    * are otherwise purely functions of viewport size + elapsed time, never of scroll or page
    * position, which is the specific, hard-won fix for an earlier bug where scroll-coupled particle
-   * coordinates went mathematically unreachable off-screen once scrolled past. `* 1.5` gain mirrors
-   * Latitude's own `T.lead`: a formation should visibly start answering the first flick of the
-   * wheel, not wait until the visitor is already halfway to the next section. */
+   * coordinates went mathematically unreachable off-screen once scrolled past. `* 2` gain (Latitude's
+   * own `T.lead` was `1.5`, raised further here for a snappier, more "instantly reactive" feel per
+   * explicit request) means a transition is fully resolved by the halfway point between two stops —
+   * a formation should visibly start answering the first flick of the wheel, not wait until the
+   * visitor is already most of the way to the next section. */
   function pickFormation(): { A: FieldForm; B: FieldForm; t: number; anchorA: number; anchorB: number } {
     if (!stops.length) return { A: 'hero', B: 'hero', t: 0, anchorA: 0, anchorB: 0 };
     const sc = window.scrollY + H / 2;
-    if (sc <= stops[0].y) return { A: stops[0].form, B: stops[0].form, t: 0, anchorA: stops[0].anchor, anchorB: stops[0].anchor };
+    if (sc <= stops[0].y) return { A: stops[0].form, B: stops[0].form, t: 0, anchorA: stops[0].anchorPx, anchorB: stops[0].anchorPx };
     const last = stops[stops.length - 1];
-    if (sc >= last.y) return { A: last.form, B: last.form, t: 0, anchorA: last.anchor, anchorB: last.anchor };
+    if (sc >= last.y) return { A: last.form, B: last.form, t: 0, anchorA: last.anchorPx, anchorB: last.anchorPx };
     for (let i = 0; i < stops.length - 1; i++) {
       const a = stops[i], b = stops[i + 1];
       if (sc >= a.y && sc < b.y) {
         const raw = (sc - a.y) / (b.y - a.y);
-        return { A: a.form, B: b.form, t: smoothstep(clamp(raw * 1.5, 0, 1)), anchorA: a.anchor, anchorB: b.anchor };
+        return { A: a.form, B: b.form, t: smoothstep(clamp(raw * 2, 0, 1)), anchorA: a.anchorPx, anchorB: b.anchorPx };
       }
     }
-    return { A: last.form, B: last.form, t: 0, anchorA: last.anchor, anchorB: last.anchor };
+    return { A: last.form, B: last.form, t: 0, anchorA: last.anchorPx, anchorB: last.anchorPx };
   }
 
   // ---------- readability guard ----------
@@ -405,7 +421,13 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   window.addEventListener('pointercancel', onUp);
   window.addEventListener('touchmove', onTouchMove, { passive: false });
 
-  const onResize = () => layout();
+  // measureStops() depends on the CURRENT W (for the smart-anchor margin math) and on every stop
+  // element's post-resize layout position — both only valid once layout() has already re-run for
+  // this resize, so it's sequenced right after it here rather than as its own independent listener.
+  const onResize = () => {
+    layout();
+    measureStops();
+  };
   window.addEventListener('resize', onResize);
 
   // ---------- formation sampler ----------
@@ -429,7 +451,7 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         F.x = cx + X * s;
         F.y = cy - Y2 * s;
         const front = clamp(0.5 - (Z3 / (R || 1)) * 0.5, 0, 1);
-        F.a = (0.14 + front * 0.55) * (0.7 + rnd2[i] * 0.4);
+        F.a = (0.2 + front * 0.55) * (0.7 + rnd2[i] * 0.4);
         F.s = (1.1 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
         break;
       }
@@ -447,7 +469,7 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         F.y = climb * H + (rnd2[i] - 0.5) * 9;
         const front = clamp(0.5 - Math.sin(ph) * 0.5, 0, 1);
         const edge = smoothstep(clamp(climb * 10, 0, 1)) * (1 - smoothstep(clamp((climb - 0.9) * 10, 0, 1)));
-        F.a = (0.1 + front * 0.5) * (0.6 + rnd2[i] * 0.6) * edge;
+        F.a = (0.16 + front * 0.5) * (0.6 + rnd2[i] * 0.6) * edge;
         F.s = (0.9 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
         break;
       }
@@ -462,7 +484,7 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         F.x = cx + X + Math.sin(time * 0.33 + rnd2[i] * TAU) * 7;
         F.y = cy + Z * Math.sin(tl) * 0.92 + (rnd3[i] - 0.5) * 9;
         const front = clamp(0.5 - (Z / rr) * 0.5, 0, 1);
-        F.a = (0.14 + front * 0.45) * (0.55 + rnd2[i] * 0.7);
+        F.a = (0.2 + front * 0.45) * (0.55 + rnd2[i] * 0.7);
         F.s = (0.9 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
         break;
       }
@@ -477,16 +499,18 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         const row = i % ROWS;
         const rowT = ROWS > 1 ? row / (ROWS - 1) : 0.5;
         F.x = (rnd1[i] * 1.08 - 0.04) * W;
-        const baseY = H * (0.22 + rowT * 0.54);
-        const amp = 24 + row * 5;
-        const speed = 0.22 + row * 0.03;
+        const baseY = H * (0.2 + rowT * 0.58);
+        // Amplitude and speed both raised markedly (was 24-49px/0.22-0.37) — explicitly requested to
+        // read as "clearly defined, high-amplitude, sweeping" rather than a subtle ripple.
+        const amp = 46 + row * 9;
+        const speed = 0.32 + row * 0.045;
         const wave = Math.sin(F.x * 0.011 + time * speed + row * 1.3 + rnd2[i] * TAU * 0.4) * amp;
-        const swell = Math.sin(F.x * 0.0035 - time * speed * 0.55 + rnd3[i] * TAU) * 12;
+        const swell = Math.sin(F.x * 0.0035 - time * speed * 0.55 + rnd3[i] * TAU) * 18;
         F.y = baseY + wave + swell;
         const edgeFade =
           smoothstep(clamp((F.x / W) * 9, 0, 1)) * (1 - smoothstep(clamp((F.x / W - 0.93) * 9, 0, 1)));
-        F.a = (0.09 + rnd2[i] * 0.17) * edgeFade;
-        F.s = 0.8 + rnd3[i] * 0.7;
+        F.a = (0.16 + rnd2[i] * 0.24) * edgeFade;
+        F.s = 0.9 + rnd3[i] * 0.8;
         break;
       }
       case 'contact': {
@@ -494,21 +518,32 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         // live as Latitude's own "everything gathers on whatever is marked as the target" CTA
         // formation, tuned tighter/denser than a first pass (higher power on the radial falloff packs
         // far more particles into the near-core ring instead of spreading them evenly out to the
-        // edge) plus a slow radial "breathing" pull so it reads as an active magnetic attraction
-        // rather than a static ring of dots.
+        // edge) plus a radial "breathing" pull so it reads as an active magnetic attraction rather
+        // than a static ring of dots.
+        //
+        // tgtY is deliberately CLAMPED to stay within the visible viewport even when the real button
+        // is currently off-screen — without this, pickFormation()'s lead means this formation can
+        // become dominant well before ContactPortal's section has scrolled into view at all, so the
+        // convergence point (and therefore every particle heading toward it) sits below the visible
+        // area and gets frustum-culled: the field visibly VANISHES approaching the section, only to
+        // "pop" into a cluster once you've scrolled past the point where the button finally appears.
+        // Clamping keeps the halo visible and gathering from the first frame this formation takes
+        // over, then lets it slide the last stretch onto the button's true position as it arrives —
+        // reads as the particles actively noticing and swirling toward the portal as you approach it.
+        const rawTgtY = targetRect ? targetRect.top + targetRect.height / 2 : cy;
         const tgtX = targetRect ? targetRect.left + targetRect.width / 2 : cx;
-        const tgtY = targetRect ? targetRect.top + targetRect.height / 2 : cy;
+        const tgtY = clamp(rawTgtY, H * 0.16, H * 0.84);
         const tgtW = targetRect ? targetRect.width / 2 : Math.min(W, H) * 0.15;
         const tgtH = targetRect ? targetRect.height / 2 : Math.min(W, H) * 0.15;
-        const pull = 1 - 0.08 * (0.5 + 0.5 * Math.sin(time * 0.45 + rnd3[i] * TAU));
-        const a = rnd1[i] * TAU + time * 0.16;
-        const spread = Math.pow(rnd2[i], 3.2) * Math.min(W, H) * 0.2 * pull;
+        const pull = 1 - 0.12 * (0.5 + 0.5 * Math.sin(time * 0.6 + rnd3[i] * TAU));
+        const a = rnd1[i] * TAU + time * 0.26;
+        const spread = Math.pow(rnd2[i], 2.8) * Math.min(W, H) * 0.2 * pull;
         const rw = tgtW * 1.04 + spread, rh = tgtH * 1.04 + spread * 0.85;
         F.x = tgtX + Math.cos(a) * rw;
         F.y = tgtY + Math.sin(a) * rh;
-        const near = 1 - Math.pow(rnd2[i], 3.2);
-        F.a = 0.1 + near * near * 0.78;
-        F.s = 0.9 + near * 2.6;
+        const near = 1 - Math.pow(rnd2[i], 2.8);
+        F.a = 0.16 + near * near * 0.74;
+        F.s = 1 + near * 2.6;
         break;
       }
       case 'scatter':
@@ -523,8 +558,8 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         const wx = Math.sin(time * (0.05 + rnd3[i] * 0.06) + rnd1[i] * TAU) * (10 + rnd2[i] * 16);
         F.x = scatterX[i] + wx;
         F.y = flowY;
-        F.a = (0.05 + rnd2[i] * 0.06) * edgeFade;
-        F.s = 0.7;
+        F.a = (0.08 + rnd2[i] * 0.09) * edgeFade;
+        F.s = 0.75;
         break;
       }
     }
@@ -575,16 +610,13 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     // pickFormation() above. Computed once per frame (cheap: a handful of stop comparisons), not
     // per particle.
     const { A: formA, B: formB, t: formT, anchorA, anchorB } = pickFormation();
-    // Turns each stop's -1/0/1 `anchor` into an actual pixel offset applied to every particle's
-    // target x this frame — this is what makes formations feel like they're flowing asymmetrically
-    // through the page (hugging a side, then the next section pulling toward the other side) instead
-    // of every single one stacking on the same dead-center point. Capped rather than a flat fraction
-    // of W so it stays a tasteful shift on an ultrawide monitor instead of dragging particles off
-    // past the visible margins. Blended by the same formT as the formation blend itself, uniformly
-    // across all particles (not per-particle staggered like the shape blend) since it's a whole-field
-    // translation, not a shape change.
-    const ANCHOR_MAX = Math.min(W * 0.18, 220);
-    const anchorOffsetPx = (anchorA + (anchorB - anchorA) * formT) * ANCHOR_MAX;
+    // Blends between each stop's own precomputed anchorPx (see measureStops()) — this is what makes
+    // formations feel like they're flowing asymmetrically through the page (sitting in a real content
+    // margin, then the next section's margin pulling the other way) instead of every single one
+    // stacking on the same dead-center point. Blended by the same formT as the formation blend itself,
+    // uniformly across all particles (not per-particle staggered like the shape blend) since it's a
+    // whole-field translation, not a shape change.
+    const anchorOffsetPx = anchorA + (anchorB - anchorA) * formT;
 
     yaw += T.idleSpin * dt * 0.5;
     if (!dragging) {

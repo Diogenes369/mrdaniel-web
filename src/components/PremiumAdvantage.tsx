@@ -55,7 +55,7 @@ export default function PremiumAdvantage() {
   };
 
   return (
-    <section id="premium-advantage" ref={dissolveRef} className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full">
+    <section id="premium-advantage" ref={dissolveRef} data-field-form="rings" data-field-anchor="right" className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full">
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <motion.div className="text-center mb-14 md:mb-16 max-w-2xl mx-auto">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
