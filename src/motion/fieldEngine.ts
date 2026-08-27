@@ -82,12 +82,15 @@ interface Sprite {
 }
 
 function buildSprites(spritePx: number): [Sprite[], Sprite[]] {
-  // 12 alpha steps (was 8) — finer depth-cued fading, still cheap since these are baked once, not
-  // per frame. Gradient shape is deliberately a SHARP small core + a fast initial falloff + a long
-  // soft tail — a wide even falloff (the previous shape) reads as a soft blob at any size; a hard
-  // core reads as a crisp point with a bloom around it, which is what "razor-sharp" actually means
-  // for an additively-blended point sprite (a truly hard-edged circle with no falloff at all would
-  // alias/flicker sub-pixel as it moves, which is worse, not better).
+  // 12 alpha steps — finer depth-cued fading, still cheap since these are baked once, not per frame.
+  // Gradient shape is now a MOSTLY-SOLID disc (full alpha out to 58% radius) with only a short,
+  // tight anti-aliasing taper to 0 by 78% — deliberately NOT the wide soft-glow-halo shape this had
+  // before. That earlier shape, combined with additive ('lighter') blending on overlapping points,
+  // is exactly what reads as "blurry glowing blobs" once enough particles cluster near the sphere's
+  // front — every soft edge stacks and bleeds into its neighbors. A tight, mostly-solid disc doesn't
+  // have much soft edge left to bleed, and particle drawing below now also uses normal ('source-over')
+  // blending instead of additive, so two overlapping points no longer brighten each other at all —
+  // together this is what actually produces "razor-sharp pinpoint dots" rather than a nebula.
   const AL = 12;
   const build = (rgb: readonly [number, number, number]) => {
     const out: Sprite[] = [];
@@ -98,8 +101,8 @@ function buildSprites(spritePx: number): [Sprite[], Sprite[]] {
       const al = (a + 1) / AL;
       const grad = g.createRadialGradient(spritePx / 2, spritePx / 2, 0, spritePx / 2, spritePx / 2, spritePx / 2);
       grad.addColorStop(0.0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${al.toFixed(3)})`);
-      grad.addColorStop(0.09, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${al.toFixed(3)})`);
-      grad.addColorStop(0.22, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${(al * 0.5).toFixed(3)})`);
+      grad.addColorStop(0.58, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${al.toFixed(3)})`);
+      grad.addColorStop(0.78, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
       grad.addColorStop(1.0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
       g.fillStyle = grad;
       g.fillRect(0, 0, spritePx, spritePx);
@@ -210,7 +213,12 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   // declaration is (conservatively, correctly) treated as possibly running before the guard ran.
   let seeded = false;
   const layout = () => {
-    DPR = Math.min(2, window.devicePixelRatio || 1);
+    // Capped at 3 (was 2) — explicitly to force true native-resolution rendering on 3x-DPR phones
+    // (iPhone Pro-class devices and most flagship Android) rather than silently downscaling their
+    // sharpest points to look soft. Still capped, not raw devicePixelRatio, since a small number of
+    // devices report absurd values (4+) that would blow the backing-buffer cost far past what the
+    // visible sharpness gain is worth.
+    DPR = Math.min(3, window.devicePixelRatio || 1);
     W = window.innerWidth;
     H = window.innerHeight;
     for (const c of [fieldCanvas, auroraCanvas]) {
@@ -436,7 +444,12 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     }
 
     ctx.clearRect(0, 0, W, H);
-    ctx.globalCompositeOperation = 'lighter';
+    // 'source-over' (normal alpha blending), not 'lighter' (additive) — additive blending is what
+    // makes overlapping points brighten and bleed into each other into one glowing mass wherever the
+    // sphere gets dense (its front face, ring intersections); normal blending draws each point
+    // independently, which is what actually reads as "sharp individual dots" rather than a nebula.
+    // The aurora wash a few lines up is intentionally left on 'lighter' — that IS meant to glow.
+    ctx.globalCompositeOperation = 'source-over';
     const fr2 = T.fieldR * T.fieldR;
     const breathe = 1 + Math.sin(time * TAU * T.breathHz) * T.breathAmp;
 

@@ -301,11 +301,37 @@ body::before {
    targets are never created unless that flag is on.
    ============================================================ */
 
+/* The restored cosmic starfield (StarfieldLayer.tsx) — same z-index as .motion-field-layer below
+   on purpose: with two `position:fixed` siblings at equal z-index, DOM ORDER decides paint order
+   (later wins, painting on top), and starfield mounts first in App.tsx, so it reliably sits BENEATH
+   the particle/aurora canvases without needing a lower z-index of its own — one less magic number
+   to keep in sync between two files. */
+.starfield-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  z-index: 0;
+  pointer-events: none;
+  contain: strict;
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.starfield-layer canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 /* Same fixed-full-viewport-backdrop contract as .scene3d-layer above — z-index:0, pointer-events:
    none so it never blocks a click/scroll on real content, own GPU compositing layer. Two canvases
    stack via document order: aurora first (soft wash), field second (points), both `position:fixed`
    inside this one positioning context rather than each separately `position:fixed` — one fewer
-   compositing layer than two independently-fixed canvases. */
+   compositing layer than two independently-fixed canvases. Mounted AFTER .starfield-layer in
+   App.tsx, so it paints on top of the stars — the particle engine is meant to sit above them. */
 .motion-field-layer {
   position: fixed;
   inset: 0;
@@ -399,45 +425,29 @@ body::before {
   }
 }
 
-/* ---------- MOTION V2 GLASS OVERRIDES ----------
-   First pass at this targeted `bg-carbon-800`/`bg-carbon-900` — the theme's own named tokens — but
-   an audit across every homepage section found most cards actually use bespoke arbitrary-value fills
-   instead (`bg-[#0D0E12]`, `bg-black/40`, etc. — SystemMetrics's stat cards are one example of many),
-   so a token-name selector missed most of the site. What IS consistent everywhere, regardless of
-   which exact color a card happens to use, is the STRUCTURAL fingerprint: every card in this codebase
-   is `rounded-xl`/`rounded-2xl`/`rounded-3xl` (or an arbitrary large radius like `rounded-[1.75rem]`)
-   with a hairline border — buttons use `rounded-full` and small tag/badge chips don't carry a card's
-   padding, so this doesn't catch either. Matching on shape rather than color/background is what makes
-   this actually comprehensive without hand-auditing and editing every one of the ~20+ card-rendering
-   components across every page. `!important` is deliberate: this must win over whatever inline
-   Tailwind background utility the component itself declared, and both are equally-specific single
-   declarations, so specificity order can't be trusted the way a cascade layer would guarantee it.
-   Scoped to `.motion-v2 main` — zero effect for any visitor without the `?motion=2d` flag, and
-   modals/overlays rendered as App.tsx siblings of `<main>` (LeadForm, command palette, etc.) are
-   structurally outside this selector's reach, staying fully opaque/readable on purpose. */
+/* ---------- MOTION V2 TRANSPARENCY OVERRIDES ----------
+   Superseded a `backdrop-filter: blur(...)` version of this rule by explicit request: no blur
+   anywhere, cards stay fully translucent (like the rest of this site already is — most cards here
+   already use a translucent fill, e.g. `bg-carbon-900/60`) so the starfield and particle field stay
+   sharp and directly visible THROUGH cards, not diffused behind frosted glass. An audit across every
+   homepage section found the real gap wasn't transparency itself but a handful of cards using a
+   bespoke fully-opaque arbitrary-value fill instead (`bg-[#0D0E12]`, no alpha at all — SystemMetrics's
+   stat cards are one example of several), which a token-name selector like `bg-carbon-900` would
+   miss. What IS consistent everywhere, regardless of which exact color a card happens to use, is the
+   STRUCTURAL fingerprint: every card in this codebase is `rounded-xl`/`rounded-2xl`/`rounded-3xl`
+   (or an arbitrary large radius like `rounded-[1.75rem]`) with a hairline border — buttons use
+   `rounded-full` and small tag/badge chips don't carry a card's padding, so neither is caught here.
+   `!important` is deliberate: this must win over whatever inline Tailwind background utility the
+   component itself declared, and both are equally-specific single declarations, so specificity order
+   can't be trusted the way a cascade layer would guarantee it. Scoped to `.motion-v2 main` — zero
+   effect for any visitor without the `?motion=2d` flag, and modals/overlays rendered as App.tsx
+   siblings of `<main>` (LeadForm, command palette, etc.) are structurally outside this selector's
+   reach, staying fully opaque/readable on purpose. */
 html.motion-v2 main [class*="rounded-2xl"],
 html.motion-v2 main [class*="rounded-xl"],
 html.motion-v2 main [class*="rounded-3xl"],
 html.motion-v2 main [class*="rounded-["] {
-  /* .34, not .45 — lowered once the aurora layer itself was actually bright enough (see
-     fieldEngine.ts's drawAurora) to confirm how much fill a card can drop to before its own text
-     loses contrast, rather than guessing a number with nothing behind it to test against. */
-  background-color: rgba(10, 11, 15, 0.34) !important;
-  backdrop-filter: blur(20px) saturate(1.25) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.25) !important;
-}
-@media (prefers-reduced-motion: reduce), (max-width: 480px) {
-  /* Backdrop blur is one of the more GPU-expensive CSS filters, paid on every scroll repaint for
-     every matched card on screen at once — worth skipping on the smallest/most constrained
-     devices; reduced-motion users and small phones get the plainer, cheaper translucent-only look. */
-  html.motion-v2 main [class*="rounded-2xl"],
-  html.motion-v2 main [class*="rounded-xl"],
-  html.motion-v2 main [class*="rounded-3xl"],
-  html.motion-v2 main [class*="rounded-["] {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background-color: rgba(10, 11, 15, 0.62) !important;
-  }
+  background-color: rgba(10, 11, 15, 0.3) !important;
 }
 
 /* Mobile horizontal-swipe carousel track/item pair — the shared pattern behind every "long

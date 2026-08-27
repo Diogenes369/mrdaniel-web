@@ -15,9 +15,13 @@ import { ScrollTrigger } from './lib/gsap';
 import { isMotionV2Enabled } from './lib/motionFlag';
 
 const Scene3D = lazy(() => import('./three/Scene3D'));
-// Both lazy — a visitor without the `?motion=2d` preview flag never downloads either of these
-// chunks, and one with the flag never downloads Scene3D/Three.js. See lib/motionFlag.ts.
+// All lazy — a visitor without the `?motion=2d` preview flag never downloads MotionField/Starfield/
+// Cursor, and one WITH the flag never downloads Scene3D's wireframe-planet bundle. Note this means
+// the flag does still pull in Three.js/R3F/drei (via StarfieldLayer) — by explicit request, to bring
+// back the site's real cosmic starfield underneath the new engine, not to avoid Three.js entirely.
+// See lib/motionFlag.ts.
 const MotionField = lazy(() => import('./motion/MotionField'));
+const StarfieldLayer = lazy(() => import('./motion/StarfieldLayer'));
 const Cursor = lazy(() => import('./components/Cursor'));
 
 // The tracker pulls in the Firebase SDK (~200KB gzipped) — code-split into its own chunk via
@@ -105,7 +109,21 @@ export default function App() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-carbon-950 text-zinc-100 font-sans selection:bg-brand-500 selection:text-black" dir="rtl">
       <RouteScrollManager />
-      <Suspense fallback={null}>{sceneReady && (motionV2 ? <MotionField /> : <Scene3D />)}</Suspense>
+      <Suspense fallback={null}>
+        {sceneReady &&
+          (motionV2 ? (
+            // StarfieldLayer BEFORE MotionField is load-bearing, not stylistic — see the
+            // ".starfield-layer" comment in index.css: both are `position:fixed` at the same
+            // z-index, so paint order (which sits "under" the other) is decided purely by DOM
+            // order here.
+            <>
+              <StarfieldLayer />
+              <MotionField />
+            </>
+          ) : (
+            <Scene3D />
+          ))}
+      </Suspense>
       {motionV2 && (
         <Suspense fallback={null}>
           <Cursor />
