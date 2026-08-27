@@ -1,0 +1,649 @@
+import 'dotenv/config';
+import { randomUUID } from 'crypto';
+import express from 'express';
+import type { Request, Response } from 'express';
+import nodemailer from 'nodemailer';
+import { GoogleGenAI } from '@google/genai';
+import { getNewsItemBySlug, getNewsItems } from './src/server/newsFeed';
+import { getAINews } from './src/server/aiNewsFeed';
+import { AI_ASSISTANT_SYSTEM_INSTRUCTION } from './src/server/aiSystemPrompt';
+import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, transcribeAudio, detectGeminiRateLimit, generateVisualSearchQuery, generateImageGenerationPrompt } from './src/agent/SocialAgentEngine';
+import { sanitizeOutput, containsPromptInjection } from './src/agent/AgentSecurityGuard';
+import { buildMediaFrames } from './src/agent/MediaTemplateRenderer';
+import {
+  pushQueueItem,
+  readStrategicContext,
+  findLatestPendingQueueItem,
+  updateQueueItemStatus,
+  updateQueueItemBody,
+  readAwaitingEditFor,
+  setAwaitingEditFor,
+  appendStrategicContext,
+  agentFirebaseConfigured,
+  writeWeeklyPlan,
+  createVideoJob,
+  readVideoJob,
+  updateVideoJob,
+} from './src/agent/firebaseServer';
+import { sendAdminMessage } from './src/agent/WhatsAppDispatcher';
+import type { ContentFormat, VideoProvider, VideoJobStatus } from './src/agent/types';
+import { generateWeeklyPlan } from './src/agent/WeeklyPlanEngine';
+import {
+  startVideoGeneration,
+  pollVideoGeneration,
+  getConfiguredVideoProviders,
+  printMissingVideoProviderKeysMessage,
+  printMissingKeysForProvider,
+  describeMissingKeysFor,
+  isScriptUsable,
+  buildScriptFromText,
+  type VideoScriptInput,
+} from './src/agent/VideoGenerationEngine';
+
+const PORT = Number(process.env.PORT) || 3000;
+const isProduction = process.env.NODE_ENV === 'production';
+
+const app = express();
+app.use(express.json());
+
+// ---------------------------------------------------------------------------
+// Gemini chat
+// ---------------------------------------------------------------------------
+
+const genAI = process.env.GEMINI_API_KEY
+  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  : null;
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+app.post('/api/chat', async (req: Request, res: Response) => {
+  const messages: ChatMessage[] = Array.isArray(req.body?.messages) ? req.body.messages : [];
+
+  if (!genAI) {
+    res.json({
+      reply: 'שירות הצ׳אט אינו זמין כרגע. ניתן למלא את טופס יצירת הקשר או לפנות ישירות במייל danihell3039@gmail.com.',
+    });
+    return;
+  }
+
+  try {
+    const contents = messages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+
+    const response = await genAI.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents,
+      config: {
+        systemInstruction: AI_ASSISTANT_SYSTEM_INSTRUCTION,
+        temperature: 0.7,
+        topP: 0.95,
+      },
+    });
+
+    const reply = response.text?.trim() || 'תודה על פנייתך. אשמח לסייע בהמשך.';
+    res.json({ reply });
+  } catch (err) {
+    console.error('Gemini chat error:', err);
+    res.json({
+      reply: 'מצטער, חלה שגיאת תקשורת רגעית. אפשר גם למלא את טופס יצירת הקשר באתר או לפנות ישירות במייל danihell3039@gmail.com.',
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Lead capture
+// ---------------------------------------------------------------------------
+
+const LEAD_EMAIL_TO = process.env.LEAD_EMAIL_TO || 'danihell3039@gmail.com';
+
+function getMailTransporter() {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) return null;
+
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT),
+    secure: Number(SMTP_PORT) === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+}
+
+app.post('/api/leads', async (req: Request, res: Response) => {
+  const { name, email, phone, project, notes, sourceSection, selectedProduct, productCategory, price, userCompanySize } = req.body ?? {};
+
+  if (!name || !email) {
+    res.status(400).json({ ok: false, error: 'missing name/email' });
+    return;
+  }
+
+  const transporter = getMailTransporter();
+  if (!transporter) {
+    console.log('[lead] (SMTP not configured, logging only)', { name, email, phone, project, notes, sourceSection, selectedProduct, productCategory, price, userCompanySize });
+    res.json({ ok: true });
+    return;
+  }
+
+  const productLines = selectedProduct
+    ? `\nמוצר/סוכן נבחר: ${selectedProduct}${productCategory ? ` (${productCategory})` : ''}\nמחיר: ${price ? `₪${price}` : '-'}\nגודל ארגון: ${userCompanySize || '-'}\n`
+    : '';
+  const subjectPrefix = selectedProduct ? `ליד חדש · ${selectedProduct}` : 'ליד חדש מהאתר';
+
+  try {
+    await transporter.sendMail({
+      from: `"אתר דניאל בן ברוך" <${process.env.SMTP_USER}>`,
+      to: LEAD_EMAIL_TO,
+      replyTo: email,
+      subject: `${subjectPrefix}: ${name}`,
+      text: `שם: ${name}\nאימייל: ${email}\nטלפון: ${phone || '-'}\nמקור הפנייה: ${sourceSection || '-'}\nפרויקט: ${project || '-'}${productLines}\nהערות:\n${notes || '-'}`,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Lead email error:', err);
+    res.status(500).json({ ok: false, error: 'send failed' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Health check — pinged by src/lib/tracker.ts to derive real client-measured latency
+// ---------------------------------------------------------------------------
+
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({ ok: true, ts: Date.now() });
+});
+
+// ---------------------------------------------------------------------------
+// Cyber/tech news aggregation
+// ---------------------------------------------------------------------------
+
+app.get('/api/news', async (_req: Request, res: Response) => {
+  const data = await getNewsItems();
+  res.json(data);
+});
+
+app.get('/api/news/item/:slug', async (req: Request, res: Response) => {
+  const item = await getNewsItemBySlug(req.params.slug);
+  if (!item) {
+    res.status(404).json({ error: 'not found' });
+    return;
+  }
+  res.json({ item });
+});
+
+app.get('/api/ai-news', async (_req: Request, res: Response) => {
+  const data = await getAINews();
+  res.json(data);
+});
+
+// ---------------------------------------------------------------------------
+// Social Agent (local-dev mirror of api/agent-generate.ts) — see that file for the full
+// action/auth/CORS contract; this is intentionally a thin duplicate, matching every other route
+// in this file's existing convention of a separate Express route per Vercel Function.
+// ---------------------------------------------------------------------------
+
+function isAgentAdminAuthorized(req: Request): boolean {
+  const configured = process.env.ADMIN_API_SECRET;
+  if (!configured) return true;
+  return req.headers['x-admin-secret'] === configured;
+}
+
+app.post('/api/agent-generate', async (req: Request, res: Response) => {
+  if (!isAgentAdminAuthorized(req)) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+
+  const { action } = req.body ?? {};
+
+  try {
+    if (action === 'score-lead') {
+      const { query } = req.body ?? {};
+      if (typeof query !== 'string' || !query.trim()) {
+        res.status(400).json({ ok: false, error: 'missing query' });
+        return;
+      }
+      res.json({ ok: true, result: scoreLeadIntent(query) });
+      return;
+    }
+
+    if (action === 'generate-content') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { platform, topic, format } = req.body ?? {};
+      if (!['tiktok', 'instagram', 'linkedin'].includes(platform)) {
+        res.status(400).json({ ok: false, error: 'invalid platform' });
+        return;
+      }
+      if (typeof topic !== 'string' || !topic.trim()) {
+        res.status(400).json({ ok: false, error: 'missing topic' });
+        return;
+      }
+      const resolvedFormat: ContentFormat = ['post', 'carousel', 'video-script'].includes(format) ? format : 'post';
+      const strategicContext = await readStrategicContext();
+
+      if (resolvedFormat === 'video-script') {
+        const script = await generateVideoScript(topic, strategicContext);
+        const flatBody = [script.hook, ...script.scenes.map((s) => s.onScreenText), script.cta].join('\n');
+        const security = sanitizeOutput(flatBody);
+        if (!security.passed) {
+          res.json({ ok: true, blocked: true, security });
+          return;
+        }
+        const mediaPreview = buildMediaFrames({ format: resolvedFormat, topic, body: flatBody, videoScript: script });
+        const imageGenerationPrompt = await generateImageGenerationPrompt(platform, topic, flatBody);
+        const id = await pushQueueItem({ kind: 'content', platform, format: resolvedFormat, topic, body: flatBody, videoScript: script, mediaPreview, imageGenerationPrompt, status: 'pending_approval', security, createdAt: Date.now() });
+        res.json({ ok: true, id, body: flatBody, videoScript: script, imageGenerationPrompt, security });
+        return;
+      }
+
+      const { body, carouselSlides, hashtags } = await generateSocialContent(platform, topic, resolvedFormat, strategicContext);
+      const security = sanitizeOutput(body);
+      if (!security.passed) {
+        res.json({ ok: true, blocked: true, security });
+        return;
+      }
+      const mediaPreview = buildMediaFrames({ format: resolvedFormat, topic, body, carouselSlides });
+      const imageGenerationPrompt = await generateImageGenerationPrompt(platform, topic, body);
+      const id = await pushQueueItem({ kind: 'content', platform, format: resolvedFormat, topic, body, carouselSlides: carouselSlides ?? null, hashtags: hashtags ?? null, mediaPreview, imageGenerationPrompt, status: 'pending_approval', security, createdAt: Date.now() });
+      res.json({ ok: true, id, body, carouselSlides, hashtags, imageGenerationPrompt, security });
+      return;
+    }
+
+    if (action === 'draft-engagement') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { query } = req.body ?? {};
+      if (typeof query !== 'string' || !query.trim()) {
+        res.status(400).json({ ok: false, error: 'missing query' });
+        return;
+      }
+      const scored = scoreLeadIntent(query);
+      const draftMessage = await draftEngagementMessage(query, scored.intent);
+      const security = sanitizeOutput(draftMessage);
+      if (!security.passed) {
+        res.json({ ok: true, blocked: true, security });
+        return;
+      }
+      const id = await pushQueueItem({ kind: 'engagement', query, intent: scored.intent, intentScore: scored.score, intentReasons: scored.reasons, draftMessage, status: 'pending_approval', security, createdAt: Date.now() });
+      res.json({ ok: true, id, draftMessage, scored, security });
+      return;
+    }
+
+    res.status(400).json({ ok: false, error: 'unknown action' });
+  } catch (err) {
+    const rateLimit = detectGeminiRateLimit(err);
+    if (rateLimit) {
+      res.status(429).json({ ok: false, status: 'rate_limited', message: 'הגעת למגבלת ה-API החינמית לשעה זו', retryAfterSeconds: rateLimit.retryAfterSeconds });
+      return;
+    }
+    console.error('[api/agent-generate] error:', err);
+    res.status(500).json({ ok: false, error: 'generation failed' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// WhatsApp bridge webhook (local-dev mirror of api/agent-whatsapp-webhook.ts) — see that file for
+// the full action-word/edit-flow contract.
+// ---------------------------------------------------------------------------
+
+function isWhatsAppBridgeAuthorized(req: Request): boolean {
+  const configured = process.env.WHATSAPP_WEBHOOK_SECRET;
+  if (!configured) return true;
+  return req.headers['x-webhook-secret'] === configured;
+}
+
+const AGENT_APPROVE_WORDS = ['1', 'אשר', 'אישור', 'מאשר'];
+const AGENT_EDIT_WORDS = ['2', 'ערוך', 'עריכה'];
+const AGENT_REJECT_WORDS = ['3', 'דחה', 'דחייה', 'לדחות'];
+
+app.post('/api/agent-whatsapp-webhook', async (req: Request, res: Response) => {
+  if (!isWhatsAppBridgeAuthorized(req)) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  if (!agentFirebaseConfigured) {
+    res.json({ ok: true, skipped: true, reason: 'firebase-not-configured' });
+    return;
+  }
+
+  const { from, text, audioBase64, audioMimeType } = req.body ?? {};
+
+  try {
+    let effectiveText: string = typeof text === 'string' ? text.trim() : '';
+    if (!effectiveText && audioBase64 && audioMimeType) {
+      effectiveText = (await transcribeAudio(audioBase64, audioMimeType)).trim();
+    }
+    if (!effectiveText) {
+      res.json({ ok: true, skipped: true, reason: 'empty message' });
+      return;
+    }
+    if (containsPromptInjection(effectiveText)) {
+      await sendAdminMessage('⚠️ ההודעה זוהתה כמכילה ניסיון הזרקת הוראות ולא עובדה.');
+      res.json({ ok: true, blocked: true });
+      return;
+    }
+
+    const normalized = effectiveText.trim().toLowerCase();
+    const awaitingEditFor = await readAwaitingEditFor();
+
+    if (awaitingEditFor && !AGENT_APPROVE_WORDS.includes(normalized) && !AGENT_EDIT_WORDS.includes(normalized) && !AGENT_REJECT_WORDS.includes(normalized)) {
+      await updateQueueItemBody(awaitingEditFor, effectiveText);
+      await setAwaitingEditFor(null);
+      await sendAdminMessage('✏️ הטקסט עודכן בהצלחה.');
+      res.json({ ok: true, action: 'edited', id: awaitingEditFor });
+      return;
+    }
+
+    if (AGENT_APPROVE_WORDS.includes(normalized)) {
+      const latest = await findLatestPendingQueueItem();
+      if (!latest) {
+        await sendAdminMessage('אין כרגע פריטים ממתינים לאישור.');
+        res.json({ ok: true, action: 'approve', found: false });
+        return;
+      }
+      await updateQueueItemStatus(latest.id, 'approved');
+      await sendAdminMessage('✅ אושר. הטקסט הסופי זמין בלוח הבקרה להעתקה/פרסום ידני.');
+      res.json({ ok: true, action: 'approve', id: latest.id });
+      return;
+    }
+
+    if (AGENT_EDIT_WORDS.includes(normalized)) {
+      const latest = await findLatestPendingQueueItem();
+      if (!latest) {
+        await sendAdminMessage('אין כרגע פריטים ממתינים לעריכה.');
+        res.json({ ok: true, action: 'edit', found: false });
+        return;
+      }
+      await setAwaitingEditFor(latest.id);
+      await sendAdminMessage('✏️ שלחו את הטקסט המעודכן בהודעה הבאה.');
+      res.json({ ok: true, action: 'edit-prompt', id: latest.id });
+      return;
+    }
+
+    if (AGENT_REJECT_WORDS.includes(normalized)) {
+      const latest = await findLatestPendingQueueItem();
+      if (!latest) {
+        await sendAdminMessage('אין כרגע פריטים ממתינים לדחייה.');
+        res.json({ ok: true, action: 'reject', found: false });
+        return;
+      }
+      await updateQueueItemStatus(latest.id, 'rejected');
+      await sendAdminMessage('🗑️ נדחה.');
+      res.json({ ok: true, action: 'reject', id: latest.id });
+      return;
+    }
+
+    await appendStrategicContext(effectiveText);
+    await sendAdminMessage('📝 נרשם כהנחיה אסטרטגית להמשך יצירת תוכן.');
+    res.json({ ok: true, action: 'strategic-note', from });
+  } catch (err) {
+    console.error('[api/agent-whatsapp-webhook] error:', err);
+    res.status(500).json({ ok: false, error: 'processing failed' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Weekly content plan (local-dev mirror of api/generate-weekly-plan.ts)
+// ---------------------------------------------------------------------------
+
+function isWeeklyPlanAuthorized(req: Request): boolean {
+  const configured = process.env.ADMIN_API_SECRET;
+  if (!configured) return true;
+  return req.headers['x-admin-secret'] === configured;
+}
+
+app.post('/api/generate-weekly-plan', async (req: Request, res: Response) => {
+  if (!isWeeklyPlanAuthorized(req)) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  if (!isEngineConfigured()) {
+    res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+    return;
+  }
+  try {
+    const plan = await generateWeeklyPlan();
+    const saved = agentFirebaseConfigured ? await writeWeeklyPlan(plan) : false;
+    res.json({ ok: true, plan, saved });
+  } catch (err) {
+    const rateLimit = detectGeminiRateLimit(err);
+    if (rateLimit) {
+      res.status(429).json({ ok: false, status: 'rate_limited', message: 'הגעת למגבלת ה-API החינמית לשעה זו', retryAfterSeconds: rateLimit.retryAfterSeconds });
+      return;
+    }
+    console.error('[api/generate-weekly-plan] error:', err);
+    res.status(500).json({ ok: false, error: 'generation failed' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AI video generation (local-dev mirror of api/generate-video.ts) — see that file for the full
+// provider-priority / missing-key-messaging contract.
+// ---------------------------------------------------------------------------
+
+function isVideoScriptShape(value: unknown): value is VideoScriptInput {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.hook !== 'string' || typeof v.cta !== 'string') return false;
+  return Array.isArray(v.scenes) || typeof v.body === 'string';
+}
+
+const KNOWN_VIDEO_PROVIDERS: VideoProvider[] = ['veo', 'runway', 'heygen', 'replicate', 'kling'];
+
+/** Same temporary disable as api/generate-video.ts — see that file's comment. */
+const VIDEO_GENERATION_ENABLED = false;
+
+app.get('/api/generate-video', async (req: Request, res: Response) => {
+  if (!isWeeklyPlanAuthorized(req)) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  if (!VIDEO_GENERATION_ENABLED) {
+    res.status(503).json({ ok: false, error: 'video generation is temporarily disabled' });
+    return;
+  }
+  if (!agentFirebaseConfigured) {
+    res.status(503).json({ ok: false, error: 'Firebase not configured' });
+    return;
+  }
+  const id = req.query?.id as string | undefined;
+  if (!id) {
+    res.status(400).json({ ok: false, error: 'missing id' });
+    return;
+  }
+  const job = await readVideoJob(id);
+  if (!job) {
+    res.status(404).json({ ok: false, error: 'job not found' });
+    return;
+  }
+  if (job.status !== 'processing') {
+    res.json({ ok: true, ...job });
+    return;
+  }
+  const result = await pollVideoGeneration(job.provider as VideoProvider, (job.providerState as Record<string, unknown>) || {});
+  const patch: Record<string, unknown> = { status: result.status as VideoJobStatus, updatedAt: Date.now() };
+  if (result.videoDataUrl) patch.videoDataUrl = result.videoDataUrl;
+  if (result.mimeType) patch.mimeType = result.mimeType;
+  if (result.error) patch.error = result.error;
+  if (result.status !== 'processing') {
+    await updateVideoJob(id, patch);
+  }
+  res.json({ ok: true, id, ...job, ...patch });
+});
+
+app.post('/api/generate-video', async (req: Request, res: Response) => {
+  if (!isWeeklyPlanAuthorized(req)) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  if (!VIDEO_GENERATION_ENABLED) {
+    res.status(503).json({ ok: false, error: 'video generation is temporarily disabled' });
+    return;
+  }
+  if (!agentFirebaseConfigured) {
+    res.status(503).json({ ok: false, error: 'Firebase not configured' });
+    return;
+  }
+  const body = req.body ?? {};
+  const visualPrompt: string | undefined = typeof body.visualPrompt === 'string' ? body.visualPrompt : undefined;
+  let topic: string | undefined = typeof body.topic === 'string' ? body.topic : undefined;
+  const { aspectRatio, aspect_ratio, provider } = body;
+
+  let script: VideoScriptInput | null = isVideoScriptShape(body.script) ? body.script : null;
+  if (!isScriptUsable(script)) {
+    const fallbackText = visualPrompt?.trim() || topic?.trim();
+    script = fallbackText ? buildScriptFromText(fallbackText) : null;
+  }
+  if (!isScriptUsable(script)) {
+    res.status(400).json({ ok: false, error: 'no usable video script — provide a script with content, or a visualPrompt/topic to use as fallback text' });
+    return;
+  }
+  const finalScript: VideoScriptInput = script!;
+  const finalTopic: string = topic?.trim() || visualPrompt?.trim() || finalScript.hook || 'AI video';
+  const resolvedAspect = (aspectRatio ?? aspect_ratio) === '16:9' ? '16:9' : '9:16';
+  const requestedProvider: VideoProvider | undefined = KNOWN_VIDEO_PROVIDERS.includes(provider) ? provider : undefined;
+  if (provider && !requestedProvider) {
+    res.status(400).json({ ok: false, error: `unknown provider "${provider}" — expected one of ${KNOWN_VIDEO_PROVIDERS.join(', ')}` });
+    return;
+  }
+
+  if (requestedProvider) {
+    const missing = describeMissingKeysFor(requestedProvider);
+    if (missing.length > 0) {
+      const message = printMissingKeysForProvider(requestedProvider);
+      res.status(503).json({ ok: false, error: `${requestedProvider} not configured — missing ${missing.join(', ')}`, details: message });
+      return;
+    }
+  } else if (getConfiguredVideoProviders().length === 0) {
+    const message = printMissingVideoProviderKeysMessage();
+    res.status(503).json({ ok: false, error: 'no video generation provider configured', details: message });
+    return;
+  }
+
+  try {
+    const start = await startVideoGeneration(finalScript, finalTopic, resolvedAspect, requestedProvider);
+    const id = randomUUID();
+    const now = Date.now();
+    const job = {
+      id,
+      provider: start.provider,
+      status: start.status,
+      aspectRatio: resolvedAspect,
+      createdAt: now,
+      updatedAt: now,
+      providerState: start.providerState ?? null,
+      error: start.error ?? null,
+    };
+    await createVideoJob(id, job);
+    res.json({ ok: true, id, provider: start.provider, status: start.status, error: start.error });
+  } catch (err) {
+    console.error('[api/generate-video] error:', err);
+    res.status(500).json({ ok: false, error: 'video generation failed to start' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Pexels search proxy (local-dev mirror of api/pexels-search.ts) — see that file for why the
+// PEXELS_API_KEY stays server-side while the resolved photo URL itself is fetched directly by the
+// browser afterward.
+// ---------------------------------------------------------------------------
+
+const VALID_PEXELS_ORIENTATIONS = ['landscape', 'portrait', 'square'];
+
+app.get('/api/pexels-search', async (req: Request, res: Response) => {
+  if (!isWeeklyPlanAuthorized(req)) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  const slideText = req.query?.slideText as string | undefined;
+  const fallbackQuery = req.query?.query as string | undefined;
+  const orientationParam = req.query?.orientation as string | undefined;
+  const orientation = VALID_PEXELS_ORIENTATIONS.includes(orientationParam || '') ? orientationParam : 'square';
+
+  let effectiveQuery: string | undefined;
+  let creativeQueryFailed = false;
+  if (slideText && slideText.trim()) {
+    try {
+      effectiveQuery = await generateVisualSearchQuery(slideText);
+    } catch (err) {
+      creativeQueryFailed = true;
+      const rateLimit = detectGeminiRateLimit(err);
+      console.error(rateLimit ? '[agent/pexels] visual query generation rate-limited, falling back to plain query:' : '[agent/pexels] visual query generation failed, falling back to plain query:', err);
+    }
+  }
+  if (!effectiveQuery) effectiveQuery = fallbackQuery;
+  if (!effectiveQuery || !effectiveQuery.trim()) {
+    res.status(400).json({ ok: false, error: 'missing slideText or query' });
+    return;
+  }
+
+  const pexelsKey = process.env.PEXELS_API_KEY;
+  if (!pexelsKey) {
+    console.error('[agent/pexels] PEXELS_API_KEY not configured — the dashboard will use its curated fallback photo pool instead.');
+    res.status(503).json({ ok: false, error: 'PEXELS_API_KEY not configured' });
+    return;
+  }
+
+  try {
+    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(effectiveQuery)}&per_page=3&orientation=${orientation}`;
+    const pexelsRes = await fetch(url, { headers: { Authorization: pexelsKey } });
+    const data = await pexelsRes.json();
+    const photo = data?.photos?.[0];
+    if (!pexelsRes.ok || !photo) {
+      res.status(502).json({ ok: false, error: data?.error || `Pexels search failed (${pexelsRes.status})` });
+      return;
+    }
+    res.json({ ok: true, photoUrl: photo.src?.large2x || photo.src?.large || photo.src?.original, photographer: photo.photographer, usedQuery: effectiveQuery, creativeQueryFailed });
+  } catch (err) {
+    console.error('[api/pexels-search] error:', err);
+    res.status(500).json({ ok: false, error: 'pexels search failed' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Vite middleware for development / static serving for production
+// ---------------------------------------------------------------------------
+
+async function start() {
+  if (!isProduction) {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'custom',
+    });
+    app.use(vite.middlewares);
+
+    app.use('*', async (req: Request, res: Response) => {
+      try {
+        const url = req.originalUrl;
+        let template = await vite.transformIndexHtml(url, await (await import('fs/promises')).readFile('index.html', 'utf-8'));
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        console.error(e);
+        res.status(500).end((e as Error).message);
+      }
+    });
+  } else {
+    const path = await import('path');
+    const express404 = express.static(path.resolve('dist'));
+    app.use(express404);
+    app.use('*', (_req: Request, res: Response) => {
+      res.sendFile(path.resolve('dist/index.html'));
+    });
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+  });
+}
+
+start();

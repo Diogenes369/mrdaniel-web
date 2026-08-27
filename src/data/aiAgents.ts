@@ -1,0 +1,149 @@
+import { Users, Headset, Share2, BrainCog, Rocket, UserCog, type LucideIcon } from 'lucide-react';
+
+/** Who the agent is packaged for — drives the "עסקים וארגונים" / "פרילנסרים ואנשים פרטיים"
+ * filter and the wizard's audience question. */
+export type AgentAudience = 'business' | 'individual';
+
+/** The problem the agent is built to solve — drives the wizard's goal question and the
+ * recommendation match. */
+export type AgentGoal = 'lead-gen' | 'support' | 'social' | 'knowledge';
+
+export interface AiAgent {
+  id: string;
+  name: string;
+  tagline: string;
+  audience: AgentAudience[];
+  goals: AgentGoal[];
+  tierLabel: string;
+  icon: LucideIcon;
+  accent: string;
+  glow: string;
+  /** The underlying multi-model architecture — deliberately named, not "AI-powered" hand-waving. */
+  modelFoundation: string;
+  coreCapability: string;
+  roiEstimate: string;
+  integrations: string[];
+  useCase: string;
+  price: number;
+  badge?: string;
+}
+
+export const GOAL_LABEL: Record<AgentGoal, string> = {
+  'lead-gen': 'ייצור וסינון לידים',
+  support: 'שירות ותמיכת לקוחות',
+  social: 'אוטומציית תוכן ורשתות',
+  knowledge: 'ידע פנים-ארגוני',
+};
+
+export const AUDIENCE_LABEL: Record<AgentAudience, string> = {
+  business: 'עסקים וארגונים',
+  individual: 'פרילנסרים ואנשים פרטיים',
+};
+
+export const AI_AGENTS: AiAgent[] = [
+  {
+    id: 'agent-sales-autopilot',
+    name: 'סוכן מכירות ולידים אוטונומי',
+    tagline: 'עונה, מסנן ומתזמן פגישות עם כל ליד — תוך פחות מ-30 שניות, מסביב לשעון.',
+    audience: ['business'],
+    goals: ['lead-gen'],
+    tierLabel: 'Business · Growth',
+    icon: Rocket,
+    accent: 'text-brand-400',
+    glow: 'group-hover:shadow-[0_20px_70px_rgba(0,255,102,0.2)]',
+    modelFoundation: 'Claude Opus 4.5 + GPT-5.2 — ניתוב רב-מודלי חכם לפי מורכבות הפנייה',
+    coreCapability: 'מזהה כוונת רכישה בזמן אמת, אוסף פרטי ליד מלאים, ומזמן פגישה ישירות ביומן הצוות — ללא מגע יד אדם עד לשלב הסגירה.',
+    roiEstimate: 'מקצר זמן תגובה ראשוני מ-4 שעות בממוצע ל-30 שניות, ומעלה שיעור המרת לידים ב-35% בממוצע.',
+    integrations: ['WhatsApp Business API', 'CRM (HubSpot / Salesforce / Priority)', 'אתר ו-Web Chat', 'REST API'],
+    useCase: 'עסקי B2B ו-B2C בעלי נפח פניות גבוה שבו כל דקת עיכוב בתגובה עולה כסף — נדל"ן, שירותים פיננסיים, סוכנויות דיגיטל.',
+    price: 7900,
+    badge: 'הכי מבוקש',
+  },
+  {
+    id: 'agent-support-247',
+    name: 'סוכן שירות לקוחות 24/7',
+    tagline: 'פותר את רוב הפניות בעצמו, ומעביר לנציג אנושי רק כשבאמת נדרש.',
+    audience: ['business'],
+    goals: ['support'],
+    tierLabel: 'Business · Growth',
+    icon: Headset,
+    accent: 'text-brand-300',
+    glow: 'group-hover:shadow-[0_20px_60px_rgba(159,232,112,0.15)]',
+    modelFoundation: 'Claude Sonnet 4.5 (מענה מהיר) + Gemini 2.5 Flash (ניתוב וסיווג פניות)',
+    coreCapability: 'מבין את היסטוריית הלקוח, עונה מתוך בסיס הידע הארגוני, ומסלים לנציג אנושי עם סיכום מלא כשמדובר במקרה חריג.',
+    roiEstimate: 'חוסך כ-70% מנפח הפניות השגרתיות לנציגים אנושיים, וזמינות מלאה 24/7 ללא עלות משמרות לילה.',
+    integrations: ['WhatsApp', 'Zendesk / Freshdesk', 'צ׳אט אתר', 'REST API'],
+    useCase: 'חברות מסחר אלקטרוני, SaaS ונותני שירות עם נפח פניות תמיכה גבוה וחוזר על עצמו.',
+    price: 9400,
+  },
+  {
+    id: 'agent-enterprise-knowledge',
+    name: 'סוכן ידע פנים-ארגוני (Enterprise RAG)',
+    tagline: 'כל המידע הארגוני — מדיניות, נהלים ותיעוד — במקום אחד, עם תשובה מדויקת תוך שניות.',
+    audience: ['business'],
+    goals: ['knowledge'],
+    tierLabel: 'Enterprise',
+    icon: BrainCog,
+    accent: 'text-brand-400',
+    glow: 'group-hover:shadow-[0_20px_70px_rgba(0,255,102,0.2)]',
+    modelFoundation: 'Claude Opus 4.5 + Vector DB ייעודי (Pinecone / Weaviate) על בסיס הידע שלכם',
+    coreCapability: 'מאנדקס את כל מאגרי הידע הארגוניים (Confluence, SharePoint, PDF-ים פנימיים) ועונה עם ציטוט מקור מדויק — לא ניחוש.',
+    roiEstimate: 'מקצר זמן איתור מידע פנימי מ-20 דקות בממוצע לפחות מדקה, וחוסך כ-100 שעות עבודה חודשיות בצוותי תמיכה, משפטי ו-HR.',
+    integrations: ['Slack / Microsoft Teams', 'Confluence / SharePoint', 'פורטל פנים-ארגוני', 'REST API'],
+    useCase: 'ארגונים בינוניים-גדולים עם מאגרי ידע מבוזרים בין כלים שונים, שבהם עובדים מבזבזים שעות בחיפוש מידע קיים.',
+    price: 14900,
+  },
+  {
+    id: 'agent-orchestration-flagship',
+    name: 'סוכן תפעול ארגוני Multi-Agent',
+    tagline: 'צוות שלם של סוכנים מתואמים — מכירות, תמיכה וניהול ידע — תחת שכבת ממשל ובקרה אחת.',
+    audience: ['business'],
+    goals: ['knowledge', 'lead-gen', 'support'],
+    tierLabel: 'Enterprise Flagship',
+    icon: UserCog,
+    accent: 'text-black',
+    glow: 'group-hover:shadow-[0_20px_80px_rgba(0,255,102,0.3)]',
+    modelFoundation: 'Claude Opus 4.5 + Gemini 3 Pro + GPT-5.2 — Multi-Agent Orchestration עם Guardian Agents לממשל',
+    coreCapability: 'מתאם בין מספר סוכנים ייעודיים (מכירות, תמיכה, ידע פנימי) תחת שכבת Guardian Agents אחת המפקחת על הרשאות, עלויות ואיכות תשובה.',
+    roiEstimate: 'מחליף החזקת מספר כלי אוטומציה נפרדים, ומייצר נראות אחודה על כל האינטראקציות האוטומטיות של הארגון.',
+    integrations: ['ERP / CRM ארגוני', 'Slack / Microsoft Teams', 'WhatsApp Business API', 'REST / GraphQL API'],
+    useCase: 'ארגונים עם כמה תהליכים אוטומטיים מקבילים שרוצים שכבת ניהול, ממשל ובקרת עלויות אחודה במקום פתרונות מבודדים.',
+    price: 18500,
+    badge: 'Flagship 2026',
+  },
+  {
+    id: 'agent-freelancer-assistant',
+    name: 'סוכן ניהול לקוחות לפרילנסרים',
+    tagline: 'מתאם פגישות, שולח תזכורות ועונה על שאלות נפוצות של לקוחות — כאילו יש לכם עוזר/ת אישית.',
+    audience: ['individual'],
+    goals: ['lead-gen', 'support'],
+    tierLabel: 'Individual · Starter',
+    icon: Users,
+    accent: 'text-brand-300',
+    glow: 'group-hover:shadow-[0_20px_60px_rgba(159,232,112,0.15)]',
+    modelFoundation: 'Gemini 2.5 Flash + Claude Haiku 4.5 — עלות הפעלה נמוכה במיוחד',
+    coreCapability: 'עונה ללקוחות פוטנציאליים ב-WhatsApp, מתאם פגישות ביומן, ושולח תזכורות תשלום — כל זה בלי שתצטרכו לעצור באמצע עבודה.',
+    roiEstimate: 'חוסך כ-8 שעות שבועיות בניהול תיאומים, תזכורות ומענה ללקוחות — זמן שחוזר ישירות לעבודה בתשלום.',
+    integrations: ['WhatsApp', 'Google Calendar', 'טופס אתר', 'API'],
+    useCase: 'פרילנסרים, יועצים ובעלי עסקים עצמאיים שמנהלים לבד את כל התקשורת מול לקוחות ורוצים להחזיר לעצמם שעות.',
+    price: 4800,
+    badge: 'נקודת כניסה',
+  },
+  {
+    id: 'agent-content-social',
+    name: 'סוכן אוטומציית תוכן ורשתות',
+    tagline: 'מייצר, מעצב ומתזמן תוכן שבועי לרשתות החברתיות — מרעיון ראשוני ועד פרסום.',
+    audience: ['individual'],
+    goals: ['social'],
+    tierLabel: 'Individual · Growth',
+    icon: Share2,
+    accent: 'text-brand-400',
+    glow: 'group-hover:shadow-[0_20px_60px_rgba(0,255,102,0.15)]',
+    modelFoundation: 'Claude Opus 4.5 (כתיבה ואסטרטגיית תוכן) + Gemini 3 Pro (ניתוח מגמות ותמונה)',
+    coreCapability: 'בונה לוח תוכן שבועי מותאם למותג האישי שלכם, מנסח פוסטים ולוכד תזמון פרסום אוטומטי בפלטפורמות הרלוונטיות.',
+    roiEstimate: 'מייצר ומתזמן תוכן שבועי מלא ב-90% פחות זמן לעומת כתיבה ותכנון ידניים.',
+    integrations: ['Instagram / LinkedIn API', 'WhatsApp Business', 'לוח תזמון Web'],
+    useCase: 'יוצרי תוכן, פרילנסרים ובעלי עסקים קטנים שרוצים נוכחות עקבית ברשתות בלי להקדיש לכך שעות מדי שבוע.',
+    price: 6200,
+  },
+];

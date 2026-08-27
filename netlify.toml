@@ -1,0 +1,39 @@
+[build]
+  command = "vite build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Netlify evaluates [[redirects]] top-to-bottom, first match wins — and an explicit rule here
+# always takes precedence over a function's own `config.path` binding. So API routes MUST be
+# listed before the SPA catch-all below, or every request (including /api/*) falls through to
+# index.html. The item route is listed first because it's the more specific match. The
+# /api/ai-news rule is technically redundant with the generic /api/* rule below it (same target,
+# since the function file is named ai-news) but kept explicit for clarity; the generic rule below
+# is what actually resolves /api/news and /api/ai-news alike, by function-name splat.
+[[redirects]]
+  from = "/api/news/item/*"
+  to = "/.netlify/functions/news-item/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai-news"
+  to = "/.netlify/functions/ai-news"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback so client-side routes (react-router-dom) survive a hard refresh/direct link.
+# Must stay LAST — as a catch-all it would otherwise shadow the API redirects above.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

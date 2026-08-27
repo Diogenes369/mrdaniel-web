@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+<title>דניאל — בינה מלאכותית, סייבר ופיתוח דיגיטלי</title>
+<meta name="theme-color" content="#0a0a0a" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --font-sans: 'Assistant', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --bg-void: #0a0a0a;
+  --bg-surface: #121212;
+  --bg-surface-elevated: #1a1a1a;
+  --text-main: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-dim: #666;
+  --accent-1: #76b900;
+  --accent-1-dim: rgba(118,185,0,0.15);
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --glass-bg: rgba(18,18,18,0.65);
+  --glass-border: rgba(255,255,255,0.08);
+  --ease-out: cubic-bezier(0.21, 0.82, 0.46, 1);
+  --header-h: 76px;
+  --space-sm: 1rem; --space-md: 2rem; --space-lg: 4rem; --space-xl: 6rem; --space-2xl: 9rem;
+  --radius-sm: 8px; --radius-md: 16px; --radius-lg: 24px;
+  --gradient-brand: linear-gradient(135deg, var(--accent-1), #9cf000);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 100%; }
+body { font-family: var(--font-sans); background-color: var(--bg-void); color: var(--text-main); line-height: 1.6; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+body.no-scroll { overflow: hidden; }
+::selection { background: var(--accent-1); color: #000; }
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-void); }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; border: 2px solid var(--bg-void); }
+a { color: inherit; text-decoration: none; transition: color 0.2s; }
+ul, ol { list-style: none; }
+img, svg { max-width: 100%; display: block; }
+button, input, textarea, select { font: inherit; color: inherit; background: none; border: none; outline: none; }
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.15; color: #fff; }
+h1 { font-size: clamp(2.6rem, 6vw, 4.8rem); font-weight: 800; margin-bottom: 1.2rem; }
+h2 { font-size: clamp(2rem, 4vw, 3rem); margin-bottom: var(--space-sm); }
+h3 { font-size: 1.4rem; margin-bottom: 0.6rem; }
+p { margin-bottom: 1.2rem; max-width: 68ch; }
+.eyebrow { display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-sans); font-size: 0.95rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-1); margin-bottom: 1rem; }
+.container { width: 100%; max-width: 1280px; margin-inline: auto; padding-inline: 1.5rem; position: relative; z-index: 2; }
+
+/* Ultra High Performance Modern Sleek Buttons (Hardware Accelerated 60FPS) */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0.85rem 3.2rem; font-weight: 600; font-size: 1.05rem; letter-spacing: 0.02em;
+  border-radius: 999px; cursor: pointer;
+  position: relative; overflow: hidden; z-index: 1;
+  text-align: center; color: var(--text-main);
+  background: rgba(26, 26, 26, 0.85);
+  border: 1px solid rgba(118, 185, 0, 0.35);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 0 12px rgba(118, 185, 0, 0.06);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  text-decoration: none;
+  transform: translateZ(0);
+  will-change: transform;
+}
+.btn::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(118, 185, 0, 0.15), transparent 70%);
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+.btn span, .btn svg { position: relative; z-index: 2; transition: transform 0.25s ease, color 0.25s ease; }
+.btn span { display: inline-flex; align-items: center; gap: 0.75rem; }
+.btn svg { width: 1.1em; height: 1.1em; flex-shrink: 0; }
+
+.btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  border-color: var(--accent-1);
+  background: rgba(32, 32, 32, 0.95);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(57, 255, 20, 0.25), inset 0 0 15px rgba(57, 255, 20, 0.12);
+}
+.btn:hover::before { opacity: 1; }
+.btn:active { transform: translateY(0) scale(0.98); }
+
+.glass { 
+  background: rgba(18, 18, 18, 0.85); 
+  -webkit-backdrop-filter: blur(8px); 
+  backdrop-filter: blur(8px); 
+  border: 1px solid var(--glass-border); 
+  border-radius: var(--radius-md);
+  transform: translateZ(0);
+}
+
+/* Header */
+.site-header { position: fixed; top: 0; inset-inline: 0; height: var(--header-h); display: flex; align-items: center; z-index: 100; transition: background 0.3s; border-bottom: 1px solid transparent; }
+.site-header.is-scrolled { background: rgba(10,10,10,0.85); backdrop-filter: blur(12px); border-bottom-color: var(--border-subtle); }
+.site-header.is-scrolled #navAudioBtn { opacity: 1 !important; transform: translateY(0) !important; pointer-events: auto !important; }
+.site-header.is-scrolled ~ main .hero-audio-btn { opacity: 0 !important; transform: translateY(-10px) !important; pointer-events: none !important; }
+
+.header-inner { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; gap: 2rem; } .brand { justify-self: start; } .header-actions { justify-self: end; }
+.brand { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; z-index: 102; text-decoration: none; }
+.brand-logo {
+  height: 38px;
+  width: auto;
+  max-width: 170px;
+  object-fit: contain;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  filter: drop-shadow(0 0 12px rgba(57, 255, 20, 0.4));
+  display: block;
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), filter 0.3s ease;
+}
+.brand:hover .brand-logo {
+  transform: scale(1.04);
+  filter: drop-shadow(0 0 16px rgba(57, 255, 20, 0.75));
+}
+.brand-tagline { font-size: 0.62rem; color: var(--text-secondary); font-family: var(--font-sans); font-weight: 500; display: block; letter-spacing: 0.3px; line-height: 1.2; }
+.footer-brand .brand-logo { height: 56px; max-width: 250px; filter: drop-shadow(0 0 14px rgba(57, 255, 20, 0.45)); }
+.footer-brand .brand-tagline { font-size: 0.75rem; color: var(--text-secondary) !important; font-weight: 500; margin-top: 0.2rem; }
+.desktop-nav { justify-self: center; }
+.nav-list { display: flex; gap: 2.5rem; }
+.nav-link { font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); position: relative; padding-block: 0.5rem; }
+.nav-link::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent-1); transform: scaleX(0); transform-origin: right; transition: transform 0.3s var(--ease-out); }
+.nav-link:hover, .nav-link.is-active { color: #fff; }
+.nav-link:hover::after, .nav-link.is-active::after { transform: scaleX(1); transform-origin: left; }
+.header-actions { justify-self: end; display: flex; align-items: center; gap: 1rem; }
+.nav-toggle { display: none; }
+
+@media (max-width: 980px) {
+  .header-inner { display: flex; justify-content: space-between; }
+  .desktop-nav, .header-actions .btn { display: none; } .header-actions { justify-self: center; margin-left: auto; margin-right: 1rem; }
+  .nav-toggle { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid var(--border-subtle); border-radius: 8px; color: #fff; z-index: 102; }
+}
+
+.mobile-menu { position: fixed; inset: 0; background: var(--bg-void); z-index: 101; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2rem; opacity: 0; visibility: hidden; transition: 0.3s; }
+.mobile-menu.is-open { opacity: 1; visibility: visible; }
+.mobile-menu a { font-size: 1.8rem; font-weight: 700; color: var(--text-secondary); }
+
+/* Fullscreen Immersive Breathing Web3 Face */
+.hero { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; padding-top: var(--header-h); }
+.breathe-wrapper { 
+  position: absolute; inset: 0; z-index: 1; 
+  animation: breathe 10s ease-in-out infinite alternate;
+  transform: translateZ(0);
+  will-change: transform;
+}
+@keyframes breathe { 0% { transform: scale3d(1, 1, 1); } 100% { transform: scale3d(1.03, 1.03, 1); } }
+.hero-bg { position: absolute; inset: 0; background: var(--bg-void); transform: translateZ(0); }
+.hero-face-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero-face-img { 
+  width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; 
+  filter: brightness(0.4) contrast(1.1) grayscale(30%);
+  transition: all 1.5s cubic-bezier(0.21, 0.82, 0.46, 1);
+}
+.hero:hover .hero-face-img {
+  filter: brightness(0.65) contrast(1.15) grayscale(0%);
+  transform: scale(1.02);
+}
+.hero-bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 0%, var(--bg-void) 90%), linear-gradient(to bottom, rgba(10,10,10,0.4) 0%, var(--bg-void) 100%); pointer-events: none; z-index: 2; }
+
+.hero-content { position: relative; z-index: 10; max-width: 800px; width: 100%; display: flex; flex-direction: column; align-items: center; text-shadow: 0 4px 20px rgba(0,0,0,0.8); margin-top: 15vh; }
+.hero-actions { display: flex; gap: 1rem; margin-top: 2rem; justify-content: center; }
+
+/* Infinite Marquee */
+.marquee { width: 100%; overflow: hidden; border-block: 1px solid var(--border-subtle); background: rgba(18,18,18,0.5); padding-block: 1.5rem; display: flex; position: relative; z-index: 2; direction: ltr; }
+.marquee::before, .marquee::after { content: ''; position: absolute; top: 0; bottom: 0; width: 100px; z-index: 2; pointer-events: none; }
+.marquee::before { left: 0; background: linear-gradient(to right, var(--bg-void), transparent); }
+.marquee::after { right: 0; background: linear-gradient(to left, var(--bg-void), transparent); }
+.marquee-inner { 
+  display: flex; width: max-content; 
+  animation: scroll-marquee 120s linear infinite; 
+  transform: translateZ(0);
+  will-change: transform;
+}
+@keyframes scroll-marquee { 
+  0% { transform: translate3d(0, 0, 0); } 
+  100% { transform: translate3d(-50%, 0, 0); } 
+}
+.marquee-item { display: flex; align-items: center; gap: 0.75rem; font-family: var(--font-sans); font-size: 1.1rem; color: var(--text-secondary); opacity: 0.8; font-weight: 700; white-space: nowrap; padding-inline: 2rem; direction: rtl; }
+@keyframes scroll-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+/* Standard Sections */
+/* Standard Sections with Browser Rendering Optimizations */
+.section { 
+  padding-block: var(--space-2xl); 
+  position: relative; 
+  z-index: 2; 
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 700px;
+}
+.section-alt { background: var(--bg-surface); border-block: 1px solid var(--border-subtle); }
+.section-head { margin-bottom: var(--space-xl); max-width: 700px; }
+.section-head--center { margin-inline: auto; text-align: center; }
+.section-head--center .eyebrow { justify-content: center; }
+
+/* Service Grids */
+.grid-2 { display: grid; grid-template-columns: 1fr; gap: 4rem; align-items: center; }
+@media (min-width: 980px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+.service-card, .bento-card { padding: 2.5rem; display: flex; flex-direction: column; height: 100%; position: relative; transition: border-color 0.3s; margin-bottom: 2rem; }
+.service-card:hover, .bento-card:hover { border-color: var(--border-strong); }
+.icon-badge { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 16px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle); color: var(--accent-1); margin-bottom: 1.5rem; }
+.icon-badge svg { width: 28px; height: 28px; }
+.service-card h3, .bento-card h3 { font-size: 1.6rem; margin-bottom: 1rem; }
+.service-card p, .bento-card p { flex-grow: 1; margin-bottom: 2rem; color: var(--text-secondary); }
+.card-accent-top { border-top-width: 3px; border-top-color: var(--accent-1); }
+
+/* Image Showcases */
+.showcase-img { width: 100%; height: auto; border-radius: var(--radius-lg); border: 1px solid var(--border-strong); box-shadow: 0 20px 40px rgba(0,0,0,0.5); object-fit: cover; aspect-ratio: 4/3; }
+
+/* Testimonials Track */
+.testi-track-wrap { 
+  overflow: hidden; 
+  padding-block: 2rem; 
+  position: relative; 
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+.testi-track { display: flex; gap: 2rem; overflow-x: auto; scroll-snap-type: x mandatory; padding-inline: 50px; scrollbar-width: none; }
+.testi-track::-webkit-scrollbar { display: none; }
+.testi-card { flex: 0 0 340px; scroll-snap-align: center; padding: 2rem; display: flex; flex-direction: column; }
+.testi-stars { display: flex; gap: 0.2rem; color: var(--accent-1); margin-bottom: 1.2rem; }
+.testi-stars svg { width: 16px; height: 16px; fill: currentColor; }
+.testi-card p { font-size: 1.05rem; font-style: italic; margin-bottom: 1.5rem; flex-grow: 1; }
+.testi-who { display: flex; align-items: center; gap: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 1.2rem; }
+.testi-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--bg-surface-elevated); border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--accent-1); font-size: 1.2rem; }
+
+.testi-controls { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem; direction: ltr; }
+.testi-controls button { width: 44px; height: 44px; border-radius: 8px; border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; color: #fff; background: transparent; }
+.testi-controls button:hover { background: var(--bg-surface); border-color: var(--accent-1); color: var(--accent-1); }
+
+/* CTA Banner */
+.cta-banner { padding-block: 5rem; text-align: center; border-radius: var(--radius-lg); margin-block: var(--space-xl); margin-inline: auto; max-width: 1200px; background: var(--bg-surface); border: 1px solid var(--border-strong); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+.cta-banner h2 { font-size: clamp(2rem, 4vw, 3rem); }
+.cta-banner p { color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 2.5rem; }
+
+/* Footer */
+.site-footer { border-top: 1px solid var(--border-subtle); padding-block: 4rem 2rem; background: var(--bg-surface); position: relative; z-index: 2; color: var(--text-main); }
+.footer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 3rem; margin-bottom: 4rem; }
+.footer-col h4 { font-size: 1.1rem; margin-bottom: 1.5rem; color: #fff; }
+.footer-col ul { display: flex; flex-direction: column; gap: 1rem; }
+.footer-col a { position: relative; padding-bottom: 2px; display: inline-block; width: fit-content; color: var(--text-secondary); transition: color 0.3s; }
+.footer-col a::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: var(--accent-1); transform: scaleX(0); transform-origin: right; transition: transform 0.3s var(--ease-out); }
+.footer-col a:hover { color: #fff; }
+.footer-col a:hover::after { transform: scaleX(1); transform-origin: left; }
+.footer-bottom { padding-top: 2rem; border-top: 1px solid var(--border-subtle); font-size: 0.9rem; text-align: center; display: flex; flex-direction: column; gap: 1.5rem; align-items: center; }
+.footer-bottom-links { display: flex; gap: 2rem; justify-content: center; }
+.footer-bottom-links button, .footer-bottom-links a { color: var(--text-secondary); text-decoration: underline; cursor: pointer; transition: color 0.2s; font-size: 0.9rem; }
+.footer-bottom-links button:hover, .footer-bottom-links a:hover { color: var(--accent-1); }
+
+/* Modals */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; opacity: 0; visibility: hidden; transition: 0.3s; }
+.modal-overlay.is-active { opacity: 1; visibility: visible; }
+.modal-card { width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; padding: 2.5rem; position: relative; opacity: 0; }
+.modal-card.large-modal { max-width: 800px; }
+.modal-overlay.is-active .modal-card { 
+  animation: modal-unfold 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+}
+.modal-overlay.is-closing .modal-card { 
+  animation: modal-fold 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+}
+@keyframes modal-unfold {
+  0% { clip-path: polygon(50% 0, 50% 0, 50% 2%, 50% 2%); opacity: 0; transform: translateY(-20px); }
+  40% { clip-path: polygon(0% 0, 100% 0, 100% 2%, 0% 2%); opacity: 1; transform: translateY(0); }
+  100% { clip-path: polygon(0% 0, 100% 0, 100% 100%, 0% 100%); opacity: 1; transform: translateY(0); }
+}
+@keyframes modal-fold {
+  0% { clip-path: polygon(0% 0, 100% 0, 100% 100%, 0% 100%); opacity: 1; transform: translateY(0); }
+  60% { clip-path: polygon(0% 0, 100% 0, 100% 2%, 0% 2%); opacity: 1; transform: translateY(0); }
+  100% { clip-path: polygon(50% 0, 50% 0, 50% 2%, 50% 2%); opacity: 0; transform: translateY(-20px); }
+}
+
+/* Modals specific subtle green tint & Matrix effect */
+.modal-card.glass {
+  background: rgba(8, 18, 8, 0.65); /* More transparent for glassmorphism */
+  backdrop-filter: blur(28px);
+  border: 1px solid rgba(57, 255, 20, 0.3); /* Slightly more neon border */
+  box-shadow: 0 30px 60px rgba(0,0,0,0.9), inset 0 0 60px rgba(57, 255, 20, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+/* The Matrix Falling Background Animation */
+.modal-card.glass::before {
+  content: '';
+  position: absolute;
+  top: -150%;
+  left: 0;
+  width: 100%;
+  height: 300%;
+  background-image: 
+    linear-gradient(180deg, rgba(57,255,20,0) 0%, rgba(57,255,20,0.08) 50%, rgba(57,255,20,0) 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(57,255,20,0.03) 2px, rgba(57,255,20,0.03) 4px);
+  background-size: 100% 50%, 100% 100%;
+  animation: matrix-fall 10s linear infinite;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+@keyframes matrix-fall {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(50%); }
+}
+
+.modal-card.glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Make Modal Buttons more fantastic */
+.modal-card.glass .btn::before {
+  background: conic-gradient(from 0deg, transparent 40%, #39ff14 100%);
+  animation: spin-border-fast 4s linear infinite;
+  opacity: 1; /* Always somewhat visible */
+  transition: opacity 0.3s, background 0.3s;
+}
+.modal-card.glass .btn:hover::before {
+  background: conic-gradient(from 0deg, transparent 10%, #39ff14 100%, #ffffff 100%);
+  animation: spin-border-fast 1.5s linear infinite;
+}
+.modal-card.glass .btn {
+  border-color: rgba(57,255,20,0.2);
+}
+
+@keyframes spin-border-fast { 
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+
+/* Fixed Close Button Left */
+.modal-close { position: absolute; top: 1.5rem; left: 1.5rem; right: auto; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); color: var(--text-main); cursor: pointer; transition: all 0.3s; z-index: 10; }
+@keyframes spin-infinite { to { transform: rotate(360deg); } }
+.modal-close:hover { background: rgba(255,255,255,0.1); color: var(--accent-1); }
+.modal-close:hover svg { animation: spin-infinite 2s linear infinite; }
+
+.field { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
+.field label { font-size: 0.9rem; font-weight: 600; color: var(--text-main); }
+.field input, .field textarea, .field select { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0.85rem 1rem; color: #fff; transition: 0.2s; }
+.field input:focus, .field textarea:focus { border-color: var(--accent-1); outline: none; }
+.field textarea { min-height: 100px; resize: vertical; }
+
+.whatsapp-float { position: fixed; bottom: 1.5rem; left: 1.5rem; width: 48px; height: 48px; background: rgba(18, 18, 18, 0.7); backdrop-filter: blur(12px); color: var(--text-secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 1px solid rgba(255, 255, 255, 0.08); z-index: 90; cursor: pointer; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.whatsapp-float:hover { animation: matrix-glitch 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+@keyframes matrix-glitch {
+  0% { filter: blur(0px); opacity: 1; transform: scale(1); }
+  25% { filter: blur(4px) drop-shadow(0 0 10px #39ff14); opacity: 0.6; transform: scale(1.2) skewX(10deg); color: transparent; text-shadow: 0 0 5px #39ff14; }
+  50% { filter: blur(8px) contrast(2); opacity: 0.3; transform: scale(0.8) skewX(-10deg); color: transparent; text-shadow: 0 0 20px #39ff14; }
+  75% { filter: blur(3px); opacity: 0.8; transform: scale(1.1) skewX(5deg); color: #39ff14; }
+  100% { filter: blur(0px); opacity: 1; transform: scale(1.05); border-color: var(--accent-1); color: var(--accent-1); background: rgba(18, 18, 18, 0.95); box-shadow: 0 0 15px rgba(57, 255, 20, 0.3); }
+}
+
+/* Hide WhatsApp icon when modal is open */
+body.no-scroll .whatsapp-float { opacity: 0; pointer-events: none; }
+
+
+
+/* Matrix Background */
+.matrix-bg {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.45;
+  background: 
+    linear-gradient(to bottom, rgba(8, 18, 8, 0.95) 0%, rgba(8, 18, 8, 0.4) 50%, rgba(8, 18, 8, 0.95) 100%),
+    radial-gradient(ellipse at 50% 50%, rgba(57, 255, 20, 0.06) 0%, transparent 80%);
+  contain: strict;
+  transform: translateZ(0);
+}
+.section-matrix { position: relative; overflow: hidden; }
+
+/* Blended Showcase Images */
+.showcase-img-blend {
+  width: 100%; height: auto; border: none; box-shadow: none; border-radius: var(--radius-md);
+  object-fit: cover; aspect-ratio: 4/3;
+  mask-image: radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 80%);
+  -webkit-mask-image: radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 80%);
+  transform: translateZ(0) scale(1.15);
+  contain: paint;
+}
+
+/* Reveal Animations */
+.reveal, .reveal-group > * { 
+  opacity: 0; 
+  transform: translate3d(0, 20px, 0); 
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1); 
+  will-change: opacity, transform;
+}
+.is-revealed, .reveal-group.is-revealed > * { 
+  opacity: 1; 
+  transform: translate3d(0, 0, 0); 
+  will-change: auto;
+}
+.reveal-group.is-revealed > *:nth-child(1) { transition-delay: 0.1s; }
+.reveal-group.is-revealed > *:nth-child(2) { transition-delay: 0.2s; }
+.reveal-group.is-revealed > *:nth-child(3) { transition-delay: 0.3s; }
+.reveal-group.is-revealed > *:nth-child(4) { transition-delay: 0.4s; }
+.reveal-group.is-revealed > *:nth-child(5) { transition-delay: 0.5s; }
+
+/* Mobile Header Alignment */
+@media (max-width: 768px) {
+  .header-inner {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+  .brand {
+    order: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    text-align: right !important;
+  }
+  .header-actions {
+    order: 2 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+  }
+  /* Hide the desktop contact button in header on mobile to keep it ultra clean */
+  .header-actions .btn.js-open-wa {
+    display: none !important;
+  }
+  .nav-toggle {
+    margin-inline-start: 0 !important;
+  }
+}
+
+/* =========================================================
+   EXCLUSIVE PREMIUM MOBILE OPTIMIZATIONS (Max Width: 768px)
+   ========================================================= */
+@media (max-width: 768px) {
+  :root {
+    --space-2xl: 2.75rem;
+    --space-xl: 1.75rem;
+    --header-h: 60px;
+  }
+
+  .container {
+    padding-inline: 1rem !important;
+    max-width: 100% !important;
+  }
+
+  /* Header & Minimalist Hamburger */
+  .site-header { height: 60px; }
+  .brand-mark { width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px; }
+  .brand-word strong { font-size: 1rem; }
+  .brand-word span { font-size: 0.6rem; }
+  
+  .nav-toggle {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    width: 38px;
+    height: 38px;
+    background: rgba(20, 20, 20, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(57, 255, 20, 0.3);
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.3s;
+  }
+  .nav-toggle .hamburger-line {
+    width: 18px;
+    height: 2px;
+    background: #fff;
+    border-radius: 2px;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .nav-toggle.is-active {
+    border-color: var(--accent-1);
+    background: rgba(57, 255, 20, 0.15);
+  }
+  .nav-toggle.is-active .hamburger-line:nth-child(1) {
+    transform: translateY(3.5px) rotate(45deg);
+    background: var(--accent-1);
+  }
+  .nav-toggle.is-active .hamburger-line:nth-child(2) {
+    transform: translateY(-3.5px) rotate(-45deg);
+    background: var(--accent-1);
+  }
+
+  /* Compact High-DPI Mobile Menu */
+  .mobile-menu {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.35s, visibility 0.35s;
+  }
+  .mobile-menu.is-open {
+    opacity: 1;
+    visibility: visible;
+  }
+  .mobile-menu-inner {
+    width: 100%;
+    max-width: 360px;
+    background: rgba(12, 16, 12, 0.92);
+    border: 1px solid rgba(57, 255, 20, 0.35);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 25px rgba(57, 255, 20, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    transform: translateY(15px) scale(0.96);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .mobile-menu.is-open .mobile-menu-inner {
+    transform: translateY(0) scale(1);
+  }
+  .mobile-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 0.85rem;
+  }
+  .mobile-menu-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .mobile-menu-close svg { width: 16px; height: 16px; }
+  .mobile-menu-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .mobile-menu a.mobile-nav-link {
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    color: var(--text-main);
+    padding: 0.6rem 0.85rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+  .mobile-menu a.mobile-nav-link .link-num {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--accent-1);
+    opacity: 0.8;
+  }
+  .mobile-menu a.mobile-nav-link:active,
+  .mobile-menu a.mobile-nav-link:hover {
+    background: rgba(57, 255, 20, 0.08);
+    border-color: rgba(57, 255, 20, 0.25);
+    color: #fff;
+  }
+
+  /* Hero Section Mobile Polish */
+  .hero { min-height: 85vh; padding-top: 5rem; padding-bottom: 2rem; }
+  .hero h1 { font-size: 1.85rem !important; line-height: 1.25 !important; }
+  .hero p { font-size: 0.95rem !important; padding-inline: 0.5rem; }
+  .hero-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    width: 100%;
+    max-width: 360px;
+    margin-top: 1.5rem;
+  }
+  .hero-actions .btn {
+    padding: 0.75rem 0.5rem !important;
+    font-size: 0.82rem !important;
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Horizontal Showcase Cards in AI / Cyber / Dev (לרוחב במקום מגדל לאורך) */
+  .grid-2 {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1.25rem !important;
+  }
+
+  /* Horizontal Visual Blend Banner */
+  .grid-2 > div:has(.showcase-img-blend) {
+    width: 100%;
+    max-height: 140px !important;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    background: rgba(10, 20, 10, 0.4);
+    border: 1px solid rgba(57, 255, 20, 0.15);
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+  .showcase-img-blend {
+    width: 100% !important;
+    height: 140px !important;
+    object-fit: cover !important;
+    aspect-ratio: auto !important;
+    mask-image: linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%) !important;
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%) !important;
+  }
+
+  /* Compact Horizontal Bento & Service Cards */
+  .service-card, .bento-card {
+    padding: 1.15rem !important;
+    margin-bottom: 0 !important;
+    display: grid !important;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.9rem;
+    row-gap: 0.4rem;
+    align-items: start;
+    border-radius: 12px !important;
+  }
+  .service-card .icon-badge, .bento-card .icon-badge {
+    grid-row: 1 / span 2;
+    width: 42px !important;
+    height: 42px !important;
+    margin-bottom: 0 !important;
+    border-radius: 10px !important;
+  }
+  .service-card .icon-badge svg, .bento-card .icon-badge svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .service-card h3, .bento-card h3 {
+    font-size: 1.1rem !important;
+    margin-bottom: 0.2rem !important;
+    line-height: 1.3 !important;
+  }
+  .service-card p, .bento-card p {
+    font-size: 0.85rem !important;
+    line-height: 1.4 !important;
+    margin-bottom: 0 !important;
+    grid-column: 2 / -1;
+  }
+
+  /* Highlights Bar */
+  .glass[style*="border-right: 4px solid"] {
+    padding: 1.15rem !important;
+    font-size: 0.88rem !important;
+  }
+  .glass[style*="border-right: 4px solid"] p {
+    font-size: 0.88rem !important;
+    line-height: 1.45 !important;
+  }
+
+  /* Action buttons inside sections */
+  .reveal-group .btn {
+    width: 100% !important;
+    justify-content: center;
+    margin-top: 0.5rem !important;
+    padding: 0.85rem 1rem !important;
+  }
+
+  /* Testimonials */
+  .testi-track {
+    padding-inline: 15px !important;
+    gap: 1rem !important;
+  }
+  .testi-card {
+    flex: 0 0 85vw !important;
+    padding: 1.25rem !important;
+    border-radius: 12px !important;
+  }
+  .testi-card p { font-size: 0.92rem !important; }
+
+  /* Magazines Grid - Horizontal 2-Col or Horizontal Split */
+  #magazines .grid-3, #magazines [class*="grid"] {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+  
+  /* Section Headings */
+  .section-head { margin-bottom: 1.5rem !important; }
+  .section-title { font-size: 1.5rem !important; line-height: 1.25 !important; }
+  .eyebrow { font-size: 0.78rem !important; margin-bottom: 0.4rem !important; }
+}
+
+</style>
+</head>
+<body>
+
+
+<header class="site-header" id="siteHeader">
+  <div class="container header-inner">
+    <a href="#hero" class="brand" aria-label="חזרה לראש הדף">
+      <img src="/logo.png" alt="לוגו" class="brand-logo" />
+      <span class="brand-tagline">בינה מלאכותית | סייבר | פיתוח דיגיטלי | הוצאה לאור</span>
+    </a>
+    <nav class="desktop-nav">
+      <ul class="nav-list">
+        <li><a href="about.html" class="nav-link">אודות</a></li>
+        <li><a href="ai.html" class="nav-link">בינה מלאכותית</a></li>
+        <li><a href="cyber.html" class="nav-link">סייבר</a></li>
+        <li><a href="#dev" class="nav-link">פיתוח ודיגיטל</a></li>
+        <li><a href="#magazines" class="nav-link" style="color: var(--accent-1);">מגזינים וחוברות</a></li>
+      </ul>
+    </nav>
+    <div class="header-actions">
+      <button type="button" class="btn btn-pulse js-open-wa" data-wa-topic="general" style="padding: 0.5rem 1.25rem;">
+        <span><svg data-lucide="message-square"></svg> צור קשר</span>
+      </button>
+      <button class="nav-toggle" id="navToggle" aria-expanded="false"><svg data-lucide="menu"></svg></button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-menu" id="mobileMenu">
+  <button class="modal-close js-mobile-close" id="mobileMenuClose" aria-label="סגירת תפריט" style="position: absolute; top: 1.5rem; left: 1.5rem; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(57, 255, 20, 0.35); color: #fff; cursor: pointer; z-index: 120; transition: all 0.3s ease;">
+    <svg data-lucide="x" style="width: 22px; height: 22px; stroke-width: 2.5;"></svg>
+  </button>
+  <a href="about.html">אודות</a>
+  <a href="ai.html">בינה מלאכותית</a>
+  <a href="cyber.html">סייבר ואבטחת מידע</a>
+  <a href="#dev">פיתוח דיגיטלי</a>
+  <a href="#magazines" style="color: var(--accent-1); font-size: 1.4rem;">מגזינים וחוברות</a>
+  <button class="btn btn-pulse js-open-wa" data-wa-topic="general" style="margin-top: 2rem;"><span>צור קשר</span></button>
+</div>
+
+<main>
+  <!-- Fullscreen Immersive Hero with Hover Reveal -->
+  <section class="hero" id="hero">
+    <div class="breathe-wrapper">
+      <div class="hero-bg" id="heroBg">
+        <div class="hero-face-container" id="heroFaceContainer">
+          <img src="/src/assets/images/geometric_face_1787205911590.jpg" alt="Web3 Face" class="hero-face-img" />
+        </div>
+      </div>
+    </div>
+    
+    <div class="container hero-content reveal">
+      <h1>הופכים טכנולוגיה מורכבת<br/><span style="color: var(--accent-1);">לפיתרון תחרותי</span></h1>
+      <p style="font-size: 1.25rem; font-weight: 500; text-shadow: 0 2px 10px rgba(0,0,0,1);">
+        מייעול תהליכים בעזרת בינה מלאכותית, דרך אבטחת סייבר מקיפה ועד לפיתוח נוכחות דיגיטלית מתקדמת ותוכן מקצועי (חוברות ומגזינים).
+      </p>
+      <div class="hero-actions">
+        <button class="btn btn-primary js-open-wa" data-wa-topic="general"><span><svg data-lucide="zap"></svg> נתחיל פרויקט</span></button>
+        <button class="btn btn-secondary js-open-wa" data-wa-topic="general"><span><svg data-lucide="coffee"></svg> ייעוץ מהיר בוואטסאפ</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Infinite Marquee Seamless Loop -->
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-inner">
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> סוכני AI אוטונומיים</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> מבדקי חדירות (Pen Testing)</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> פיתוח Web3 מתקדם</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> שירותי CISO חיצוני</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> אוטומציות Make ו-Zapier</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> אבטחת ענן ושרתים</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> אינטגרציות OpenAI</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> מגזינים וחוברות מקצועיות</span>
+      <!-- Loop Twin Set for 60fps Infinite Scroll -->
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> סוכני AI אוטונומיים</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> מבדקי חדירות (Pen Testing)</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> פיתוח Web3 מתקדם</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> שירותי CISO חיצוני</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> אוטומציות Make ו-Zapier</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> אבטחת ענן ושרתים</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> אינטגרציות OpenAI</span>
+      <span class="marquee-item"><svg data-lucide="check-circle-2"></svg> מגזינים וחוברות מקצועיות</span>
+    </div>
+  </div>
+
+  <section class="section" id="about">
+    <div class="container reveal">
+      <div class="section-head section-head--center"><p class="eyebrow">אודות</p><h2 class="section-title">טכנולוגיה שעובדת בשבילך</h2></div>
+      <div class="glass" style="padding: 2.5rem; border-radius: var(--radius-md); border-right: 4px solid var(--accent-1); background: rgba(118, 185, 0, 0.05); display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 800px; margin: 0 auto;">
+        <p style="font-size: 1.2rem; color: #fff; margin-bottom: 1.5rem; text-align: center; max-width: 600px;">עם מעל עשור של ניסיון ב-Full-Stack, אבטחת מידע ובינה מלאכותית, המטרה שלי היא להפוך טכנולוגיה מורכבת למנוע צמיחה עבור העסק שלך.</p>
+        <p style="color: var(--text-secondary); text-align: center; max-width: 700px;">בניית מערכות יציבות, אוטומציה שמחליפה שעות אדם, ושירותי CISO שמבטיחים שקט נפשי. בנוסף, אני מוציא לאור מגזינים טכנולוגיים וחוברות עבודה מקצועיות הנמכרות לקהל הרחב.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt section-matrix" id="ai">
+    <div class="matrix-bg"></div>
+    <div class="container">
+      <div class="section-head reveal"><p class="eyebrow">בינה מלאכותית</p><h2 class="section-title">להכפיל את כוח האדם בעסק</h2></div>
+      <div class="grid-2">
+        <div class="reveal-group" style="display:flex; flex-direction:column; gap:1.5rem;">
+          <div class="glass" style="padding: 1.5rem; border-radius: var(--radius-md); border-right: 4px solid var(--accent-1); background: rgba(118, 185, 0, 0.05);">
+            <p style="margin-bottom:1rem; color: #fff; font-size: 1.05rem;">
+              בעידן של סוכני AI אוטונומיים (Agentic AI), המהפכה כבר מזמן אינה מתמצה ביצירת טקסטים או מענה לשאלות, אלא בהרצת תהליכים מורכבים מקצה לקצה. מנועי ה-AI המתקדמים של 2026 מנתחים נתונים בזמן אמת, מקבלים החלטות ומבצעים משימות רוטיניות, מנהליות ותפעוליות באופן עצמאי לחלוטין – ללא צורך בהתערבות אנושית רציפה.
+            </p>
+            <p style="margin-bottom:0; color: var(--text-secondary); font-size: 1rem;">
+              השילוב של אוטומציה חכמה בארגון מאפשר לצוותים הקייימים להתנתק מהשגרות השוחקות ולהתמקד בצמיחה, באסטרטגיה ובחדשנות. התוצאה היא קיצור דרמטי בזמני התגובה, אפס טעויות אנוש בתהליכים קריטיים, והכפלת התפוקה והאפקטיביות העסקית ללא הגדלת מצבת העובדים.
+            </p>
+          </div>
+          <article class="service-card glass card-accent-top" style="padding: 2rem; margin-bottom:0;">
+            <span class="icon-badge"><svg data-lucide="bot"></svg></span>
+            <h3>צ'אטבוטים חכמים וסוכני AI</h3>
+            <p>פיתוח נציגי שירות מבוססי מודלי שפה מתקדמים (LLMs) שלומדים את הנתונים שלך, מנהלים אינטראקציות חכמות וסוגרים לידים אוטומטית 24/7.</p>
+          </article>
+          <article class="service-card glass card-accent-top" style="padding: 2rem; margin-bottom:0;">
+            <span class="icon-badge"><svg data-lucide="webhook"></svg></span>
+            <h3>אוטומציות מתקדמות (Make/Zapier)</h3>
+            <p>ארכיטקטורת זרימת נתונים חלקה בין המערכות של הארגון. חיבור CRM, מערכות סליקה ודיוור, לחיסכון מסיבי של שעות אדם וטעויות אנוש.</p>
+          </article>
+          <button class="btn btn-primary js-open-wa" data-wa-topic="ai" style="width: fit-content; margin-top: 1rem;"><span>ייעוץ והטמעת AI</span></button>
+        </div>
+        <div class="reveal" style="height:100%; display:flex; align-items:center;">
+          <img src="/src/assets/images/ai_dashboard_green_1787209497406.jpg" alt="AI Dashboard Interface" class="showcase-img-blend" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-matrix" id="cyber">
+    <div class="matrix-bg"></div>
+    <div class="container">
+      <div class="section-head reveal"><p class="eyebrow">סייבר ואבטחת מידע</p><h2 class="section-title">הגנה אקטיבית על הנכסים שלך</h2></div>
+      <div class="grid-2">
+        <div class="reveal" style="height:100%; display:flex; align-items:center;">
+          <img src="/src/assets/images/cyber_security_green_1787209532410.jpg" alt="Cyber Security Dashboard" class="showcase-img-blend" />
+        </div>
+        <div class="reveal-group" style="display:flex; flex-direction:column; gap:1.5rem;">
+          <div class="glass" style="padding: 1.5rem; border-radius: var(--radius-md); border-right: 4px solid var(--accent-1); background: rgba(118, 185, 0, 0.05);">
+            <p style="margin-bottom:1rem; color: #fff; font-size: 1.05rem;">
+              תפיסת האבטחה ההיקפית הישנה כבר אינה מספקת מול איומי הסייבר, מתקפות הכופר וטכניקות האקטיביזם המודרניות של 2026. הגנה אקטיבית מבוססת על ארכיטקטורת Zero Trust ("לעולם אל תבטח, תמיד תאמת"), המניחה מראש ניסיון חדירה ומבודדת כל רכיב ברשת בזמן אמת.
+            </p>
+            <p style="margin-bottom:0; color: var(--text-secondary); font-size: 1rem;">
+              באמצעות ניטור רציף, אכיפת גישה במודל ה-Least Privilege, ניתוח התנהגות חשודה ומנגנוני בידוד אוטומטיים של תנועה רוחבית (Micro-segmentation), המערכות שלנו מגנות על המידע הרגיש, השרתים ותחנות הקצה. ההגנה האקטיבית מבטיחה שהנכסים הדיגיטליים, שרשרת האספקה והמשכיות העסקית שלכם יישארו מוגנים ושמורים היטב בכל רגע.
+            </p>
+          </div>
+          <article class="bento-card glass card-accent-top" style="padding: 2rem; margin-bottom:0;">
+            <span class="icon-badge"><svg data-lucide="shield-check"></svg></span>
+            <h3>מבדקי חדירות (PT) לאפליקציות ורשתות</h3>
+            <p>איתור פרצות אבטחה פרואקטיבי על ידי תקיפה מבוקרת (Red Teaming) של התשתיות הדיגיטליות שלכם. קבלת דו"ח מפורט והנחיות תיקון לצוות הפיתוח.</p>
+          </article>
+          <article class="bento-card glass card-accent-top" style="padding: 2rem; margin-bottom:0;">
+            <span class="icon-badge"><svg data-lucide="lock"></svg></span>
+            <h3>שירותי CISO להשכרה וניהול סיכונים</h3>
+            <p>ליווי ארגוני שוטף לבניית מדיניות אבטחה ארגונית, עמידה בתקני פרטיות מחמירים (GDPR, ISO), הכשרות עובדים ותגובה לאירועי סייבר קריטיים.</p>
+          </article>
+          <button class="btn btn-secondary js-open-wa" data-wa-topic="cyber" style="width: fit-content; margin-top: 1rem;"><span>תיאום שיחת סייבר</span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-matrix" id="dev">
+    <div class="matrix-bg"></div>
+    <div class="container">
+      <div class="section-head reveal"><p class="eyebrow">פיתוח ונוכחות דיגיטלית</p><h2 class="section-title">קוד נקי ועיצוב שממיר</h2></div>
+      <div class="grid-2">
+        <div class="reveal" style="height:100%; display:flex; align-items:center;">
+          <img src="/src/assets/images/web3_dev_green_1787241382895.jpg" alt="Web3 and Software Development Architecture" class="showcase-img-blend" style="transform: scaleX(-1);" />
+        </div>
+        <div class="reveal-group" style="display:flex; flex-direction:column; gap:1.5rem;">
+          <div class="glass" style="padding: 1.5rem; border-radius: var(--radius-md); border-right: 4px solid var(--accent-1); background: rgba(118, 185, 0, 0.05);">
+            <p style="margin-bottom:1rem; color: #fff; font-size: 1.05rem;">
+              בעידן שבו כל חלקיק שנייה קובע, פלטפורמות דיגיטליות נדרשות להפגין מהירות, יציבות וחווית משתמש חסרת פשרות. בניית פלטפורמות מורכבות ו-SaaS מצריכה ארכיטקטורת ענן מתקדמת וקוד נקי מבוסס סטנדרטים בינלאומיים.
+            </p>
+            <p style="margin-bottom:0; color: var(--text-secondary); font-size: 1rem;">
+              מארכיטקטורת ענן מתקדמת ומסדי נתונים ועד לעיצוב מתקדם, כל שורת קוד נכתבת מתוך מחשבה על ביצועים ואופטימיזציה מירבית, כדי להבטיח שהמוצר שלכם ימיר, יעבוד חלק ויוביל את התעשייה.
+            </p>
+          </div>
+          <article class="bento-card glass card-accent-top" style="padding: 2rem; margin-bottom:0;">
+            <span class="icon-badge"><svg data-lucide="smartphone"></svg></span>
+            <h3>Mobile-First & Fully Responsive</h3>
+            <p>חווית משתמש (UX/UI) פורצת דרך, מותאמת באופן מושלם לכל מכשיר. דגש על עיצוב נקי וביצועים מהירים במיוחד (Web Vitals) המגדילים יחסי המרה.</p>
+          </article>
+          <article class="bento-card glass card-accent-top" style="padding: 2rem; margin-bottom:0;">
+            <span class="icon-badge"><svg data-lucide="database"></svg></span>
+            <h3>ארכיטקטורת נתונים וענן (Web3/SaaS)</h3>
+            <p>פיתוח Full-Stack למערכות מורכבות ואפליקציות רשת, תוך שילוב מסדי נתונים חכמים, ניהול שרתים מהיר ואינטגרציות נרחבות.</p>
+          </article>
+          <button class="btn btn-secondary js-open-wa" data-wa-topic="dev" style="width: fit-content; margin-top: 1rem;"><span>בואו נדבר על הפרויקט</span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  
+  <section class="section section-matrix" id="magazines">
+    <div class="matrix-bg"></div>
+    <div class="container">
+      <div class="section-head section-head--center reveal">
+        <p class="eyebrow">הוצאה לאור</p>
+        <h2 class="section-title">מגזינים וחוברות עבודה</h2>
+        <p style="color: var(--text-secondary); max-width: 650px; margin: 1.5rem auto 0; font-size: 1.15rem; line-height: 1.6;">
+          תוכן מקצועי דיגיטלי הנמכר ישירות לקהל הרחב. עלות חד-פעמית ונוחה לכל כיס ללא התחייבות או מנוי חודשי. הקבצים המלאים (PDF) נשלחים ישירות לתיבת המייל שלכם מיד לאחר הרכישה.
+        </p>
+      </div>
+      <div class="grid-3 reveal">
+        <article class="bento-card glass card-accent-top" style="padding: 2.5rem; text-align: center; display: flex; flex-direction: column; align-items: center; border-radius: var(--radius-lg);">
+          <span class="icon-badge" style="margin-bottom: 1.5rem; width: 64px; height: 64px;"><svg data-lucide="book-open" style="width: 28px; height: 28px;"></svg></span>
+          <h3 style="font-size: 1.3rem; margin-bottom: 1rem;">מגזין סייבר 2026: איומים ופתרונות</h3>
+          <p style="margin-bottom: 1.5rem; flex-grow: 1; color: var(--text-secondary); font-size: 0.95rem;">סקירה מקיפה של איומי הסייבר החדשים והכלים המעשיים להגנה עצמית וארגונית במרחב הדיגיטלי.</p>
+          <div style="font-size: 1.8rem; font-weight: 700; color: var(--accent-1); margin-bottom: 1.5rem;">₪49 <span style="font-size: 0.95rem; color: var(--text-secondary); font-weight: 400;">/ חד פעמי</span></div>
+          <button class="btn btn-secondary js-open-wa" data-wa-topic="content" style="width: 100%; padding: 0.75rem;"><span><svg data-lucide="shopping-cart"></svg> לרכישה מהירה</span></button>
+        </article>
+        
+        <article class="bento-card glass card-accent-top" style="padding: 2.5rem; text-align: center; display: flex; flex-direction: column; align-items: center; border-radius: var(--radius-lg);">
+          <span class="icon-badge" style="margin-bottom: 1.5rem; width: 64px; height: 64px;"><svg data-lucide="brain-circuit" style="width: 28px; height: 28px;"></svg></span>
+          <h3 style="font-size: 1.3rem; margin-bottom: 1rem;">חוברת אוטומציות AI לעסקים</h3>
+          <p style="margin-bottom: 1.5rem; flex-grow: 1; color: var(--text-secondary); font-size: 0.95rem;">המדריך השלם לבניית סוכני AI וחיבור מערכות במודל של Zero-Touch בארגון שלך.</p>
+          <div style="font-size: 1.8rem; font-weight: 700; color: var(--accent-1); margin-bottom: 1.5rem;">₪59 <span style="font-size: 0.95rem; color: var(--text-secondary); font-weight: 400;">/ חד פעמי</span></div>
+          <button class="btn btn-secondary js-open-wa" data-wa-topic="content" style="width: 100%; padding: 0.75rem;"><span><svg data-lucide="shopping-cart"></svg> לרכישה מהירה</span></button>
+        </article>
+        
+        <article class="bento-card glass card-accent-top" style="padding: 2.5rem; text-align: center; display: flex; flex-direction: column; align-items: center; border-radius: var(--radius-lg);">
+          <span class="icon-badge" style="margin-bottom: 1.5rem; width: 64px; height: 64px;"><svg data-lucide="code-2" style="width: 28px; height: 28px;"></svg></span>
+          <h3 style="font-size: 1.3rem; margin-bottom: 1rem;">מבוא לארכיטקטורת Web3</h3>
+          <p style="margin-bottom: 1.5rem; flex-grow: 1; color: var(--text-secondary); font-size: 0.95rem;">הסברים פרקטיים על רשתות בלוקצ'יין, חוזים חכמים והקמת אפליקציות מבוזרות (dApps).</p>
+          <div style="font-size: 1.8rem; font-weight: 700; color: var(--accent-1); margin-bottom: 1.5rem;">₪39 <span style="font-size: 0.95rem; color: var(--text-secondary); font-weight: 400;">/ חד פעמי</span></div>
+          <button class="btn btn-secondary js-open-wa" data-wa-topic="content" style="width: 100%; padding: 0.75rem;"><span><svg data-lucide="shopping-cart"></svg> לרכישה מהירה</span></button>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  
+
+  <section class="cta-banner reveal">
+    <div class="container">
+      <h2>מוכנים לעלות שלב?</h2>
+      <p>הדרך הכי מהירה להתחיל היא שיחה קצרה בוואטסאפ.</p>
+      <button class="btn btn-primary btn-pulse js-open-wa" data-wa-topic="general"><span><svg data-lucide="message-square"></svg> פתיחת שיחה בוואטסאפ</span></button>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <a href="#hero" class="brand footer-brand" style="margin-bottom: 1.5rem;">
+          <img src="/logo.png" alt="לוגו" class="brand-logo footer-logo" />
+          <span class="brand-tagline">פתרונות דיגיטליים מתקדמים</span>
+        </a>
+        <p style="color:var(--text-secondary) !important;">בינה מלאכותית, אבטחת סייבר ופיתוח דיגיטלי — לצד חוברות הדרכה ומגזינים מקצועיים לרכישה דיגיטלית.</p>
+      </div>
+      <div class="footer-col"><h4>ניווט מהיר</h4><ul><li><a href="about.html">אודות</a></li><li><a href="ai.html">בינה מלאכותית</a></li><li><a href="cyber.html">סייבר ואבטחה</a></li><li><a href="#dev">פיתוח ודיגיטל</a></li></ul></div>
+      <div class="footer-col"><h4>שירותים ותוכן</h4><ul><li><a href="#" class="js-open-wa" data-wa-topic="ai">פיתוח אוטומציות</a></li><li><a href="#" class="js-open-wa" data-wa-topic="cyber">ייעוץ מומחה CISO</a></li><li><a href="#" class="js-open-wa" data-wa-topic="dev">הקמת מערכות Web3</a></li><li><a href="#" class="js-open-wa" data-wa-topic="content">רכישת מגזינים מקצועיים</a></li></ul></div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-bottom-links">
+        <a href="terms.html">תנאי שימוש</a>
+        <a href="privacy.html">מדיניות פרטיות</a>
+      </div>
+      <span style="color:var(--text-secondary) !important;">© 2026 דניאל בן ברוך. כל הזכויות שמורות.</span>
+    </div>
+  </div>
+</footer>
+
+<button class="whatsapp-float js-open-wa" data-wa-topic="general" aria-label="פתיחת שיחה"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.888-.788-1.489-1.761-1.663-2.06-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></button>
+
+<!-- WhatsApp Modal -->
+<div class="modal-overlay js-modal-overlay" id="waModalOverlay">
+  <div class="modal-card glass" role="dialog" aria-modal="true" aria-labelledby="waModalTitle">
+    <button class="modal-close js-modal-close" aria-label="סגירה"><svg data-lucide="x"></svg></button>
+    <h3 id="waModalTitle" style="padding-right: 2rem;">פנייה מהירה</h3>
+    <p>השאירו פרטים וההודעה תועבר ישירות לוואטסאפ.</p>
+    <div class="field"><label for="wa-name">שם מלא</label><input id="wa-name" type="text" required /></div>
+    <div class="field">
+      <label for="wa-topic">תחום עניין</label>
+      <select id="wa-topic">
+        <option value="general">ייעוץ כללי</option>
+        <option value="ai">בינה מלאכותית ואוטומציה</option>
+        <option value="cyber">סייבר ואבטחת מידע</option>
+        <option value="dev">פיתוח דיגיטלי</option>
+        <option value="content">רכישת תוכן וחוברות</option>
+      </select>
+    </div>
+    <div class="field"><label for="wa-message">הודעה</label><textarea id="wa-message"></textarea></div>
+    <button type="button" class="btn btn-primary btn-block" id="waModalSend" style="width: 100%;"><span>שליחת פנייה</span></button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.js" defer></script>
+<script>
+  // Force scroll to top on page load
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+  window.scrollTo(0, 0);
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.lucide) window.lucide.createIcons();
+  
+
+  // Header Nav & Mobile Menu
+  const header = document.getElementById('siteHeader');
+  const toggle = document.getElementById('navToggle');
+  const mobileMenu = document.getElementById('mobileMenu');
+  
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        if (header) header.classList.toggle('is-scrolled', window.scrollY > 20);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+
+  if (toggle && mobileMenu) {
+    toggle.addEventListener('click', () => {
+      const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', !isOpen);
+      mobileMenu.classList.toggle('is-open', !isOpen);
+      document.body.classList.toggle('no-scroll', !isOpen);
+      if (!isOpen && window.lucide) {
+        window.lucide.createIcons();
+      }
+    });
+    mobileMenu.querySelectorAll('a, button').forEach(el => {
+      el.addEventListener('click', () => {
+        toggle.setAttribute('aria-expanded', 'false');
+        mobileMenu.classList.remove('is-open');
+        document.body.classList.remove('no-scroll');
+      });
+    });
+  }
+
+  // Active Nav Links Observer
+  const sections = document.querySelectorAll('main [id]');
+  const navLinks = document.querySelectorAll('.nav-link[href^="#"]');
+  if (sections.length && navLinks.length && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          navLinks.forEach(link => {
+            link.classList.toggle('is-active', link.getAttribute('href') === `#${entry.target.id}`);
+          });
+        }
+      });
+    }, { threshold: 0.2, rootMargin: "-20% 0px -50% 0px" });
+    sections.forEach(sec => observer.observe(sec));
+  }
+
+  // Reveal Animations
+  const revealTargets = document.querySelectorAll('.reveal, .reveal-group');
+  if (revealTargets.length && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-revealed');
+          obs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    revealTargets.forEach(el => observer.observe(el));
+  }
+
+
+
+  // Modals Controller
+  const waOverlay = document.getElementById('waModalOverlay');
+  const waTopic = document.getElementById('wa-topic');
+  
+  // Open WA Modal
+  document.querySelectorAll('.js-open-wa').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const topic = btn.getAttribute('data-wa-topic');
+      if (topic && waTopic) waTopic.value = topic;
+      if (waOverlay) {
+          waOverlay.classList.add('is-active');
+          document.body.classList.add('no-scroll');
+      }
+    });
+  });
+
+  
+  // Close Modals
+  document.querySelectorAll('.js-modal-close').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.js-modal-overlay.is-active').forEach(m => {
+        m.classList.add('is-closing');
+        setTimeout(() => { m.classList.remove('is-active', 'is-closing'); document.body.classList.remove('no-scroll'); }, 550);
+      });
+    });
+  });
+  document.querySelectorAll('.js-modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.classList.add('is-closing');
+        setTimeout(() => { overlay.classList.remove('is-active', 'is-closing'); document.body.classList.remove('no-scroll'); }, 550);
+      }
+    });
+  });
+
+  // WhatsApp Send action
+  const waBtn = document.getElementById('waModalSend');
+  if (waBtn) {
+    waBtn.addEventListener('click', () => {
+      const name = document.getElementById('wa-name').value.trim();
+      const topicSelect = document.getElementById('wa-topic');
+      const topic = topicSelect.options[topicSelect.selectedIndex].text;
+      const message = document.getElementById('wa-message').value.trim();
+      
+      let finalMsg = `שלום דניאל,
+הגעתי מהאתר. שמי ${name || 'לא צוין'}.
+נושא הפנייה: ${topic}
+`;
+      if (message) finalMsg += `
+הודעה: ${message}`;
+      
+      const whatsappUrl = `https://wa.me/972506473039?text=${encodeURIComponent(finalMsg)}`;
+      window.open(whatsappUrl, '_blank');
+      
+      waOverlay.classList.add('is-closing');
+      setTimeout(() => {
+        waOverlay.classList.remove('is-active', 'is-closing');
+        document.body.classList.remove('no-scroll');
+      }, 550);
+    });
+  }
+});
+</script>
+
+
+</body>
+</html>

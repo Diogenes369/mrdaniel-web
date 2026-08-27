@@ -1,0 +1,21 @@
+{
+  "rewrites": [
+    { "source": "/api/news", "destination": "/api/news.ts" },
+    { "source": "/api/news/item/:slug", "destination": "/api/news-item.ts?slug=:slug" },
+    { "source": "/api/ai-news", "destination": "/api/ai-news.ts" },
+    { "source": "/api/leads", "destination": "/api/leads.ts" },
+    { "source": "/api/chat", "destination": "/api/chat.ts" },
+    { "source": "/api/agent-generate", "destination": "/api/agent-generate.ts" },
+    { "source": "/api/agent-whatsapp-webhook", "destination": "/api/agent-whatsapp-webhook.ts" },
+    { "source": "/api/generate-weekly-plan", "destination": "/api/generate-weekly-plan.ts" },
+    { "source": "/api/generate-video", "destination": "/api/generate-video.ts" },
+    { "source": "/api/pexels-search", "destination": "/api/pexels-search.ts" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/agent-generate", "schedule": "0 8 * * *" }
+  ],
+  "functions": {
+    "api/generate-video.ts": { "maxDuration": 60 }
+  }
+}

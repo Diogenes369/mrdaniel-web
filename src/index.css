@@ -1,0 +1,475 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Heebo', sans-serif;
+  --font-display: 'Rubik', sans-serif;
+  /* Latin-only cyber/tech display face — Orbitron has no Hebrew glyphs, so it's used deliberately
+     for short English/mono tech chrome (badges, ticker items, stat values) rather than as the
+     primary heading font, which must stay Hebrew-safe (Rubik). */
+  --font-cyber: 'Orbitron', 'Rubik', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* NVIDIA solid-green brand ramp — one hue, only opacity/shade varies */
+  --color-brand-300: #9FE870;
+  --color-brand-400: #8FD400;
+  --color-brand-500: #76B900;
+  --color-brand-600: #5C9200;
+  --color-glow: #00FF66;
+
+  /* Supplementary "living" accent tones — used for secondary highlights/glows (tech-accent icons,
+     data callouts) alongside the brand green, not as a replacement for it. */
+  --color-electric-blue: #38BDF8;
+  --color-neon-cyan: #22D3EE;
+
+  /* Deep solid cyber-dark surface ramp — this site is dark-mode only, permanently. A light-theme
+     variant was tried and rolled back: converting every hardcoded text/card color across 25+
+     components correctly, with no way to visually verify the result, was a real risk of shipping
+     illegible pages rather than a genuine improvement. */
+  --color-carbon-950: #08090C;
+  --color-carbon-900: #121212;
+  --color-carbon-800: #1E1E24;
+  --color-carbon-700: #2A2D34;
+  --color-carbon-600: #3A3D46;
+
+  /* Brightened override of Tailwind's default gray/zinc ramp — every existing `text-zinc-300` /
+     `text-zinc-400` / `text-zinc-500` usage across the whole codebase (the dominant "muted body
+     copy" convention in every section component) picks this up automatically at build time, so
+     this single block lifts body/secondary text luminance site-wide without touching each of the
+     ~30 files that reference those utilities. Relative ordering (200 brighter than 300 brighter
+     than 400...) is preserved so existing visual-hierarchy decisions (description vs. label vs.
+     fine-print) still read correctly, just lifted overall. */
+  --color-zinc-200: #F1F5F9;
+  --color-zinc-300: #E2E8F0;
+  --color-zinc-400: #CBD5E1;
+  --color-zinc-500: #94A3B8;
+  --color-zinc-600: #64748B;
+}
+
+/* Fluid, `clamp()`-based type scale — continuous size interpolation between viewports instead of
+   fixed Tailwind breakpoint jumps, so headings/body copy fit precisely at any width (no overflow
+   at the very smallest phones, no oversized jump at desktop) rather than snapping between a fixed
+   set of sizes. `text-wrap: balance` (headings) evens out line lengths so a heading never ends
+   with one isolated word stranded alone on its own line; `text-wrap: pretty` (paragraphs) applies
+   the same anti-orphan logic to body copy. Both degrade to normal wrapping silently on browsers
+   that don't yet support the property — no fallback needed. */
+.text-fluid-hero {
+  font-size: clamp(2.1rem, 6vw + 1rem, 5.25rem);
+  line-height: 1.08;
+  text-wrap: balance;
+}
+.text-fluid-h2 {
+  font-size: clamp(2rem, 5vw + 1rem, 3.75rem);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.text-fluid-h3 {
+  font-size: clamp(1.25rem, 2vw + 0.9rem, 1.875rem);
+  line-height: 1.25;
+  text-wrap: balance;
+}
+.text-fluid-body {
+  font-size: clamp(0.95rem, 1.5vw + 0.7rem, 1.125rem);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+h1, h2, h3, h4 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+
+html {
+  background-color: #08090C;
+  -webkit-text-size-adjust: 100%;
+  /* Crisp glyph rendering on Retina/OLED panels — thinner, less "fuzzy" antialiasing than each
+     platform's default subpixel-hinted rendering, which reads noticeably better on today's
+     high-DPI displays. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  overflow-x: hidden;
+  background-color: #08090C;
+  overscroll-behavior-y: none;
+  /* Ambient corner glow — a fixed, low-opacity radial wash (brand green + electric blue) behind
+     every page, rather than a flat, uniformly-crushed near-black. Purely decorative and
+     pointer-events:none; doesn't affect layout or any component's own background. Given
+     `background-attachment: fixed` is unreliable on iOS Safari during momentum scroll, this uses a
+     genuinely fixed-position pseudo-element instead (GPU-composited, same technique as
+     `.scene3d-layer`) so the glow stays anchored to the viewport, not the document, on every
+     platform. */
+  position: relative;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 40% at 15% 0%, rgba(118, 185, 0, 0.14), transparent 60%),
+    radial-gradient(ellipse 55% 38% at 100% 15%, rgba(56, 189, 248, 0.08), transparent 60%),
+    radial-gradient(ellipse 50% 35% at 0% 100%, rgba(0, 255, 102, 0.07), transparent 60%);
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Minimalist carbon scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #08090C;
+}
+::-webkit-scrollbar-thumb {
+  background: #2A2D34;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3A3D46;
+}
+
+/* Custom Text Selection */
+::selection {
+  background: #76B900;
+  color: #08090C;
+}
+
+/* Carbon fiber mesh — used on cards/containers per the brand spec */
+.bg-carbon-fiber {
+  background-color: #1E1E24;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 6px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,0.35) 0px, rgba(0,0,0,0.35) 1px, transparent 1px, transparent 6px);
+  background-size: 8px 8px;
+}
+
+/* GSAP scroll-pin performance hint */
+.gsap-pin-layer {
+  will-change: transform, opacity, filter;
+}
+
+/* Footer's subtle geometric grid accent — faint green grid lines, masked to fade toward the
+   edges so it reads as a decorative accent rather than a busy uniform pattern. */
+.footer-grid {
+  background-image:
+    linear-gradient(rgba(118, 185, 0, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(118, 185, 0, 0.08) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 35%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 35%, transparent 85%);
+}
+
+/* CSS containment for long, off-screen-heavy sections (perf) */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 1200px;
+}
+
+/* Native-like momentum scrolling for scrollable panels (iOS) */
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Web3-style glassy form input — 16px+ base size prevents iOS auto-zoom-on-focus */
+.input-glow {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+  color: #fff;
+  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+@media (max-width: 767px) {
+  .input-glow {
+    font-size: 16px;
+  }
+}
+.input-glow::placeholder {
+  color: #8b8f98;
+}
+.input-glow:focus {
+  outline: none;
+  border-color: #76B900;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 3px rgba(118, 185, 0, 0.14);
+}
+
+/* Web3-style range slider */
+.range-glow {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  cursor: pointer;
+}
+.range-glow::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--range-accent, #76B900);
+  border: 3px solid #08090C;
+  box-shadow: 0 0 14px var(--range-accent, #76B900);
+  transition: transform 0.2s ease;
+}
+.range-glow::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+.range-glow::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--range-accent, #76B900);
+  border: 3px solid #08090C;
+  box-shadow: 0 0 14px var(--range-accent, #76B900);
+  cursor: pointer;
+}
+
+/* iOS safe-area helpers */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Fixed full-viewport 3D scene backdrop — sits behind all page content. `inset: 0` on a `fixed`
+   element already resolves to the exact viewport box (unlike `100vw`, it never over-counts the
+   scrollbar gutter and can't introduce a horizontal overflow scrollbar), so width/height are
+   pinned explicitly here only as a defensive no-op, not as the actual sizing mechanism. Never
+   nest this inside a `.container`/`max-width` wrapper — it must stay a direct, unconstrained child. */
+.scene3d-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  z-index: 0;
+  pointer-events: none;
+  contain: strict;
+  /* iOS Safari-specific: a `position: fixed` WebGL canvas with no explicit compositing hint is a
+     known trigger for Safari to defer repainting it during momentum scroll (it reads as the whole
+     3D background "freezing" mid-scroll, then catching up once the scroll gesture settles).
+     Forcing this layer onto its own GPU compositing layer keeps it actively composited through
+     the scroll gesture instead of being treated as static background content. `transform` +
+     `will-change: transform` are the load-bearing pair here. `backface-visibility: hidden` is a
+     known-safe secondary compositing hint for older WebKit. `perspective` and
+     `will-change: contents` are included per explicit request as further hints — realistically
+     inert for a WebGL canvas specifically (its pixel updates happen via GPU draw calls, not the
+     DOM paint/3D-transform pipeline these target), but harmless to leave in. */
+  transform: translateZ(0);
+  will-change: transform, contents;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+.scene3d-layer canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: none;
+}
+
+/* GPU-accelerated transform hint for frequently-animated interactive elements */
+.gpu {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Mobile horizontal-swipe carousel track/item pair — the shared pattern behind every "long
+   vertical card list → compact swipe row on phones" conversion. Every flex/scroll declaration here
+   is scoped inside the max-width query on purpose: call sites pair this class with a plain
+   `md:grid md:grid-cols-*` Tailwind utility for the desktop layout, and since this class carries NO
+   unscoped `display` of its own, there's no same-specificity cascade-order fight between "my custom
+   class" and "Tailwind's generated md: utility" — desktop's grid simply applies untouched above the
+   breakpoint. `snap-mandatory` guarantees the gesture always settles on a card boundary, never a
+   half-scrolled state; `-webkit-overflow-scrolling: touch` + `overscroll-behavior-x: contain` keep
+   the gesture native-feeling on iOS and stop it bubbling into a page-level horizontal scroll.
+   GPU-composited (`translateZ(0)`) so the drag itself stays on the compositor thread. */
+@media (max-width: 767px) {
+  .mobile-carousel-track {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+  }
+  .mobile-carousel-track::-webkit-scrollbar {
+    display: none;
+  }
+  .mobile-carousel-item {
+    scroll-snap-align: center;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Compact, minimalist mobile card treatment — smaller padding/radius than the desktop card
+     language plus a translucent glass surface with a subtle neon edge, deliberately scoped to
+     phones only via this media query (desktop keeps the solid opaque cards from the earlier
+     scroll-fade/glass cleanup pass — this reintroduces blur ONLY at this specific breakpoint, on
+     purpose, per explicit request). */
+  .mobile-compact-card {
+    padding: 1rem !important;
+    border-radius: 1rem !important;
+    background: rgba(13, 14, 18, 0.72) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-color: rgba(118, 185, 0, 0.28) !important;
+  }
+}
+
+/* "Found here" search-result highlight — a self-contained keyframe animation (rather than
+   add/remove-timed transitions) so the 2.5s pulse plays out reliably regardless of exactly when
+   the class is added/removed by JS. Uses `outline` (not a Tailwind `ring`) so it works on any
+   element without affecting layout or fighting the element's own box-shadow/border. */
+@keyframes search-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 255, 102, 0); outline-color: rgba(0, 255, 102, 0); }
+  15%, 80% { box-shadow: 0 0 40px 6px rgba(0, 255, 102, 0.5); outline-color: rgba(0, 255, 102, 0.85); }
+}
+.search-highlight-pulse {
+  outline: 2px solid transparent;
+  outline-offset: 4px;
+  border-radius: 1rem;
+  animation: search-pulse 2.5s ease-in-out;
+}
+
+/* Hide the Netlify deploy drawer/feedback badge that Netlify can inject into a preview/deploy
+   context — this is a hosting-platform overlay, not part of the site itself. */
+iframe[src*="netlify"],
+#netlify-modal-drawer,
+[data-netlify-deploy-id],
+.netlify-feedback-button {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Respect reduced motion globally */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Accessibility Widget — global overrides
+   Toggled via classes/CSS vars on <html> by src/lib/a11yStore.ts. None of
+   these use `filter`/`transform` on a shared ancestor of the page's fixed
+   elements (header, floating widgets, GSAP ScrollTrigger's pinned sections
+   all use `position: fixed` under the hood here) — that would silently
+   create a new CSS containing block for every one of them and break their
+   positioning the moment a contrast mode is toggled on. See the comment on
+   `.a11y-color-overlay` below for how contrast/grayscale/invert avoid that.
+   ========================================================================== */
+
+/* Text sizing — scales the rem-relative root, exactly like a native browser zoom would. */
+:root {
+  --a11y-scale: 1;
+}
+html {
+  font-size: calc(100% * var(--a11y-scale, 1));
+}
+
+/* High contrast — real color overrides (not a `filter`), scoped to the actual page chrome
+   (header/main/footer) and deliberately excluding the accessibility widget itself so its own
+   controls stay legible and easy to find no matter what mode is active. */
+html.a11y-contrast-high header,
+html.a11y-contrast-high main,
+html.a11y-contrast-high footer {
+  background: #000 !important;
+  color: #fff !important;
+}
+html.a11y-contrast-high header *,
+html.a11y-contrast-high main *,
+html.a11y-contrast-high footer * {
+  background-color: #000 !important;
+  color: #fff !important;
+  border-color: #4d4d4d !important;
+}
+html.a11y-contrast-high header a,
+html.a11y-contrast-high main a,
+html.a11y-contrast-high footer a,
+html.a11y-contrast-high header button,
+html.a11y-contrast-high main button,
+html.a11y-contrast-high footer button {
+  color: #FFD400 !important;
+}
+
+/* Grayscale / Invert — a full-viewport blend-mode overlay recolors everything painted beneath it
+   without touching any element's own `filter`/`transform`, so it can't disturb fixed/pinned
+   positioning anywhere on the page. Rendered by AccessibilityWidget; inert (no background, no
+   blend mode) unless one of these classes is active. */
+.a11y-color-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  pointer-events: none;
+}
+html.a11y-contrast-mono .a11y-color-overlay {
+  background: hsl(0, 0%, 50%);
+  mix-blend-mode: saturation;
+}
+html.a11y-contrast-invert .a11y-color-overlay {
+  background: #fff;
+  mix-blend-mode: difference;
+}
+
+/* Readable font — a plain, highly-legible system stack for both Hebrew and Latin text. */
+html.a11y-readable-font body,
+html.a11y-readable-font body * {
+  font-family: Arial, Helvetica, 'Segoe UI', sans-serif !important;
+  letter-spacing: 0.01em;
+}
+
+/* Highlight links — a strong, consistent focus-independent affordance on every interactive element. */
+html.a11y-highlight-links a,
+html.a11y-highlight-links button,
+html.a11y-highlight-links [role='button'] {
+  outline: 2px solid #FFD400 !important;
+  outline-offset: 2px !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+}
+
+/* Stop animations — freezes CSS transitions/animations everywhere. The 3D WebGL scene and GSAP's
+   own timeline are paused separately in JS (a11yStore.ts / Scene3D.tsx), since neither is driven
+   by CSS. Mirrors the existing `prefers-reduced-motion` block above, scoped to this class instead
+   of the OS-level media query. */
+html.a11y-stop-motion *,
+html.a11y-stop-motion *::before,
+html.a11y-stop-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Large cursor — a bold, high-visibility replacement for the default arrow. */
+html.a11y-large-cursor,
+html.a11y-large-cursor * {
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='40'%20height='40'%20viewBox='0%200%2040%2040'%3E%3Cpath%20d='M4%202%20L4%2034%20L13%2025%20L19%2036%20L24%2033%20L18%2022%20L30%2022%20Z'%20fill='black'%20stroke='white'%20stroke-width='2'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 4, auto !important;
+}

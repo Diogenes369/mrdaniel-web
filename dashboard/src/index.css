@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Heebo', sans-serif;
+  --font-display: 'Rubik', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Same one-hue NVIDIA-green brand ramp as the main site (src/index.css) — kept in sync so this
+     dashboard reads as the same product, not a different tool bolted on. */
+  --color-brand-300: #9fe870;
+  --color-brand-400: #8fd400;
+  --color-brand-500: #76b900;
+  --color-brand-600: #5c9200;
+  --color-glow: #00ff66;
+
+  --color-carbon-950: #08090c;
+  --color-carbon-900: #121212;
+  --color-carbon-800: #1e1e24;
+  --color-carbon-700: #2a2d34;
+  --color-carbon-600: #3a3d46;
+}
+
+html,
+body {
+  background-color: var(--color-carbon-950);
+  font-family: var(--font-sans);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-carbon-950);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-carbon-700);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-carbon-600);
+}
+
+/* Shared "surface" card treatment used across every dashboard widget — a softer, more polished
+   surface than a flat `bg-black/80` block: a subtle carbon-fiber-adjacent gradient, a hairline
+   border instead of a heavy brand-colored one, and a faint inner highlight along the top edge,
+   matching the restrained glass-card language used for cards on the main site. */
+.dash-card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%), var(--color-carbon-900);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+}
+.dash-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 40%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* PDF export via native browser print — see components/PrintableReport.tsx for why. Hidden by
+   default; swapped with the live dashboard UI only inside @media print. */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .dash-root {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+    direction: rtl;
+    /* A plain system stack, not the dashboard's Heebo/Rubik webfonts — guarantees the print
+       engine always has a real, already-installed Hebrew-safe face to fall back to, regardless of
+       whether the webfont finished loading at the moment print was triggered. */
+    font-family: Arial, 'Segoe UI', Tahoma, sans-serif;
+    color: #000;
+    background: #fff;
+    padding: 24px;
+  }
+  .print-only h1 {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+  .print-only .print-meta {
+    font-size: 12px;
+    color: #444;
+    margin-bottom: 16px;
+  }
+  .print-only table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .print-only th,
+  .print-only td {
+    border: 1px solid #999;
+    padding: 6px 10px;
+    text-align: right;
+  }
+  .print-only th {
+    background: #eee;
+    font-weight: 700;
+  }
+  .print-only tr:nth-child(even) td {
+    background: #fafafa;
+  }
+  @page {
+    margin: 16mm 12mm;
+  }
+}
