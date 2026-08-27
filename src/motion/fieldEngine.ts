@@ -31,9 +31,10 @@ const T = {
   radiusH: 0.30,
   axisCam: 3.1,
   tiltBase: -0.38,
-  // Raised from 0.05 — "rotating at an optimal speed upon initial load" per explicit request; still
-  // slow enough to read as a stately drift rather than a spinning toy.
-  idleSpin: 0.085,
+  // Raised from an original 0.05, then again ~35% here (0.085 -> 0.115) per explicit request for
+  // a "lively, energetic, commanding" globe on landing — still reads as a deliberate rotation
+  // rather than a spinning toy at this rate.
+  idleSpin: 0.115,
   breathAmp: 0.02,
   breathHz: 0.05,
   K: 42,
@@ -93,9 +94,11 @@ const TAU = Math.PI * 2;
 // 'rings' = the concentric drifting rings formation, 'scatter' = the ambient wander already in use
 // site-wide, 'wave' = the wide horizontal rolling wave bands seen behind their "independent digital
 // studio" section (spans the full viewport width edge-to-edge, unlike every other formation which
-// clusters around a point), 'contact' = the converging halo around their circular "Let's talk" CTA,
-// confirmed live (a dashed rotating ring with a dense particle halo assembling around it).
-export type FieldForm = 'hero' | 'helix' | 'rings' | 'scatter' | 'wave' | 'contact';
+// clusters around a point), 'helix-h' = the same double-helix technique laid on its side — climbing
+// across the full viewport WIDTH instead of the height, for one giant lateral DNA moment roughly
+// mid-page — 'contact' = the converging halo around their circular "Let's talk" CTA, confirmed live
+// (a dashed rotating ring with a dense particle halo assembling around it).
+export type FieldForm = 'hero' | 'helix' | 'helix-h' | 'rings' | 'scatter' | 'wave' | 'contact';
 
 // Precomputed "rgb(r,g,b," prefix — each particle's actual draw call appends only its own alpha and
 // closing paren (`STAR_RGB + alpha.toFixed(3) + ')'`), which is materially cheaper per particle than
@@ -187,6 +190,10 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
 
   let W = 0, H = 0, DPR = 1;
   let cx = 0, cy = 0, R = 0, FOCAL = 0;
+  // The one shared "gutter" distance every left/right-anchored formation offsets by — see FormStop's
+  // anchorDir doc comment for why this replaced a per-section-measured value. Recomputed in layout()
+  // since it scales with viewport width.
+  let GUTTER_PX = 0;
   // `: number` annotations are load-bearing here, not stylistic — T is `as const`, so its property
   // values are non-fresh literal types (e.g. -0.38) that DON'T widen to `number` on a plain `let`
   // the way a fresh literal would, which would otherwise make every later reassignment a type error.
@@ -219,6 +226,7 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     cx = W * 0.5;
     cy = H * 0.42; // slightly above center — leaves room for the scroll cue / CTA below
     FOCAL = T.axisCam * R;
+    GUTTER_PX = clamp(W * 0.17, 60, 260);
 
     // Scatter targets recompute on resize (a particle's scatter home is a pure function of its own
     // seeded randoms and the current viewport, not stored/accumulated state). Deliberately plain
@@ -257,13 +265,14 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   interface FormStop {
     y: number;
     form: FieldForm;
-    /** Actual pixel offset applied to every particle's target x while this stop is active — 0 for an
-     * unanchored (centered) stop. Unlike a flat fraction-of-viewport-width shift, this is measured
-     * once per stop against that section's own `.container` child: it sits in the middle of whatever
-     * empty margin genuinely exists between the viewport edge and the content column at the CURRENT
-     * viewport size, so the field lands beside whatever card/text block is actually there instead of
-     * an arbitrary distance that might cut across it on a narrower window. See measureStops() below. */
-    anchorPx: number;
+    /** -1 / 0 / 1 — LEFT gutter / CENTERED / RIGHT gutter. Exactly three canonical states, not a
+     * per-section-measured continuum: every 'left' stop site-wide shares the identical resulting
+     * pixel offset (see GUTTER_PX below, computed once per layout), and likewise for 'right'. An
+     * earlier version measured each stop's own `.container` margin individually, which meant two
+     * "left" sections could land at visibly different distances from the edge depending on how wide
+     * their own content column happened to be — reading as an ambiguous, wobbly middle position
+     * rather than one of three deliberate, repeatable alignment states. */
+    anchorDir: -1 | 0 | 1;
   }
   let stops: FormStop[] = [];
   function measureStops() {
@@ -271,20 +280,11 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     stops = Array.from(els)
       .map((el) => {
         const a = el.dataset.fieldAnchor;
-        const dir = a === 'left' ? -1 : a === 'right' ? 1 : 0;
-        let anchorPx = 0;
-        if (dir !== 0) {
-          const content = el.querySelector<HTMLElement>('.container');
-          const cr = content ? content.getBoundingClientRect() : null;
-          // Fallback (no .container found) assumes a typical centered content column rather than 0,
-          // so an anchor never silently no-ops if a section's markup ever changes shape.
-          const margin = cr ? (dir < 0 ? cr.left : W - cr.right) : W * 0.14;
-          anchorPx = dir * clamp(margin * 0.55, 36, 240);
-        }
+        const anchorDir: -1 | 0 | 1 = a === 'left' ? -1 : a === 'right' ? 1 : 0;
         return {
           y: el.getBoundingClientRect().top + window.scrollY + el.offsetHeight / 2,
           form: (el.dataset.fieldForm as FieldForm) || 'scatter',
-          anchorPx,
+          anchorDir,
         };
       })
       .sort((a, b) => a.y - b.y);
@@ -301,7 +301,10 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   // immediately"), while STILL resolving well before the next stop is reached, which is what leaves
   // the back end of that hold window as real runway for the particle spring physics to physically
   // finish traveling before the visitor's eye/viewport actually arrives there.
-  const DWELL = 0.32;
+  // Extended from 0.32 per explicit request ("extend the formation dwell/breathing time so shapes
+  // stay calm, legible, and fully formed") — each formation now spends nearly 80% of the gap between
+  // stops fully settled, with only a ~20% window in the middle actually morphing.
+  const DWELL = 0.39;
   const DWELL_SPAN = 1 - DWELL * 2;
   // Transitions landing on 'contact' resolve almost immediately instead of following the general
   // dwell curve — that formation's target is a REAL on-screen element (the CTA ring), not an
@@ -319,12 +322,12 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
    * are otherwise purely functions of viewport size + elapsed time, never of scroll or page
    * position, which is the specific, hard-won fix for an earlier bug where scroll-coupled particle
    * coordinates went mathematically unreachable off-screen once scrolled past. */
-  function pickFormation(): { A: FieldForm; B: FieldForm; t: number; anchorA: number; anchorB: number } {
+  function pickFormation(): { A: FieldForm; B: FieldForm; t: number; anchorA: -1 | 0 | 1; anchorB: -1 | 0 | 1 } {
     if (!stops.length) return { A: 'hero', B: 'hero', t: 0, anchorA: 0, anchorB: 0 };
     const sc = window.scrollY + H / 2;
-    if (sc <= stops[0].y) return { A: stops[0].form, B: stops[0].form, t: 0, anchorA: stops[0].anchorPx, anchorB: stops[0].anchorPx };
+    if (sc <= stops[0].y) return { A: stops[0].form, B: stops[0].form, t: 0, anchorA: stops[0].anchorDir, anchorB: stops[0].anchorDir };
     const last = stops[stops.length - 1];
-    if (sc >= last.y) return { A: last.form, B: last.form, t: 0, anchorA: last.anchorPx, anchorB: last.anchorPx };
+    if (sc >= last.y) return { A: last.form, B: last.form, t: 0, anchorA: last.anchorDir, anchorB: last.anchorDir };
     for (let i = 0; i < stops.length - 1; i++) {
       const a = stops[i], b = stops[i + 1];
       if (sc >= a.y && sc < b.y) {
@@ -333,10 +336,10 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
           b.form === 'contact'
             ? clamp((raw - CONTACT_START) / CONTACT_SPAN, 0, 1)
             : clamp((raw - DWELL) / DWELL_SPAN, 0, 1);
-        return { A: a.form, B: b.form, t: smoothstep(held), anchorA: a.anchorPx, anchorB: b.anchorPx };
+        return { A: a.form, B: b.form, t: smoothstep(held), anchorA: a.anchorDir, anchorB: b.anchorDir };
       }
     }
-    return { A: last.form, B: last.form, t: 0, anchorA: last.anchorPx, anchorB: last.anchorPx };
+    return { A: last.form, B: last.form, t: 0, anchorA: last.anchorDir, anchorB: last.anchorDir };
   }
 
   // ---------- readability guard ----------
@@ -507,6 +510,26 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         const front = clamp(0.5 - Math.sin(ph) * 0.5, 0, 1);
         const edge = smoothstep(clamp(climb * 10, 0, 1)) * (1 - smoothstep(clamp((climb - 0.9) * 10, 0, 1)));
         F.a = (0.16 + front * 0.5) * (0.6 + rnd2[i] * 0.6) * edge;
+        F.s = (0.9 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
+        break;
+      }
+      case 'helix-h': {
+        // The same double-helix technique as 'helix', laid on its side — climbs across the full
+        // viewport WIDTH instead of the height (amplitude in Y instead of X), so it reads as one
+        // giant lateral DNA strand spanning edge-to-edge for a single dramatic mid-page moment,
+        // distinct from the compact vertical helix used elsewhere. Always centered (never
+        // side-anchored, like 'wave') since a shape already spanning the full width has no
+        // meaningful "beside the content" position to sit in.
+        const strand = i % 2;
+        const amp = Math.min(W, H) * 0.15 * breathe;
+        const ph = rnd1[i] * Math.PI * 4.4 + time * 0.5 + strand * Math.PI;
+        let climb = (rnd1[i] + time * 0.03) % 1;
+        if (climb < 0) climb += 1;
+        F.y = cy + Math.cos(ph) * amp + (rnd3[i] - 0.5) * 8;
+        F.x = climb * W * 1.08 - W * 0.04 + (rnd2[i] - 0.5) * 9;
+        const front = clamp(0.5 - Math.sin(ph) * 0.5, 0, 1);
+        const edge = smoothstep(clamp(climb * 10, 0, 1)) * (1 - smoothstep(clamp((climb - 0.9) * 10, 0, 1)));
+        F.a = (0.18 + front * 0.5) * (0.6 + rnd2[i] * 0.6) * edge;
         F.s = (0.9 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
         break;
       }
@@ -700,13 +723,15 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     // pickFormation() above. Computed once per frame (cheap: a handful of stop comparisons), not
     // per particle.
     const { A: formA, B: formB, t: formT, anchorA, anchorB } = pickFormation();
-    // Blends between each stop's own precomputed anchorPx (see measureStops()) — this is what makes
-    // formations feel like they're flowing asymmetrically through the page (sitting in a real content
-    // margin, then the next section's margin pulling the other way) instead of every single one
-    // stacking on the same dead-center point. Blended by the same formT as the formation blend itself,
-    // uniformly across all particles (not per-particle staggered like the shape blend) since it's a
-    // whole-field translation, not a shape change.
-    const anchorOffsetPx = anchorA + (anchorB - anchorA) * formT;
+    // Blends between each stop's own -1/0/1 anchorDir, scaled by the single shared GUTTER_PX — this is
+    // what makes formations feel like they're flowing asymmetrically through the page (sitting flush
+    // in the left or right gutter, then the next section pulling the other way) instead of every
+    // single one stacking on the same dead-center point. Blended by the same formT as the formation
+    // blend itself, uniformly across all particles (not per-particle staggered like the shape blend)
+    // since it's a whole-field translation, not a shape change. The blend itself passes through
+    // intermediate values while transitioning — that's the "liquid-smooth" motion BETWEEN the three
+    // states, not a fourth resting state, since it only ever settles at -GUTTER_PX/0/+GUTTER_PX.
+    const anchorOffsetPx = (anchorA + (anchorB - anchorA) * formT) * GUTTER_PX;
     // How much of the *current* blend is 'hero' (0..1) — used both to fade the wireframe rings in/out
     // in step with the particle formation blend, and to gate the hover-tilt effect below so it only
     // engages while the globe is actually the thing on screen.

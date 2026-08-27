@@ -664,3 +664,68 @@ html.a11y-large-cursor,
 html.a11y-large-cursor * {
   cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='40'%20height='40'%20viewBox='0%200%2040%2040'%3E%3Cpath%20d='M4%202%20L4%2034%20L13%2025%20L19%2036%20L24%2033%20L18%2022%20L30%2022%20Z'%20fill='black'%20stroke='white'%20stroke-width='2'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 4, auto !important;
 }
+
+/* Dual-row text marquee (TextMarquee.tsx) — full-bleed regardless of the container the
+   component happens to render inside, edges softened with a fade mask rather than a hard
+   clip so the ticker reads as flowing off-screen instead of ending abruptly. Track position
+   is written directly to the element's own `transform` from JS every frame (see the
+   component), never animated in CSS, so its speed can react to live scroll velocity. */
+.marquee-section {
+  position: relative;
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  border-block: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.marquee-row {
+  position: relative;
+  overflow: hidden;
+  background: #050508;
+  padding-block: clamp(14px, 2.4vw, 22px);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.marquee-copy {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(16px, 2.4vw, 28px);
+  padding-inline-end: clamp(16px, 2.4vw, 28px);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: clamp(13px, 2.1vw, 20px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.marquee-track--rev .marquee-item {
+  color: rgba(143, 212, 0, 0.85); /* brand-400 */
+}
+
+.marquee-dot {
+  color: rgba(118, 185, 0, 0.55); /* brand-500 */
+  font-size: 0.6em;
+}
+
+.marquee-track--rev .marquee-dot {
+  color: rgba(203, 213, 225, 0.4);
+}

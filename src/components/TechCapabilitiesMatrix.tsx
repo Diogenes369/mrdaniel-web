@@ -85,7 +85,7 @@ export default function TechCapabilitiesMatrix() {
   const activeTab = TABS.find((t) => t.id === active)!;
 
   return (
-    <section id="tech-matrix" ref={dissolveRef} data-field-form="helix" data-field-anchor="right" className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full">
+    <section id="tech-matrix" ref={dissolveRef} data-field-form="scatter" className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full">
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <motion.div className="text-center mb-10 max-w-2xl mx-auto">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">

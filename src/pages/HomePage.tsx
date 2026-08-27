@@ -1,4 +1,5 @@
 import Hero from '../components/Hero';
+import TextMarquee from '../components/TextMarquee';
 import SystemMetrics from '../components/SystemMetrics';
 import TechComparisonMatrix from '../components/TechComparisonMatrix';
 import TechCapabilitiesMatrix from '../components/TechCapabilitiesMatrix';
@@ -16,6 +17,7 @@ export default function HomePage() {
   return (
     <>
       <Hero />
+      <TextMarquee />
       <SystemMetrics />
       <TechComparisonMatrix />
       <TechCapabilitiesMatrix />
