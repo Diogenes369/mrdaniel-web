@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, BrainCircuit, ShieldAlert, Sparkles, ArrowLeft } from 'lucide-react';
+import { BookOpen, BrainCircuit, ShieldAlert, ArrowLeft } from 'lucide-react';
 import TiltCard from './TiltCard';
 import WebButton from './WebButton';
 import { useSectionDissolve } from '../hooks/useSectionDissolve';
@@ -20,11 +20,6 @@ export default function Magazines() {
         <TiltCard strength={4} className="max-w-5xl mx-auto">
           <div className="relative overflow-hidden bg-[#0D0E12] border border-white/10 rounded-[2.5rem] p-8 md:p-14 text-center">
             <div className="absolute inset-0 bg-gradient-to-b from-brand-500/[0.07] to-transparent pointer-events-none" aria-hidden="true" />
-
-            <span className="relative inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-500/30 bg-brand-500/5 text-xs font-mono font-bold tracking-widest text-brand-400 uppercase mb-6">
-              <Sparkles className="w-3.5 h-3.5" />
-              מאגר הידע של דניאל
-            </span>
 
             <h2 className="relative font-display text-fluid-h2 font-black text-white mb-6">
               מגזינים, מדריכים <span className="text-brand-500">וחוברות עבודה</span>

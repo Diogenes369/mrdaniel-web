@@ -98,10 +98,6 @@ export default function EdgeCaseSimulator() {
     <section id="edge-case-simulator" ref={sectionRef} className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full">
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <div className="text-center mb-12 max-w-2xl mx-auto">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-500/30 bg-brand-500/5 text-xs font-mono font-bold tracking-widest text-brand-400 uppercase mb-6">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            סימולטור מקרי קצה
-          </span>
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
             מה קורה כשמנסים <span className="text-brand-500">לשבור את הסוכן?</span>
           </h2>

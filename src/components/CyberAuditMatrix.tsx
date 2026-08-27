@@ -85,10 +85,6 @@ export default function CyberAuditMatrix() {
     <section id="cyber-audit" ref={sectionRef} className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full">
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <div className="text-center mb-10 max-w-2xl mx-auto">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-500/30 bg-brand-500/5 text-xs font-mono font-bold tracking-widest text-brand-400 uppercase mb-6">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            לוח בקרה חי
-          </span>
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
             מטריצת בקרה <span className="text-brand-500">סייבר ופרטיות</span>
           </h2>
@@ -116,7 +112,14 @@ export default function CyberAuditMatrix() {
           )}
         </div>
 
-        <div className="mobile-carousel-track -mx-4 px-4 pb-2 gap-4 md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-5 max-w-5xl mx-auto mb-12">
+        {/* -mx-4/px-4 (mobile edge-bleed) vs. the desktop centering below both set margin-left/
+            margin-right — they used to coexist unscoped on the same element (plus a stray
+            `md:mx-0` that fought `mx-auto` for the same property at desktop too), which is exactly
+            what caused both bugs at once: an off-center desktop grid, and mobile overflow/cropping
+            from the edge-bleed margin fighting a simultaneously-applied `max-w-5xl mx-auto`. Now
+            cleanly split: mobile owns -mx-4/px-4 with nothing competing, md: owns mx-auto/max-w-5xl
+            with nothing competing. */}
+        <div className="mobile-carousel-track -mx-4 px-4 pb-2 gap-4 md:px-0 md:pb-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-5 md:max-w-5xl md:mx-auto mb-12">
           {MODULES.map((mod) => {
             const isActive = activeIds.has(mod.id);
             return (

@@ -1,9 +1,12 @@
 /**
  * MOTION V2 (PREVIEW) — Canvas2D particle field + aurora wash, ported from the Latitude teardown's
- * technique (hand-projected 3D sphere, per-ring spring-damper physics, sprite-based additive
- * rendering) and re-tuned to this site's own brand tokens and layout. Deliberately vanilla —
- * no Three.js, no GSAP — so it costs the "already paying for it" WebGL background nothing extra;
- * this is its lightweight *alternative*, gated behind the `?motion=2d` flag (see motionFlag.ts).
+ * technique (hand-projected 3D sphere, per-ring spring-damper physics) and re-tuned to this site's
+ * own brand tokens and layout. Points are drawn as direct filled vector circles, normal-blended —
+ * no sprite bitmaps, no additive glow — for the sharpest possible edge at any DPR (see the draw call
+ * in the frame loop below for why). Deliberately vanilla — no Three.js, no GSAP — so it costs the
+ * "already paying for it" WebGL background nothing extra; this is its lightweight *alternative to
+ * that particular scene*, gated behind the `?motion=2d` flag (see motionFlag.ts) — note it's paired
+ * with a *real* Three.js starfield underneath it (StarfieldLayer.tsx), by explicit request.
  *
  * Framework-agnostic on purpose: a bare `createFieldEngine()` factory over two <canvas> elements,
  * so the React wrapper (MotionField.tsx) only has to own the refs/lifecycle, not the physics.
@@ -77,41 +80,12 @@ const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 const smoothstep = (x: number) => x * x * (3 - 2 * x);
 const TAU = Math.PI * 2;
 
-interface Sprite {
-  canvas: HTMLCanvasElement;
-}
-
-function buildSprites(spritePx: number): [Sprite[], Sprite[]] {
-  // 12 alpha steps — finer depth-cued fading, still cheap since these are baked once, not per frame.
-  // Gradient shape is now a MOSTLY-SOLID disc (full alpha out to 58% radius) with only a short,
-  // tight anti-aliasing taper to 0 by 78% — deliberately NOT the wide soft-glow-halo shape this had
-  // before. That earlier shape, combined with additive ('lighter') blending on overlapping points,
-  // is exactly what reads as "blurry glowing blobs" once enough particles cluster near the sphere's
-  // front — every soft edge stacks and bleeds into its neighbors. A tight, mostly-solid disc doesn't
-  // have much soft edge left to bleed, and particle drawing below now also uses normal ('source-over')
-  // blending instead of additive, so two overlapping points no longer brighten each other at all —
-  // together this is what actually produces "razor-sharp pinpoint dots" rather than a nebula.
-  const AL = 12;
-  const build = (rgb: readonly [number, number, number]) => {
-    const out: Sprite[] = [];
-    for (let a = 0; a < AL; a++) {
-      const c = document.createElement('canvas');
-      c.width = c.height = spritePx;
-      const g = c.getContext('2d')!;
-      const al = (a + 1) / AL;
-      const grad = g.createRadialGradient(spritePx / 2, spritePx / 2, 0, spritePx / 2, spritePx / 2, spritePx / 2);
-      grad.addColorStop(0.0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${al.toFixed(3)})`);
-      grad.addColorStop(0.58, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${al.toFixed(3)})`);
-      grad.addColorStop(0.78, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
-      grad.addColorStop(1.0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
-      g.fillStyle = grad;
-      g.fillRect(0, 0, spritePx, spritePx);
-      out.push({ canvas: c });
-    }
-    return out;
-  };
-  return [build(STAR), build(SIGNAL)];
-}
+// Precomputed "rgb(r,g,b," prefixes — each particle's actual draw call appends only its own alpha
+// and closing paren (`STAR_RGB + alpha.toFixed(3) + ')'`), which is materially cheaper per particle
+// than template-literal-interpolating all three channels every frame across N particles, and is the
+// reason this is a plain string constant rather than something like a cached Map.
+const STAR_RGB = `rgba(${STAR[0]},${STAR[1]},${STAR[2]},`;
+const SIGNAL_RGB = `rgba(${SIGNAL[0]},${SIGNAL[1]},${SIGNAL[2]},`;
 
 export interface FieldEngineOptions {
   fieldCanvas: HTMLCanvasElement;
@@ -138,21 +112,8 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   if (!ctx || !actx) {
     return { setFrozen() {}, dispose() {} };
   }
-  // Canvas2D's default smoothing quality is implementation-defined and, on several engines, biased
-  // toward speed over fidelity — since every point sprite is drawn via a scaled-down drawImage
-  // (spritePx source → a few CSS px on screen), the resampling quality here is what actually decides
-  // whether a point reads as a crisp dot or a soft, slightly muddy blob. Explicit and high on both
-  // contexts; the cost is paid once per drawImage call, not proportional to canvas resolution.
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  actx.imageSmoothingEnabled = true;
-  actx.imageSmoothingQuality = 'high';
-
   let frozen = reducedMotion; // reduced-motion starts frozen and stays that way — never re-armed.
   const N = tier === 'high' ? 1400 : 520;
-  const spritePx = tier === 'high' ? 96 : 48;
-  const [starSprites, signalSprites] = buildSprites(spritePx);
-  const AL = starSprites.length;
 
   // ---------- particle state (typed arrays — 1,400 particles × several Float32Arrays is a fraction
   // of a millisecond to allocate and keeps the per-frame loop free of per-particle object churn). ----------
@@ -470,10 +431,8 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         const gx = cx + X * s, gy = cy - Y2 * s;
         const front = clamp(0.5 - (Z3 / (R || 1)) * 0.5, 0, 1);
         const galpha = (0.14 + front * 0.55) * (0.7 + rnd2[i] * 0.4);
-        // A pure multiplier (NOT pre-scaled by spritePx — spritePx is the *source bitmap*
-        // resolution the sprite was baked at, unrelated to how many CSS px it's drawn at; folding
-        // it in here once and then multiplying by spritePx again at the draw call was a real bug
-        // that produced 25-106px "stars" — a wash of blown-out white rather than a field of points).
+        // A pure dimensionless multiplier — turned into an actual on-screen radius once, at the
+        // draw call below (`size * 3.5`), never here.
         const gsize = (1.1 + front * 1.3) * (0.8 + rnd3[i] * 0.6);
         // Straight linear blend between this particle's scattered "ambient" home and its globe
         // position — globeWeight is already eased by the scroll-distance clamp above, so a second
@@ -483,16 +442,24 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         alpha = 0.04 * (1 - globeWeight) + galpha * globeWeight;
         size = 0.8 * (1 - globeWeight) + gsize * globeWeight;
       } else {
-        // Slow, per-particle Lissajous-ish wander around its own viewport-relative home — organic
-        // and always in view at any scroll depth, unlike the scroll-linked parallax this replaced.
-        // Amplitude and frequency both vary per particle (via its own seeded randoms) so the whole
-        // field never moves as one visible unit — that desync IS what reads as "organic" rather
-        // than "one shape sliding".
-        const wx = Math.sin(time * (0.05 + rnd3[i] * 0.06) + rnd1[i] * TAU) * (14 + rnd2[i] * 22);
-        const wy = Math.cos(time * (0.04 + rnd2[i] * 0.05) + rnd3[i] * TAU) * (14 + rnd1[i] * 22);
+        // Continuous upward FLOW, not just in-place wander — a stateless function of elapsed time
+        // (not scroll or accumulated state), wrapped modulo the viewport height, so each particle
+        // endlessly rises and loops seamlessly forever, at any scroll depth, without ever needing to
+        // be "re-seeded". This is what makes the field read as genuinely flowing across the full
+        // height of the page rather than a fixed scatter that merely jitters around a static home.
+        const flowSpeed = 6 + rnd1[i] * 10; // px/sec — varies per particle so the field never rises
+        // as one visible sheet.
+        let flowY = (scatterY[i] - time * flowSpeed) % H;
+        if (flowY < 0) flowY += H;
+        const q = flowY / H;
+        // Fades in over the bottom 12% and out over the top 12% of its travel — without this, a
+        // particle wrapping from y≈0 back to y≈H would visibly "pop" in/out at the seam every cycle.
+        const edgeFade = smoothstep(clamp(q * 8, 0, 1)) * (1 - smoothstep(clamp((q - 0.88) * 8, 0, 1)));
+
+        const wx = Math.sin(time * (0.05 + rnd3[i] * 0.06) + rnd1[i] * TAU) * (10 + rnd2[i] * 16);
         tx = scatterX[i] + wx;
-        ty = scatterY[i] + wy;
-        alpha = 0.05 + rnd2[i] * 0.05;
+        ty = flowY;
+        alpha = (0.05 + rnd2[i] * 0.06) * edgeFade;
         size = 0.7;
       }
 
@@ -518,20 +485,23 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
       py[i] += vy[i] * dt;
 
       // Physics runs for every particle regardless of drawStride — only the (comparatively
-      // expensive) drawImage call is thinned under sustained load, so density recovers the instant
+      // expensive) fill call is thinned under sustained load, so density recovers the instant
       // performance does, with no re-seeding or visible pop back to full.
       if (drawStride > 1 && i % drawStride !== 0) continue;
       const x = px[i], y = py[i];
       if (x < -40 || x > W + 40 || y < -40 || y > H + 40) continue;
-      let ai = Math.round(alpha * AL) - 1;
-      if (ai < 0) continue;
-      if (ai >= AL) ai = AL - 1;
-      const sprites = hue[i] === 1 ? signalSprites : starSprites;
-      // `size` is a small dimensionless multiplier (~0.7-2.9) — this constant is the only place the
-      // actual on-screen point diameter (in CSS px) is decided, independent of the sprite bitmap's
-      // own resolution (spritePx). Deliberately small: this reads as a field of points, not blobs.
-      const s = size * 7;
-      ctx.drawImage(sprites[ai].canvas, x - s * 0.5, y - s * 0.5, s, s);
+      if (alpha < 0.01) continue;
+      // A directly-filled circle, not a scaled sprite bitmap — zero gradient, zero soft edge, only
+      // the canvas's own ~1px edge anti-aliasing (which is sub-pixel smoothing, not a visible glow).
+      // This replaced a pre-baked radial-gradient sprite system: even tuned to a mostly-solid disc
+      // shape, ANY gradient sprite still has a soft transition ring around it once actually drawn on
+      // screen, which is exactly what read as "blurry"/"foggy" — a vector circle has none at all.
+      // `size` is a small dimensionless multiplier (~0.7-2.9); ×3.5 sets the on-screen radius in CSS px.
+      const r = size * 3.5;
+      ctx.fillStyle = (hue[i] === 1 ? SIGNAL_RGB : STAR_RGB) + alpha.toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';
   };

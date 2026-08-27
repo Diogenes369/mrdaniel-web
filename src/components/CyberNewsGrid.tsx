@@ -23,16 +23,6 @@ export default function CyberNewsGrid() {
     <section id="news" className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden cv-auto">
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center mb-12 md:mb-16 relative z-10">
-          <motion.div
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-500/30 bg-brand-500/5 text-xs font-mono font-bold tracking-widest text-brand-400 uppercase mb-6"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
-            </span>
-            עדכון יומי
-          </motion.div>
-
           <motion.h2
             className="font-display text-fluid-h2 font-black text-white mb-6"
           >

@@ -246,10 +246,6 @@ export default function AiAgentsSection() {
     <section id="ai-agents" className="py-20 md:py-32 border-t border-white/5 relative overflow-hidden cv-auto">
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <div className="text-center mb-10 max-w-3xl mx-auto">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-500/30 bg-brand-500/5 text-xs font-mono font-bold tracking-widest text-brand-400 uppercase mb-6">
-            <Sparkles className="w-3.5 h-3.5" />
-            חדש · Custom AI Agents 2026
-          </span>
           <motion.h2
             className="font-display text-fluid-h2 font-black text-white mb-6"
           >

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { motion, useSpring, useTransform, useInView } from 'motion/react';
-import { TrendingUp, Clock, Users, Sparkles, Home, ShoppingCart, Building2, Briefcase, Plus, Minus, type LucideIcon } from 'lucide-react';
+import { TrendingUp, Clock, Users, Home, ShoppingCart, Building2, Briefcase, Plus, Minus, type LucideIcon } from 'lucide-react';
 import WebButton from './WebButton';
 import { useSectionDissolve } from '../hooks/useSectionDissolve';
 import { AI_AGENTS, type AiAgent } from '../data/aiAgents';
@@ -242,10 +242,6 @@ export default function AdvancedRoiCalculator() {
     <section id="roi-calculator" ref={sectionRef} className="py-12 md:py-20 border-t border-white/5 relative overflow-hidden w-full">
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <div className="text-center mb-12 max-w-2xl mx-auto">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-500/30 bg-brand-500/5 text-xs font-mono font-bold tracking-widest text-brand-400 uppercase mb-6">
-            <Sparkles className="w-3.5 h-3.5" />
-            מחשבון ROI אינטראקטיבי
-          </span>
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
             כמה סוכן AI <span className="text-brand-500">שווה לעסק שלך?</span>
           </h2>
