@@ -107,7 +107,10 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-carbon-950 text-zinc-100 font-sans selection:bg-brand-500 selection:text-black" dir="rtl">
+    <div
+      className={`min-h-screen overflow-x-hidden ${motionV2 ? 'bg-[#050508]' : 'bg-carbon-950'} text-zinc-100 font-sans selection:bg-brand-500 selection:text-black`}
+      dir="rtl"
+    >
       <RouteScrollManager />
       <Suspense fallback={null}>
         {sceneReady &&

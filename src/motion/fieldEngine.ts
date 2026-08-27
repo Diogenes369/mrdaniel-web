@@ -1,26 +1,25 @@
 /**
- * MOTION V2 (PREVIEW) — Canvas2D particle field + aurora wash, ported from the Latitude teardown's
- * technique (hand-projected 3D sphere, per-ring spring-damper physics) and re-tuned to this site's
- * own brand tokens and layout. Points are drawn as direct filled vector circles, normal-blended —
- * no sprite bitmaps, no additive glow — for the sharpest possible edge at any DPR (see the draw call
- * in the frame loop below for why). Deliberately vanilla — no Three.js, no GSAP — so it costs the
- * "already paying for it" WebGL background nothing extra; this is its lightweight *alternative to
- * that particular scene*, gated behind the `?motion=2d` flag (see motionFlag.ts) — note it's paired
- * with a *real* Three.js starfield underneath it (StarfieldLayer.tsx), by explicit request.
+ * MOTION V2 (PREVIEW) — Canvas2D particle field, ported from the Latitude teardown's technique
+ * (hand-projected 3D sphere, per-ring spring-damper physics) and re-tuned to this site's own brand
+ * tokens and layout. Points are drawn as direct filled vector circles, normal-blended — no sprite
+ * bitmaps, no additive glow — for the sharpest possible edge at any DPR (see the draw call in the
+ * frame loop below for why). Deliberately vanilla — no Three.js, no GSAP — so it costs the "already
+ * paying for it" WebGL background nothing extra; this is its lightweight *alternative to that
+ * particular scene*, gated behind the `?motion=2d` flag (see motionFlag.ts) — note it's paired with
+ * a *real* Three.js starfield underneath it (StarfieldLayer.tsx), by explicit request.
+ *
+ * There was an aurora wash layer here (soft color-gradient blobs behind the points) — removed by
+ * explicit request: pure black background + white starfield only, zero color wash. If it's ever
+ * wanted back, the technique is documented in the Latitude teardown research this module is based on.
  *
  * Framework-agnostic on purpose: a bare `createFieldEngine()` factory over two <canvas> elements,
  * so the React wrapper (MotionField.tsx) only has to own the refs/lifecycle, not the physics.
  */
 
-// ---------- brand tokens (kept in sync BY HAND with src/index.css's @theme block — same convention
-// already used for the dashboard/agent type duplication elsewhere in this codebase; Canvas2D can't
-// read CSS custom properties without an extra getComputedStyle round trip per value, which isn't
-// worth paying every time these are needed inside a hot per-particle loop). ----------
-const STAR = [241, 245, 249] as const; // zinc-200 — the neutral majority particle color
-const SIGNAL = [0, 255, 102] as const; // --color-glow — the accent minority particle color
-const AURORA_A = [56, 189, 248] as const; // electric-blue
-const AURORA_B = [34, 211, 238] as const; // neon-cyan
-const AURORA_C = [118, 185, 0] as const; // brand-500 — a third, warmer glow tone
+// Strictly monochrome by explicit request — pure black background, pure white points, zero color
+// anywhere in this layer (no green accent hue, no aurora wash). Matches the real starfield's own
+// near-white color exactly (see StarfieldLayer.tsx's Sparkles `color="#dff5e6"`).
+const STAR = [241, 245, 249] as const; // zinc-200
 
 // ---------- tuning (see the teardown's appendix for the source constants this was calibrated
 // against; values below are re-tuned for a slightly smaller, calmer field than the original). ----------
@@ -80,17 +79,14 @@ const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 const smoothstep = (x: number) => x * x * (3 - 2 * x);
 const TAU = Math.PI * 2;
 
-// Precomputed "rgb(r,g,b," prefixes — each particle's actual draw call appends only its own alpha
-// and closing paren (`STAR_RGB + alpha.toFixed(3) + ')'`), which is materially cheaper per particle
-// than template-literal-interpolating all three channels every frame across N particles, and is the
-// reason this is a plain string constant rather than something like a cached Map.
+// Precomputed "rgb(r,g,b," prefix — each particle's actual draw call appends only its own alpha and
+// closing paren (`STAR_RGB + alpha.toFixed(3) + ')'`), which is materially cheaper per particle than
+// template-literal-interpolating all three channels every frame across N particles.
 const STAR_RGB = `rgba(${STAR[0]},${STAR[1]},${STAR[2]},`;
-const SIGNAL_RGB = `rgba(${SIGNAL[0]},${SIGNAL[1]},${SIGNAL[2]},`;
 
 export interface FieldEngineOptions {
   fieldCanvas: HTMLCanvasElement;
-  auroraCanvas: HTMLCanvasElement;
-  /** Fewer particles, smaller sprites, capped draw rate — see useDeviceTier.ts. */
+  /** Fewer particles, capped draw rate — see useDeviceTier.ts. */
   tier: 'high' | 'low';
   reducedMotion: boolean;
 }
@@ -103,13 +99,12 @@ export interface FieldEngineHandle {
 }
 
 export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
-  const { fieldCanvas, auroraCanvas, tier, reducedMotion } = opts;
+  const { fieldCanvas, tier, reducedMotion } = opts;
   const ctx = fieldCanvas.getContext('2d', { alpha: true });
-  const actx = auroraCanvas.getContext('2d', { alpha: true });
 
   // A canvas can legitimately fail to produce a 2D context (exhausted context budget, a locked-down
   // browser policy) — fail silently rather than throw, since this whole feature is decorative.
-  if (!ctx || !actx) {
+  if (!ctx) {
     return { setFrozen() {}, dispose() {} };
   }
   let frozen = reducedMotion; // reduced-motion starts frozen and stays that way — never re-armed.
@@ -121,7 +116,6 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   const vx = new Float32Array(N), vy = new Float32Array(N);
   const rnd1 = new Float32Array(N), rnd2 = new Float32Array(N), rnd3 = new Float32Array(N);
   const kmul = new Float32Array(N);
-  const hue = new Uint8Array(N); // 0 = star, 1 = signal accent (~12% of particles)
   const ringOf = new Uint8Array(N);
   const scatterX = new Float32Array(N), scatterY = new Float32Array(N);
 
@@ -130,7 +124,6 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     rnd2[i] = hash(i * 4 + 2311);
     rnd3[i] = hash(i * 4 + 90001);
     kmul[i] = 1 - T.pKvar * 0.5 + rnd2[i] * T.pKvar;
-    hue[i] = rnd3[i] < 0.12 ? 1 : 0;
   }
 
   const NR = T.rings;
@@ -169,9 +162,9 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   let yaw = 0, yawVel = 0, tilt: number = T.tiltBase, tiltVel = 0, tiltTarget: number = T.tiltBase;
   let mx = -1e4, my = -1e4, fieldAmt = 0;
 
-  // Arrow-function *expressions*, not `function` declarations — TS's null-narrowing of `ctx`/`actx`
-  // above only survives into closures defined textually after the guard; a hoisted `function`
-  // declaration is (conservatively, correctly) treated as possibly running before the guard ran.
+  // Arrow-function *expression*, not a `function` declaration — TS's null-narrowing of `ctx` above
+  // only survives into closures defined textually after the guard; a hoisted `function` declaration
+  // is (conservatively, correctly) treated as possibly running before the guard ran.
   let seeded = false;
   const layout = () => {
     // Capped at 3 (was 2) — explicitly to force true native-resolution rendering on 3x-DPR phones
@@ -182,12 +175,9 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     DPR = Math.min(3, window.devicePixelRatio || 1);
     W = window.innerWidth;
     H = window.innerHeight;
-    for (const c of [fieldCanvas, auroraCanvas]) {
-      c.width = Math.round(W * DPR);
-      c.height = Math.round(H * DPR);
-    }
+    fieldCanvas.width = Math.round(W * DPR);
+    fieldCanvas.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    actx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     R = Math.min(W * (tier === 'high' ? T.radiusW : T.radiusWM), H * T.radiusH);
     cx = W * 0.5;
@@ -219,6 +209,32 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     seeded = true;
   };
   layout();
+
+  // ---------- readability guard ----------
+  // Any element flagged [data-field-guard] (Hero.tsx's headline block, currently the only one) gets
+  // the field dimmed specifically behind it, feathered so there's no visible rectangle — this is
+  // what actually guarantees "100% readable" instead of hoping small/sharp points never happen to
+  // land on a letter. Queried once (the element doesn't come and go), but its rect is re-read every
+  // frame in the loop below since it's a normal-flow element that moves as the page scrolls.
+  const guardEl = document.querySelector<HTMLElement>('[data-field-guard]');
+  const GUARD_MIN = 0.12, GUARD_FEATHER = 56;
+  function guardFactorAt(x: number, y: number, r: DOMRect | null): number {
+    if (!r) return 1;
+    const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+    const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+    const d = Math.max(dx, dy);
+    if (d <= 0) return GUARD_MIN;
+    if (d >= GUARD_FEATHER) return 1;
+    return GUARD_MIN + (1 - GUARD_MIN) * smoothstep(d / GUARD_FEATHER);
+  }
+
+  // ---------- boot entrance ----------
+  // A brief materialize-in rather than the field snapping to full brightness the instant physics
+  // starts — particles are already springing in from scatter positions toward the globe (see the
+  // per-particle spring below), so this just makes that assembly READ as a deliberate entrance
+  // rather than a flash. One-way ramp, not looped.
+  const bootAt = performance.now();
+  const BOOT_MS = 1100;
 
   // ---------- pointer / drag (window-level hit-testing, exactly like usePointer.ts already does
   // for the R3F scene — the canvas stays pointer-events:none so it can never intercept a real click
@@ -303,37 +319,8 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   const onResize = () => layout();
   window.addEventListener('resize', onResize);
 
-  // ---------- aurora ----------
-  const AURORA_COLORS = [AURORA_A, AURORA_B, AURORA_C];
-  const drawAurora = (time: number) => {
-    actx.clearRect(0, 0, W, H);
-    actx.globalCompositeOperation = 'lighter';
-    for (let k = 0; k < 3; k++) {
-      const rgb = AURORA_COLORS[k];
-      const x = (0.2 + k * 0.3 + Math.sin(time * (0.03 + k * 0.01) + k) * 0.08) * W;
-      const y = (0.25 + k * 0.22 + Math.cos(time * (0.025 + k * 0.008) + k * 2) * 0.07) * H;
-      const rr = Math.max(W, H) * (0.42 + Math.sin(time * 0.017 + k) * 0.06);
-      const g = actx.createRadialGradient(x, y, 0, x, y, rr);
-      // Raised from 0.05/0.018 — at the original values this was measured at ~17/255 alpha
-      // (~6.7%) by the time it reached a card's screen position, which is not enough color for a
-      // frosted-glass card sitting over it to visibly pick up: `backdrop-filter` was demonstrably
-      // working (confirmed via getImageData), there just wasn't enough light behind the glass to
-      // bend. This is the one deliberately vivid layer in the whole system — everything else (the
-      // point field, the cards) stays deliberately restrained around it.
-      g.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.20)`);
-      g.addColorStop(0.55, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.075)`);
-      g.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
-      actx.fillStyle = g;
-      actx.beginPath();
-      actx.arc(x, y, rr, 0, TAU);
-      actx.fill();
-    }
-    actx.globalCompositeOperation = 'source-over';
-  };
-
   // ---------- main loop ----------
   let last = performance.now();
-  let aurAt = 0;
   let raf = 0;
   let disposed = false;
 
@@ -399,20 +386,16 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     const wantField = FINE && globeWeight > 0.15 ? 1 : 0;
     fieldAmt = damp(fieldAmt, wantField, 1 / T.fieldTau, dt);
 
-    if (now - aurAt > 32) {
-      drawAurora(time);
-      aurAt = now;
-    }
-
     ctx.clearRect(0, 0, W, H);
     // 'source-over' (normal alpha blending), not 'lighter' (additive) — additive blending is what
     // makes overlapping points brighten and bleed into each other into one glowing mass wherever the
     // sphere gets dense (its front face, ring intersections); normal blending draws each point
     // independently, which is what actually reads as "sharp individual dots" rather than a nebula.
-    // The aurora wash a few lines up is intentionally left on 'lighter' — that IS meant to glow.
     ctx.globalCompositeOperation = 'source-over';
     const fr2 = T.fieldR * T.fieldR;
     const breathe = 1 + Math.sin(time * TAU * T.breathHz) * T.breathAmp;
+    const bootFade = smoothstep(clamp((now - bootAt) / BOOT_MS, 0, 1));
+    const guardRect = guardEl ? guardEl.getBoundingClientRect() : null;
 
     for (let i = 0; i < N; i++) {
       // Target position: blend between the ring/globe formation and this particle's scattered
@@ -490,15 +473,17 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
       if (drawStride > 1 && i % drawStride !== 0) continue;
       const x = px[i], y = py[i];
       if (x < -40 || x > W + 40 || y < -40 || y > H + 40) continue;
+      alpha *= bootFade * guardFactorAt(x, y, guardRect);
       if (alpha < 0.01) continue;
       // A directly-filled circle, not a scaled sprite bitmap — zero gradient, zero soft edge, only
       // the canvas's own ~1px edge anti-aliasing (which is sub-pixel smoothing, not a visible glow).
-      // This replaced a pre-baked radial-gradient sprite system: even tuned to a mostly-solid disc
-      // shape, ANY gradient sprite still has a soft transition ring around it once actually drawn on
-      // screen, which is exactly what read as "blurry"/"foggy" — a vector circle has none at all.
-      // `size` is a small dimensionless multiplier (~0.7-2.9); ×3.5 sets the on-screen radius in CSS px.
-      const r = size * 3.5;
-      ctx.fillStyle = (hue[i] === 1 ? SIGNAL_RGB : STAR_RGB) + alpha.toFixed(3) + ')';
+      // Radius deliberately tiny — down from an earlier ×3.5 (which gave ~5-20px dots, plainly too
+      // big) to true pinpoint scale matching the real starfield's own star size: `size` is a small
+      // dimensionless multiplier (~0.7-2.9 across ambient→front-facing-globe); this maps it to a
+      // ~0.85-1.66px radius (≈1.7-3.3px diameter) instead of a big dot, with just enough range left
+      // to still read as depth (closer globe points a touch larger than ambient ones).
+      const r = 0.6 + size * 0.35;
+      ctx.fillStyle = STAR_RGB + alpha.toFixed(3) + ')';
       ctx.beginPath();
       ctx.arc(x, y, r, 0, TAU);
       ctx.fill();

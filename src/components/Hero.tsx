@@ -17,6 +17,10 @@ export default function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
           className="max-w-4xl mx-auto text-center px-4"
+          // Read by the motion=2d particle engine (fieldEngine.ts) to dim the particle field
+          // specifically behind this block, so the headline/subhead stay 100% readable regardless
+          // of what the field is doing — a no-op when Scene3D (the default background) is active.
+          data-field-guard
         >
           <h1 className="font-display text-fluid-hero font-black text-white mb-7 [text-shadow:0_2px_18px_rgba(0,0,0,0.85),0_6px_44px_rgba(0,0,0,0.75)]">
             הופכים טכנולוגיה מורכבת

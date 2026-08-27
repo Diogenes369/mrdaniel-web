@@ -15,22 +15,21 @@ function useA11yStopMotion() {
 
 /**
  * Lightweight Canvas2D alternative to Scene3D — see src/motion/fieldEngine.ts for the actual
- * particle/aurora physics. Only ever mounted when the `?motion=2d` preview flag is on (see
- * App.tsx); never both this and Scene3D at once.
+ * particle physics. Only ever mounted when the `?motion=2d` preview flag is on (see App.tsx); never
+ * both this and Scene3D at once. Single canvas — the aurora wash layer was removed by explicit
+ * request (pure black + white starfield only, zero color wash).
  */
 export default function MotionField() {
   const fieldRef = useRef<HTMLCanvasElement>(null);
-  const auroraRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<FieldEngineHandle | null>(null);
   const tier = useDeviceTier();
   const stopMotion = useA11yStopMotion();
 
   useEffect(() => {
-    const fieldCanvas = fieldRef.current, auroraCanvas = auroraRef.current;
-    if (!fieldCanvas || !auroraCanvas) return;
+    const fieldCanvas = fieldRef.current;
+    if (!fieldCanvas) return;
     const engine = createFieldEngine({
       fieldCanvas,
-      auroraCanvas,
       tier,
       reducedMotion: prefersReducedMotion(),
     });
@@ -50,7 +49,6 @@ export default function MotionField() {
 
   return (
     <div className="motion-field-layer" aria-hidden="true">
-      <canvas ref={auroraRef} />
       <canvas ref={fieldRef} />
     </div>
   );

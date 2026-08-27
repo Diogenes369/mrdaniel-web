@@ -301,6 +301,22 @@ body::before {
    targets are never created unless that flag is on.
    ============================================================ */
 
+/* The site-wide `body::before` ambient corner glow a few lines up (green + electric-blue radial
+   washes, ALWAYS on, independent of this flag entirely) turned out to be a real contributor to a
+   "muddy green" complaint about the motion=2d preview — it sits at z-index:0 under everything,
+   compounding with anything else in this layer. Left untouched for the default site (a deliberate,
+   pre-existing brand decision, not this module's to remove), but killed specifically here: pure
+   black + white starfield means literally nothing else may tint the background under this flag. */
+html.motion-v2 body::before {
+  display: none;
+}
+/* Belt-and-suspenders with App.tsx's own conditional bg-[#050508] on the root div — this covers the
+   sliver of body background an overscroll bounce can briefly expose past that div's own edge. */
+html.motion-v2,
+html.motion-v2 body {
+  background-color: #050508;
+}
+
 /* The restored cosmic starfield (StarfieldLayer.tsx) — same z-index as .motion-field-layer below
    on purpose: with two `position:fixed` siblings at equal z-index, DOM ORDER decides paint order
    (later wins, painting on top), and starfield mounts first in App.tsx, so it reliably sits BENEATH
