@@ -1,4 +1,5 @@
 import Hero from '../components/Hero';
+import MotionPreviewSection from '../components/MotionPreviewSection';
 import SystemMetrics from '../components/SystemMetrics';
 import TechComparisonMatrix from '../components/TechComparisonMatrix';
 import TechCapabilitiesMatrix from '../components/TechCapabilitiesMatrix';
@@ -15,6 +16,7 @@ export default function HomePage() {
   return (
     <>
       <Hero />
+      <MotionPreviewSection />
       <SystemMetrics />
       <TechComparisonMatrix />
       <TechCapabilitiesMatrix />

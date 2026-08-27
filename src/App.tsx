@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import ScrollProgress from './components/ScrollProgress';
@@ -12,8 +12,13 @@ import CommandPalette from './components/CommandPalette';
 import { useLenis, smoothScrollTo, scrollToTopInstant, triggerRouteTransitionPulse } from './hooks/useLenis';
 import { useDeferredMount } from './hooks/useDeferredMount';
 import { ScrollTrigger } from './lib/gsap';
+import { isMotionV2Enabled } from './lib/motionFlag';
 
 const Scene3D = lazy(() => import('./three/Scene3D'));
+// Both lazy — a visitor without the `?motion=2d` preview flag never downloads either of these
+// chunks, and one with the flag never downloads Scene3D/Three.js. See lib/motionFlag.ts.
+const MotionField = lazy(() => import('./motion/MotionField'));
+const Cursor = lazy(() => import('./components/Cursor'));
 
 // The tracker pulls in the Firebase SDK (~200KB gzipped) — code-split into its own chunk via
 // dynamic import rather than a static one, so it never bloats the main bundle that every visitor
@@ -63,6 +68,10 @@ export default function App() {
   useLenis();
   const location = useLocation();
   const sceneReady = useDeferredMount();
+  // Computed once per session, same pattern as Scene3D.tsx's own `useState(isIOSWebKit)` — the
+  // flag is a runtime/localStorage switch (see lib/motionFlag.ts), not something that needs to
+  // react live mid-session.
+  const [motionV2] = useState(isMotionV2Enabled);
 
   useEffect(() => {
     loadTracker().then((t) => t.initTracker());
@@ -87,9 +96,12 @@ export default function App() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-carbon-950 text-zinc-100 font-sans selection:bg-brand-500 selection:text-black" dir="rtl">
       <RouteScrollManager />
-      <Suspense fallback={null}>
-        {sceneReady && <Scene3D />}
-      </Suspense>
+      <Suspense fallback={null}>{sceneReady && (motionV2 ? <MotionField /> : <Scene3D />)}</Suspense>
+      {motionV2 && (
+        <Suspense fallback={null}>
+          <Cursor />
+        </Suspense>
+      )}
       <ScrollProgress />
       <Header />
       <main key={location.pathname} className="relative z-[1]">

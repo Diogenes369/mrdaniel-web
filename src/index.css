@@ -294,6 +294,111 @@ body::before {
   transform: translateZ(0);
 }
 
+/* ============================================================
+   MOTION V2 (PREVIEW) — Latitude-inspired Canvas2D field + cursor + word reveal.
+   Flag-gated at the JS level (see src/lib/motionFlag.ts); the CSS below is inert dead weight
+   (never matched) for any visitor without the `?motion=2d` flag, since the classes/elements it
+   targets are never created unless that flag is on.
+   ============================================================ */
+
+/* Same fixed-full-viewport-backdrop contract as .scene3d-layer above — z-index:0, pointer-events:
+   none so it never blocks a click/scroll on real content, own GPU compositing layer. Two canvases
+   stack via document order: aurora first (soft wash), field second (points), both `position:fixed`
+   inside this one positioning context rather than each separately `position:fixed` — one fewer
+   compositing layer than two independently-fixed canvases. */
+.motion-field-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  z-index: 0;
+  pointer-events: none;
+  contain: strict;
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.motion-field-layer canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Custom cursor — the one glassmorphic surface in this system, used once, deliberately (mirrors
+   the teardown's own restraint). Fine-pointer only; touch devices never render it (see Cursor.tsx's
+   own `(pointer:fine)` gate, mirrored here as a defensive no-op if that check is ever bypassed). */
+.motion-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 50;
+  pointer-events: none;
+  will-change: transform;
+}
+.motion-cursor .bubble {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  margin: -48px 0 0 -48px;
+  border-radius: 50%;
+  background: rgba(8, 9, 12, 0.55);
+  border: 1px solid rgba(118, 185, 0, 0.45);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #f1f5f9;
+  text-align: center;
+  line-height: 1.4;
+  transform: scale(0);
+  opacity: 0;
+  transition:
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.3s ease;
+}
+.motion-cursor.on .bubble {
+  transform: scale(1);
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .motion-cursor {
+    display: none;
+  }
+}
+
+/* Reversible word-mask reveal (see useWordReveal.ts). A mask, not a fade: the inner word sits below
+   its own overflow-hidden line and slides up into place, then slides back down out of view if
+   scrolled back past — "the word was put there," not "it appeared." */
+.sp {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
+}
+.sp > .wd {
+  display: inline-block;
+  transform: translateY(115%);
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--wd, 0ms);
+}
+.in .sp > .wd {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp > .wd {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
 /* Mobile horizontal-swipe carousel track/item pair — the shared pattern behind every "long
    vertical card list → compact swipe row on phones" conversion. Every flex/scroll declaration here
    is scoped inside the max-width query on purpose: call sites pair this class with a plain
