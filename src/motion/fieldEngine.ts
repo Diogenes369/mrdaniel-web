@@ -291,15 +291,35 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   }
   measureStops();
 
+  // Fraction of the scroll distance between two adjacent stops spent fully settled (not blending) at
+  // EACH end — e.g. 0.32 means the first 32% of that gap is spent locked on formation A, the middle
+  // 36% is the actual morph, and formation B is already fully resolved (and just holds there,
+  // completely settled) for the final 32% before the visitor even reaches the next stop's own
+  // midpoint. Replaces an earlier flat "lead" multiplier that started blending immediately at 0% —
+  // this instead gives each shape real dwell time to be seen fully formed before it starts changing
+  // again, per explicit request ("give users time to appreciate each shape instead of snapping
+  // immediately"), while STILL resolving well before the next stop is reached, which is what leaves
+  // the back end of that hold window as real runway for the particle spring physics to physically
+  // finish traveling before the visitor's eye/viewport actually arrives there.
+  const DWELL = 0.32;
+  const DWELL_SPAN = 1 - DWELL * 2;
+  // Transitions landing on 'contact' get a much earlier resolve point instead of the general dwell
+  // curve — that formation's target is a REAL on-screen element (the CTA ring), not an abstract point
+  // cluster, so it specifically needs generous runway for the particle spring physics to have fully
+  // arrived by the time the visitor's viewport reaches the section (confirmed via live pixel-density
+  // testing: the general symmetric DWELL above, which only resolves at 70% of the way through the
+  // gap, left just 30% of the scroll distance for particles to travel from wherever they were —
+  // nowhere near enough, and is what was producing a visibly empty/sparse halo right as the section
+  // centers). Resolving by 35% here instead leaves 65% of the gap as settling runway — comfortably
+  // more than even the old flat-lead approach had (50%).
+  const CONTACT_START = 0.05, CONTACT_END = 0.35;
+  const CONTACT_SPAN = CONTACT_END - CONTACT_START;
+
   /** Which two formations are active right now, and how far blended between them (0=fully A,
    * 1=fully B) — the *only* thing scroll position controls; every formation's own coordinates below
    * are otherwise purely functions of viewport size + elapsed time, never of scroll or page
    * position, which is the specific, hard-won fix for an earlier bug where scroll-coupled particle
-   * coordinates went mathematically unreachable off-screen once scrolled past. `* 2` gain (Latitude's
-   * own `T.lead` was `1.5`, raised further here for a snappier, more "instantly reactive" feel per
-   * explicit request) means a transition is fully resolved by the halfway point between two stops —
-   * a formation should visibly start answering the first flick of the wheel, not wait until the
-   * visitor is already most of the way to the next section. */
+   * coordinates went mathematically unreachable off-screen once scrolled past. */
   function pickFormation(): { A: FieldForm; B: FieldForm; t: number; anchorA: number; anchorB: number } {
     if (!stops.length) return { A: 'hero', B: 'hero', t: 0, anchorA: 0, anchorB: 0 };
     const sc = window.scrollY + H / 2;
@@ -310,7 +330,11 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
       const a = stops[i], b = stops[i + 1];
       if (sc >= a.y && sc < b.y) {
         const raw = (sc - a.y) / (b.y - a.y);
-        return { A: a.form, B: b.form, t: smoothstep(clamp(raw * 2, 0, 1)), anchorA: a.anchorPx, anchorB: b.anchorPx };
+        const held =
+          b.form === 'contact'
+            ? clamp((raw - CONTACT_START) / CONTACT_SPAN, 0, 1)
+            : clamp((raw - DWELL) / DWELL_SPAN, 0, 1);
+        return { A: a.form, B: b.form, t: smoothstep(held), anchorA: a.anchorPx, anchorB: b.anchorPx };
       }
     }
     return { A: last.form, B: last.form, t: 0, anchorA: last.anchorPx, anchorB: last.anchorPx };
