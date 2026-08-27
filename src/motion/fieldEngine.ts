@@ -72,6 +72,9 @@ function hash(n: number): number {
 }
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
+// Hermite smoothstep — eases both ends of a 0..1 ramp (slow-fast-slow) instead of a linear ramp's
+// constant rate, which is what makes an eased transition read as "graceful" rather than mechanical.
+const smoothstep = (x: number) => x * x * (3 - 2 * x);
 const TAU = Math.PI * 2;
 
 interface Sprite {
@@ -79,7 +82,13 @@ interface Sprite {
 }
 
 function buildSprites(spritePx: number): [Sprite[], Sprite[]] {
-  const AL = 8;
+  // 12 alpha steps (was 8) — finer depth-cued fading, still cheap since these are baked once, not
+  // per frame. Gradient shape is deliberately a SHARP small core + a fast initial falloff + a long
+  // soft tail — a wide even falloff (the previous shape) reads as a soft blob at any size; a hard
+  // core reads as a crisp point with a bloom around it, which is what "razor-sharp" actually means
+  // for an additively-blended point sprite (a truly hard-edged circle with no falloff at all would
+  // alias/flicker sub-pixel as it moves, which is worse, not better).
+  const AL = 12;
   const build = (rgb: readonly [number, number, number]) => {
     const out: Sprite[] = [];
     for (let a = 0; a < AL; a++) {
@@ -89,8 +98,8 @@ function buildSprites(spritePx: number): [Sprite[], Sprite[]] {
       const al = (a + 1) / AL;
       const grad = g.createRadialGradient(spritePx / 2, spritePx / 2, 0, spritePx / 2, spritePx / 2, spritePx / 2);
       grad.addColorStop(0.0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${al.toFixed(3)})`);
-      grad.addColorStop(0.16, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${al.toFixed(3)})`);
-      grad.addColorStop(0.4, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${(al * 0.4).toFixed(3)})`);
+      grad.addColorStop(0.09, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${al.toFixed(3)})`);
+      grad.addColorStop(0.22, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${(al * 0.5).toFixed(3)})`);
       grad.addColorStop(1.0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
       g.fillStyle = grad;
       g.fillRect(0, 0, spritePx, spritePx);
@@ -126,6 +135,15 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   if (!ctx || !actx) {
     return { setFrozen() {}, dispose() {} };
   }
+  // Canvas2D's default smoothing quality is implementation-defined and, on several engines, biased
+  // toward speed over fidelity — since every point sprite is drawn via a scaled-down drawImage
+  // (spritePx source → a few CSS px on screen), the resampling quality here is what actually decides
+  // whether a point reads as a crisp dot or a soft, slightly muddy blob. Explicit and high on both
+  // contexts; the cost is paid once per drawImage call, not proportional to canvas resolution.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  actx.imageSmoothingEnabled = true;
+  actx.imageSmoothingQuality = 'high';
 
   let frozen = reducedMotion; // reduced-motion starts frozen and stays that way — never re-armed.
   const N = tier === 'high' ? 1400 : 520;
@@ -208,11 +226,18 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
     FOCAL = T.axisCam * R;
 
     // Scatter targets recompute on resize (a particle's scatter home is a pure function of its own
-    // seeded randoms and the current viewport, not stored/accumulated state).
+    // seeded randoms and the current viewport, not stored/accumulated state). Deliberately plain
+    // viewport-relative coordinates (0..W, 0..H) — an EARLIER version spanned 2.4 viewport-heights
+    // of page-space per particle on the theory that scrolling would "reveal" the rest via a small
+    // parallax factor, but at a realistic scroll speed that parallax could never actually traverse
+    // that distance: roughly 60% of the field was mathematically stuck off-screen forever the moment
+    // a visitor scrolled past the first viewport-height, which is exactly why every section below the
+    // hero rendered with visibly zero particles. The organic "floating" motion instead comes from the
+    // per-particle time-based wander added in the frame loop below (driftPhase), the same technique
+    // the Latitude teardown's own ambient formations use — always within view, at any scroll depth.
     for (let i = 0; i < N; i++) {
       scatterX[i] = rnd1[i] * W;
-      scatterY[i] = rnd2[i] * H * 2.4; // spans well past one viewport height so it reads as an
-      // ambient wash while scrolling, not a field that visibly "runs out" partway down the page.
+      scatterY[i] = rnd2[i] * H;
       // Seed the actual (spring-driven) position too, but ONLY on first layout — a Float32Array
       // defaults every particle to (0,0), and without this every single one would visibly spring
       // in from the top-left corner as one converging clump on load instead of starting already
@@ -320,8 +345,14 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
       const y = (0.25 + k * 0.22 + Math.cos(time * (0.025 + k * 0.008) + k * 2) * 0.07) * H;
       const rr = Math.max(W, H) * (0.42 + Math.sin(time * 0.017 + k) * 0.06);
       const g = actx.createRadialGradient(x, y, 0, x, y, rr);
-      g.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.05)`);
-      g.addColorStop(0.55, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.018)`);
+      // Raised from 0.05/0.018 — at the original values this was measured at ~17/255 alpha
+      // (~6.7%) by the time it reached a card's screen position, which is not enough color for a
+      // frosted-glass card sitting over it to visibly pick up: `backdrop-filter` was demonstrably
+      // working (confirmed via getImageData), there just wasn't enough light behind the glass to
+      // bend. This is the one deliberately vivid layer in the whole system — everything else (the
+      // point field, the cards) stays deliberately restrained around it.
+      g.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.20)`);
+      g.addColorStop(0.55, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.075)`);
       g.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
       actx.fillStyle = g;
       actx.beginPath();
@@ -343,6 +374,15 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
   // this cadence, so a capped draw rate never makes dragging the globe feel laggy.
   const frameBudgetMs = tier === 'low' ? 1000 / 30 : 0;
 
+  // Live performance guard — useDeviceTier is a one-time heuristic (cores/memory/pointer type) and
+  // can't see actual sustained frame cost, which also depends on things it can't know in advance
+  // (how many other tabs/apps are competing for the GPU right now, thermal throttling on a phone
+  // mid-session). If real frame time stays bad for ~1.5s straight, thin the DRAW loop by skipping
+  // every other (then every third) particle — physics for every particle keeps running regardless,
+  // so density recovers instantly and smoothly the moment performance does, no re-seeding or pop.
+  let badFrames = 0, drawStride = 1;
+  const BAD_FRAME_MS = 1000 / 24; // worse than ~24fps counts against the budget
+
   const frame = (now: number) => {
     if (disposed) return;
     raf = requestAnimationFrame(frame);
@@ -351,15 +391,27 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
 
     let dt = (now - last) / 1000;
     last = now;
+    if (dt * 1000 > BAD_FRAME_MS) {
+      badFrames++;
+      if (badFrames > 90 && drawStride < 3) {
+        drawStride++;
+        badFrames = 0;
+      }
+    } else if (badFrames > 0) {
+      badFrames--;
+    }
     if (dt > 0.05) dt = 0.05; // guards the spring integration against a huge dt after a tab was
     // backgrounded — without this a stale delta can send the ring physics into a visible "explosion".
     const time = now / 1000;
 
-    // Hero-to-scatter blend — how much of the page has scrolled past the hero's own height. Reads
+    // Hero-to-scatter dissolve — how much of the page has scrolled past the hero's own height. Reads
     // window.scrollY directly (not Lenis's document-wide progress, which is the wrong unit for "how
-    // far past THIS one section" on a long page).
+    // far past THIS one section" on a long page). The dissolve runs over 1.4 hero-heights rather than
+    // exactly one, and is smoothstep-eased rather than linear — both changes exist purely so the
+    // globe reads as gradually dissolving into the ambient field rather than visibly running out of
+    // road right at the section boundary and snapping into its final rate of change.
     const heroPx = document.getElementById('hero')?.offsetHeight || window.innerHeight;
-    const globeWeight = clamp(1 - window.scrollY / heroPx, 0, 1);
+    const globeWeight = smoothstep(clamp(1 - window.scrollY / (heroPx * 1.4), 0, 1));
 
     yaw += T.idleSpin * dt * 0.5;
     if (!dragging) {
@@ -418,8 +470,15 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
         alpha = 0.04 * (1 - globeWeight) + galpha * globeWeight;
         size = 0.8 * (1 - globeWeight) + gsize * globeWeight;
       } else {
-        tx = scatterX[i];
-        ty = scatterY[i] - window.scrollY * 0.04; // a faint parallax drift as the page scrolls
+        // Slow, per-particle Lissajous-ish wander around its own viewport-relative home — organic
+        // and always in view at any scroll depth, unlike the scroll-linked parallax this replaced.
+        // Amplitude and frequency both vary per particle (via its own seeded randoms) so the whole
+        // field never moves as one visible unit — that desync IS what reads as "organic" rather
+        // than "one shape sliding".
+        const wx = Math.sin(time * (0.05 + rnd3[i] * 0.06) + rnd1[i] * TAU) * (14 + rnd2[i] * 22);
+        const wy = Math.cos(time * (0.04 + rnd2[i] * 0.05) + rnd3[i] * TAU) * (14 + rnd1[i] * 22);
+        tx = scatterX[i] + wx;
+        ty = scatterY[i] + wy;
         alpha = 0.05 + rnd2[i] * 0.05;
         size = 0.7;
       }
@@ -445,6 +504,10 @@ export function createFieldEngine(opts: FieldEngineOptions): FieldEngineHandle {
       px[i] += vx[i] * dt;
       py[i] += vy[i] * dt;
 
+      // Physics runs for every particle regardless of drawStride — only the (comparatively
+      // expensive) drawImage call is thinned under sustained load, so density recovers the instant
+      // performance does, with no re-seeding or visible pop back to full.
+      if (drawStride > 1 && i % drawStride !== 0) continue;
       const x = px[i], y = py[i];
       if (x < -40 || x > W + 40 || y < -40 || y > H + 40) continue;
       let ai = Math.round(alpha * AL) - 1;

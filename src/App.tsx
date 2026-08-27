@@ -73,6 +73,15 @@ export default function App() {
   // react live mid-session.
   const [motionV2] = useState(isMotionV2Enabled);
 
+  // A single class on <html> is what index.css's `.motion-v2` rules key off — see the "MOTION V2
+  // GLASS OVERRIDES" block there for why this exists: it lets the preview turn the site's already
+  // largely-translucent cards into true frosted glass (added backdrop-blur, not a new opacity)
+  // WITHOUT editing the ~20 component files that render them, and reverts to zero effect the
+  // instant the flag is off.
+  useEffect(() => {
+    document.documentElement.classList.toggle('motion-v2', motionV2);
+  }, [motionV2]);
+
   useEffect(() => {
     loadTracker().then((t) => t.initTracker());
     // Every CTA on the site already dispatches this one event to open the lead modal — listening

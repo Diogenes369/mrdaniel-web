@@ -399,6 +399,47 @@ body::before {
   }
 }
 
+/* ---------- MOTION V2 GLASS OVERRIDES ----------
+   First pass at this targeted `bg-carbon-800`/`bg-carbon-900` — the theme's own named tokens — but
+   an audit across every homepage section found most cards actually use bespoke arbitrary-value fills
+   instead (`bg-[#0D0E12]`, `bg-black/40`, etc. — SystemMetrics's stat cards are one example of many),
+   so a token-name selector missed most of the site. What IS consistent everywhere, regardless of
+   which exact color a card happens to use, is the STRUCTURAL fingerprint: every card in this codebase
+   is `rounded-xl`/`rounded-2xl`/`rounded-3xl` (or an arbitrary large radius like `rounded-[1.75rem]`)
+   with a hairline border — buttons use `rounded-full` and small tag/badge chips don't carry a card's
+   padding, so this doesn't catch either. Matching on shape rather than color/background is what makes
+   this actually comprehensive without hand-auditing and editing every one of the ~20+ card-rendering
+   components across every page. `!important` is deliberate: this must win over whatever inline
+   Tailwind background utility the component itself declared, and both are equally-specific single
+   declarations, so specificity order can't be trusted the way a cascade layer would guarantee it.
+   Scoped to `.motion-v2 main` — zero effect for any visitor without the `?motion=2d` flag, and
+   modals/overlays rendered as App.tsx siblings of `<main>` (LeadForm, command palette, etc.) are
+   structurally outside this selector's reach, staying fully opaque/readable on purpose. */
+html.motion-v2 main [class*="rounded-2xl"],
+html.motion-v2 main [class*="rounded-xl"],
+html.motion-v2 main [class*="rounded-3xl"],
+html.motion-v2 main [class*="rounded-["] {
+  /* .34, not .45 — lowered once the aurora layer itself was actually bright enough (see
+     fieldEngine.ts's drawAurora) to confirm how much fill a card can drop to before its own text
+     loses contrast, rather than guessing a number with nothing behind it to test against. */
+  background-color: rgba(10, 11, 15, 0.34) !important;
+  backdrop-filter: blur(20px) saturate(1.25) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.25) !important;
+}
+@media (prefers-reduced-motion: reduce), (max-width: 480px) {
+  /* Backdrop blur is one of the more GPU-expensive CSS filters, paid on every scroll repaint for
+     every matched card on screen at once — worth skipping on the smallest/most constrained
+     devices; reduced-motion users and small phones get the plainer, cheaper translucent-only look. */
+  html.motion-v2 main [class*="rounded-2xl"],
+  html.motion-v2 main [class*="rounded-xl"],
+  html.motion-v2 main [class*="rounded-3xl"],
+  html.motion-v2 main [class*="rounded-["] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgba(10, 11, 15, 0.62) !important;
+  }
+}
+
 /* Mobile horizontal-swipe carousel track/item pair — the shared pattern behind every "long
    vertical card list → compact swipe row on phones" conversion. Every flex/scroll declaration here
    is scoped inside the max-width query on purpose: call sites pair this class with a plain
