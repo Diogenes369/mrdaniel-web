@@ -57,7 +57,7 @@ function PackageCard({ pkg }: { pkg: PricingPackage }) {
 export default function PricingSection() {
   return (
     <section id="pricing" className="relative py-20 md:py-32 border-t border-white/5 overflow-hidden cv-auto">
-      <div className="container mx-auto px-4 md:px-6 relative z-10">
+      <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
             שירותים <span className="text-brand-500">ותמחור ברור</span>
@@ -68,7 +68,7 @@ export default function PricingSection() {
         </div>
 
         {/* Plain-language services */}
-        <div className="mx-auto max-w-5xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-16 md:mb-20">
+        <div className="mx-auto max-w-[1500px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-5 mb-16 md:mb-20">
           {PLAIN_SERVICES.map((s) => (
             <div key={s.term} className="rounded-2xl border border-white/10 bg-[#0D0E12] p-5">
               <div className="mb-3 flex items-center gap-2.5">
@@ -83,7 +83,7 @@ export default function PricingSection() {
         </div>
 
         {/* Packages */}
-        <div className="mx-auto max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 items-stretch">
+        <div className="mx-auto max-w-[1200px] grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 items-stretch">
           {PACKAGES.map((pkg) => (
             <TiltCard key={pkg.id} strength={3} className="h-full">
               <PackageCard pkg={pkg} />

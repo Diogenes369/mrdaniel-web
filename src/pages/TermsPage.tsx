@@ -15,7 +15,7 @@ const TOC: TocItem[] = [
 export default function TermsPage() {
   return (
     <div className="min-h-screen pt-24 md:pt-28">
-      <div className="container mx-auto px-6 max-w-4xl">
+      <div className="container-wide">
         <PolicyHero
           title="תנאי שימוש באתר"
           metaLabel="הסדרה משפטית ודיני מדינת ישראל"

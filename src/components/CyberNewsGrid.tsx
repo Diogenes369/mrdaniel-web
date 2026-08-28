@@ -96,7 +96,7 @@ export default function CyberNewsGrid() {
 
   return (
     <section id="news" className="py-14 md:py-24 border-t border-white/5 relative overflow-hidden cv-auto">
-      <div className="container mx-auto px-4 md:px-6 relative z-10">
+      <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-8 md:mb-10">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-4">
             חדשות <span className="text-brand-500">סייבר, AI וטכנולוגיה</span>
@@ -175,7 +175,7 @@ export default function CyberNewsGrid() {
         </div>
 
         {isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-64 rounded-2xl bg-white/[0.03] border border-white/5 animate-pulse" />
             ))}
@@ -194,7 +194,7 @@ export default function CyberNewsGrid() {
 
         {!isLoading && !isError && filtered.length > 0 && (
           <>
-            <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 max-w-6xl mx-auto mb-10">
+            <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6 max-w-[1600px] mx-auto mb-10">
               {filtered.map((item) => (
                 <motion.div key={item.id} className="h-full">
                   <NewsCard item={item} />

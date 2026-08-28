@@ -46,7 +46,7 @@ import LeadCtaGrid from '../components/content/LeadCtaGrid';
 export default function DigitalPage() {
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28">
-      <div className="container mx-auto px-6 max-w-4xl">
+      <div className="container-wide">
         <PageHero
           badgeIcon={Rocket}
           badgeLabel="Digital Development & Web3"

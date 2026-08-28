@@ -33,7 +33,7 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
       id={offer.id}
       className="relative py-20 md:py-32 border-t border-white/5 overflow-hidden cv-auto"
     >
-      <div className="container mx-auto px-4 md:px-6 relative z-10">
+      <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
             {offer.title} <span className="text-brand-500">{offer.accent}</span>
@@ -42,7 +42,7 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
         </div>
 
         {/* Desktop / tablet: static 4-up grid. */}
-        <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto mb-12">
+        <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6 max-w-[1600px] mx-auto mb-12">
           {offer.bullets.map((b) => (
             <TiltCard key={b.title} strength={4} className="h-full">
               <BulletCard bullet={b} />

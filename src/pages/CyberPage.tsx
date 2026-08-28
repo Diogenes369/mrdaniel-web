@@ -22,7 +22,7 @@ import { PageHero, SectionHeading, InteractiveServiceGrid, InfoBox, SpecTable, A
 export default function CyberPage() {
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28">
-      <div className="container mx-auto px-6 max-w-4xl">
+      <div className="container-wide">
         <PageHero
           badgeIcon={ShieldCheck}
           badgeLabel="Cybersecurity & Resiliency Architecture"

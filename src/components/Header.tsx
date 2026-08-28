@@ -155,7 +155,7 @@ export default function Header() {
       }`}
       style={{ willChange: 'transform, opacity, background-color' }}
     >
-      <div className="container mx-auto px-4 md:px-6">
+      <div className="container-wide">
         {/* Desktop-only: on scroll this row condenses from a full-width bar into a floating
             glassmorphism capsule (w-fit + rounded-full + its own bg/border/glow) — the outer
             <header> above sheds its own background at the lg breakpoint so the capsule reads as

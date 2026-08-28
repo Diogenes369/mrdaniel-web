@@ -12,7 +12,7 @@ const TOC: TocItem[] = [
 export default function AccessibilityPage() {
   return (
     <div className="min-h-screen pt-24 md:pt-28">
-      <div className="container mx-auto px-6 max-w-4xl">
+      <div className="container-wide">
         <PolicyHero
           title="הצהרת נגישות"
           metaLabel="מחויבות לנגישות דיגיטלית"

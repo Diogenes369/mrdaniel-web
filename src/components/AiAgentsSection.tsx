@@ -244,7 +244,7 @@ export default function AiAgentsSection() {
 
   return (
     <section id="ai-agents" className="py-20 md:py-32 border-t border-white/5 relative overflow-hidden cv-auto">
-      <div className="container mx-auto px-4 md:px-6 relative z-10">
+      <div className="container-wide relative z-10">
         <div className="text-center mb-10 max-w-3xl mx-auto">
           <motion.h2
             className="font-display text-fluid-h2 font-black text-white mb-6"
@@ -281,7 +281,7 @@ export default function AiAgentsSection() {
         <AnimatePresence mode="wait">
           <motion.div key={filter} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3 }}>
             {/* Desktop / tablet: responsive multi-column grid. */}
-            <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6 md:gap-7 max-w-6xl mx-auto">
+            <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-7 max-w-[1600px] mx-auto">
               {visibleAgents.map((agent) => (
                 <AgentCard key={agent.id} agent={agent} />
               ))}

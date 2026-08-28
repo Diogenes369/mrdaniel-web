@@ -99,7 +99,7 @@ export default function Footer() {
     <footer className="relative overflow-hidden border-t border-[#76B900]/20 bg-black py-8">
       <div className="footer-grid absolute inset-0 pointer-events-none" aria-hidden="true" />
 
-      <div className="container mx-auto px-6 relative z-10">
+      <div className="container-wide relative z-10">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-8 mb-8">
           <div className="col-span-2 md:col-span-1">
             <Link to="/" onClick={handleLogoClick} className="inline-flex rounded-lg outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">

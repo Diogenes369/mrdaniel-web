@@ -188,7 +188,7 @@ export default function CapabilityMatrix() {
 
   return (
     <section id="matrix" ref={dissolveRef} className="py-20 md:py-32 border-t border-white/5 relative overflow-hidden">
-      <div className="container mx-auto px-4 md:px-6">
+      <div className="container-wide">
         <motion.div
           className="text-center mb-12"
         >
@@ -228,7 +228,7 @@ export default function CapabilityMatrix() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.3 }}
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3"
             >
               {CAPABILITIES[active].map((item, idx) => (
                 <motion.button

@@ -27,7 +27,7 @@ const HUB_LINKS = [
 export default function AboutPage() {
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28">
-      <div className="container mx-auto px-6 max-w-4xl">
+      <div className="container-wide">
         <PageHero
           badgeIcon={Terminal}
           badgeLabel="IT Management • Cyber Architecture • Agentic AI • Web3"
@@ -35,11 +35,11 @@ export default function AboutPage() {
           subtitle="מנהל תשתיות ורשתות, ארכיטקט אבטחת סייבר ומומחה ליישום בינה מלאכותית ארגונית"
         />
 
-        <div className="text-lg text-zinc-200 leading-[1.9] bg-carbon-900/60 border border-white/10 border-r-4 border-r-brand-500 rounded-xl p-6 md:p-7 mb-14">
+        <div className="text-lg text-zinc-200 leading-[1.9] bg-carbon-900/60 border border-white/10 border-r-4 border-r-brand-500 rounded-xl p-6 md:p-7 mb-14 max-w-4xl">
           בעולם טכנולוגי שנע במהירות שיא, הפער בין אימוץ טכנולוגיה חדשה לבין יצירת יתרון עסקי אמיתי טמון בחיבור הנכון בין תשתיות רשת חזקות, הגנה היקפית מודרנית ואוטומציה חכמה מבוססת AI — לא בכל רכיב בנפרד.
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }} className="bg-carbon-900/50 border border-white/10 rounded-2xl p-7 md:p-9 mb-16">
+        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }} className="bg-carbon-900/50 border border-white/10 rounded-2xl p-7 md:p-9 mb-16 max-w-4xl">
           <h2 className="flex items-center gap-3 font-display font-bold text-xl md:text-2xl text-white mb-5">
             <ShieldCheck className="w-6 h-6 text-brand-400" />
             על הפעילות והחזון המקצועי
@@ -75,7 +75,7 @@ export default function AboutPage() {
             <LayoutGrid className="w-5 h-5 text-brand-400" />
             <h3 className="font-display font-bold text-xl text-white">כל שירותי האתר במקום אחד</h3>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {HUB_LINKS.map((item) => (
               <Link
                 key={item.to}
@@ -95,7 +95,7 @@ export default function AboutPage() {
           </div>
         </div>
 
-        <div className="bg-carbon-900/60 border border-white/10 rounded-2xl p-7 md:p-9 mb-16 text-center">
+        <div className="bg-carbon-900/60 border border-white/10 rounded-2xl p-7 md:p-9 mb-16 text-center max-w-3xl mx-auto">
           <div className="flex items-center justify-center gap-2.5 mb-3">
             <Share2 className="w-5 h-5 text-brand-400" />
             <h3 className="font-display font-bold text-xl text-white">עקבו אחרי הפעילות באופן שוטף</h3>
@@ -106,14 +106,14 @@ export default function AboutPage() {
           <SocialLinks className="justify-center" iconClassName="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 hover:shadow-[0_0_16px_rgba(0,255,102,0.35)] transition-all outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" glyphClassName="w-5 h-5" />
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }} className="bg-carbon-900 border border-brand-500/30 rounded-2xl p-8 md:p-12 text-center mb-16">
+        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }} className="bg-carbon-900 border border-brand-500/30 rounded-2xl p-8 md:p-12 text-center mb-16 max-w-4xl mx-auto">
           <p className="font-display text-xl md:text-2xl font-bold text-white leading-relaxed mb-4">
             "טכנולוגיה איכותית אינה נמדדת בסיבוכיות שלה, אלא בשקט התפעולי ובערך העסקי שהיא מייצרת."
           </p>
           <span className="text-brand-400 font-medium">— דניאל</span>
         </motion.div>
 
-        <div className="bg-gradient-to-br from-brand-500/15 via-carbon-900 to-carbon-900 border border-brand-500/30 rounded-2xl p-7 md:p-10 mb-16 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right">
+        <div className="bg-gradient-to-br from-brand-500/15 via-carbon-900 to-carbon-900 border border-brand-500/30 rounded-2xl p-7 md:p-10 mb-16 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right max-w-5xl mx-auto">
           <div>
             <h3 className="font-display font-bold text-xl md:text-2xl text-white mb-2">רוצים להעמיק בעצמכם? זה בחנות</h3>
             <p className="text-zinc-400 max-w-md">חוברות עבודה מקצועיות ומגזינים דיגיטליים בנושאי AI, סייבר ורשתות ארגוניות — ידע מעשי, לא תיאוריה.</p>

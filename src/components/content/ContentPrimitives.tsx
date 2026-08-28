@@ -47,7 +47,8 @@ export function SectionHeading({ icon: Icon, title, description }: { icon: Lucid
         <Icon className="w-6 h-6 text-brand-400 shrink-0" />
         {title}
       </h2>
-      <p className="text-zinc-400 text-base md:text-lg">{description}</p>
+      {/* Description stays a comfortable measure even inside a wide `.container-wide` page. */}
+      <p className="text-zinc-400 text-base md:text-lg max-w-3xl">{description}</p>
     </div>
   );
 }
@@ -56,9 +57,10 @@ export function SectionHeading({ icon: Icon, title, description }: { icon: Lucid
  * site-wide) — kept optional so existing call sites that still pass one don't need to be touched. */
 export function InfoBox({ title, children }: { badgeIcon?: LucideIcon; badgeLabel?: string; title?: string; children: ReactNode }) {
   return (
-    <div className="bg-carbon-900/60 border border-white/10 border-r-4 border-r-brand-500 rounded-2xl p-6 md:p-8 mb-16">
+    <div className="bg-carbon-900/60 border border-white/10 border-r-4 border-r-brand-500 rounded-2xl p-6 md:p-10 mb-16">
       {title && <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">{title}</h2>}
-      <div className="space-y-4 text-base md:text-lg text-zinc-300 leading-[1.85]">{children}</div>
+      {/* Prose measure so a wide page doesn't stretch these paragraphs past a readable line length. */}
+      <div className="space-y-4 text-base md:text-lg text-zinc-300 leading-[1.85] max-w-4xl">{children}</div>
     </div>
   );
 }
@@ -71,7 +73,7 @@ export interface ServiceItem {
 
 export function ServiceGrid({ items }: { items: ServiceItem[] }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-16">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6 mb-16">
       {items.map((item) => (
         <motion.div
           key={item.title}
@@ -134,7 +136,7 @@ export function InteractiveServiceGrid({ items }: { items: ServiceItem[] }) {
   return (
     <div className="mb-16 space-y-5">
       <InteractiveServiceCard item={featured} index={0} featured />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6">
         {rest.map((item, i) => (
           <InteractiveServiceCard key={item.title} item={item} index={i + 1} />
         ))}
@@ -168,7 +170,7 @@ export interface AudienceItem {
 
 export function AudienceGrid({ items }: { items: AudienceItem[] }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-16">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6 mb-16">
       {items.map((item) => (
         <div key={item.title} className="bg-carbon-900/60 border border-white/10 rounded-2xl p-6 hover:border-brand-500/30 transition-colors">
           <div className="font-mono text-xs font-bold text-brand-400 mb-2 uppercase tracking-wide">{item.tag}</div>

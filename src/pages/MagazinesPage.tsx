@@ -665,7 +665,7 @@ export default function MagazinesPage() {
 
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
-      <div className="container mx-auto px-6 max-w-6xl">
+      <div className="container-wide">
         <PageHero
           badgeIcon={BookOpen}
           badgeLabel="החנות הדיגיטלית · Premium Guides 2026"
@@ -695,7 +695,7 @@ export default function MagazinesPage() {
           guides catalog below it (swapped up one position from the store's page order). */}
       <AiAgentsSection />
 
-      <div className="container mx-auto px-6 max-w-6xl">
+      <div className="container-wide">
         <div className="max-w-md mx-auto relative mb-6">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
           <input
@@ -733,18 +733,18 @@ export default function MagazinesPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.3 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16"
+            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6 mb-16"
           >
             {visibleProducts.length > 0 ? (
               visibleProducts.map((product) => <ProductCard key={product.id} product={product} onPreview={() => setPreviewProduct(product)} />)
             ) : (
-              <div className="md:col-span-2 text-center py-12 text-zinc-400">לא נמצאו מדריכים התואמים את החיפוש.</div>
+              <div className="md:col-span-2 xl:col-span-3 text-center py-12 text-zinc-400">לא נמצאו מדריכים התואמים את החיפוש.</div>
             )}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      <div className="container mx-auto px-6 max-w-6xl">
+      <div className="container-wide">
         <RoiMeter />
 
         <div className="text-center mb-12">

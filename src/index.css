@@ -625,3 +625,19 @@ html.a11y-large-cursor * {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Wide, immersive page shell — replaces the tight Tailwind `container` on
+   desktop. Caps at 1700px with fluid gutters (~1rem on phones → 4rem on wide
+   screens). Prose inside still self-limits its line length via `max-w-*` /
+   `.measure`, so text stays readable while grids and cards use the full width.
+   --------------------------------------------------------------------------- */
+.container-wide {
+  width: 100%;
+  max-width: 1700px;
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 5vw, 4rem);
+}
+.measure {
+  max-width: 72ch;
+}

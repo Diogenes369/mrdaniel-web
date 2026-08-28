@@ -30,7 +30,7 @@ export default function NewsPage() {
 
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
-      <div className="container mx-auto px-6 max-w-6xl">
+      <div className="container-wide">
         <PageHero
           badgeIcon={Rss}
           badgeLabel="עדכון יומי · Israeli Hebrew Tech Feed"
@@ -71,7 +71,7 @@ export default function NewsPage() {
         </div>
 
         {isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
             {Array.from({ length: 9 }).map((_, idx) => (
               <div key={idx} className="h-64 rounded-2xl bg-white/[0.03] border border-white/5 animate-pulse" />
             ))}
@@ -97,7 +97,7 @@ export default function NewsPage() {
             )}
 
             {filtered.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
                 {filtered.map((item, idx) => (
                   <motion.div
                     key={item.id}
