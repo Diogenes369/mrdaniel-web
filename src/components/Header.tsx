@@ -17,6 +17,7 @@ const HEADER_SOCIAL_CHANNELS = ['instagram', 'linkedin', 'mail'] as const;
 type NavLink = { name: string; to?: string; action?: 'contact' };
 const navLinks: NavLink[] = [
   { name: 'סוכני AI', to: '/ai' },
+  { name: 'מערכת JARVIS', to: '/jarvis' },
   { name: 'סייבר ואבטחה', to: '/cyber' },
   { name: 'פיתוח ושיווק', to: '/digital' },
   { name: 'חדשות', to: '/news' },
@@ -29,6 +30,7 @@ const SHUFFLE_DESTINATIONS = [
   '/architecture',
   '/capabilities',
   '/ai',
+  '/jarvis',
   '/cyber',
   '/about',
   '/digital',
@@ -211,7 +213,7 @@ export default function Header() {
             />
           </Link>
 
-          <nav className={`hidden lg:flex items-center shrink-0 transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${scrolled ? 'gap-5' : 'gap-8'}`}>
+          <nav className={`hidden lg:flex items-center shrink-0 transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${scrolled ? 'gap-4 xl:gap-5' : 'gap-5 xl:gap-8'}`}>
             {navLinks.map((link) =>
               link.action === 'contact' ? (
                 <button

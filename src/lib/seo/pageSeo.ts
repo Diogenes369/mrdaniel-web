@@ -38,6 +38,22 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
       breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'סוכני AI', path: '/ai' }]),
     ],
   },
+  '/jarvis': {
+    title: 'מערכת JARVIS — שכבת AI אוטונומית לארגון | דניאל בן ברוך',
+    description:
+      'JARVIS היא תשתית AI ארגונית המאחדת סוכני בינה מלאכותית אוטונומיים, תזמור מודלי שפה (LLM), פייפליינים של דאטה בזמן אמת, מנוע אוטומציה לתהליכים ובקרת גישה ברמת בנק — בהתאמה אישית לפי מורכבות הארגון, ללא מחירון מדף.',
+    path: '/jarvis',
+    jsonLd: [
+      serviceLd({
+        name: 'מערכת JARVIS — ארכיטקטורת AI ארגונית',
+        serviceType: 'Enterprise AI System Architecture',
+        description:
+          'תכנון והטמעה של מערכת JARVIS: סוכני AI אוטונומיים, תזמור LLM ארגוני, פייפליינים של דאטה בזמן אמת, מנוע אוטומציה לתהליכים ואבטחה ובקרת גישה ברמת בנק.',
+        path: '/jarvis',
+      }),
+      breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'מערכת JARVIS', path: '/jarvis' }]),
+    ],
+  },
   '/cyber': {
     title: 'אבטחת סייבר לעסקים קטנים ובינוניים ולארגונים | דניאל בן ברוך',
     description:

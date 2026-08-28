@@ -2,6 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://mrdaniel.co.il/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://mrdaniel.co.il/ai</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://mrdaniel.co.il/jarvis</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://mrdaniel.co.il/cyber</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://mrdaniel.co.il/digital</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://mrdaniel.co.il/news</loc><changefreq>daily</changefreq><priority>0.8</priority></url>

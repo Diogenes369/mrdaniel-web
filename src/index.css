@@ -601,7 +601,8 @@ html.a11y-large-cursor * {
 .news-ticker__track {
   display: flex;
   width: max-content;
-  animation: news-ticker-scroll 55s linear infinite;
+  /* Deliberately slow so headlines are comfortable and smooth to read. */
+  animation: news-ticker-scroll 120s linear infinite;
   will-change: transform;
 }
 .news-ticker:hover .news-ticker__track {

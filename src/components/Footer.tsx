@@ -9,6 +9,7 @@ import { smoothScrollTo, scrollToTopSmooth } from '../hooks/useLenis';
 const NAV_LINKS = [
   { name: 'אודות', to: '/about' },
   { name: 'AI', to: '/ai' },
+  { name: 'מערכת JARVIS', to: '/jarvis' },
   { name: 'סייבר', to: '/cyber' },
   { name: 'דיגיטל', to: '/digital' },
   { name: 'ארכיטקטורה', to: '/architecture' },

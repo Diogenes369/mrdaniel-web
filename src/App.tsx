@@ -34,6 +34,7 @@ function loadTracker(): Promise<TrackerModule> {
 import HomePage from './pages/HomePage';
 import AboutPage from './pages/AboutPage';
 import AIPage from './pages/AIPage';
+import JarvisPage from './pages/JarvisPage';
 import CyberPage from './pages/CyberPage';
 import DigitalPage from './pages/DigitalPage';
 import ArchitecturePage from './pages/ArchitecturePage';
@@ -100,15 +101,17 @@ export default function App() {
       <Suspense fallback={null}>{sceneReady && <Scene3D />}</Suspense>
       <ScrollProgress />
       {/* Live headline ticker: very top of the layout, above the header, in normal document
-          flow. It scrolls away with the page; the header measures it and is NOT sticky-bundled
-          with it (see Header.tsx). */}
-      <NewsTicker />
+          flow, DESKTOP ONLY (the component is `hidden md:block`). It scrolls away with the page;
+          the header measures it and is NOT sticky-bundled with it (see Header.tsx). On mobile the
+          ticker instead renders inline inside the homepage news section (CyberNewsGrid). */}
+      <NewsTicker placement="top" />
       <Header />
       <main key={location.pathname} className="relative z-[1]">
         <Routes location={location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/ai" element={<AIPage />} />
+          <Route path="/jarvis" element={<JarvisPage />} />
           <Route path="/cyber" element={<CyberPage />} />
           <Route path="/digital" element={<DigitalPage />} />
           <Route path="/architecture" element={<ArchitecturePage />} />

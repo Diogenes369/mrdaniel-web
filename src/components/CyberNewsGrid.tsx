@@ -4,13 +4,15 @@ import { motion } from 'motion/react';
 import { Rss, ArrowLeft, RefreshCw, Sparkles, Clock3 } from 'lucide-react';
 import WebButton from './WebButton';
 import NewsCard from './NewsCard';
+import NewsTicker from './NewsTicker';
 import ScrollLockRail from './mobile/ScrollLockRail';
 import { useNewsFeed, type NewsTopic } from '../services/newsService';
 
 // Homepage news section: category tab filters, reading-time tags (in NewsCard), an "updated"
-// pill, and a responsive grid / mobile scroll-lock rail. The infinite live headline ticker that
-// used to sit inside this section now lives site-wide at the very top of the layout
-// (NewsTicker.tsx, mounted in App.tsx). All underlying data is unchanged — same useNewsFeed().
+// pill, and a responsive grid / mobile scroll-lock rail. The infinite live headline ticker sits
+// site-wide at the very top of the layout on DESKTOP (NewsTicker, mounted in App.tsx) and is
+// re-rendered here inline on MOBILE (`placement="inline"`, `md:hidden`). Data is unchanged —
+// same useNewsFeed().
 const PREVIEW_COUNT = 9;
 
 const CATEGORIES: { id: NewsTopic | 'all'; label: string }[] = [
@@ -48,6 +50,9 @@ export default function CyberNewsGrid() {
             לוח חדשות חי — ריכוז אוטומטי מגיקטיים, אנשים ומחשבים, Techtime ו-Israel Defense, בעברית.
           </p>
         </div>
+
+        {/* Mobile-only: the live ticker, back in its original in-section spot. */}
+        <NewsTicker placement="inline" />
 
         {/* Category tabs + updated pill */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8">
