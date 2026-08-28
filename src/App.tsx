@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Header from './components/Header';
+import NewsTicker from './components/NewsTicker';
 import ScrollProgress from './components/ScrollProgress';
 import Footer from './components/Footer';
 import AIAssistantWidget from './components/AIAssistantWidget';
@@ -98,6 +99,10 @@ export default function App() {
       <RouteSeo />
       <Suspense fallback={null}>{sceneReady && <Scene3D />}</Suspense>
       <ScrollProgress />
+      {/* Live headline ticker: very top of the layout, above the header, in normal document
+          flow. It scrolls away with the page; the header measures it and is NOT sticky-bundled
+          with it (see Header.tsx). */}
+      <NewsTicker />
       <Header />
       <main key={location.pathname} className="relative z-[1]">
         <Routes location={location}>

@@ -56,13 +56,41 @@ const DRAWER_EXIT_MS = 280;
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // The live news ticker (NewsTicker.tsx) sits above the header in normal flow. The header is
+  // fixed but is NOT bundled into that sticky ticker — instead it glues its own `top` to the
+  // ticker's bottom edge (top = tickerHeight - scrollY, clamped at 0) so the ticker scrolls
+  // fully away and then only the compact header stays pinned. No CSS transition on `top`: the
+  // scroll handler updates it every frame so it tracks the ticker 1:1 with no gap or overlap.
+  const [tickerOffset, setTickerOffset] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 80);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    const bar = document.getElementById('news-ticker-bar');
+    let barHeight = bar?.offsetHeight ?? 0;
+
+    const apply = () => {
+      setScrolled(window.scrollY > 80);
+      setTickerOffset(Math.max(0, barHeight - window.scrollY));
+    };
+    apply();
+
+    const ro =
+      bar && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => {
+            barHeight = bar.offsetHeight;
+            apply();
+          })
+        : null;
+    ro?.observe(bar as Element);
+
+    window.addEventListener('scroll', apply, { passive: true });
+    window.addEventListener('resize', apply);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('scroll', apply);
+      window.removeEventListener('resize', apply);
+    };
   }, []);
 
   const openAgent = () => window.dispatchEvent(new CustomEvent('open-agent-qualifier'));
@@ -148,12 +176,12 @@ export default function Header() {
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      className={`fixed top-0 inset-x-0 z-40 pt-safe border-none outline-none transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      className={`fixed inset-x-0 z-40 pt-safe border-none outline-none transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
         scrolled
           ? 'bg-black shadow-2xl py-2 lg:bg-transparent lg:shadow-none lg:py-4'
           : 'bg-transparent py-6 md:py-8'
       }`}
-      style={{ willChange: 'transform, opacity, background-color' }}
+      style={{ top: tickerOffset, willChange: 'transform, opacity, background-color' }}
     >
       <div className="container-wide">
         {/* Desktop-only: on scroll this row condenses from a full-width bar into a floating

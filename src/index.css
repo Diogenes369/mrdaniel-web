@@ -587,7 +587,8 @@ html.a11y-large-cursor * {
 }
 
 /* ---------------------------------------------------------------------------
-   Live news ticker (CyberNewsGrid.tsx) — a seamless, gap-free infinite marquee.
+   Live news ticker (NewsTicker.tsx, mounted site-wide at the top of App.tsx) —
+   a seamless, gap-free infinite marquee.
    Two identical `__group`s sit side by side inside `__track`; the track scrolls
    left by exactly one group width and loops, so a group is always filling the
    viewport (no blank frames, no first-cycle empty space). `dir: ltr` on the
