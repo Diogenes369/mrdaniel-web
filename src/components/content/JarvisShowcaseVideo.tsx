@@ -1,141 +1,125 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Play, X, Film } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Play, Film, Maximize2, AlertCircle } from 'lucide-react';
 
 /**
- * Sleek media showcase for the JARVIS page. Renders a framed 16:9 poster with a play control;
- * activating it opens a full-screen modal player. Accepts an HTML5 `src` (mp4/webm), a
- * `youtubeId`, or a `vimeoId` — whichever is provided wins in that order. With no source it
- * degrades to an on-brand "demo coming soon" placeholder (no dead controls). No external deps:
- * embeds are plain iframes, created only once the modal opens so nothing third-party loads on
- * page view.
+ * Custom local-file video gallery for the JARVIS page. NO YouTube / Vimeo / external embeds —
+ * every clip streams from a statically-served path (default `/videos/jarvis/`). Drop the source
+ * files into `public/videos/jarvis/` (see the README there); locally they live at `D:\123`.
+ *
+ * A featured 16:9 HTML5 <video> plays the selected clip; a thumbnail strip switches between them.
+ * If a file is missing the tile degrades to an on-brand "coming soon" state instead of a broken
+ * player, so the section is safe to ship before the media is uploaded.
  */
-export interface JarvisShowcaseVideoProps {
-  src?: string;
+export interface JarvisClip {
+  src: string;
+  label: string;
   poster?: string;
-  youtubeId?: string;
-  vimeoId?: string;
-  title?: string;
-  caption?: string;
 }
 
-export default function JarvisShowcaseVideo({
-  src,
-  poster,
-  youtubeId,
-  vimeoId,
-  title = 'JARVIS — הדגמת מערכת',
-  caption = 'סיור מודרך במערכת: סוכני AI, תזמור LLM, פייפליינים בזמן אמת ובקרת גישה ארגונית.',
-}: JarvisShowcaseVideoProps) {
-  const [open, setOpen] = useState(false);
-  const hasMedia = Boolean(src || youtubeId || vimeoId);
+const BASE = '/videos/jarvis/';
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+const DEFAULT_CLIPS: JarvisClip[] = [
+  { src: `${BASE}overview.mp4`, label: 'סקירת מערכת JARVIS' },
+  { src: `${BASE}voice-interface.mp4`, label: 'ממשק קולי טבעי' },
+  { src: `${BASE}business-automation.mp4`, label: 'אוטומציה עסקית' },
+  { src: `${BASE}smart-home.mp4`, label: 'שליטה בבית ובמשרד החכם' },
+];
+
+export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?: JarvisClip[] }) {
+  const [active, setActive] = useState(0);
+  const [errored, setErrored] = useState<Record<number, boolean>>({});
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const current = clips[active];
+  const currentErrored = Boolean(errored[active]);
+
+  const goFullscreen = () => {
+    const el = videoRef.current;
+    if (el && el.requestFullscreen) el.requestFullscreen().catch(() => {});
+  };
 
   return (
     <div className="mb-16">
+      {/* Featured player */}
       <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0B0C10]">
-        {/* 16:9 stage */}
         <div className="relative aspect-video w-full">
-          {poster ? (
-            <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover opacity-70" aria-hidden="true" />
-          ) : (
-            <>
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(118,185,0,0.18),transparent_60%)]" aria-hidden="true" />
-              <div
-                className="absolute inset-0 opacity-[0.15]"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
-                  backgroundSize: '44px 44px',
-                }}
-                aria-hidden="true"
-              />
-            </>
-          )}
-
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center px-6">
-            <button
-              type="button"
-              onClick={() => hasMedia && setOpen(true)}
-              disabled={!hasMedia}
-              aria-label={hasMedia ? 'הפעלת סרטון ההדגמה' : 'סרטון ההדגמה יעלה בקרוב'}
-              className="group relative flex h-20 w-20 items-center justify-center rounded-full border border-brand-500/40 bg-black/50 backdrop-blur-sm transition-transform hover:scale-105 disabled:opacity-60 disabled:hover:scale-100"
-            >
-              <span className="absolute inset-0 rounded-full bg-brand-500/20 blur-xl transition-opacity group-hover:opacity-100 opacity-70" aria-hidden="true" />
-              {hasMedia ? (
-                <Play className="relative w-8 h-8 text-brand-300 translate-x-0.5" />
-              ) : (
-                <Film className="relative w-7 h-7 text-brand-300/80" />
-              )}
-            </button>
-            <div>
-              <p className="font-display text-lg md:text-xl font-bold text-white">{title}</p>
-              <p className="mx-auto mt-1 max-w-md text-sm text-zinc-400">
-                {hasMedia ? caption : 'הדגמת הווידאו תיטען כאן — המערכת מוכנה לקבל קובץ MP4, או הטמעת YouTube / Vimeo.'}
+          {currentErrored ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(118,185,0,0.16),transparent_60%)]" aria-hidden="true" />
+              <span className="relative flex h-16 w-16 items-center justify-center rounded-full border border-brand-500/40 bg-black/50">
+                <Film className="w-7 h-7 text-brand-300/80" />
+              </span>
+              <p className="relative font-display text-lg font-bold text-white">{current.label}</p>
+              <p className="relative max-w-md text-sm text-zinc-400">
+                הסרטון יתווסף בקרוב. הרכיב מוכן להזרמת קובץ וידאו מקומי מהנתיב{' '}
+                <code dir="ltr" className="font-mono text-brand-300">{BASE}</code>
               </p>
             </div>
-          </div>
+          ) : (
+            <video
+              key={current.src}
+              ref={videoRef}
+              src={current.src}
+              poster={current.poster}
+              controls
+              preload="metadata"
+              playsInline
+              onError={() => setErrored((e) => ({ ...e, [active]: true }))}
+              className="absolute inset-0 h-full w-full bg-black"
+            >
+              הדפדפן שלך אינו תומך בתגית וידאו.
+            </video>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3">
+          <span className="text-sm font-bold text-white truncate">{current.label}</span>
+          <button
+            type="button"
+            onClick={goFullscreen}
+            disabled={currentErrored}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-300 hover:text-brand-300 transition-colors disabled:opacity-40"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            מסך מלא
+          </button>
         </div>
       </div>
 
-      <AnimatePresence>
-        {open && hasMedia && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 md:p-8"
-            onClick={() => setOpen(false)}
-          >
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="סגירת הנגן"
-              className="absolute top-4 right-4 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white hover:border-brand-400/50 hover:text-brand-300 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div
-              className="relative w-full max-w-5xl aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {src ? (
-                <video src={src} poster={poster} controls autoPlay playsInline className="h-full w-full">
-                  הדפדפן שלך אינו תומך בתגית וידאו.
-                </video>
-              ) : youtubeId ? (
-                <iframe
-                  className="h-full w-full"
-                  src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&rel=0`}
-                  title={title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : (
-                <iframe
-                  className="h-full w-full"
-                  src={`https://player.vimeo.com/video/${vimeoId}?autoplay=1`}
-                  title={title}
-                  allow="autoplay; fullscreen; picture-in-picture"
-                  allowFullScreen
-                />
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Thumbnail strip */}
+      {clips.length > 1 && (
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {clips.map((clip, i) => {
+            const on = i === active;
+            const bad = Boolean(errored[i]);
+            return (
+              <button
+                key={clip.src}
+                type="button"
+                onClick={() => setActive(i)}
+                aria-current={on ? 'true' : undefined}
+                className={`group relative flex flex-col overflow-hidden rounded-xl border text-right transition-colors ${
+                  on ? 'border-brand-500/60 bg-brand-500/10' : 'border-white/10 bg-carbon-900/60 hover:border-brand-500/40'
+                }`}
+              >
+                <div className="relative aspect-video w-full bg-black/50">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(118,185,0,0.14),transparent_65%)]" aria-hidden="true" />
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    {bad ? (
+                      <AlertCircle className="w-5 h-5 text-zinc-500" />
+                    ) : (
+                      <Play className={`w-5 h-5 translate-x-0.5 ${on ? 'text-brand-300' : 'text-zinc-400 group-hover:text-brand-300'}`} />
+                    )}
+                  </span>
+                </div>
+                <span className={`px-3 py-2 text-xs font-bold ${on ? 'text-brand-200' : 'text-zinc-300'}`}>
+                  {clip.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

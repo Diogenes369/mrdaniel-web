@@ -39,16 +39,16 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
     ],
   },
   '/jarvis': {
-    title: 'מערכת JARVIS — שכבת AI אוטונומית לארגון | דניאל בן ברוך',
+    title: 'מערכת JARVIS לעסקים ולבית חכם — העוזר האישי של העתיד | דניאל בן ברוך',
     description:
-      'JARVIS היא תשתית AI ארגונית המאחדת סוכני בינה מלאכותית אוטונומיים, תזמור מודלי שפה (LLM), פייפליינים של דאטה בזמן אמת, מנוע אוטומציה לתהליכים ובקרת גישה ברמת בנק — בהתאמה אישית לפי מורכבות הארגון, ללא מחירון מדף.',
+      'מערכת JARVIS (Just A Rather Very Intelligent System) — סוכן בינה מלאכותית פרואקטיבי המנהל סביבה, פרויקטים ואוטומציות: ממשק קולי טבעי, אוטומציה עסקית, שליטה בבית ובמשרד החכם, מבוסס LLM ו-RAG עם אבטחת AES-256. פתרון בהתאמה אישית, ללא מחירון מדף.',
     path: '/jarvis',
     jsonLd: [
       serviceLd({
-        name: 'מערכת JARVIS — ארכיטקטורת AI ארגונית',
-        serviceType: 'Enterprise AI System Architecture',
+        name: 'מערכת JARVIS — עוזר AI לעסקים ולבית חכם',
+        serviceType: 'AI Assistant & Automation System',
         description:
-          'תכנון והטמעה של מערכת JARVIS: סוכני AI אוטונומיים, תזמור LLM ארגוני, פייפליינים של דאטה בזמן אמת, מנוע אוטומציה לתהליכים ואבטחה ובקרת גישה ברמת בנק.',
+          'תכנון והטמעה של מערכת JARVIS: ממשק קולי טבעי (NLP), אוטומציה וניהול עסקי, שליטה במכשירי IoT בבית ובמשרד, מבוססת LLM, RAG וזיכרון וקטורי עם אבטחת מידע מקצה לקצה.',
         path: '/jarvis',
       }),
       breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'מערכת JARVIS', path: '/jarvis' }]),

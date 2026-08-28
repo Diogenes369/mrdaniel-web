@@ -1,28 +1,24 @@
 import { motion } from 'motion/react';
 import {
-  Bot,
-  Braces,
-  Activity,
-  Workflow,
-  ShieldCheck,
   Cpu,
-  Network,
-  Gauge,
-  TrendingDown,
-  Building2,
-  ArrowLeft,
+  Mic,
+  Briefcase,
+  Home,
+  BrainCircuit,
+  Database,
+  Radio,
+  AudioLines,
+  Lock,
+  Check,
+  Layers,
+  Activity,
+  BarChart3,
   CalendarClock,
   FileText,
-  Layers,
-  Lock,
-  Database,
+  ArrowLeft,
+  ShieldCheck,
 } from 'lucide-react';
-import {
-  SectionHeading,
-  ServiceGrid,
-  InfoBox,
-  SpecTable,
-} from '../components/content/ContentPrimitives';
+import { SectionHeading, ServiceGrid, InfoBox } from '../components/content/ContentPrimitives';
 import JarvisShowcaseVideo from '../components/content/JarvisShowcaseVideo';
 import LeadCtaGrid from '../components/content/LeadCtaGrid';
 import WebButton from '../components/WebButton';
@@ -78,6 +74,68 @@ function JarvisBadge() {
   );
 }
 
+interface CapabilityGroup {
+  icon: typeof Mic;
+  title: string;
+  points: { lead: string; text: string }[];
+}
+
+const CAPABILITIES: CapabilityGroup[] = [
+  {
+    icon: Mic,
+    title: '🎙️ ממשק קולי טבעי ואינטראקטיבי',
+    points: [
+      {
+        lead: 'הבנת שפה טבעית (NLP)',
+        text: 'אין צורך בפקודות קוליות קשיחות. המערכת מבינה סלנג, כוונת משתמש והקשר מורכב.',
+      },
+      {
+        lead: 'תקשורת דו-כיוונית',
+        text: 'המערכת משיבה בקול אנושי, זורם וטבעי, ומסוגלת לנהל דיון ולשאול שאלות הבהרה.',
+      },
+    ],
+  },
+  {
+    icon: Briefcase,
+    title: '💼 ניהול ואוטומציה עסקית מתקדמת',
+    points: [
+      {
+        lead: 'אינטגרציה מלאה לתוכנות (APIs)',
+        text: 'המערכת מתממשקת ליומנים, תיבות מייל, מערכות CRM, ומנהלי משימות.',
+      },
+      {
+        lead: 'ניהול לו"ז חכם',
+        text: 'תיאום פגישות אוטומטי, שליחת תזכורות וסיכום מיילים נכנסים.',
+      },
+      {
+        lead: 'ניתוח נתונים',
+        text: 'הפקת דוחות, מעקב אחר ביצועים ומתן תובנות עסקיות בזמן אמת.',
+      },
+    ],
+  },
+  {
+    icon: Home,
+    title: '🏡 שליטה מוחלטת בבית ובמשרד חכם',
+    points: [
+      {
+        lead: 'מערכת בקרה מרכזית',
+        text: 'חיבור לכל מכשירי ה-IoT (תאורה, מיזוג, אבטחה, ומולטימדיה).',
+      },
+      {
+        lead: 'תרחישים חכמים',
+        text: 'הפעלת פרופילים מותאמים אישית (למשל: "מצב פגישה" שמחשיך אורות ומפעיל מקרן).',
+      },
+    ],
+  },
+];
+
+const CUSTOMER_BENEFITS = [
+  'חיסכון של שעות עבודה (אוטומציה אדמיניסטרטיבית).',
+  'זמינות של 24/7 (עוזר שלא מפספס משימה).',
+  'התאמה אישית מלאה (נתפר בדיוק לפי הצרכים).',
+  'אבטחת מידע מתקדמת.',
+];
+
 export default function JarvisPage() {
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
@@ -92,14 +150,15 @@ export default function JarvisPage() {
           <JarvisBadge />
           <span className="mt-8 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3.5 py-1.5 text-xs font-mono font-bold uppercase tracking-widest text-brand-300">
             <Cpu className="w-3.5 h-3.5" />
-            Enterprise AI Operating System
+            Just A Rather Very Intelligent System
           </span>
-          <h1 className="mt-5 font-display font-black text-4xl md:text-6xl leading-[1.1] text-white max-w-4xl">
-            מערכת JARVIS — שכבת ה-AI האוטונומית של הארגון
+          <h1 className="mt-5 font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl">
+            מערכת JARVIS לעסקים ולבית חכם: העוזר האישי של העתיד, כבר היום
           </h1>
-          <p className="mt-5 text-lg md:text-xl text-zinc-300 leading-relaxed max-w-3xl">
-            תשתית אחת שמאחדת סוכני בינה מלאכותית אוטונומיים, תזמור מודלי שפה, פייפליינים של דאטה בזמן אמת,
-            מנוע אוטומציה לתהליכים ובקרת גישה ברמת בנק — פרוסה בתוך הסביבה הארגונית שלכם, לא כשירות חיצוני.
+          <p className="mt-6 text-base md:text-lg text-zinc-300 leading-[1.9] max-w-3xl">
+            מערכת JARVIS (Just A Rather Very Intelligent System) היא תפיסה מהפכנית של ניהול סביבה, פרויקטים
+            ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
+            המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <WebButton variant="primary" onClick={() => openJarvisLead('JARVIS Page · Hero')}>
@@ -114,140 +173,139 @@ export default function JarvisPage() {
         </motion.div>
 
         <div className="pt-4">
-          <InfoBox title="פתרון בהתאמה אישית לפי מורכבות הארגון">
+          {/* ---- Concept badge ---- */}
+          <InfoBox title="🤖 מהי מערכת JARVIS?">
             <p>
-              JARVIS אינה חבילת מדף. כל הטמעה נתפרת סביב מפת התהליכים, המערכות והרגולציה של הארגון —
-              מספר הסוכנים, מקורות הדאטה, רמת ההרשאות ועומק האינטגרציות נקבעים באפיון משותף.
-            </p>
-            <p>
-              לכן <strong className="text-white">אין באתר זה מחירון או עלויות חבילה קבועות</strong>. ההיקף,
-              לוחות הזמנים והתמחור נבנים לאחר פגישת אפיון, ומוגשים כהצעה ארגונית מסודרת.
+              JARVIS אינה סתם עוד תוכנה או צ'אטבוט רגיל. זהו סוכן בינה מלאכותית פרואקטיבי (AI Agent). בעוד
+              שתוכנות רגילות מחכות לפקודות קשיחות, JARVIS מבינה הקשר, לומדת את הרגלי המשתמש ומסוגלת לקבל החלטות
+              ולבצע משימות מורכבות מקצה לקצה באופן עצמאי.
             </p>
           </InfoBox>
 
-          {/* ---- Video showcase ---- */}
+          {/* ---- Video showcase (local files, no YouTube) ---- */}
           <SectionHeading
             icon={Activity}
-            title="הדגמת מערכת"
-            description="סיור מודרך קצר בליבת JARVIS — מהסוכנים ועד בקרת הגישה. הרכיב מוכן להצגת קובץ וידאו או הטמעת YouTube / Vimeo."
+            title="הדגמות וידאו"
+            description="גלריית וידאו מקומית של מערכת JARVIS בפעולה — הסרטונים מוזרמים ישירות מהשרת, ללא הטמעות חיצוניות."
           />
           <JarvisShowcaseVideo />
 
-          {/* ---- Deep system breakdown ---- */}
+          {/* ---- Core capabilities ---- */}
           <SectionHeading
             icon={Layers}
-            title="פירוק המערכת — חמש שכבות ליבה"
-            description="כל שכבה עומדת בפני עצמה וניתנת להטמעה בהדרגה, אך הערך המלא מגיע כשהן פועלות יחד תחת ממשל אחד."
+            title="🚀 יכולות הליבה של המערכת"
+            description="שלושה תחומי ליבה שבהם JARVIS פועלת כמוח מרכזי אחד — קול, עסק ובית/משרד חכם."
           />
-          <ServiceGrid
-            items={[
-              {
-                icon: Bot,
-                title: 'סוכני AI אוטונומיים',
-                description:
-                  'סוכנים ייעודיים לכל תהליך עסקי — פיננסים, תפעול, מכירות ושירות — הפועלים תחת שכבת Guardian Agents לממשל, בקרה ותיעוד מלא של כל פעולה.',
-              },
-              {
-                icon: Braces,
-                title: 'תזמור LLM ארגוני',
-                description:
-                  'ניתוב חכם בין מודלים (ענן ומקומיים) לפי עלות, חביון ורגישות מידע, עם ארכיטקטורת RAG על מאגר הידע הארגוני והסתרת מידע רגיש (PII) בזמן ריצה.',
-              },
-              {
-                icon: Activity,
-                title: 'פייפליינים של דאטה בזמן אמת',
-                description:
-                  'קליטה זורמת (streaming) ממערכות המקור, נרמול ואחסון וקטורי — כדי שהסוכנים יפעלו על המצב העדכני של הארגון, לא על תמונת מצב ישנה.',
-              },
-              {
-                icon: Workflow,
-                title: 'מנוע אוטומציה לתהליכים',
-                description:
-                  'תהליכים רב-שלביים עם תנאים, אישורים אנושיים (human-in-the-loop), חזרות (retries) ו-Rollback — מוגדרים כקוד וניתנים לניטור מקצה לקצה.',
-              },
-              {
-                icon: ShieldCheck,
-                title: 'אבטחה ובקרת גישה ברמת בנק',
-                description:
-                  'Zero-Trust, ניהול זהויות (IAM / Entra ID), הרשאות מבוססות תפקיד לכל סוכן, הצפנה בתנועה ובמנוחה, ויומן ביקורת (audit log) בלתי ניתן לשינוי.',
-              },
-            ]}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-16">
+            {CAPABILITIES.map((group) => {
+              const Icon = group.icon;
+              return (
+                <div
+                  key={group.title}
+                  className="flex h-full flex-col rounded-2xl border border-white/10 bg-carbon-fiber p-6 hover:border-brand-500/40 transition-colors"
+                >
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-display text-lg font-bold text-white leading-snug mb-4">{group.title}</h3>
+                  <ul className="space-y-4">
+                    {group.points.map((p) => (
+                      <li key={p.lead} className="text-sm leading-relaxed text-zinc-400">
+                        <strong className="block text-zinc-100 mb-0.5">{p.lead}:</strong>
+                        {p.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
 
-          <SpecTable
-            rows={[
-              {
-                label: 'שכבת ממשל',
-                value: (
-                  <>
-                    Guardian Agents — <strong className="text-white">אישור, חסימה ותיעוד</strong> של כל פעולת סוכן, כולל
-                    הגנה מפני Prompt Injection ודליפת מידע.
-                  </>
-                ),
-              },
-              { label: 'מודלים', value: 'תזמור רב-מודלי (ענן + מקומי), RAG ארגוני, מטמון תשובות ומיסוך PII' },
-              { label: 'דאטה', value: 'חיבור למערכות מקור, streaming, אחסון וקטורי וסנכרון מצב תמידי' },
-              { label: 'אוטומציה', value: 'תהליכים כקוד, אישורים אנושיים, retries, Rollback וניטור מלא' },
-              { label: 'אבטחה', value: 'Zero-Trust, IAM / RBAC לכל סוכן, הצפנה מקצה לקצה, audit log בלתי ניתן לשינוי' },
-              { label: 'פריסה', value: 'ענן פרטי / היברידי / on-prem — בתוך הפרימטר הארגוני, לא כ-SaaS חיצוני' },
-            ]}
-          />
-
-          {/* ---- Business value & ROI ---- */}
+          {/* ---- Technical architecture ---- */}
           <SectionHeading
-            icon={TrendingDown}
-            title="ערך עסקי ו-ROI"
-            description="הסבר ברמת הנהלה: מה JARVIS משנה בשורה התחתונה, ואיך זה נמדד."
+            icon={BrainCircuit}
+            title="הארכיטקטורה הטכנולוגית של מערכת JARVIS"
+            description="חמש תשתיות טכנולוגיות שפועלות במקביל תחת 'מוח מרכזי' אחד."
           />
+          <InfoBox>
+            <p>
+              מאחורי חוויית המשתמש החלקה והאינטראקטיבית של מערכת JARVIS עומד שילוב של טכנולוגיות הבינה
+              המלאכותית, האוטומציה ואבטחת המידע המתקדמות ביותר בעולם. המערכת אינה פועלת כתוכנה סגורה, אלא כ'מוח
+              מרכזי' המשלב מספר תשתיות טכנולוגיות במקביל כדי להשיג מהירות תגובה מקסימלית, יציבות מלאה ודיוק גבוה.
+            </p>
+          </InfoBox>
           <ServiceGrid
             items={[
               {
-                icon: Gauge,
-                title: 'יעילות תפעולית',
-                description:
-                  'תהליכים ידניים חוזרים עוברים לאוטומציה מפוקחת — זמני מחזור מתקצרים משעות לדקות, וצוותים מתפנים לעבודה בעלת ערך גבוה.',
-              },
-              {
-                icon: TrendingDown,
-                title: 'הפחתת עלויות',
-                description:
-                  'תזמור מודלים לפי עלות/חביון מוריד את הוצאות ה-AI, וצמצום עבודה ידנית ושגיאות אנוש מקטין עלויות תפעול ותיקון.',
-              },
-              {
-                icon: Building2,
-                title: 'יכולת פריסה ארגונית',
-                description:
-                  'פריסה בתוך הפרימטר הארגוני עם עמידה ברגולציה, בקרת גישה מלאה ויומני ביקורת — מוכן לביקורת אבטחת מידע ולסביבות מפוקחות.',
-              },
-              {
-                icon: Network,
-                title: 'הטמעה הדרגתית',
-                description:
-                  'מתחילים משכבה אחת ותהליך אחד עם מדד הצלחה ברור, ומרחיבים לפי תוצאות — בלי פרויקט "ביג-בנג" מסוכן.',
+                icon: BrainCircuit,
+                title: '🧠 מנועי LLM (Large Language Models) מובילים',
+                description: 'מבוסס על GPT-4, Claude ו-Gemini להבנת הקשר עמוקה וניהול שיחה דינמית.',
               },
               {
                 icon: Database,
-                title: 'ידע ארגוני ממונף',
+                title: '💾 טכנולוגיית RAG וזיכרון וקטורי',
                 description:
-                  'הדאטה והמסמכים הפנימיים הופכים לנכס פעיל שהסוכנים משתמשים בו — במקום ידע שכלוא במגירות ובראשים של אנשים.',
+                  'Retrieval-Augmented Generation — זיכרון לטווח ארוך של העדפות ונהלים, ושילוב מידע פנימי בזמן אמת ממסמכים ומיילים.',
+              },
+              {
+                icon: Radio,
+                title: '📡 ממשקי API וסנכרון רשת בזמן אמת',
+                description: 'סוכן עצמאי (AI Agent) עם אוטומציה מקצה לקצה וזמן תגובה אפסי (Low Latency).',
+              },
+              {
+                icon: AudioLines,
+                title: '🎙️ עיבוד קול חכם (STT & TTS)',
+                description: 'STT להמרת דיבור לטקסט עם סינון רעשים, ו-TTS להפקת קול אנושי וטבעי.',
               },
               {
                 icon: Lock,
-                title: 'שליטה וריבונות מידע',
+                title: '🔒 אבטחת מידע ופרטיות מקצה לקצה',
                 description:
-                  'המידע הרגיש לא יוצא מהארגון. מודלים מקומיים ומיסוך PII מאפשרים AI מתקדם גם על נתונים מסווגים.',
+                  'הצפנת AES-256 (תקן צבאי/פיננסי), ניהול הרשאות OAuth 2.0, ואפשרות לסביבה מבודדת בשרתים פרטיים או On-Premise.',
               },
             ]}
           />
+
+          {/* ---- Customer benefits ---- */}
+          <SectionHeading
+            icon={BarChart3}
+            title="📊 היתרונות המרכזיים עבור הלקוח שלך"
+            description="מה זה אומר בפועל, בשורה התחתונה."
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-16">
+            {CUSTOMER_BENEFITS.map((benefit) => (
+              <div
+                key={benefit}
+                className="flex items-start gap-3 rounded-2xl border border-white/10 bg-carbon-900/60 p-5"
+              >
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400">
+                  <Check className="w-4 h-4" />
+                </span>
+                <span className="text-base text-zinc-200 leading-relaxed">{benefit}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* ---- Pricing framing (no public pricing) ---- */}
+          <InfoBox title="פתרון בהתאמה אישית לפי מורכבות הארגון והדרישות">
+            <p>
+              מערכת JARVIS נתפרת סביב מפת התהליכים, המערכות והרגולציה של כל ארגון — מספר האינטגרציות, מקורות
+              הדאטה, רמת ההרשאות ואופן הפריסה (ענן פרטי או On-Premise) נקבעים באפיון משותף.
+            </p>
+            <p>
+              לכן <strong className="text-white">אין באתר זה מחירים ציבוריים או עלויות חבילה קבועות</strong>.
+              ההיקף, לוחות הזמנים והתמחור נבנים לאחר פגישת אפיון ומוגשים כהצעה ארגונית מסודרת.
+            </p>
+          </InfoBox>
 
           {/* ---- Mid-page CTA band ---- */}
           <div className="my-16 rounded-2xl border border-brand-500/30 bg-gradient-to-bl from-brand-500/15 via-carbon-900 to-carbon-900 p-8 md:p-12 text-center">
             <h2 className="font-display font-black text-2xl md:text-3xl text-white mb-3">
-              נבנה את ארכיטקטורת JARVIS סביב הארגון שלכם
+              נבנה את מערכת JARVIS סביב הצרכים שלכם
             </h2>
             <p className="text-zinc-300 max-w-2xl mx-auto mb-7">
-              פגישת אפיון קצרה ממפה את התהליכים, המערכות והרגולציה — ובסופה הצעה ארגונית מסודרת עם היקף,
-              לוחות זמנים ותמחור מותאם. ללא מחירון מדף.
+              פגישת אפיון קצרה ממפה את התהליכים, המערכות והדרישות — ובסופה הצעה מסודרת עם היקף, לוחות זמנים
+              ותמחור מותאם. ללא מחירון מדף.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <WebButton variant="primary" onClick={() => openJarvisLead('JARVIS Page · Mid CTA')}>
@@ -272,15 +330,15 @@ export default function JarvisPage() {
             items={[
               {
                 icon: CalendarClock,
-                title: 'פגישת אפיון והתאמה',
-                sub: 'ממפים יחד תהליכים, מערכות ורגולציה, ומגדירים שכבה ראשונה עם מדד הצלחה ברור להטמעה הדרגתית.',
+                title: 'פגישת אפיון והתאמה אישית',
+                sub: 'ממפים יחד תהליכים, מערכות ודרישות, ומגדירים שלב ראשון עם מדד הצלחה ברור להטמעה הדרגתית.',
                 subject: LEAD_SUBJECT,
                 action: 'לתיאום פגישת אפיון',
                 featured: true,
               },
               {
                 icon: FileText,
-                title: 'הצעת מחיר לארגון',
+                title: 'בקשת הצעת מחיר לארגון',
                 sub: 'יש כבר דרישות והיקף? שלחו אותם ותקבלו הצעה ארגונית מסודרת — היקף, לוחות זמנים ותמחור מותאם.',
                 subject: LEAD_SUBJECT,
                 action: 'לבקשת הצעה ארגונית',
@@ -288,7 +346,7 @@ export default function JarvisPage() {
               {
                 icon: ShieldCheck,
                 title: 'סקירת אבטחה וארכיטקטורה',
-                sub: 'לצוותי אבטחת מידע: מעבר על מודל ה-Zero-Trust, בקרת הגישה לכל סוכן ויומני הביקורת של JARVIS.',
+                sub: 'לצוותי אבטחת מידע: מעבר על הצפנת AES-256, הרשאות OAuth 2.0 ואפשרות פריסה מבודדת On-Premise.',
                 subject: LEAD_SUBJECT,
                 action: 'לתיאום סקירה',
               },
@@ -296,8 +354,8 @@ export default function JarvisPage() {
           />
 
           <p className="mt-10 text-center text-sm text-zinc-500">
-            אין באתר זה מחירים ציבוריים או עלויות חבילה קבועות עבור מערכת JARVIS. התמחור נקבע לפי מורכבות הארגון,
-            לאחר פגישת אפיון.
+            אין באתר זה מחירים ציבוריים או עלויות חבילה קבועות עבור מערכת JARVIS. התמחור נקבע בהתאמה אישית לפי
+            מורכבות הארגון והדרישות, לאחר פגישת אפיון.
           </p>
         </div>
       </div>
