@@ -1,13 +1,6 @@
 /**
- * Circular contact "portal" — replicated from a live-verified section of latitudeform.com (their
- * "Let's talk" CTA: a dashed ring rotating around a circular button, with a dense particle halo
- * converging on it as you scroll near it), adapted to this site's brand tokens and Hebrew copy.
- *
- * The particle convergence itself isn't drawn here — it's the motion=2d engine's 'contact'
- * formation (fieldEngine.ts), which targets whatever carries `data-field-target` below. This
- * component only needs to exist, be marked, and be positioned; the field does the rest as the
- * visitor scrolls into view (see pickFormation()'s scroll-driven blend). On the default background
- * (Scene3D, no flag), this renders as a plain static circular CTA with no field to react to it.
+ * Site outro: a bold closing question above a compact circular "בואו נדבר" CTA that opens the lead
+ * modal, framed by a slow rotating dashed ring.
  */
 export default function ContactPortal() {
   const handleClick = () => {
@@ -19,54 +12,60 @@ export default function ContactPortal() {
   return (
     <section
       id="contact-portal"
-      data-field-form="contact"
-      className="relative min-h-[70dvh] flex flex-col items-center justify-center py-20 md:py-28 border-t border-white/5 overflow-hidden"
+      className="relative min-h-[92dvh] flex flex-col items-center justify-center py-40 md:py-64 border-t border-white/5 overflow-hidden text-center"
     >
+      {/* ── Site outro: bold closing question, framing the CTA below it. Sized with `text-fluid-hero`
+          (the exact token the Hero <h1> uses) so the closing headline visually matches the opening
+          one; stays an <h2> for heading hierarchy. text-wrap:balance from the base rule. ── */}
+      <h2 className="relative z-10 font-display font-black text-fluid-hero leading-[1.08] text-white max-w-[16ch] md:max-w-[22ch] mx-auto px-6 [text-shadow:0_2px_22px_rgba(0,0,0,0.9)]">
+        מוכנים לקחת את המערכות שלכם לשלב הבא?
+      </h2>
+
+      {/* ── Compact CTA badge — a sleek, elegant button rather than the previous oversized circle. ── */}
       <button
         type="button"
         onClick={handleClick}
-        data-field-target
-        data-cursor="לחצו לפנייה"
         aria-label="פתיחת טופס יצירת קשר"
-        className="group relative grid place-items-center rounded-full cursor-pointer outline-none transition-transform duration-700 ease-out hover:scale-[1.035] focus-visible:scale-[1.035] focus-visible:ring-2 focus-visible:ring-brand-400/60"
-        style={{ width: 'clamp(260px, 32vw, 420px)', aspectRatio: '1' }}
+        className="group relative z-10 mt-16 md:mt-24 grid place-items-center rounded-full cursor-pointer outline-none transition-transform duration-500 ease-out hover:scale-[1.05] focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-brand-400/60"
+        style={{ width: 'clamp(180px, 18vw, 240px)', aspectRatio: '1' }}
       >
-        {/* Static hairline ring + the slow (26s — matches the reference exactly) rotating dashed
-            ring, same "the ring echoes the world" idea as the reference's own CTA. */}
+        {/* Faint neutral fill so the badge reads as a surface, not just an outline; brightens on hover. */}
+        <div
+          className="absolute inset-[6%] rounded-full bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.07),transparent_72%)] opacity-70 transition-opacity duration-500 group-hover:opacity-100"
+          aria-hidden="true"
+        />
+
+        {/* Static hairline ring + the slow (26s) rotating dashed ring — neutral cool-white strokes
+            (the green was removed so the end of the site reads calm and un-decorated). */}
         <svg className="absolute inset-0 w-full h-full overflow-visible" viewBox="0 0 100 100" aria-hidden="true">
-          <circle cx="50" cy="50" r="49" fill="none" stroke="rgba(0,255,102,0.28)" strokeWidth="0.4" />
+          <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(226,232,255,0.18)" strokeWidth="0.6" />
           <circle
             className="contact-portal-dial origin-center"
             cx="50"
             cy="50"
-            r="44"
+            r="43"
             fill="none"
-            stroke="rgba(0,255,102,0.75)"
-            strokeWidth="0.7"
-            strokeDasharray="1.4 6"
+            stroke="rgba(226,232,255,0.55)"
+            strokeWidth="1.1"
+            strokeDasharray="1.6 5"
           />
         </svg>
 
-        {/* Soft fill glow, brightens on hover — same recipe the reference's own .fill uses. */}
-        <div
-          className="absolute inset-0 rounded-full opacity-60 transition-opacity duration-700 group-hover:opacity-100"
-          style={{ background: 'radial-gradient(circle at 50% 62%, rgba(0,255,102,0.16), transparent 70%)' }}
-          aria-hidden="true"
-        />
-
-        <div className="relative z-10 text-center px-6">
-          <span className="block font-display font-black text-3xl md:text-5xl text-white mb-3 [text-shadow:0_2px_18px_rgba(0,0,0,0.85)]">
+        <div className="relative z-10 flex flex-col items-center gap-2 px-4">
+          <span className="font-display font-black text-xl md:text-2xl leading-none text-white [text-shadow:0_2px_14px_rgba(0,0,0,0.85)]">
             בואו נדבר
           </span>
-          <span className="inline-flex items-center gap-3 font-sans text-sm font-medium tracking-wide text-zinc-300 transition-colors group-hover:text-white">
-            <span className="block h-px w-6 bg-brand-500 transition-[width] duration-500 group-hover:w-10" aria-hidden="true" />
+          <span className="inline-flex items-center gap-2 font-sans text-[11px] md:text-xs font-medium tracking-[0.15em] text-zinc-400 transition-colors group-hover:text-brand-300">
+            <span className="block h-px w-4 bg-brand-500 transition-[width] duration-500 group-hover:w-7" aria-hidden="true" />
             צור קשר
           </span>
         </div>
       </button>
 
-      <p className="relative z-10 font-sans text-sm md:text-base text-zinc-400 mt-9 max-w-sm mx-auto text-center leading-relaxed px-6">
-        מענה אישי תוך 24 שעות — לא בוט, לא מוקד שירות. ספרו לי מה אתם בונים ונמצא יחד את הדרך הנכונה.
+      {/* ── Expanded closing statement. Balanced onto ~3 even lines on desktop via the
+          `#contact-portal p` rule in index.css; scales down cleanly on mobile. ── */}
+      <p className="relative z-10 mt-16 md:mt-24 font-sans text-base md:text-lg text-zinc-400 max-w-[34rem] md:max-w-[42rem] mx-auto leading-relaxed md:leading-[1.75] px-6 sm:px-8">
+        מענה אישי, מקצועי וישיר תמיד — ללא בוטים וללא מוקדי שירות. זמין לייעוץ, אפיון פרויקטים, או סתם לשיחת פיתוח מעמיקה. מחכה למייל שלכם.
       </p>
     </section>
   );

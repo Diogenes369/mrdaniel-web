@@ -113,6 +113,14 @@ export function useNewsArticle(slug: string | undefined) {
   });
 }
 
+/** Rough reading time in whole minutes (~220 wpm, whitespace-tokenised so it works for Hebrew and
+ *  English alike). Always at least 1. Computed client-side from an item's summary/excerpt — the news
+ *  data pipeline itself is left untouched. */
+export function readingTimeMin(text: string): number {
+  const words = (text || '').trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 220));
+}
+
 export function formatRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return '';

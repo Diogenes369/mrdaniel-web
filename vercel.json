@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/health", "destination": "/api/health.ts" },
     { "source": "/api/news", "destination": "/api/news.ts" },
     { "source": "/api/news/item/:slug", "destination": "/api/news-item.ts?slug=:slug" },
     { "source": "/api/ai-news", "destination": "/api/ai-news.ts" },

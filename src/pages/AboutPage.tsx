@@ -115,10 +115,6 @@ export default function AboutPage() {
 
         <div className="bg-gradient-to-br from-brand-500/15 via-carbon-900 to-carbon-900 border border-brand-500/30 rounded-2xl p-7 md:p-10 mb-16 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right">
           <div>
-            <div className="inline-flex items-center gap-2 font-mono text-xs font-bold text-brand-400 uppercase tracking-widest bg-brand-500/10 border border-brand-500/25 px-3 py-1 rounded-full mb-3">
-              <ShoppingBag className="w-3.5 h-3.5" />
-              המגזינים והחוברות
-            </div>
             <h3 className="font-display font-bold text-xl md:text-2xl text-white mb-2">רוצים להעמיק בעצמכם? זה בחנות</h3>
             <p className="text-zinc-400 max-w-md">חוברות עבודה מקצועיות ומגזינים דיגיטליים בנושאי AI, סייבר ורשתות ארגוניות — ידע מעשי, לא תיאוריה.</p>
           </div>

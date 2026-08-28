@@ -30,6 +30,23 @@ export function getPointerIdleMs(): number {
 
 export function usePointerTracking() {
   useEffect(() => {
+    let raf = 0;
+
+    // The velocity-decay loop only needs to run while there's velocity left to decay. It parks
+    // itself once |v| is negligible (≈ every frame the pointer is still) and is re-kicked by the
+    // next real move — so a stationary cursor costs zero rAF work instead of an always-on loop
+    // multiplying two numbers by 0.9 forever.
+    const decay = () => {
+      pvx *= 0.9;
+      pvy *= 0.9;
+      if (Math.abs(pvx) + Math.abs(pvy) < 1e-4) {
+        pvx = pvy = 0;
+        raf = 0;
+        return;
+      }
+      raf = requestAnimationFrame(decay);
+    };
+
     const onMove = (e: PointerEvent) => {
       const nx = (e.clientX / window.innerWidth) * 2 - 1;
       const ny = (e.clientY / window.innerHeight) * 2 - 1;
@@ -45,20 +62,13 @@ export function usePointerTracking() {
       lastY = ny;
       lastT = now;
       lastMoveAt = now;
+      if (!raf) raf = requestAnimationFrame(decay);
     };
     window.addEventListener('pointermove', onMove, { passive: true });
 
-    let raf = 0;
-    const decay = () => {
-      pvx *= 0.9;
-      pvy *= 0.9;
-      raf = requestAnimationFrame(decay);
-    };
-    raf = requestAnimationFrame(decay);
-
     return () => {
       window.removeEventListener('pointermove', onMove);
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
     };
   }, []);
 }

@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowRight, ExternalLink, Clock, Copy, Check, MessageCircle } from 'lucide-react';
 import WebButton from '../components/WebButton';
+import Seo from '../components/seo/Seo';
+import { techArticleLd, breadcrumbLd } from '../lib/structuredData';
 import { useNewsArticle, formatRelativeTime } from '../services/newsService';
 
 export default function NewsArticlePage() {
@@ -56,8 +58,30 @@ export default function NewsArticlePage() {
     );
   }
 
+  const articlePath = `/news/${item.slug}`;
+
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
+      <Seo
+        title={`${item.title} | חדשות — דניאל בן ברוך`}
+        description={item.excerpt || item.summary.slice(0, 160)}
+        path={articlePath}
+        type="article"
+        jsonLd={[
+          techArticleLd({
+            title: item.title,
+            description: item.excerpt || item.summary.slice(0, 200),
+            path: articlePath,
+            datePublished: item.publishedAt,
+            sourceName: item.source,
+          }),
+          breadcrumbLd([
+            { name: 'בית', path: '/' },
+            { name: 'חדשות', path: '/news' },
+            { name: item.title, path: articlePath },
+          ]),
+        ]}
+      />
       <div className="container mx-auto px-6 max-w-3xl">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
           <button

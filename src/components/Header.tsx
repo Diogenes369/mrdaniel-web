@@ -11,15 +11,16 @@ import { smoothScrollTo, scrollToTopSmooth } from '../hooks/useLenis';
 // toolbar and mobile drawer keep just these three.
 const HEADER_SOCIAL_CHANNELS = ['instagram', 'linkedin', 'mail'] as const;
 
-const navLinks = [
-  { name: 'אודות', to: '/about' },
-  { name: 'AI', to: '/ai' },
-  { name: 'סייבר', to: '/cyber' },
-  { name: 'דיגיטל', to: '/digital' },
-  { name: 'ארכיטקטורה', to: '/architecture' },
-  { name: 'יכולות', to: '/capabilities' },
-  { name: 'חנות', to: '/magazines' },
+// Consolidated to the core offerings only. Dropped links (אודות / ארכיטקטורה / יכולות / חנות) stay
+// live as routes and remain in the footer. "צור קשר" is an action, not a route — it opens the lead
+// modal (the site's contact funnel).
+type NavLink = { name: string; to?: string; action?: 'contact' };
+const navLinks: NavLink[] = [
+  { name: 'סוכני AI', to: '/ai' },
+  { name: 'סייבר ואבטחה', to: '/cyber' },
+  { name: 'פיתוח ושיווק', to: '/digital' },
   { name: 'חדשות', to: '/news' },
+  { name: 'צור קשר', action: 'contact' },
 ];
 
 // "Surprise me" destinations for the shuffle toolbar icon.
@@ -67,6 +68,12 @@ export default function Header() {
   const handleCtaClick = (e: React.MouseEvent) => {
     e.preventDefault();
     window.dispatchEvent(new CustomEvent('open-agent-qualifier'));
+  };
+
+  const openContact = () => {
+    window.dispatchEvent(
+      new CustomEvent('open-lead-modal', { detail: { subject: 'יצירת קשר', sourceSection: 'Navbar' } })
+    );
   };
 
   // Already home → smooth-scroll to top (a normal <Link to="/"> click does nothing when the path
@@ -175,22 +182,27 @@ export default function Header() {
           </Link>
 
           <nav className={`hidden lg:flex items-center shrink-0 transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${scrolled ? 'gap-5' : 'gap-8'}`}>
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.to}
-                onClick={(e) => handleNavClick(e, link.to)}
-                className={`whitespace-nowrap text-sm font-medium text-zinc-300 hover:text-white transition-colors py-2 rounded ${FOCUS_SAFE_CLASS}`}
-              >
-                {link.to === '/ai' ? (
-                  <span className="font-cyber font-bold text-sm tracking-wider uppercase bg-gradient-to-r from-brand-300 via-brand-400 to-brand-500 bg-clip-text text-transparent">
-                    AI
-                  </span>
-                ) : (
-                  link.name
-                )}
-              </Link>
-            ))}
+            {navLinks.map((link) =>
+              link.action === 'contact' ? (
+                <button
+                  key={link.name}
+                  type="button"
+                  onClick={openContact}
+                  className={`whitespace-nowrap text-sm font-medium text-zinc-300 hover:text-white transition-colors py-2 rounded cursor-pointer ${FOCUS_SAFE_CLASS}`}
+                >
+                  {link.name}
+                </button>
+              ) : (
+                <Link
+                  key={link.name}
+                  to={link.to!}
+                  onClick={(e) => handleNavClick(e, link.to!)}
+                  className={`whitespace-nowrap text-sm font-medium text-zinc-300 hover:text-white transition-colors py-2 rounded ${FOCUS_SAFE_CLASS}`}
+                >
+                  {link.name}
+                </Link>
+              )
+            )}
           </nav>
 
           <div className={`flex items-center shrink-0 transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${scrolled ? 'gap-2' : 'gap-2 md:gap-3'}`}>
@@ -285,16 +297,30 @@ export default function Header() {
                 net for a very short viewport (e.g. landscape) — normally 8 links at this size fit
                 a single dvh with no scrolling needed. */}
             <nav className="flex-1 min-h-0 overflow-y-auto momentum-scroll flex flex-col justify-center gap-1 px-6">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.name}
-                  to={link.to}
-                  onClick={(e) => handleMobileNavClick(e, link.to)}
-                  className={`text-xl font-display font-medium text-white border-b border-white/10 py-3 ${link.to === '/ai' ? 'uppercase' : ''} ${FOCUS_SAFE_CLASS}`}
-                >
-                  {link.name}
-                </Link>
-              ))}
+              {navLinks.map((link) =>
+                link.action === 'contact' ? (
+                  <button
+                    key={link.name}
+                    type="button"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      window.setTimeout(openContact, DRAWER_EXIT_MS);
+                    }}
+                    className={`text-right text-xl font-display font-medium text-white border-b border-white/10 py-3 ${FOCUS_SAFE_CLASS}`}
+                  >
+                    {link.name}
+                  </button>
+                ) : (
+                  <Link
+                    key={link.name}
+                    to={link.to!}
+                    onClick={(e) => handleMobileNavClick(e, link.to!)}
+                    className={`text-xl font-display font-medium text-white border-b border-white/10 py-3 ${FOCUS_SAFE_CLASS}`}
+                  >
+                    {link.name}
+                  </Link>
+                )
+              )}
             </nav>
 
             {/* Bottom: social links, anchored with safe-area clearance for the home indicator */}

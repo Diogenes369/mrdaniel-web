@@ -12,9 +12,6 @@ export default function Hero() {
   return (
     <section
       id="hero"
-      // Read by the motion=2d particle engine's scroll-driven formation state machine — see
-      // pickFormation() in fieldEngine.ts. This is the first "stop": the ring-sphere formation.
-      data-field-form="hero"
       className="relative min-h-[100dvh] flex items-center pt-28 pb-16 overflow-hidden"
     >
       <div className="container mx-auto px-6 relative z-10">
@@ -23,10 +20,6 @@ export default function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
           className="max-w-4xl mx-auto text-center px-4"
-          // Read by the motion=2d particle engine (fieldEngine.ts) to dim the particle field
-          // specifically behind this block, so the headline/subhead stay 100% readable regardless
-          // of what the field is doing — a no-op when Scene3D (the default background) is active.
-          data-field-guard
         >
           <h1 className="font-display text-fluid-hero font-black text-white mb-7 [text-shadow:0_2px_18px_rgba(0,0,0,0.85),0_6px_44px_rgba(0,0,0,0.75)]">
             הופכים טכנולוגיה מורכבת

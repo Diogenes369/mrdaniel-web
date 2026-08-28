@@ -1,34 +1,25 @@
 import Hero from '../components/Hero';
-import TextMarquee from '../components/TextMarquee';
-import SystemMetrics from '../components/SystemMetrics';
-import TechComparisonMatrix from '../components/TechComparisonMatrix';
-import TechCapabilitiesMatrix from '../components/TechCapabilitiesMatrix';
-import EdgeCaseSimulator from '../components/EdgeCaseSimulator';
-import CyberAuditMatrix from '../components/CyberAuditMatrix';
-import Web3DevSection from '../components/Web3DevSection';
-import DeploymentRoadmap from '../components/DeploymentRoadmap';
-import AdvancedRoiCalculator from '../components/AdvancedRoiCalculator';
-import PremiumAdvantage from '../components/PremiumAdvantage';
+import WordRotator from '../components/WordRotator';
+import OfferSection from '../components/home/OfferSection';
 import CyberNewsGrid from '../components/CyberNewsGrid';
-import Magazines from '../components/Magazines';
 import ContactPortal from '../components/ContactPortal';
+import { HOME_OFFERS } from '../data/homeOffers';
 
+/**
+ * Streamlined homepage: hero → rotating headline → the three core offerings (custom AI agents,
+ * cyber & security, web development + marketing) → interactive news dashboard → contact.
+ * The heavier "generic AI" widgets (ROI calculator, simulated live monitors, comparison matrices,
+ * roadmaps) were removed — their routes still exist and are reachable from the footer.
+ */
 export default function HomePage() {
   return (
     <>
       <Hero />
-      <TextMarquee />
-      <SystemMetrics />
-      <TechComparisonMatrix />
-      <TechCapabilitiesMatrix />
-      <EdgeCaseSimulator />
-      <CyberAuditMatrix />
-      <Web3DevSection />
-      <DeploymentRoadmap />
-      <AdvancedRoiCalculator />
-      <PremiumAdvantage />
+      <WordRotator />
+      {HOME_OFFERS.map((offer) => (
+        <OfferSection key={offer.id} offer={offer} />
+      ))}
       <CyberNewsGrid />
-      <Magazines />
       <ContactPortal />
     </>
   );

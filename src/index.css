@@ -294,183 +294,14 @@ body::before {
   transform: translateZ(0);
 }
 
-/* ============================================================
-   MOTION V2 (PREVIEW) — Latitude-inspired Canvas2D field + cursor + word reveal.
-   Flag-gated at the JS level (see src/lib/motionFlag.ts); the CSS below is inert dead weight
-   (never matched) for any visitor without the `?motion=2d` flag, since the classes/elements it
-   targets are never created unless that flag is on.
-   ============================================================ */
+/* The experimental "motion=2d" background engine (Canvas2D particle field, R3F starfield, custom
+   cursor, scroll-image-sequence) and every `html.motion-v2 …` / `.motion-field-layer` /
+   `.starfield-layer` / `.scroll-sequence-layer` / `.motion-cursor` rule that supported it were
+   archived to src/archive/canvas-motion-v2/ — see the README there. The site's standard background
+   is the R3F scene (`.scene3d-layer`, defined above). */
 
-/* The site-wide `body::before` ambient corner glow a few lines up (green + electric-blue radial
-   washes, ALWAYS on, independent of this flag entirely) turned out to be a real contributor to a
-   "muddy green" complaint about the motion=2d preview — it sits at z-index:0 under everything,
-   compounding with anything else in this layer. Left untouched for the default site (a deliberate,
-   pre-existing brand decision, not this module's to remove), but killed specifically here: pure
-   black + white starfield means literally nothing else may tint the background under this flag. */
-html.motion-v2 body::before {
-  display: none;
-}
-/* Belt-and-suspenders with App.tsx's own conditional bg-[#050508] on the root div — this covers the
-   sliver of body background an overscroll bounce can briefly expose past that div's own edge. */
-html.motion-v2,
-html.motion-v2 body {
-  background-color: #050508;
-}
-
-/* The restored cosmic starfield (StarfieldLayer.tsx) — same z-index as .motion-field-layer below
-   on purpose: with two `position:fixed` siblings at equal z-index, DOM ORDER decides paint order
-   (later wins, painting on top), and starfield mounts first in App.tsx, so it reliably sits BENEATH
-   the particle/aurora canvases without needing a lower z-index of its own — one less magic number
-   to keep in sync between two files. */
-.starfield-layer {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  margin: 0;
-  z-index: 0;
-  pointer-events: none;
-  contain: strict;
-  transform: translateZ(0);
-  will-change: transform;
-  backface-visibility: hidden;
-}
-.starfield-layer canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Same fixed-full-viewport-backdrop contract as .scene3d-layer above — z-index:0, pointer-events:
-   none so it never blocks a click/scroll on real content, own GPU compositing layer. Two canvases
-   stack via document order: aurora first (soft wash), field second (points), both `position:fixed`
-   inside this one positioning context rather than each separately `position:fixed` — one fewer
-   compositing layer than two independently-fixed canvases. Mounted AFTER .starfield-layer in
-   App.tsx, so it paints on top of the stars — the particle engine is meant to sit above them. */
-.motion-field-layer {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  margin: 0;
-  z-index: 0;
-  pointer-events: none;
-  contain: strict;
-  transform: translateZ(0);
-  will-change: transform;
-  backface-visibility: hidden;
-}
-.motion-field-layer canvas {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Custom cursor — the one glassmorphic surface in this system, used once, deliberately (mirrors
-   the teardown's own restraint). Fine-pointer only; touch devices never render it (see Cursor.tsx's
-   own `(pointer:fine)` gate, mirrored here as a defensive no-op if that check is ever bypassed). */
-.motion-cursor {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 50;
-  pointer-events: none;
-  will-change: transform;
-}
-.motion-cursor .bubble {
-  display: grid;
-  place-items: center;
-  width: 96px;
-  height: 96px;
-  margin: -48px 0 0 -48px;
-  border-radius: 50%;
-  background: rgba(8, 9, 12, 0.55);
-  border: 1px solid rgba(118, 185, 0, 0.45);
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #f1f5f9;
-  text-align: center;
-  line-height: 1.4;
-  transform: scale(0);
-  opacity: 0;
-  transition:
-    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 0.3s ease;
-}
-.motion-cursor.on .bubble {
-  transform: scale(1);
-  opacity: 1;
-}
-@media (pointer: coarse) {
-  .motion-cursor {
-    display: none;
-  }
-}
-
-/* Reversible word-mask reveal (see useWordReveal.ts). A mask, not a fade: the inner word sits below
-   its own overflow-hidden line and slides up into place, then slides back down out of view if
-   scrolled back past — "the word was put there," not "it appeared." */
-.sp {
-  display: inline-block;
-  overflow: hidden;
-  vertical-align: bottom;
-  padding-bottom: 0.14em;
-  margin-bottom: -0.14em;
-}
-.sp > .wd {
-  display: inline-block;
-  transform: translateY(115%);
-  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  transition-delay: var(--wd, 0ms);
-}
-.in .sp > .wd {
-  transform: translateY(0);
-}
-@media (prefers-reduced-motion: reduce) {
-  .sp > .wd {
-    transform: none !important;
-    transition: none !important;
-  }
-}
-
-/* ---------- MOTION V2 TRANSPARENCY OVERRIDES ----------
-   Superseded a `backdrop-filter: blur(...)` version of this rule by explicit request: no blur
-   anywhere, cards stay fully translucent (like the rest of this site already is — most cards here
-   already use a translucent fill, e.g. `bg-carbon-900/60`) so the starfield and particle field stay
-   sharp and directly visible THROUGH cards, not diffused behind frosted glass. An audit across every
-   homepage section found the real gap wasn't transparency itself but a handful of cards using a
-   bespoke fully-opaque arbitrary-value fill instead (`bg-[#0D0E12]`, no alpha at all — SystemMetrics's
-   stat cards are one example of several), which a token-name selector like `bg-carbon-900` would
-   miss. What IS consistent everywhere, regardless of which exact color a card happens to use, is the
-   STRUCTURAL fingerprint: every card in this codebase is `rounded-xl`/`rounded-2xl`/`rounded-3xl`
-   (or an arbitrary large radius like `rounded-[1.75rem]`) with a hairline border — buttons use
-   `rounded-full` and small tag/badge chips don't carry a card's padding, so neither is caught here.
-   `!important` is deliberate: this must win over whatever inline Tailwind background utility the
-   component itself declared, and both are equally-specific single declarations, so specificity order
-   can't be trusted the way a cascade layer would guarantee it. Scoped to `.motion-v2 main` — zero
-   effect for any visitor without the `?motion=2d` flag, and modals/overlays rendered as App.tsx
-   siblings of `<main>` (LeadForm, command palette, etc.) are structurally outside this selector's
-   reach, staying fully opaque/readable on purpose. */
-html.motion-v2 main [class*="rounded-2xl"],
-html.motion-v2 main [class*="rounded-xl"],
-html.motion-v2 main [class*="rounded-3xl"],
-html.motion-v2 main [class*="rounded-["] {
-  background-color: rgba(10, 11, 15, 0.3) !important;
-}
-
-/* ContactPortal's outer dashed ring — a plain, unscoped keyframe (not motion-v2-gated): it's a
-   harmless, cheap CSS rotation that reads fine as a static circular CTA accent even on the default
-   background where there's no particle field to converge around it. 26s — matches the reference's
-   own rotation speed exactly (measured, not guessed): slow enough to feel alive without reading as
-   an obvious loop. */
+/* ContactPortal's outer dashed ring — a cheap CSS rotation that reads as a live circular CTA
+   accent. 26s: slow enough to feel alive without reading as an obvious loop. */
 @keyframes contact-portal-spin {
   to {
     transform: rotate(360deg);
@@ -483,6 +314,12 @@ html.motion-v2 main [class*="rounded-["] {
   .contact-portal-dial {
     animation: none;
   }
+}
+/* The closing line under the CTA is a short 2-line block, so it wants `balance` (even line lengths,
+   no orphan) rather than the site-wide default `p { text-wrap: pretty }`. Higher-specificity,
+   unlayered selector so it beats that base rule (a Tailwind utility, being layered, would not). */
+#contact-portal p {
+  text-wrap: balance;
 }
 
 /* Mobile horizontal-swipe carousel track/item pair — the shared pattern behind every "long
@@ -665,67 +502,86 @@ html.a11y-large-cursor * {
   cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='40'%20height='40'%20viewBox='0%200%2040%2040'%3E%3Cpath%20d='M4%202%20L4%2034%20L13%2025%20L19%2036%20L24%2033%20L18%2022%20L30%2022%20Z'%20fill='black'%20stroke='white'%20stroke-width='2'%20stroke-linejoin='round'/%3E%3C/svg%3E") 4 4, auto !important;
 }
 
-/* Dual-row text marquee (TextMarquee.tsx) — full-bleed regardless of the container the
-   component happens to render inside, edges softened with a fade mask rather than a hard
-   clip so the ticker reads as flowing off-screen instead of ending abruptly. Track position
-   is written directly to the element's own `transform` from JS every frame (see the
-   component), never animated in CSS, so its speed can react to live scroll velocity. */
-.marquee-section {
+/* Single-slot rotating headline (WordRotator.tsx). Full-bleed band; one Hebrew phrase at a time in
+   the site's PRIMARY font (Heebo), typed out character-by-character then backspaced away before the
+   next, with a glowing green terminal block caret. Width is reserved for the longest phrase so the
+   band never reflows mid-type. */
+.word-rotator {
   position: relative;
   width: 100vw;
   margin-inline: calc(50% - 50vw);
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  background: rgba(255, 255, 255, 0.05);
+  align-items: center;
+  justify-content: center;
+  padding-block: clamp(20px, 3.2vw, 40px);
+  background: #050508;
   border-block: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
-.marquee-row {
+.word-rotator__viewport {
   position: relative;
-  overflow: hidden;
-  background: #050508;
-  padding-block: clamp(14px, 2.4vw, 22px);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
+  display: inline-block;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: clamp(1.05rem, 2.3vw + 0.35rem, 2.1rem);
+  line-height: 1.2;
+  color: #e8eef5;
 }
 
-.marquee-track {
-  display: flex;
-  width: max-content;
-  will-change: transform;
-}
-
-.marquee-copy {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.marquee-item {
-  display: inline-flex;
-  align-items: center;
-  gap: clamp(16px, 2.4vw, 28px);
-  padding-inline-end: clamp(16px, 2.4vw, 28px);
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: clamp(13px, 2.1vw, 20px);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #cbd5e1;
+/* Invisible full-width phrase — keeps the band a fixed width so typing doesn't shift the layout. */
+.word-rotator__sizer {
+  visibility: hidden;
   white-space: nowrap;
 }
 
-.marquee-track--rev .marquee-item {
-  color: rgba(143, 212, 0, 0.85); /* brand-400 */
+/* The live, growing/shrinking text, pinned over the sizer and aligned to the reading start edge
+   (right, in this RTL band) so it types outward from a fixed point like a real console line. */
+.word-rotator__text {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  white-space: nowrap;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7);
 }
 
-.marquee-dot {
-  color: rgba(118, 185, 0, 0.55); /* brand-500 */
-  font-size: 0.6em;
+/* Green terminal block caret. Solid + non-blinking while actively typing/deleting (`.is-steady`),
+   blinking while the phrase rests. */
+.word-rotator__caret {
+  display: inline-block;
+  width: 0.1em;
+  height: 1.05em;
+  margin-inline-start: 0.14em;
+  transform: translateY(0.08em);
+  background: #8fd400; /* brand-400 */
+  box-shadow:
+    0 0 6px rgba(143, 212, 0, 0.95),
+    0 0 16px rgba(143, 212, 0, 0.55),
+    0 0 30px rgba(143, 212, 0, 0.28);
+  animation: word-rotator-blink 1s steps(1, end) infinite;
+}
+.word-rotator__caret.is-steady {
+  animation: none;
+  opacity: 1;
 }
 
-.marquee-track--rev .marquee-dot {
-  color: rgba(203, 213, 225, 0.4);
+@keyframes word-rotator-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.12;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-rotator__caret {
+    animation: none;
+    opacity: 0.9;
+  }
 }

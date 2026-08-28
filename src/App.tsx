@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import ScrollProgress from './components/ScrollProgress';
@@ -12,17 +12,13 @@ import CommandPalette from './components/CommandPalette';
 import { useLenis, smoothScrollTo, scrollToTopInstant, triggerRouteTransitionPulse } from './hooks/useLenis';
 import { useDeferredMount } from './hooks/useDeferredMount';
 import { ScrollTrigger } from './lib/gsap';
-import { isMotionV2Enabled } from './lib/motionFlag';
+import RouteSeo from './components/seo/RouteSeo';
 
+// The site's standard background: the R3F cosmic scene. Lazy so its Three.js/R3F bundle stays out
+// of the initial payload until the page is idle (see useDeferredMount).
+// NOTE: the experimental Canvas2D particle / scroll-sequence engine was archived to
+// src/archive/canvas-motion-v2/ (see the README there to restore it).
 const Scene3D = lazy(() => import('./three/Scene3D'));
-// All lazy — a visitor without the `?motion=2d` preview flag never downloads MotionField/Starfield/
-// Cursor, and one WITH the flag never downloads Scene3D's wireframe-planet bundle. Note this means
-// the flag does still pull in Three.js/R3F/drei (via StarfieldLayer) — by explicit request, to bring
-// back the site's real cosmic starfield underneath the new engine, not to avoid Three.js entirely.
-// See lib/motionFlag.ts.
-const MotionField = lazy(() => import('./motion/MotionField'));
-const StarfieldLayer = lazy(() => import('./motion/StarfieldLayer'));
-const Cursor = lazy(() => import('./components/Cursor'));
 
 // The tracker pulls in the Firebase SDK (~200KB gzipped) — code-split into its own chunk via
 // dynamic import rather than a static one, so it never bloats the main bundle that every visitor
@@ -72,19 +68,6 @@ export default function App() {
   useLenis();
   const location = useLocation();
   const sceneReady = useDeferredMount();
-  // Computed once per session, same pattern as Scene3D.tsx's own `useState(isIOSWebKit)` — the
-  // flag is a runtime/localStorage switch (see lib/motionFlag.ts), not something that needs to
-  // react live mid-session.
-  const [motionV2] = useState(isMotionV2Enabled);
-
-  // A single class on <html> is what index.css's `.motion-v2` rules key off — see the "MOTION V2
-  // GLASS OVERRIDES" block there for why this exists: it lets the preview turn the site's already
-  // largely-translucent cards into true frosted glass (added backdrop-blur, not a new opacity)
-  // WITHOUT editing the ~20 component files that render them, and reverts to zero effect the
-  // instant the flag is off.
-  useEffect(() => {
-    document.documentElement.classList.toggle('motion-v2', motionV2);
-  }, [motionV2]);
 
   useEffect(() => {
     loadTracker().then((t) => t.initTracker());
@@ -108,30 +91,12 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen overflow-x-hidden ${motionV2 ? 'bg-[#050508]' : 'bg-carbon-950'} text-zinc-100 font-sans selection:bg-brand-500 selection:text-black`}
+      className="min-h-screen overflow-x-hidden bg-carbon-950 text-zinc-100 font-sans selection:bg-brand-500 selection:text-black"
       dir="rtl"
     >
       <RouteScrollManager />
-      <Suspense fallback={null}>
-        {sceneReady &&
-          (motionV2 ? (
-            // StarfieldLayer BEFORE MotionField is load-bearing, not stylistic — see the
-            // ".starfield-layer" comment in index.css: both are `position:fixed` at the same
-            // z-index, so paint order (which sits "under" the other) is decided purely by DOM
-            // order here.
-            <>
-              <StarfieldLayer />
-              <MotionField />
-            </>
-          ) : (
-            <Scene3D />
-          ))}
-      </Suspense>
-      {motionV2 && (
-        <Suspense fallback={null}>
-          <Cursor />
-        </Suspense>
-      )}
+      <RouteSeo />
+      <Suspense fallback={null}>{sceneReady && <Scene3D />}</Suspense>
       <ScrollProgress />
       <Header />
       <main key={location.pathname} className="relative z-[1]">

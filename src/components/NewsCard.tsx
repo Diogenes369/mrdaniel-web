@@ -1,6 +1,6 @@
-import { Clock, ExternalLink } from 'lucide-react';
+import { Clock, ExternalLink, BookOpen } from 'lucide-react';
 import TiltCard from './TiltCard';
-import { formatRelativeTime, type NewsItem } from '../services/newsService';
+import { formatRelativeTime, readingTimeMin, type NewsItem } from '../services/newsService';
 
 const CARD_BASE =
   'relative h-full overflow-hidden bg-[#0D0E12] border border-white/10 rounded-2xl transition-all duration-500 hover:border-[#76B900]/50 hover:-translate-y-1.5 hover:shadow-[0_10px_40px_-10px_rgba(118,185,0,0.2)]';
@@ -18,13 +18,19 @@ export default function NewsCard({ item }: { item: NewsItem }) {
         <div className={`${CARD_BASE} p-6 flex flex-col`}>
           <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" aria-hidden="true" />
 
-          <div className="relative flex items-center justify-between gap-3 mb-4">
-            <span className="px-2.5 py-1 text-[10px] font-mono font-bold tracking-widest border border-white/10 rounded-full text-brand-400" dir="ltr">
+          <div className="relative flex items-center justify-between gap-2 mb-4">
+            <span className="px-2.5 py-1 text-[10px] font-mono font-bold tracking-widest border border-white/10 rounded-full text-brand-400 shrink-0" dir="ltr">
               {item.source}
             </span>
-            <span className="flex items-center gap-1.5 text-xs text-zinc-500 shrink-0">
-              <Clock className="w-3.5 h-3.5" />
-              {formatRelativeTime(item.publishedAt)}
+            <span className="flex items-center gap-2.5 text-xs text-zinc-500 shrink-0">
+              <span className="inline-flex items-center gap-1" title="זמן קריאה משוער">
+                <BookOpen className="w-3.5 h-3.5" />
+                {readingTimeMin(item.summary || item.excerpt)} דק׳
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                {formatRelativeTime(item.publishedAt)}
+              </span>
             </span>
           </div>
 

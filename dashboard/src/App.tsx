@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar } from 'lucide-react';
+import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Wifi, WifiOff } from 'lucide-react';
 import { useAuthUser, logout } from './lib/auth';
-import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups } from './lib/useLiveEvents';
+import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
+import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
 import { firebaseConfigured } from './firebase';
 import type { DeviceType } from './lib/types';
 import LoginGate from './components/LoginGate';
@@ -34,6 +35,40 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'weekly-plan', label: 'לוח תוכן שבועי', icon: Calendar },
 ];
 
+/** Live connection strip — Firebase realtime link + an independent 5s round-trip probe to the
+ * production domain (mrdaniel.co.il/api/health). Makes the "no manual refresh needed" claim visible
+ * and verifiable. */
+function LiveStatus({ connected }: { connected: boolean }) {
+  const now = useHeartbeat(4000);
+  const site = useSiteHealthPing(5000);
+  const agoSec = site.checkedAt ? Math.max(0, Math.round((now - site.checkedAt) / 1000)) : null;
+  const host = SITE_ORIGIN.replace(/^https?:\/\//, '');
+
+  return (
+    <div className="flex flex-col gap-1 text-xs">
+      <span
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border font-medium ${
+          connected
+            ? 'bg-brand-500/10 border-brand-500/30 text-brand-300'
+            : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+        }`}
+        title={connected ? 'הנתונים מתעדכנים בזמן אמת דרך Firebase' : 'מנסה להתחבר מחדש'}
+      >
+        <span className="relative flex h-2 w-2">
+          {connected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />}
+          <span className={`relative inline-flex rounded-full h-2 w-2 ${connected ? 'bg-brand-400' : 'bg-amber-400'}`} />
+        </span>
+        {connected ? 'חי · עדכון אוטומטי' : 'מתחבר מחדש…'}
+      </span>
+      <span className="inline-flex items-center gap-1.5 text-zinc-500 font-mono pr-1" dir="ltr">
+        {site.reachable ? <Wifi className="w-3 h-3 text-brand-400" /> : <WifiOff className="w-3 h-3 text-red-400" />}
+        {host} {site.reachable ? `· ${site.latencyMs}ms` : '· unreachable'}
+        {agoSec !== null && ` · ${agoSec}s ago`}
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   const { user, loading } = useAuthUser();
   const presence = usePresence();
@@ -41,6 +76,7 @@ export default function App() {
   const health = useHealth();
   const leads = useLeads();
   const signups = useNewsletterSignups();
+  const connected = useFirebaseConnection();
   const [tab, setTab] = useState<Tab>('overview');
 
   if (loading) {
@@ -70,6 +106,7 @@ export default function App() {
             <p className="text-zinc-500 text-sm mt-1">Live Analytics · דניאל בן ברוך</p>
           </div>
           <div className="flex items-center gap-4 flex-wrap">
+            <LiveStatus connected={connected} />
             <ExportControls leads={leads} events={events} health={health} />
             <button
               onClick={() => logout()}

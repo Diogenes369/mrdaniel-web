@@ -55,7 +55,7 @@ interface FeaturePoint {
   reverse?: boolean;
 }
 
-function ImageFeatureSection({ image, imageAlt, badge, title, description, points, reverse = false }: FeaturePoint) {
+function ImageFeatureSection({ image, imageAlt, title, description, points, reverse = false }: FeaturePoint) {
   return (
     <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 items-center mb-14 ${reverse ? 'lg:[&>*:first-child]:order-2' : ''}`}>
       <div className="relative rounded-2xl overflow-hidden border border-white/10 h-64 lg:h-80">
@@ -63,7 +63,6 @@ function ImageFeatureSection({ image, imageAlt, badge, title, description, point
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
       </div>
       <div>
-        <span className="inline-block text-xs font-mono font-bold text-brand-400 uppercase tracking-widest mb-3">{badge}</span>
         <h3 className="font-display text-2xl md:text-3xl font-black text-white mb-4 leading-tight">{title}</h3>
         <p className="text-zinc-300 text-base leading-relaxed mb-5">{description}</p>
         <ul className="space-y-2">

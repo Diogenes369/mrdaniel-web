@@ -1,7 +1,31 @@
 import { useEffect, useState } from 'react';
 import { onValue, ref, query, limitToLast, update } from 'firebase/database';
-import { db } from '../firebase';
+import { db, firebaseConfigured } from '../firebase';
 import type { PresenceRecord, TrackedEvent, HealthRecord, LeadRecord, NewsletterSignupRecord, LeadStatus } from './types';
+
+/** Live boolean for the dashboard's own realtime link to Firebase — driven by the RTDB
+ * `.info/connected` special path, which flips the instant the underlying WebSocket drops or
+ * re-establishes. This is what makes the header "LIVE / reconnecting" indicator honest: every data
+ * hook below is push-based over that same socket, so when this is `true` the whole dashboard is
+ * auto-refreshing with no polling and no manual reload. */
+export function useFirebaseConnection(): boolean {
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    if (!db) {
+      setConnected(false);
+      return;
+    }
+    const connectedRef = ref(db, '.info/connected');
+    return onValue(
+      connectedRef,
+      (snapshot) => setConnected(snapshot.val() === true),
+      () => setConnected(false)
+    );
+  }, []);
+
+  return firebaseConfigured && connected;
+}
 
 /** Persists a pipeline-status change for one lead back to Firebase — requires the same `leads`
  * read/write rule as `useLeads` below. Resolves silently if Firebase isn't configured or the rule
