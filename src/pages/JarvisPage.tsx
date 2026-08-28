@@ -15,12 +15,9 @@ import {
   BarChart3,
   CalendarClock,
   FileText,
-  ArrowLeft,
-  ShieldCheck,
 } from 'lucide-react';
 import { SectionHeading, ServiceGrid, InfoBox } from '../components/content/ContentPrimitives';
 import JarvisShowcaseVideo from '../components/content/JarvisShowcaseVideo';
-import LeadCtaGrid from '../components/content/LeadCtaGrid';
 import WebButton from '../components/WebButton';
 
 const LEAD_SUBJECT = 'JARVIS System Inquiry';
@@ -160,14 +157,11 @@ export default function JarvisPage() {
             ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
             המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          {/* The page's ONE hero CTA — the only conversion trigger until the bottom section. */}
+          <div className="mt-8">
             <WebButton variant="primary" onClick={() => openJarvisLead('JARVIS Page · Hero')}>
               <CalendarClock className="w-4 h-4" />
               תיאום פגישת אפיון והתאמה אישית
-            </WebButton>
-            <WebButton variant="ghost" onClick={() => openJarvisLead('JARVIS Page · Hero (RFP)')}>
-              <FileText className="w-4 h-4" />
-              בקשת הצעת מחיר לארגון
             </WebButton>
           </div>
         </motion.div>
@@ -298,65 +292,23 @@ export default function JarvisPage() {
             </p>
           </InfoBox>
 
-          {/* ---- Mid-page CTA band ---- */}
-          <div className="my-16 rounded-2xl border border-brand-500/30 bg-gradient-to-bl from-brand-500/15 via-carbon-900 to-carbon-900 p-8 md:p-12 text-center">
-            <h2 className="font-display font-black text-2xl md:text-3xl text-white mb-3">
+          {/* ---- Single bottom conversion section — the page's ONLY other CTA trigger ---- */}
+          <section className="mt-20 md:mt-28 rounded-3xl border border-brand-500/30 bg-gradient-to-bl from-brand-500/15 via-carbon-900 to-carbon-900 p-10 md:p-16 text-center">
+            <h2 className="font-display font-black text-2xl md:text-4xl text-white mb-4">
               נבנה את מערכת JARVIS סביב הצרכים שלכם
             </h2>
-            <p className="text-zinc-300 max-w-2xl mx-auto mb-7">
+            <p className="text-zinc-300 text-base md:text-lg leading-relaxed max-w-2xl mx-auto mb-8">
               פגישת אפיון קצרה ממפה את התהליכים, המערכות והדרישות — ובסופה הצעה מסודרת עם היקף, לוחות זמנים
-              ותמחור מותאם. ללא מחירון מדף.
+              ותמחור מותאם. פתרון בהתאמה אישית לפי מורכבות הארגון והדרישות, ללא מחירון מדף.
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <WebButton variant="primary" onClick={() => openJarvisLead('JARVIS Page · Mid CTA')}>
-                <CalendarClock className="w-4 h-4" />
-                תיאום פגישת אפיון והתאמה אישית
-              </WebButton>
-              <WebButton variant="ghost" onClick={() => openJarvisLead('JARVIS Page · Mid CTA (RFP)')}>
-                <FileText className="w-4 h-4" />
-                בקשת הצעת מחיר לארגון
-              </WebButton>
-            </div>
-          </div>
-
-          {/* ---- Qualified lead routes ---- */}
-          <SectionHeading
-            icon={ArrowLeft}
-            title="הצעד הבא"
-            description="בחרו את נקודת הכניסה — כל פנייה מגיעה מסווגת כ־JARVIS System Inquiry ומוכנה לשיחה ממוקדת."
-          />
-          <LeadCtaGrid
-            sourceSection="JARVIS Page · Specialized CTA"
-            items={[
-              {
-                icon: CalendarClock,
-                title: 'פגישת אפיון והתאמה אישית',
-                sub: 'ממפים יחד תהליכים, מערכות ודרישות, ומגדירים שלב ראשון עם מדד הצלחה ברור להטמעה הדרגתית.',
-                subject: LEAD_SUBJECT,
-                action: 'לתיאום פגישת אפיון',
-                featured: true,
-              },
-              {
-                icon: FileText,
-                title: 'בקשת הצעת מחיר לארגון',
-                sub: 'יש כבר דרישות והיקף? שלחו אותם ותקבלו הצעה ארגונית מסודרת — היקף, לוחות זמנים ותמחור מותאם.',
-                subject: LEAD_SUBJECT,
-                action: 'לבקשת הצעה ארגונית',
-              },
-              {
-                icon: ShieldCheck,
-                title: 'סקירת אבטחה וארכיטקטורה',
-                sub: 'לצוותי אבטחת מידע: מעבר על הצפנת AES-256, הרשאות OAuth 2.0 ואפשרות פריסה מבודדת On-Premise.',
-                subject: LEAD_SUBJECT,
-                action: 'לתיאום סקירה',
-              },
-            ]}
-          />
-
-          <p className="mt-10 text-center text-sm text-zinc-500">
-            אין באתר זה מחירים ציבוריים או עלויות חבילה קבועות עבור מערכת JARVIS. התמחור נקבע בהתאמה אישית לפי
-            מורכבות הארגון והדרישות, לאחר פגישת אפיון.
-          </p>
+            <WebButton variant="primary" onClick={() => openJarvisLead('JARVIS Page · Bottom Conversion')}>
+              <FileText className="w-4 h-4" />
+              בקשת הצעת מחיר לארגון
+            </WebButton>
+            <p className="mt-6 text-xs text-zinc-500">
+              אין באתר זה מחירים ציבוריים או עלויות חבילה קבועות עבור מערכת JARVIS.
+            </p>
+          </section>
         </div>
       </div>
     </div>
