@@ -1,58 +1,57 @@
 import { useRef, useState } from 'react';
-import { Play, Film, Maximize2, AlertCircle } from 'lucide-react';
+import { Play, Film } from 'lucide-react';
 
 /**
  * Custom local-file video gallery for the JARVIS page. NO YouTube / Vimeo / external embeds —
- * every clip streams from a statically-served path (default `/videos/jarvis/`). Drop the source
- * files into `public/videos/jarvis/` (see the README there); locally they live at `D:\123`.
+ * every clip streams from a statically-served path (default `/videos/jarvis/`). The source files
+ * live in `public/videos/jarvis/` (copied from `C:\Projects\123`).
  *
- * A featured 16:9 HTML5 <video> plays the selected clip; a thumbnail strip switches between them.
- * If a file is missing the tile degrades to an on-brand "coming soon" state instead of a broken
- * player, so the section is safe to ship before the media is uploaded.
+ * Built for TikTok / Reels format: a portrait 9:16 featured player (capped so it never dominates
+ * a widescreen layout) with full native HTML5 controls (play / pause / volume / scrub /
+ * fullscreen), plus a portrait thumbnail selector to switch clips. Playback auto-advances to the
+ * next clip once the viewer has started watching, so it cycles through the whole set. A missing
+ * file degrades to an on-brand placeholder instead of a broken player.
  */
 export interface JarvisClip {
   src: string;
   label: string;
-  poster?: string;
 }
 
 const BASE = '/videos/jarvis/';
 
 const DEFAULT_CLIPS: JarvisClip[] = [
-  { src: `${BASE}overview.mp4`, label: 'סקירת מערכת JARVIS' },
-  { src: `${BASE}voice-interface.mp4`, label: 'ממשק קולי טבעי' },
-  { src: `${BASE}business-automation.mp4`, label: 'אוטומציה עסקית' },
-  { src: `${BASE}smart-home.mp4`, label: 'שליטה בבית ובמשרד החכם' },
+  { src: `${BASE}clip-1.mp4`, label: 'סרטון 1' },
+  { src: `${BASE}clip-2.mp4`, label: 'סרטון 2' },
+  { src: `${BASE}clip-3.mp4`, label: 'סרטון 3' },
+  { src: `${BASE}clip-4.mp4`, label: 'סרטון 4' },
 ];
 
 export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?: JarvisClip[] }) {
   const [active, setActive] = useState(0);
+  const [engaged, setEngaged] = useState(false);
   const [errored, setErrored] = useState<Record<number, boolean>>({});
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const current = clips[active];
   const currentErrored = Boolean(errored[active]);
 
-  const goFullscreen = () => {
-    const el = videoRef.current;
-    if (el && el.requestFullscreen) el.requestFullscreen().catch(() => {});
-  };
+  const markErrored = (i: number) => setErrored((e) => ({ ...e, [i]: true }));
+  const next = () => setActive((i) => (i + 1) % clips.length);
 
   return (
     <div className="mb-16">
-      {/* Featured player */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0B0C10]">
-        <div className="relative aspect-video w-full">
+      <div className="grid gap-6 md:grid-cols-[minmax(0,340px)_1fr] md:gap-8 md:items-start">
+        {/* Featured portrait player */}
+        <div className="relative mx-auto w-full max-w-[340px] overflow-hidden rounded-2xl border border-white/10 bg-black">
           {currentErrored ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
+            <div className="flex aspect-[9/16] flex-col items-center justify-center gap-3 px-6 text-center">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(118,185,0,0.16),transparent_60%)]" aria-hidden="true" />
-              <span className="relative flex h-16 w-16 items-center justify-center rounded-full border border-brand-500/40 bg-black/50">
-                <Film className="w-7 h-7 text-brand-300/80" />
+              <span className="relative flex h-14 w-14 items-center justify-center rounded-full border border-brand-500/40 bg-black/50">
+                <Film className="w-6 h-6 text-brand-300/80" />
               </span>
-              <p className="relative font-display text-lg font-bold text-white">{current.label}</p>
-              <p className="relative max-w-md text-sm text-zinc-400">
-                הסרטון יתווסף בקרוב. הרכיב מוכן להזרמת קובץ וידאו מקומי מהנתיב{' '}
-                <code dir="ltr" className="font-mono text-brand-300">{BASE}</code>
+              <p className="relative font-display text-base font-bold text-white">{current.label}</p>
+              <p className="relative text-xs text-zinc-400">
+                הסרטון לא נמצא בנתיב <code dir="ltr" className="font-mono text-brand-300">{BASE}</code>
               </p>
             </div>
           ) : (
@@ -60,35 +59,22 @@ export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?:
               key={current.src}
               ref={videoRef}
               src={current.src}
-              poster={current.poster}
               controls
-              preload="metadata"
+              autoPlay={engaged}
               playsInline
-              onError={() => setErrored((e) => ({ ...e, [active]: true }))}
-              className="absolute inset-0 h-full w-full bg-black"
+              preload="metadata"
+              onPlay={() => setEngaged(true)}
+              onEnded={next}
+              onError={() => markErrored(active)}
+              className="block aspect-[9/16] w-full bg-black object-contain"
             >
               הדפדפן שלך אינו תומך בתגית וידאו.
             </video>
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3">
-          <span className="text-sm font-bold text-white truncate">{current.label}</span>
-          <button
-            type="button"
-            onClick={goFullscreen}
-            disabled={currentErrored}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-300 hover:text-brand-300 transition-colors disabled:opacity-40"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-            מסך מלא
-          </button>
-        </div>
-      </div>
-
-      {/* Thumbnail strip */}
-      {clips.length > 1 && (
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Thumbnail selector */}
+        <div className="grid grid-cols-4 gap-3 md:grid-cols-2 lg:grid-cols-4">
           {clips.map((clip, i) => {
             const on = i === active;
             const bad = Boolean(errored[i]);
@@ -98,28 +84,45 @@ export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?:
                 type="button"
                 onClick={() => setActive(i)}
                 aria-current={on ? 'true' : undefined}
-                className={`group relative flex flex-col overflow-hidden rounded-xl border text-right transition-colors ${
-                  on ? 'border-brand-500/60 bg-brand-500/10' : 'border-white/10 bg-carbon-900/60 hover:border-brand-500/40'
+                aria-label={`מעבר ל${clip.label}`}
+                className={`group relative overflow-hidden rounded-xl border transition-colors ${
+                  on
+                    ? 'border-brand-500/60 ring-2 ring-brand-500/40'
+                    : 'border-white/10 hover:border-brand-500/40'
                 }`}
               >
-                <div className="relative aspect-video w-full bg-black/50">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(118,185,0,0.14),transparent_65%)]" aria-hidden="true" />
-                  <span className="absolute inset-0 flex items-center justify-center">
-                    {bad ? (
-                      <AlertCircle className="w-5 h-5 text-zinc-500" />
-                    ) : (
-                      <Play className={`w-5 h-5 translate-x-0.5 ${on ? 'text-brand-300' : 'text-zinc-400 group-hover:text-brand-300'}`} />
-                    )}
+                <div className="relative aspect-[9/16] w-full bg-black">
+                  {bad ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Film className="w-5 h-5 text-zinc-600" />
+                    </div>
+                  ) : (
+                    <video
+                      src={`${clip.src}#t=0.5`}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      tabIndex={-1}
+                      onError={() => markErrored(i)}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  )}
+                  <span
+                    className={`absolute inset-0 flex items-center justify-center bg-black/30 transition-opacity ${
+                      on ? 'opacity-0' : 'opacity-100 group-hover:opacity-60'
+                    }`}
+                  >
+                    <Play className="w-5 h-5 translate-x-0.5 text-white/90" />
+                  </span>
+                  <span className="absolute bottom-1.5 right-2 text-[11px] font-bold text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
+                    {clip.label}
                   </span>
                 </div>
-                <span className={`px-3 py-2 text-xs font-bold ${on ? 'text-brand-200' : 'text-zinc-300'}`}>
-                  {clip.label}
-                </span>
               </button>
             );
           })}
         </div>
-      )}
+      </div>
     </div>
   );
 }
