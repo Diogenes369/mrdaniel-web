@@ -17,18 +17,31 @@ import {
   PackageCheck,
   UploadCloud,
   Activity,
+  Compass,
+  DraftingCompass,
+  Hammer,
+  TrendingUp,
+  Search,
+  MousePointerClick,
+  LineChart,
+  Repeat,
+  Megaphone,
+  PhoneCall,
+  FileSearch,
+  FileText,
 } from 'lucide-react';
 import {
   PageHero,
   SectionHeading,
   InteractiveServiceGrid,
+  ServiceGrid,
   InfoBox,
   SpecTable,
   AudienceGrid,
-  UnifiedCta,
 } from '../components/content/ContentPrimitives';
 import LiveSimulation from '../components/content/LiveSimulation';
 import ProjectEstimator from '../components/content/ProjectEstimator';
+import LeadCtaGrid from '../components/content/LeadCtaGrid';
 
 export default function DigitalPage() {
   return (
@@ -66,6 +79,21 @@ export default function DigitalPage() {
               { icon: Cloud, title: 'ארכיטקטורת ענן (AWS / Azure)', description: 'תשתית Cloud-Native עם שירותים מנוהלים, תשתית-כקוד (IaC) לפריסה חוזרת, וסקיילביליות אוטומטית לפי עומס.' },
               { icon: GitBranch, title: 'CI/CD ו-DevOps', description: 'צינור אוטומטי הכולל בדיקות, סריקת אבטחה ו-Deployment הדרגתי (Blue-Green / Canary), עם Rollback אוטומטי במקרה כשל.' },
               { icon: Gauge, title: 'אופטימיזציית ביצועים', description: 'פרופיילינג ביצועים בצד השרת והלקוח, Caching רב-שכבתי ו-Code Splitting — כל שנייה של השהייה עולה בלקוחות פוטנציאליים.' },
+            ]}
+          />
+
+          <SectionHeading
+            icon={Compass}
+            title="ארכיטקטורה דיגיטלית לכל מחזור החיים"
+            description="לא רק לבנות — ללוות מהרעיון ועד הצמיחה. חמישה שלבים, כל אחד עם תוצר עסקי ברור שאפשר למדוד."
+          />
+          <ServiceGrid
+            items={[
+              { icon: Compass, title: '1. אפיון ואסטרטגיה', description: 'שיחת עומק על המטרות, המשתמשים והמספרים. יוצאים עם מסמך אפיון, סקופ מדויק ותוכנית עבודה — לפני שורת קוד אחת.' },
+              { icon: DraftingCompass, title: '2. ארכיטקטורה ועיצוב', description: 'תשתית נתונים, מודל הרשאות, בחירת ענן ומסכים ראשוניים (Prototype) שאפשר ללחוץ עליהם — כדי לתקן על נייר, לא בפרודקשן.' },
+              { icon: Hammer, title: '3. פיתוח באיטרציות', description: 'גרסאות קטנות שעולות לסביבת בדיקה כל שבוע. אתם רואים התקדמות אמיתית ומשפיעים תוך כדי, בלי "בלאק-בוקס" של חצי שנה.' },
+              { icon: Rocket, title: '4. השקה מבוקרת', description: 'פריסה הדרגתית, בדיקות עומס, גיבוי ו-Rollback מיידי. עולים לאוויר בלי לילות לבנים.' },
+              { icon: TrendingUp, title: '5. צמיחה ואופטימיזציה', description: 'אחרי ההשקה מתחילה העבודה החשובה: מדידה, ניסויים ושיפור מתמשך של יחסי ההמרה, המהירות והשימור.' },
             ]}
           />
 
@@ -117,10 +145,48 @@ export default function DigitalPage() {
             ]}
           />
 
-          <SectionHeading icon={Send} title="צור קשר והתחלה" description="תיאום ייעוץ ראשוני או קבלת הצעת מחיר לפרויקט" />
-          <UnifiedCta
-            mailSubject="הצעת מחיר לפרויקט פיתוח"
-            whatsappMessage="שלום דניאל, אשמח לקבל הצעת מחיר לפרויקט פיתוח (אתר / פלטפורמה / Web3)."
+          <SectionHeading
+            icon={TrendingUp}
+            title="אסטרטגיות צמיחה — הפיתוח הוא רק ההתחלה"
+            description="אתר שאף אחד לא מוצא, או שנכנסים אליו ולא ממירים, הוא נכס שלא עובד. אלה המנועים שמזיזים את המחט אחרי ההשקה."
+          />
+          <ServiceGrid
+            items={[
+              { icon: Search, title: 'SEO ותנועה אורגנית', description: 'מבנה טכני נכון, מהירות, ותוכן שגוגל אוהב — כדי שלקוחות ימצאו אתכם בלי לשלם על כל קליק.' },
+              { icon: MousePointerClick, title: 'אופטימיזציית המרות (CRO)', description: 'ניתוח נקודות הנטישה בפועל ושיפור נתיב המשתמש — יותר פניות מאותה כמות מבקרים.' },
+              { icon: LineChart, title: 'מדידה וניסויים (A/B)', description: 'החלטות לפי מספרים, לא תחושות. בדיקות מבוקרות על כותרות, מסכים וטפסים.' },
+              { icon: Repeat, title: 'שימור ומחזור לקוח', description: 'רצפי מייל/וואטסאפ אוטומטיים, אונבורדינג והחזרת לקוחות רדומים — ה-LTV הוא המשחק האמיתי.' },
+              { icon: Megaphone, title: 'רכישה בתשלום', description: 'קמפיינים ממוקדים עם דפי נחיתה ייעודיים ומעקב המרות מלא — תקציב שעובד, לא נשרף.' },
+            ]}
+          />
+
+          <SectionHeading icon={Send} title="הצעד הבא" description="בחרו את נקודת הכניסה שמתאימה לכם — כל פנייה מגיעה אליי מסווגת ומוכנה לשיחה ממוקדת" />
+          <LeadCtaGrid
+            sourceSection="Digital Page · Specialized CTA"
+            items={[
+              {
+                icon: PhoneCall,
+                title: 'שיחת אסטרטגיה',
+                sub: '30 דקות, ללא עלות. עוברים על המטרות, האתגרים והכיוון הנכון — עם המלצות קונקרטיות שאפשר ליישם גם בלעדיי.',
+                subject: 'שיחת אסטרטגיה דיגיטלית (30 דק׳)',
+                action: 'לתיאום שיחה',
+                featured: true,
+              },
+              {
+                icon: FileSearch,
+                title: 'אודיט לאתר / מערכת קיימת',
+                sub: 'יש לכם כבר משהו שרץ? דו״ח ממוקד על ביצועים, אבטחה, SEO וחווית משתמש — עם רשימת תיקונים לפי סדר עדיפויות.',
+                subject: 'אודיט טכני לאתר / מערכת קיימת',
+                action: 'לבקשת אודיט',
+              },
+              {
+                icon: FileText,
+                title: 'הצעת מחיר מפורטת',
+                sub: 'יודעים בדיוק מה אתם צריכים? שלחו את הדרישות ותקבלו סקופ, לוחות זמנים ומחיר מפורט — לא טווח כללי.',
+                subject: 'הצעת מחיר מפורטת — פרויקט פיתוח',
+                action: 'לבקשת הצעה',
+              },
+            ]}
           />
         </div>
       </div>

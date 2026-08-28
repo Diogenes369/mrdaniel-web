@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import Marquee from 'react-fast-marquee';
 import { Rss, ArrowLeft, RefreshCw, Sparkles, Clock3 } from 'lucide-react';
 import WebButton from './WebButton';
 import NewsCard from './NewsCard';
@@ -9,9 +8,9 @@ import ScrollLockRail from './mobile/ScrollLockRail';
 import { useNewsFeed, type NewsTopic } from '../services/newsService';
 import { prefersReducedMotion } from '../lib/gsap';
 
-// Homepage news section, rebuilt as an interactive mini-dashboard: a live headline ticker, category
-// tab filters, reading-time tags (in NewsCard), an "updated" pill, and a responsive grid / mobile
-// scroll-lock rail. All underlying data is unchanged — same useNewsFeed() query.
+// Homepage news section, rebuilt as an interactive mini-dashboard: an infinite live headline
+// ticker, category tab filters, reading-time tags (in NewsCard), an "updated" pill, and a
+// responsive grid / mobile scroll-lock rail. All underlying data is unchanged — same useNewsFeed().
 const PREVIEW_COUNT = 9;
 const TICKER_COUNT = 12;
 
@@ -22,6 +21,29 @@ const CATEGORIES: { id: NewsTopic | 'all'; label: string }[] = [
   { id: 'cloud', label: 'ענן' },
   { id: 'general', label: 'כללי' },
 ];
+
+interface TickerRow {
+  id: string;
+  title: string;
+  dateLabel: string;
+  href: string;
+}
+
+// Shown while the feed is loading, empty, or errored — the ticker is never blank.
+const FALLBACK_TICKER: TickerRow[] = [
+  { id: 'fb-ai', title: 'סוכני AI בארגונים — מגמת האוטומציה שמשנה תהליכים עסקיים', dateLabel: 'עדכני', href: '/ai' },
+  { id: 'fb-cy', title: 'אבטחת סייבר לעסקים קטנים ובינוניים: Zero-Trust כברירת מחדל', dateLabel: 'עדכני', href: '/cyber' },
+  { id: 'fb-web', title: 'פיתוח Full-Stack מודרני — מהירות, נגישות וארכיטקטורה נקייה', dateLabel: 'עדכני', href: '/digital' },
+  { id: 'fb-data', title: 'ארכיטקטורת דאטה נכונה = החלטות מהירות ומוצר טוב יותר', dateLabel: 'עדכני', href: '/architecture' },
+  { id: 'fb-mkt', title: 'קמפיינים דיגיטליים מבוססי דאטה — יותר לידים, פחות בזבוז', dateLabel: 'עדכני', href: '/digital' },
+  { id: 'fb-cap', title: 'סקירת יכולות: מ-MVP ליזם ועד פלטפורמה ארגונית מלאה', dateLabel: 'עדכני', href: '/capabilities' },
+];
+
+function formatTickerDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+}
 
 export default function CyberNewsGrid() {
   const navigate = useNavigate();
@@ -35,12 +57,42 @@ export default function CyberNewsGrid() {
     return scoped.slice(0, PREVIEW_COUNT);
   }, [allItems, active]);
 
-  const ticker = useMemo(() => (allItems ?? []).slice(0, TICKER_COUNT), [allItems]);
+  // Always a non-empty list — real headlines when we have them, evergreen fallbacks otherwise.
+  const tickerRows: TickerRow[] = useMemo(() => {
+    const rows = (allItems ?? []).slice(0, TICKER_COUNT).map((i) => ({
+      id: i.id,
+      title: i.title,
+      dateLabel: formatTickerDate(i.publishedAt),
+      href: i.link,
+    }));
+    return rows.length >= 4 ? rows : FALLBACK_TICKER;
+  }, [allItems]);
+
+  const openRow = (href: string) => {
+    if (href.startsWith('/')) navigate(href);
+    else window.open(href, '_blank', 'noopener,noreferrer');
+  };
 
   const updatedLabel =
     dataUpdatedAt > 0
       ? new Date(dataUpdatedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
       : null;
+
+  const Item = ({ row }: { row: TickerRow }) => (
+    <button
+      type="button"
+      onClick={() => openRow(row.href)}
+      className="group inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-brand-300 transition-colors"
+    >
+      <span className="text-brand-500">•</span>
+      <span>{row.title}</span>
+      {row.dateLabel && (
+        <span className="text-xs font-mono text-zinc-600 group-hover:text-brand-500/70" dir="ltr">
+          {row.dateLabel}
+        </span>
+      )}
+    </button>
+  );
 
   return (
     <section id="news" className="py-14 md:py-24 border-t border-white/5 relative overflow-hidden cv-auto">
@@ -54,41 +106,43 @@ export default function CyberNewsGrid() {
           </p>
         </div>
 
-        {/* Live headline ticker */}
-        {!isLoading && !isError && ticker.length > 0 && (
-          <div className="relative mb-8 rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
-            <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center gap-2 px-3 bg-gradient-to-l from-carbon-950 via-carbon-950/95 to-transparent">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
-              </span>
-              <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-brand-300">Live</span>
-            </div>
-            <div className="py-2.5 pr-24">
-              {reduced ? (
-                <div className="flex gap-6 overflow-hidden whitespace-nowrap px-4 text-sm text-zinc-400">
-                  {ticker.slice(0, 4).map((i) => (
-                    <span key={i.id} className="truncate">{i.title}</span>
-                  ))}
-                </div>
-              ) : (
-                <Marquee direction="left" speed={40} pauseOnHover gradient={false}>
-                  {ticker.map((i) => (
-                    <button
-                      key={i.id}
-                      type="button"
-                      onClick={() => window.open(i.link, '_blank', 'noopener,noreferrer')}
-                      className="mx-5 text-sm text-zinc-400 hover:text-brand-300 transition-colors"
-                    >
-                      <span className="mx-2 text-brand-500">•</span>
-                      {i.title}
-                    </button>
-                  ))}
-                </Marquee>
-              )}
-            </div>
+        {/* Infinite live headline ticker — always populated (fallbacks while loading/empty). */}
+        <div className="news-ticker relative mb-8 rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
+          {/* LIVE tag (right) + its gradient mask so items dissolve out from behind it */}
+          <div className="absolute right-0 inset-y-0 z-20 flex items-center gap-2 pr-3 pl-10 bg-gradient-to-l from-carbon-950 via-carbon-950 to-transparent">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
+            </span>
+            <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-brand-300">Live</span>
           </div>
-        )}
+          {/* left fade */}
+          <div className="pointer-events-none absolute left-0 inset-y-0 z-10 w-10 bg-gradient-to-r from-carbon-950 to-transparent" />
+
+          {reduced ? (
+            <div className="flex gap-8 overflow-hidden whitespace-nowrap py-2.5 pr-24 pl-4">
+              {tickerRows.slice(0, 5).map((row) => (
+                <span key={row.id} className="inline-flex items-center gap-2 text-sm text-zinc-400 truncate">
+                  <span className="text-brand-500">•</span>
+                  {row.title}
+                  {row.dateLabel && <span className="text-xs font-mono text-zinc-600" dir="ltr">{row.dateLabel}</span>}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="news-ticker__viewport py-2.5" dir="ltr">
+              <div className="news-ticker__track">
+                {[0, 1].map((dup) => (
+                  <div className="news-ticker__group" key={dup} aria-hidden={dup === 1}>
+                    {tickerRows.map((row) => (
+                      <Item key={`${dup}-${row.id}`} row={row} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Category tabs + updated pill */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8">

@@ -65,9 +65,11 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const openAgent = () => window.dispatchEvent(new CustomEvent('open-agent-qualifier'));
+
   const handleCtaClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    window.dispatchEvent(new CustomEvent('open-agent-qualifier'));
+    openAgent();
   };
 
   const openContact = () => {
@@ -258,6 +260,19 @@ export default function Header() {
               </WebButton>
             </div>
 
+            {/* Mobile quick-action — opens the personal-agent qualifier. Compact pill that sits to
+                the side of the hamburger (which is pulled to the edge via -mr-2) so it never
+                crowds the logo or the menu icon. */}
+            <button
+              type="button"
+              onClick={openAgent}
+              aria-label="פתיחת סוכן אישי"
+              className={`lg:hidden inline-flex items-center gap-1.5 rounded-full border border-[#76B900]/40 bg-[#76B900]/10 px-3 py-1.5 text-xs font-semibold text-[#9FE870] whitespace-nowrap transition-colors hover:bg-[#76B900]/20 active:scale-95 ${FOCUS_SAFE_CLASS}`}
+            >
+              <Sparkles size={13} />
+              סוכן אישי
+            </button>
+
             <button className={`lg:hidden text-white z-50 p-2 -mr-2 rounded-lg ${FOCUS_SAFE_CLASS}`} onClick={() => setMobileOpen(!mobileOpen)} aria-label="תפריט">
               {mobileOpen ? <X size={28} /> : <Menu size={28} />}
             </button>
@@ -297,6 +312,18 @@ export default function Header() {
                 net for a very short viewport (e.g. landscape) — normally 8 links at this size fit
                 a single dvh with no scrolling needed. */}
             <nav className="flex-1 min-h-0 overflow-y-auto momentum-scroll flex flex-col justify-center gap-1 px-6">
+              {/* Personal-agent quick action, highlighted above the plain nav list. */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  window.setTimeout(openAgent, DRAWER_EXIT_MS);
+                }}
+                className={`mb-4 flex items-center justify-center gap-2 rounded-full bg-brand-500 py-3.5 font-display text-lg font-bold text-black shadow-[0_0_24px_rgba(118,185,0,0.25)] ${FOCUS_SAFE_CLASS}`}
+              >
+                <Sparkles size={18} />
+                סוכן אישי · התאמה מיידית
+              </button>
               {navLinks.map((link) =>
                 link.action === 'contact' ? (
                   <button

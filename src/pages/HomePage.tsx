@@ -1,6 +1,7 @@
 import Hero from '../components/Hero';
 import WordRotator from '../components/WordRotator';
 import OfferSection from '../components/home/OfferSection';
+import PricingSection from '../components/home/PricingSection';
 import CyberNewsGrid from '../components/CyberNewsGrid';
 import ContactPortal from '../components/ContactPortal';
 import { HOME_OFFERS } from '../data/homeOffers';
@@ -19,6 +20,7 @@ export default function HomePage() {
       {HOME_OFFERS.map((offer) => (
         <OfferSection key={offer.id} offer={offer} />
       ))}
+      <PricingSection />
       <CyberNewsGrid />
       <ContactPortal />
     </>

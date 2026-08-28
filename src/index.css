@@ -585,3 +585,43 @@ html.a11y-large-cursor * {
     opacity: 0.9;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Live news ticker (CyberNewsGrid.tsx) — a seamless, gap-free infinite marquee.
+   Two identical `__group`s sit side by side inside `__track`; the track scrolls
+   left by exactly one group width and loops, so a group is always filling the
+   viewport (no blank frames, no first-cycle empty space). `dir: ltr` on the
+   viewport keeps group order predictable; the Hebrew runs inside each item
+   still render RTL via bidi. Pauses on hover; static under reduced-motion.
+   --------------------------------------------------------------------------- */
+.news-ticker__viewport {
+  overflow: hidden;
+}
+.news-ticker__track {
+  display: flex;
+  width: max-content;
+  animation: news-ticker-scroll 55s linear infinite;
+  will-change: transform;
+}
+.news-ticker:hover .news-ticker__track {
+  animation-play-state: paused;
+}
+.news-ticker__group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2.5rem;
+  padding-inline: 1.25rem;
+}
+.news-ticker__group > * {
+  flex-shrink: 0;
+}
+@keyframes news-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .news-ticker__track {
+    animation: none;
+  }
+}
