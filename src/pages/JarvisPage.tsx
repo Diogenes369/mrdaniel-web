@@ -255,27 +255,28 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
 export default function JarvisPage() {
   return (
     <div id="page-top" className="min-h-screen pb-24">
-      {/* ---- Hero: full-bleed image band (edge-to-edge, NO container) with a mask bottom fade,
-             then the headline + intro directly below. Sits clear of the navbar and fits inside
-             one viewport on desktop and mobile. ---- */}
-      <section className="relative flex min-h-[90vh] flex-col items-center overflow-hidden pt-24 md:pt-28 pb-8 md:pb-10 text-center">
-        {/* Edge-to-edge JARVIS graphic — w-full, no wrapper, object-cover object-top, smooth
-            CSS-mask bottom fade so it dissolves into the dynamic particle background. */}
+      {/* ---- Hero: the full-width JARVIS graphic is pinned to the ABSOLUTE top of the viewport
+             (behind the news ticker + nav — the section is pulled up by the desktop ticker's
+             height so `top-0` really is the page top, no break line). The image carries NO top
+             padding/margin; the inner content wrapper carries the top padding that pushes the
+             circle clear of the sticky header and drops the H1 into a clean gap below it. The
+             bottom of the image keeps its mask fade into the particle background. ---- */}
+      <section className="relative -mt-[34px] min-h-[95vh] overflow-hidden">
         <img
           src="/images/jarvis-hero-bg.png"
           alt="מערכת JARVIS"
           fetchPriority="high"
           loading="eager"
           decoding="async"
-          className="w-full h-[26vh] sm:h-[32vh] md:h-[38vh] object-cover object-center [mask-image:linear-gradient(to_bottom,black_60%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_60%,transparent_100%)]"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[50vh] sm:h-[56vh] md:h-[62vh] w-full object-cover object-center [mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)]"
         />
 
-        {/* Text — directly below the circular logo, no overlap */}
+        {/* Inner content wrapper — the ONLY place with top padding. */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="container-wide relative z-[1] mt-8 md:mt-12 flex flex-col items-center"
+          className="container-wide relative z-[1] flex flex-col items-center text-center pt-[46vh] sm:pt-[50vh] md:pt-[54vh] pb-10 md:pb-14"
         >
           <h1 className="font-display font-black text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.85)]">
             JARVIS: סוכן בינה מלאכותית אוטונומי לניהול העסק שלך
