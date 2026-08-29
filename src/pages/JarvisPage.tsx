@@ -254,12 +254,13 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
 
 export default function JarvisPage() {
   return (
-    <div id="page-top" className="min-h-screen pt-20 md:pt-28 pb-24">
-      {/* ---- Cinematic hero image band — full-bleed, ABOVE the headline, sitting clear of the
-             nav. The bottom is faded with a long, smooth CSS mask (not a solid overlay) so it
-             dissolves fully into transparency and the site's global particle background stays
-             visible behind the generous space below. ---- */}
-      <div className="relative w-full h-[42vh] min-h-[280px] sm:h-[50vh] md:h-[60vh] overflow-hidden [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)]">
+    <div id="page-top" className="min-h-screen pb-24">
+      {/* ---- True full-screen cinematic hero. The image starts at the absolute top of the page
+             (under the transparent nav); its bottom is faded with a long CSS mask so it melts
+             into the site's dynamic particle background. The headline + intro are anchored to the
+             bottom of the same viewport-height box so image, H1 and intro are all visible on
+             load, desktop and mobile, with no scroll. No overlays, glows or top gap. ---- */}
+      <section className="relative isolate flex min-h-[85vh] md:min-h-[90vh] flex-col justify-end overflow-hidden">
         <img
           src="/images/jarvis-hero-bg.png"
           alt=""
@@ -267,26 +268,25 @@ export default function JarvisPage() {
           fetchPriority="high"
           loading="eager"
           decoding="async"
-          className="absolute inset-0 h-full w-full object-cover object-center"
+          className="absolute inset-0 -z-10 h-full w-full object-cover object-center [mask-image:linear-gradient(to_bottom,black_30%,transparent_90%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_90%)]"
         />
-      </div>
 
-      {/* Headline + intro — generous negative space below the faded image so the page breathes. */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="container-wide relative z-[2] mt-16 md:mt-24 flex flex-col items-center text-center pb-14 md:pb-24"
-      >
-        <h1 className="font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.8)]">
-          JARVIS: סוכן בינה מלאכותית אוטונומי לניהול העסק שלך
-        </h1>
-        <p className="mt-6 text-base md:text-lg text-zinc-200 leading-[1.9] max-w-2xl [text-shadow:0_1px_16px_rgba(0,0,0,0.75)]">
-          מערכת JARVIS (Just A Rather Very Intelligent System) היא תפיסה מהפכנית של ניהול סביבה, פרויקטים
-          ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
-          המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
-        </p>
-      </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="container-wide relative z-[1] flex flex-col items-center text-center pb-10 md:pb-16"
+        >
+          <h1 className="font-display font-black text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.85)]">
+            JARVIS: סוכן בינה מלאכותית אוטונומי לניהול העסק שלך
+          </h1>
+          <p className="mt-5 md:mt-6 text-sm sm:text-base md:text-lg text-zinc-200 leading-[1.8] md:leading-[1.9] max-w-2xl [text-shadow:0_1px_16px_rgba(0,0,0,0.8)]">
+            מערכת JARVIS (Just A Rather Very Intelligent System) היא תפיסה מהפכנית של ניהול סביבה, פרויקטים
+            ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
+            המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
+          </p>
+        </motion.div>
+      </section>
 
       <div className="container-wide">
         <div className="pt-6 md:pt-12">
