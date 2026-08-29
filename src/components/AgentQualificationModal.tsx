@@ -254,40 +254,36 @@ export default function AgentQualificationModal() {
       ? buildWhatsAppUrl(buildWhatsAppMessage({ businessType, techStack, budget, goal, agent: result }))
       : buildWhatsAppUrl();
 
+  // NOTE: deliberately NOT wrapped in <AnimatePresence>. This modal has a nested
+  // <AnimatePresence mode="wait"> for its step transitions, and `close()` resets `step` — the
+  // combination used to deadlock an outer exit animation, leaving a stuck, invisible,
+  // pointer-events:auto full-screen overlay after close (page unclickable on mobile). Plain
+  // conditional render = the whole overlay unmounts instantly and reliably on close.
+  if (!isOpen) return null;
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        // One keyed motion element is the AnimatePresence child, so the ENTIRE overlay (backdrop
-        // + glow + card) unmounts together on close — no leftover green blur/backdrop freeze on
-        // mobile. Everything inside fades with this wrapper.
+    <div className="fixed inset-0 z-[100] flex justify-center items-end md:items-center px-4 md:px-0 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-0">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2 }}
+        onClick={close}
+        className="absolute inset-0 bg-black/90"
+      />
+
+      {/* Signature breathing glow around the card — a plain div with a CSS `animate-pulse`. */}
+      <div className="relative w-full max-w-lg">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-1 rounded-[2rem] bg-brand-500/20 blur-2xl animate-pulse"
+        />
+
         <motion.div
-          key="agent-qualifier"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0, pointerEvents: 'none' }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex justify-center items-end md:items-center px-4 md:px-0 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-0"
+          initial={{ opacity: 0, y: 40, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+          className="relative w-full max-h-[85dvh] md:max-h-[90dvh] flex flex-col bg-[#0b0c10] border border-brand-500/30 shadow-[0_30px_80px_rgba(0,0,0,0.9)] rounded-3xl overflow-hidden"
         >
-          <div onClick={close} className="absolute inset-0 bg-black/90" />
-
-          {/* Signature breathing glow around the card. Deliberately a plain div with a CSS
-              `animate-pulse` (NOT a framer `repeat: Infinity` animation) — an infinite framer
-              loop here used to delay AnimatePresence's exit, leaving a stuck full-screen overlay
-              on mobile. CSS-only means it unmounts instantly with the wrapper. */}
-          <div className="relative w-full max-w-lg">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -inset-1 rounded-[2rem] bg-brand-500/20 blur-2xl animate-pulse"
-            />
-
-            <motion.div
-              initial={{ opacity: 0, y: 60, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 26, stiffness: 220 } }}
-              // Deterministic tween on exit (not a spring) so AnimatePresence always completes and
-              // the overlay unmounts cleanly — no lingering modal / green blur on mobile.
-              exit={{ opacity: 0, y: 40, scale: 0.97, transition: { duration: 0.2, ease: 'easeIn' } }}
-              className="relative w-full max-h-[85dvh] md:max-h-[90dvh] flex flex-col bg-[#0b0c10] border border-brand-500/30 shadow-[0_30px_80px_rgba(0,0,0,0.9)] rounded-3xl overflow-hidden"
-            >
               <div className="relative bg-[#0D0E12] border-b border-white/10">
                 <ModalHeaderBanner pulse />
 
@@ -401,10 +397,8 @@ export default function AgentQualificationModal() {
                   </WebButton>
                 </div>
               )}
-            </motion.div>
-          </div>
         </motion.div>
-      )}
-    </AnimatePresence>
+      </div>
+    </div>
   );
 }
