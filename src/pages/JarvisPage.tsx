@@ -255,27 +255,26 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
 export default function JarvisPage() {
   return (
     <div id="page-top" className="min-h-screen pb-24">
-      {/* ---- True full-screen cinematic hero. The image starts at the absolute top of the page
-             (under the transparent nav); its bottom is faded with a long CSS mask so it melts
-             into the site's dynamic particle background. The headline + intro are anchored to the
-             bottom of the same viewport-height box so image, H1 and intro are all visible on
-             load, desktop and mobile, with no scroll. No overlays, glows or top gap. ---- */}
-      <section className="relative isolate flex min-h-[85vh] md:min-h-[90vh] flex-col justify-end overflow-hidden">
+      {/* ---- Hero: a strict vertical stack — clear header gap, then the JARVIS logo image, then
+             a clean gap, then the headline + intro. Everything fits within one viewport on
+             desktop and mobile (image vh tuned down so the text never crosses the fold). ---- */}
+      <section className="relative flex min-h-[90vh] flex-col items-center justify-start overflow-hidden pt-24 md:pt-32 pb-8 md:pb-12 text-center">
+        {/* JARVIS logo image — first in the stack, height-constrained, with a smooth bottom fade */}
         <img
           src="/images/jarvis-hero-bg.png"
-          alt=""
-          aria-hidden="true"
+          alt="מערכת JARVIS"
           fetchPriority="high"
           loading="eager"
           decoding="async"
-          className="absolute inset-0 -z-10 h-full w-full object-cover object-center [mask-image:linear-gradient(to_bottom,black_30%,transparent_90%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_90%)]"
+          className="h-[26vh] sm:h-[34vh] md:h-[38vh] w-full object-contain object-top [mask-image:linear-gradient(to_bottom,black_50%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_50%,transparent_100%)]"
         />
 
+        {/* Text — immediately after the image in the flow, sitting fully below the logo */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="container-wide relative z-[1] flex flex-col items-center text-center pb-10 md:pb-16"
+          className="container-wide relative z-[1] mt-6 md:mt-10 flex flex-col items-center"
         >
           <h1 className="font-display font-black text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.85)]">
             JARVIS: סוכן בינה מלאכותית אוטונומי לניהול העסק שלך
