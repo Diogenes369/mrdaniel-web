@@ -612,11 +612,18 @@ html.a11y-large-cursor * {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 2.5rem;
-  padding-inline: 1.25rem;
+  gap: 2.75rem;
+  padding-inline: 1.5rem;
 }
 .news-ticker__group > * {
   flex-shrink: 0;
+}
+/* Tighter separation on phones so more of each headline is on screen at once. */
+@media (max-width: 640px) {
+  .news-ticker__group {
+    gap: 1.75rem;
+    padding-inline: 1rem;
+  }
 }
 @keyframes news-ticker-scroll {
   from { transform: translateX(0); }
