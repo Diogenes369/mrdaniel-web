@@ -46,14 +46,23 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
   const { data: allItems } = useNewsFeed();
   const reduced = prefersReducedMotion();
 
-  // Every item from the feed — no slicing/truncation, so the loop shows the full updated set.
+  // Every item from the feed — no slicing/truncation, so the loop shows the full updated set —
+  // sorted STRICT newest-first by publication date/time, so the absolute newest headline is the
+  // first one visible when the marquee starts (applies to both placements: desktop top bar and
+  // mobile in-section ticker).
   const rows: TickerRow[] = useMemo(() => {
-    const mapped = (allItems ?? []).map((i) => ({
-      id: i.id,
-      title: i.title,
-      stamp: stampFor(i.publishedAt),
-      href: i.link,
-    }));
+    const ts = (iso: string) => {
+      const t = new Date(iso).getTime();
+      return Number.isNaN(t) ? -Infinity : t;
+    };
+    const mapped = [...(allItems ?? [])]
+      .sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt))
+      .map((i) => ({
+        id: i.id,
+        title: i.title,
+        stamp: stampFor(i.publishedAt),
+        href: i.link,
+      }));
     return mapped.length >= 4 ? mapped : FALLBACK_TICKER;
   }, [allItems]);
 
