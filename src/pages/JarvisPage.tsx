@@ -1,4 +1,5 @@
-import { motion } from 'motion/react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Mic,
   Briefcase,
@@ -12,6 +13,8 @@ import {
   Layers,
   BarChart3,
   FileText,
+  HelpCircle,
+  ChevronDown,
 } from 'lucide-react';
 import { SectionHeading, ServiceGrid, InfoBox } from '../components/content/ContentPrimitives';
 import JarvisShowcaseVideo from '../components/content/JarvisShowcaseVideo';
@@ -129,6 +132,72 @@ const CUSTOMER_BENEFITS = [
   'התאמה אישית מלאה (נתפר בדיוק לפי הצרכים).',
   'אבטחת מידע מתקדמת.',
 ];
+
+const FAQ_ITEMS: { q: string; a: string }[] = [
+  {
+    q: 'מה זו בעצם מערכת JARVIS ואיך היא שונה מ-ChatGPT רגיל?',
+    a: "JARVIS היא לא רק צ'אט מענה על שאלות, אלא סוכן בינה מלאכותית אוטונומי (Agentic AI) שפועל ומבצע פעולות בפועל. המערכת מתחברת למערכות הליבה של העסק שלך (CRM, מיילים, יומנים, בסיסי נתונים ו-APIs) ויודעת להוציא לפועל משימות מורכבות מקצה לקצה בצורה עצמאית לחלוטין.",
+  },
+  {
+    q: 'האם המערכת תומכת בתקשורת מלאה בעברית ובדיבור קולי?',
+    a: 'כן, באופן מלא! JARVIS מונעת על ידי מודלי השפה המתקדמים בעולם (GPT-4o, Claude 3.5, Gemini) התומכים בעברית טבעית ברמה אנושית. בנוסף, ניתן לשלב במערכת מנועי קול מתקדמים (TTS/STT) המאפשרים לנהל איתה שיחה קולית רציפה וטבעית בעברית לניהול ותפעול העסק.',
+  },
+  {
+    q: 'לאיזה סוגי עסקים המערכת מתאימה?',
+    a: 'JARVIS נבנית ומותאמת אישית לכל עסק - החל מחברות הייטק, משרדי נדל"ן, סוכנויות דיגיטל ועד לעסקים קטנים ובינוניים. המערכת מייעלת תהליכי שירות לקוחות, ניהול לידים, אוטומציה של משימות אדמיניסטרטיביות, ניתוח דאטה וניהול פרויקטים.',
+  },
+  {
+    q: 'עד כמה המידע העסקי שלי שמור ומאובטח?',
+    a: 'אבטחת המידע והפרטיות של העסק שלך נמצאות בראש סדר העדיפויות. JARVIS עובדת בתוך סביבה מאובטחת, מוצפנת ומבודדת (Enterprise-grade Security). המידע העסקי שלך לא משמש לאימון מודלים ציבוריים ונשאר בשליטתך מלאה.',
+  },
+  {
+    q: 'איך מתבצע תהליך ההטמעה בעסק שלי?',
+    a: 'התהליך מתחיל בפגישת אפיון מקיפה שבה אנו ממפים את הצורכים והאוטומציות הדרושות לעסק. לאחר מכן, אנו בונים, מגדירים ומחברים את JARVIS למערכות שלכם, מבצעים בדיקות איכות (QA) ומספקים הדרכה מלאה לצוות.',
+  },
+];
+
+function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+  return (
+    <div className="mx-auto max-w-4xl divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-carbon-900/40">
+      {items.map((item, i) => {
+        const isOpen = openIndex === i;
+        return (
+          <div key={item.q}>
+            <button
+              type="button"
+              onClick={() => setOpenIndex(isOpen ? null : i)}
+              aria-expanded={isOpen}
+              className="flex w-full items-center justify-between gap-4 px-5 py-5 text-right transition-colors hover:bg-white/[0.04] md:px-7"
+            >
+              <span className="font-display text-base md:text-lg font-bold text-white">{item.q}</span>
+              <ChevronDown
+                className={`w-5 h-5 shrink-0 text-brand-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="overflow-hidden"
+                >
+                  <p className="px-5 pb-6 text-sm md:text-base leading-[1.9] text-zinc-300 md:px-7">
+                    {item.a}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function JarvisPage() {
   return (
@@ -279,6 +348,14 @@ export default function JarvisPage() {
               ההיקף, לוחות הזמנים והתמחור נבנים לאחר פגישת אפיון ומוגשים כהצעה ארגונית מסודרת.
             </p>
           </InfoBox>
+
+          {/* ---- FAQ ---- */}
+          <SectionHeading
+            icon={HelpCircle}
+            title="שאלות ותשובות נפוצות"
+            description="כל מה שצריך לדעת על מערכת האוטונומיה העסקית JARVIS"
+          />
+          <FaqAccordion items={FAQ_ITEMS} />
 
           {/* ---- Single bottom conversion section — the page's ONLY other CTA trigger ---- */}
           <section className="mt-20 md:mt-28 rounded-3xl border border-brand-500/30 bg-gradient-to-bl from-brand-500/15 via-carbon-900 to-carbon-900 p-10 md:p-16 text-center">
