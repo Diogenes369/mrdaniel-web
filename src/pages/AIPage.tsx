@@ -9,9 +9,6 @@ import {
   Send,
   Check,
   Clapperboard,
-  Newspaper,
-  Clock,
-  ExternalLink,
   UserCog,
   ShoppingCart,
   Workflow,
@@ -25,37 +22,12 @@ import AgentFinder from '../components/content/AgentFinder';
 import VideoEmbed from '../components/content/VideoEmbed';
 import WebButton from '../components/WebButton';
 import { useAINewsFeed } from '../services/aiNewsService';
-import { formatRelativeTime } from '../services/newsService';
 
 // Fallback content only — used while the live /api/ai-news feed is loading for the first time,
-// or if it fails/returns nothing, so this section is never empty or broken.
+// or if it fails/returns nothing, so the video section is never empty or broken.
 const CURATED_VIDEOS = [
   { youtubeId: 'PLyCki2K0Lg', title: 'Why we built—and donated—the Model Context Protocol (MCP)', channel: 'Anthropic' },
   { youtubeId: '5CcL6I3fdcA', title: 'What Is an Enterprise AI Agent? (Assistant vs Workflow vs Agent)', channel: 'Zenphi' },
-];
-
-const CURATED_ARTICLES = [
-  {
-    title: 'הגנת סוכני AI בסביבות ארגוניות מפני מתקפות',
-    source: 'Geektime',
-    url: 'https://www.geektime.co.il/securing-ai-agents-everywhere-17925/',
-    readTime: '6 דקות קריאה',
-    tags: ['Agentic AI', 'סייבר'],
-  },
-  {
-    title: 'איך מודלי שפה אוטונומיים משנים את מחזור הפיתוח',
-    source: 'Geektime',
-    url: 'https://www.geektime.co.il/effective-ai-driven-sdlc-strategy/',
-    readTime: '7 דקות קריאה',
-    tags: ['AI Agents', 'SDLC'],
-  },
-  {
-    title: 'Introducing the Model Context Protocol',
-    source: 'Anthropic',
-    url: 'https://www.anthropic.com/news/model-context-protocol',
-    readTime: '5 דקות קריאה',
-    tags: ['MCP', 'Enterprise'],
-  },
 ];
 
 interface ShowcaseAgent {
@@ -164,16 +136,6 @@ export default function AIPage() {
   const { data: aiNews, isLoading: aiNewsLoading } = useAINewsFeed();
 
   const videos = aiNews && aiNews.videos.length > 0 ? aiNews.videos : CURATED_VIDEOS;
-  const articles =
-    aiNews && aiNews.articles.length > 0
-      ? aiNews.articles.map((item) => ({
-          title: item.title,
-          source: item.source,
-          url: item.link,
-          readTime: formatRelativeTime(item.publishedAt),
-          tags: [item.category],
-        }))
-      : CURATED_ARTICLES;
 
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
@@ -266,46 +228,6 @@ export default function AIPage() {
                   <div key={idx} className="aspect-video rounded-2xl bg-white/[0.03] border border-white/5 animate-pulse" />
                 ))
               : videos.map((v) => <VideoEmbed key={v.youtubeId} youtubeId={v.youtubeId} title={v.title} channel={v.channel} />)}
-          </div>
-
-          {/* ---- Recommended reading ---- */}
-          <SectionHeading icon={Newspaper} title="עדכון יומי: מומלץ לקריאה" description="כתבות AI טריות מהפיד החי של האתר, מתעדכנות אוטומטית" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-16">
-            {aiNewsLoading && !aiNews
-              ? Array.from({ length: 3 }).map((_, idx) => (
-                  <div key={idx} className="h-44 rounded-2xl bg-white/[0.03] border border-white/5 animate-pulse" />
-                ))
-              : articles.map((a) => (
-                  <a
-                    key={a.url}
-                    href={a.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex flex-col bg-carbon-fiber border border-white/10 rounded-2xl p-6 hover:border-brand-500/40 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 flex-wrap mb-3">
-                      {a.tags.map((tag) => (
-                        <span key={tag} className="text-[10px] font-mono font-bold text-brand-400 bg-brand-500/10 border border-brand-500/25 rounded-full px-2.5 py-1">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                    <h3 dir="auto" className="font-display font-bold text-base text-white mb-3 leading-snug flex-grow group-hover:text-brand-300 transition-colors">
-                      {a.title}
-                    </h3>
-                    <div className="flex items-center justify-between text-xs text-zinc-500 pt-3 border-t border-white/10">
-                      <span dir="ltr">{a.source}</span>
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3 h-3" />
-                        {a.readTime}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-400 group-hover:text-brand-400 transition-colors mt-3">
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      קריאה במקור
-                    </div>
-                  </a>
-                ))}
           </div>
 
           {/* ---- Final CTA ---- */}
