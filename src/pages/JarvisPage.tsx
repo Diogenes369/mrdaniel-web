@@ -254,32 +254,51 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
 
 export default function JarvisPage() {
   return (
-    <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
-      <div className="container-wide">
-        {/* ---- Hero ---- */}
+    <div id="page-top" className="min-h-screen pb-24">
+      {/* ---- Hero — edge-to-edge background image with a bottom fade into the site bg ---- */}
+      <section className="relative w-full overflow-hidden pt-28 md:pt-36 pb-14 md:pb-20">
+        <img
+          src="/images/jarvis-hero-bg.png"
+          alt=""
+          aria-hidden="true"
+          fetchPriority="high"
+          loading="eager"
+          decoding="async"
+          className="pointer-events-none absolute inset-0 z-0 h-full w-full object-cover object-center"
+        />
+        {/* bottom fade: transparent at top → solid #08090C (site bg) at the bottom */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-[#08090C] via-[#08090C]/60 to-transparent"
+        />
+        {/* light flat scrim so the logo / headline / intro stay crisp over the image */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] bg-[#08090C]/25" />
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="flex flex-col items-center text-center pt-8 pb-12 md:pt-12 md:pb-16"
+          className="container-wide relative z-[2] flex flex-col items-center text-center"
         >
           <img
             src="/images/jarvis_logo.png"
             alt="מערכת JARVIS"
             width={348}
             height={348}
-            className="h-16 md:h-24 w-auto mx-auto object-contain mb-6 drop-shadow-[0_0_28px_rgba(118,185,0,0.4)]"
+            className="h-16 md:h-24 w-auto mx-auto object-contain mb-6 drop-shadow-[0_0_28px_rgba(118,185,0,0.45)]"
           />
-          <h1 className="font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl">
+          <h1 className="font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.75)]">
             מערכת JARVIS לעסקים ולבית חכם: העוזר האישי של העתיד, כבר היום
           </h1>
-          <p className="mt-6 text-base md:text-lg text-zinc-300 leading-[1.9] max-w-3xl">
+          <p className="mt-6 text-base md:text-lg text-zinc-200 leading-[1.9] max-w-3xl [text-shadow:0_1px_16px_rgba(0,0,0,0.7)]">
             מערכת JARVIS (Just A Rather Very Intelligent System) היא תפיסה מהפכנית של ניהול סביבה, פרויקטים
             ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
             המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
           </p>
         </motion.div>
+      </section>
 
+      <div className="container-wide">
         <div className="pt-4">
           {/* ---- Concept card — broad, full-width, centered text ---- */}
           <Reveal className="bg-carbon-900/60 border border-white/10 rounded-2xl p-6 md:p-10 mb-16 text-center">
