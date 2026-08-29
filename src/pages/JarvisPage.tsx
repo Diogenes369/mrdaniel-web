@@ -153,14 +153,15 @@ export default function JarvisPage() {
         </motion.div>
 
         <div className="pt-4">
-          {/* ---- Concept badge ---- */}
-          <InfoBox title="🤖 מהי מערכת JARVIS?">
-            <p>
+          {/* ---- Concept card — broad, full-width, centered text ---- */}
+          <div className="bg-carbon-900/60 border border-white/10 rounded-2xl p-6 md:p-10 mb-16 text-center">
+            <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">🤖 מהי מערכת JARVIS?</h2>
+            <p className="text-base md:text-lg text-zinc-300 leading-[1.85] max-w-full">
               JARVIS אינה סתם עוד תוכנה או צ'אטבוט רגיל. זהו סוכן בינה מלאכותית פרואקטיבי (AI Agent). בעוד
               שתוכנות רגילות מחכות לפקודות קשיחות, JARVIS מבינה הקשר, לומדת את הרגלי המשתמש ומסוגלת לקבל החלטות
               ולבצע משימות מורכבות מקצה לקצה באופן עצמאי.
             </p>
-          </InfoBox>
+          </div>
 
           {/* ---- Video showcase — cover grid + centered lightbox modal ---- */}
           <div className="mt-16 mb-6 text-center">
