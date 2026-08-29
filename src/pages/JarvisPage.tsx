@@ -15,6 +15,9 @@ import {
   FileText,
   HelpCircle,
   ChevronDown,
+  Cloud,
+  Cpu,
+  Server,
 } from 'lucide-react';
 import { SectionHeading, ServiceGrid, InfoBox } from '../components/content/ContentPrimitives';
 import JarvisShowcaseVideo from '../components/content/JarvisShowcaseVideo';
@@ -131,6 +134,44 @@ const CUSTOMER_BENEFITS = [
   'זמינות של 24/7 (עוזר שלא מפספס משימה).',
   'התאמה אישית מלאה (נתפר בדיוק לפי הצרכים).',
   'אבטחת מידע מתקדמת.',
+];
+
+const DEPLOYMENT_OPTIONS: {
+  icon: typeof Cloud;
+  title: string;
+  description: string;
+  featured?: boolean;
+  points: { label: string; value: string }[];
+}[] = [
+  {
+    icon: Cloud,
+    title: 'תצורת ענן (Cloud) - מומלץ לרוב העסקים',
+    description:
+      'המערכת רצה על השרתים המאובטחים שלנו. אין צורך ברכישת חומרה יקרה, והעדכונים מתבצעים אוטומטית.',
+    featured: true,
+    points: [
+      { label: 'חומרה נדרשת', value: 'אין דרישות מיוחדות. עובד מכל מחשב (PC/Mac), טאבלט או סמארטפון.' },
+      { label: 'חיבור רשת', value: 'אינטרנט יציב ומהיר (פס רחב).' },
+      { label: 'ציוד היקפי', value: 'מיקרופון ורמקולים (או אוזניות) לאינטראקציה קולית.' },
+      { label: 'זמן הקמה', value: 'מהיר מאוד.' },
+    ],
+  },
+  {
+    icon: Cpu,
+    title: 'התקנה מקומית (On-Premise) - לארגונים',
+    description:
+      'המערכת מותקנת פיזית על השרתים או המחשבים בעסק שלך. מבטיח 100% פרטיות וניתוק מוחלט מהאינטרנט במידת הצורך.',
+    points: [
+      { label: 'מעבד (CPU)', value: 'דור עדכני של Intel Core i7 / AMD Ryzen 7 ומעלה.' },
+      { label: 'זיכרון (RAM)', value: 'מינימום 32GB (מומלץ 64GB ומעלה).' },
+      {
+        label: 'כרטיס מסך (GPU)',
+        value:
+          'חובה כרטיס מסך חזק של NVIDIA (סדרת RTX 3090/4090 או סדרות RTX ADA / A100 לארגונים) להרצת מודלי השפה המקומיים.',
+      },
+      { label: 'אחסון', value: 'כונן SSD NVMe מהיר (לפחות 1TB פנוי).' },
+    ],
+  },
 ];
 
 const FAQ_ITEMS: { q: string; a: string }[] = [
@@ -348,6 +389,49 @@ export default function JarvisPage() {
               ההיקף, לוחות הזמנים והתמחור נבנים לאחר פגישת אפיון ומוגשים כהצעה ארגונית מסודרת.
             </p>
           </InfoBox>
+
+          {/* ---- System & hardware requirements ---- */}
+          <SectionHeading
+            icon={Server}
+            title="דרישות מערכת וחומרה"
+            description="מערכת JARVIS גמישה וניתנת להתקנה בשתי תצורות עיקריות, בהתאם לצרכי האבטחה והתקציב של העסק שלך:"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16">
+            {DEPLOYMENT_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              return (
+                <div
+                  key={opt.title}
+                  className={`flex h-full flex-col rounded-2xl border p-6 md:p-8 transition-colors ${
+                    opt.featured
+                      ? 'border-brand-500/40 bg-brand-500/[0.04] shadow-[0_0_40px_-12px_rgba(118,185,0,0.28)]'
+                      : 'border-white/10 bg-carbon-900/60 hover:border-brand-500/30'
+                  }`}
+                >
+                  <div
+                    className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl border bg-black/40 ${
+                      opt.featured
+                        ? 'border-brand-500/40 text-brand-300 shadow-[0_0_20px_rgba(118,185,0,0.25)]'
+                        : 'border-white/10 text-brand-400'
+                    }`}
+                  >
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-display text-lg md:text-xl font-bold text-white leading-snug mb-2">
+                    {opt.title}
+                  </h3>
+                  <p className="text-sm md:text-base text-zinc-400 leading-relaxed mb-5">{opt.description}</p>
+                  <ul className="mt-auto space-y-3 border-t border-white/10 pt-5">
+                    {opt.points.map((p) => (
+                      <li key={p.label} className="text-sm md:text-[15px] leading-relaxed text-zinc-300">
+                        <strong className="text-white">{p.label}:</strong> {p.value}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
 
           {/* ---- FAQ ---- */}
           <SectionHeading
