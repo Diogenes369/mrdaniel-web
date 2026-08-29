@@ -1,18 +1,8 @@
 import { Flame, Sparkles, ArrowLeft, ExternalLink } from 'lucide-react';
 import { useAIPulse, toolOfTheWeek } from '../../services/aiPulseService';
 
-/** Small pulsing "auto-updating" badge — reused on both cards. */
-function LiveBadge() {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-500/30 bg-brand-500/10 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-widest text-brand-300 shrink-0">
-      <span className="relative flex h-1.5 w-1.5">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-400" />
-      </span>
-      מתעדכן אוטומטית
-    </span>
-  );
-}
+// Shared header style — both cards use the exact same size / weight / spacing for visual symmetry.
+const CARD_HEADING = 'mb-4 flex items-center gap-2 font-display text-lg md:text-xl font-bold text-white';
 
 /**
  * "מה חדש בעולם ה-AI" — a live external AI-tech pulse (TechCrunch AI, VentureBeat AI, Hacker News),
@@ -30,14 +20,11 @@ export default function AIPulseWidget() {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-16">
       {/* ---- Tool of the Week (auto-rotates weekly) ---- */}
       <div className="flex min-h-[280px] flex-col rounded-2xl border border-brand-500/30 bg-gradient-to-br from-brand-500/10 to-transparent p-6">
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-widest text-brand-400">
-            <Sparkles className="w-3 h-3" />
-            Tool of the Week
-          </span>
-          <LiveBadge />
-        </div>
-        <h3 className="mb-1 font-display text-xl font-bold text-white">{tool.name}</h3>
+        <h3 className={CARD_HEADING}>
+          <Sparkles className="w-4 h-4 shrink-0 text-brand-400" />
+          Tool of the Week
+        </h3>
+        <p className="font-display text-lg font-black text-brand-300">{tool.name}</p>
         <p className="mb-3 font-mono text-xs text-zinc-500" dir="ltr">
           {tool.vendor}
         </p>
@@ -55,13 +42,10 @@ export default function AIPulseWidget() {
 
       {/* ---- Live AI-tech feed ---- */}
       <div className="flex min-h-[280px] flex-col rounded-2xl border border-white/10 bg-[#0D0E12]/80 p-6 lg:col-span-2">
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-widest text-brand-400">
-            <Flame className="w-3 h-3" />
-            עדכוני AI חמים
-          </span>
-          <LiveBadge />
-        </div>
+        <h3 className={CARD_HEADING}>
+          <Flame className="w-4 h-4 shrink-0 text-brand-400" />
+          עדכוני AI חמים
+        </h3>
 
         {isLoading ? (
           <div className="space-y-3">
@@ -80,12 +64,12 @@ export default function AIPulseWidget() {
               <span className="mb-1 block font-mono text-[11px] text-brand-400/80" dir="ltr">
                 {lead.source}
               </span>
-              <h3
+              <h4
                 dir="auto"
                 className="mb-1.5 font-display text-lg font-bold leading-snug text-white transition-colors line-clamp-2 group-hover:text-brand-300"
               >
                 {lead.title}
-              </h3>
+              </h4>
               {lead.excerpt && (
                 <p dir="auto" className="text-sm leading-relaxed text-zinc-400 line-clamp-2">
                   {lead.excerpt}
