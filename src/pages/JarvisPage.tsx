@@ -22,6 +22,9 @@ import {
 import { SectionHeading, ServiceGrid, InfoBox } from '../components/content/ContentPrimitives';
 import JarvisShowcaseVideo from '../components/content/JarvisShowcaseVideo';
 import WebButton from '../components/WebButton';
+import TermTooltip from '../components/TermTooltip';
+import Reveal from '../components/Reveal';
+import SwipeRow from '../components/mobile/SwipeRow';
 
 const LEAD_SUBJECT = 'JARVIS System Inquiry';
 
@@ -197,6 +200,58 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
   },
 ];
 
+function CapCard({ group }: { group: CapabilityGroup }) {
+  const Icon = group.icon;
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-carbon-fiber p-6 hover:border-brand-500/40 transition-colors">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
+        <Icon className="w-6 h-6" />
+      </div>
+      <h3 className="font-display text-lg font-bold text-white leading-snug mb-4">{group.title}</h3>
+      <ul className="space-y-4">
+        {group.points.map((p) => (
+          <li key={p.lead} className="text-sm leading-relaxed text-zinc-400">
+            <strong className="block text-zinc-100 mb-0.5">{p.lead}:</strong>
+            {p.text}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ReqCard({ opt }: { opt: (typeof DEPLOYMENT_OPTIONS)[number] }) {
+  const Icon = opt.icon;
+  return (
+    <div
+      className={`flex h-full flex-col rounded-2xl border p-6 md:p-8 transition-colors ${
+        opt.featured
+          ? 'border-brand-500/40 bg-brand-500/[0.04] shadow-[0_0_40px_-12px_rgba(118,185,0,0.28)]'
+          : 'border-white/10 bg-carbon-900/60 hover:border-brand-500/30'
+      }`}
+    >
+      <div
+        className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl border bg-black/40 ${
+          opt.featured
+            ? 'border-brand-500/40 text-brand-300 shadow-[0_0_20px_rgba(118,185,0,0.25)]'
+            : 'border-white/10 text-brand-400'
+        }`}
+      >
+        <Icon className="w-6 h-6" />
+      </div>
+      <h3 className="font-display text-lg md:text-xl font-bold text-white leading-snug mb-2">{opt.title}</h3>
+      <p className="text-sm md:text-base text-zinc-400 leading-relaxed mb-5">{opt.description}</p>
+      <ul className="mt-auto space-y-3 border-t border-white/10 pt-5">
+        {opt.points.map((p) => (
+          <li key={p.label} className="text-sm md:text-[15px] leading-relaxed text-zinc-300">
+            <strong className="text-white">{p.label}:</strong> {p.value}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
@@ -264,60 +319,51 @@ export default function JarvisPage() {
 
         <div className="pt-4">
           {/* ---- Concept card — broad, full-width, centered text ---- */}
-          <div className="bg-carbon-900/60 border border-white/10 rounded-2xl p-6 md:p-10 mb-16 text-center">
+          <Reveal className="bg-carbon-900/60 border border-white/10 rounded-2xl p-6 md:p-10 mb-16 text-center">
             <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">🤖 מהי מערכת JARVIS?</h2>
             <p className="text-base md:text-lg text-zinc-300 leading-[1.85] max-w-full">
-              JARVIS אינה סתם עוד תוכנה או צ'אטבוט רגיל. זהו סוכן בינה מלאכותית פרואקטיבי (AI Agent). בעוד
-              שתוכנות רגילות מחכות לפקודות קשיחות, JARVIS מבינה הקשר, לומדת את הרגלי המשתמש ומסוגלת לקבל החלטות
-              ולבצע משימות מורכבות מקצה לקצה באופן עצמאי.
+              JARVIS אינה סתם עוד תוכנה או צ'אטבוט רגיל. זהו סוכן בינה מלאכותית פרואקטיבי (
+              <TermTooltip term="AI Agent">AI Agent</TermTooltip>). בעוד שתוכנות רגילות מחכות לפקודות קשיחות,
+              JARVIS מבינה הקשר, לומדת את הרגלי המשתמש ומסוגלת לקבל החלטות ולבצע משימות מורכבות מקצה לקצה באופן
+              עצמאי.
             </p>
-          </div>
+          </Reveal>
 
           {/* ---- Video showcase — cover grid + centered lightbox modal ---- */}
-          <div className="mt-16 mb-6 text-center">
-            <h2 className="font-display font-black text-2xl md:text-3xl text-white mb-3">משתמשי מערכת JARVIS</h2>
-            <p className="text-zinc-400 text-base md:text-lg leading-relaxed max-w-3xl mx-auto">
-              אלו משתמשים שעובדים כיום עם מערכת JARVIS שיכולה לנהל לכם את כל העסק/רעיון שלכם
-            </p>
-          </div>
-          <JarvisShowcaseVideo />
+          <Reveal>
+            <div className="mt-16 mb-6 text-center">
+              <h2 className="font-display font-black text-2xl md:text-3xl text-white mb-3">משתמשי מערכת JARVIS</h2>
+              <p className="text-zinc-400 text-base md:text-lg leading-relaxed max-w-3xl mx-auto">
+                אלו משתמשים שעובדים כיום עם מערכת JARVIS שיכולה לנהל לכם את כל העסק/רעיון שלכם
+              </p>
+            </div>
+            <JarvisShowcaseVideo />
+          </Reveal>
 
           {/* ---- Core capabilities ---- */}
           <SectionHeading
+            sticky
             icon={Layers}
             title="🚀 יכולות הליבה של המערכת"
-            description="שלושה תחומי ליבה שבהם JARVIS פועלת כמוח מרכזי אחד — קול, עסק ובית/משרד חכם."
+            description="שלושה תחומי ליבה שבהם JARVIS פועלת כמוח מרכזי אחד — קול, עסק ובית/משרד חכם. כל תחום מחליף שרשרת של כלים נפרדים בממשק אחד, קולי או טקסטואלי, שמדבר עם כל המערכות שכבר יש לכם."
           />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-16">
-            {CAPABILITIES.map((group) => {
-              const Icon = group.icon;
-              return (
-                <div
-                  key={group.title}
-                  className="flex h-full flex-col rounded-2xl border border-white/10 bg-carbon-fiber p-6 hover:border-brand-500/40 transition-colors"
-                >
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <h3 className="font-display text-lg font-bold text-white leading-snug mb-4">{group.title}</h3>
-                  <ul className="space-y-4">
-                    {group.points.map((p) => (
-                      <li key={p.lead} className="text-sm leading-relaxed text-zinc-400">
-                        <strong className="block text-zinc-100 mb-0.5">{p.lead}:</strong>
-                        {p.text}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-16">
+            {CAPABILITIES.map((group) => (
+              <CapCard key={group.title} group={group} />
+            ))}
           </div>
+          <SwipeRow className="mb-14" itemClassName="w-[85%]">
+            {CAPABILITIES.map((group) => (
+              <CapCard key={group.title} group={group} />
+            ))}
+          </SwipeRow>
 
           {/* ---- Technical architecture ---- */}
           <SectionHeading
+            sticky
             icon={BrainCircuit}
             title="הארכיטקטורה הטכנולוגית של מערכת JARVIS"
-            description="חמש תשתיות טכנולוגיות שפועלות במקביל תחת 'מוח מרכזי' אחד."
+            description="חמש תשתיות טכנולוגיות שפועלות במקביל תחת 'מוח מרכזי' אחד — כל אחת אחראית על חלק אחר: הבנת שפה, זיכרון ארגוני, חיבור למערכות, קול ואבטחה."
           />
           <InfoBox>
             <p>
@@ -326,6 +372,18 @@ export default function JarvisPage() {
               מרכזי' המשלב מספר תשתיות טכנולוגיות במקביל כדי להשיג מהירות תגובה מקסימלית, יציבות מלאה ודיוק גבוה.
             </p>
           </InfoBox>
+
+          {/* Beginner-friendly glossary chips — hover / tap each term for a plain-Hebrew explanation. */}
+          <div className="mb-12 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-zinc-400">
+            <span className="font-mono text-xs uppercase tracking-widest text-zinc-500">מונחים בקצרה</span>
+            <TermTooltip term="Agentic AI" />
+            <TermTooltip term="LLM" />
+            <TermTooltip term="RAG" />
+            <TermTooltip term="STT" />
+            <TermTooltip term="TTS" />
+            <TermTooltip term="Zero-Trust" />
+            <TermTooltip term="On-Premise" />
+          </div>
           <ServiceGrid
             items={[
               {
@@ -360,9 +418,10 @@ export default function JarvisPage() {
 
           {/* ---- Customer benefits ---- */}
           <SectionHeading
+            sticky
             icon={BarChart3}
             title="📊 היתרונות המרכזיים עבור הלקוח שלך"
-            description="מה זה אומר בפועל, בשורה התחתונה."
+            description="מה זה אומר בפועל, בשורה התחתונה — פחות עבודה ידנית, זמינות מלאה, התאמה מדויקת ואבטחה ברמה ארגונית."
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-16">
             {CUSTOMER_BENEFITS.map((benefit) => (
@@ -392,49 +451,25 @@ export default function JarvisPage() {
 
           {/* ---- System & hardware requirements ---- */}
           <SectionHeading
+            sticky
             icon={Server}
             title="דרישות מערכת וחומרה"
             description="מערכת JARVIS גמישה וניתנת להתקנה בשתי תצורות עיקריות, בהתאם לצרכי האבטחה והתקציב של העסק שלך:"
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16">
-            {DEPLOYMENT_OPTIONS.map((opt) => {
-              const Icon = opt.icon;
-              return (
-                <div
-                  key={opt.title}
-                  className={`flex h-full flex-col rounded-2xl border p-6 md:p-8 transition-colors ${
-                    opt.featured
-                      ? 'border-brand-500/40 bg-brand-500/[0.04] shadow-[0_0_40px_-12px_rgba(118,185,0,0.28)]'
-                      : 'border-white/10 bg-carbon-900/60 hover:border-brand-500/30'
-                  }`}
-                >
-                  <div
-                    className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl border bg-black/40 ${
-                      opt.featured
-                        ? 'border-brand-500/40 text-brand-300 shadow-[0_0_20px_rgba(118,185,0,0.25)]'
-                        : 'border-white/10 text-brand-400'
-                    }`}
-                  >
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <h3 className="font-display text-lg md:text-xl font-bold text-white leading-snug mb-2">
-                    {opt.title}
-                  </h3>
-                  <p className="text-sm md:text-base text-zinc-400 leading-relaxed mb-5">{opt.description}</p>
-                  <ul className="mt-auto space-y-3 border-t border-white/10 pt-5">
-                    {opt.points.map((p) => (
-                      <li key={p.label} className="text-sm md:text-[15px] leading-relaxed text-zinc-300">
-                        <strong className="text-white">{p.label}:</strong> {p.value}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16">
+            {DEPLOYMENT_OPTIONS.map((opt) => (
+              <ReqCard key={opt.title} opt={opt} />
+            ))}
           </div>
+          <SwipeRow className="mb-14" itemClassName="w-[88%]">
+            {DEPLOYMENT_OPTIONS.map((opt) => (
+              <ReqCard key={opt.title} opt={opt} />
+            ))}
+          </SwipeRow>
 
           {/* ---- FAQ ---- */}
           <SectionHeading
+            sticky
             icon={HelpCircle}
             title="שאלות ותשובות נפוצות"
             description="כל מה שצריך לדעת על מערכת האוטונומיה העסקית JARVIS"

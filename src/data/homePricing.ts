@@ -1,42 +1,68 @@
-import { Globe, Palette, Database, Workflow, ServerCog, type LucideIcon } from 'lucide-react';
+import { Globe, Palette, Database, Workflow, ServerCog, Bot, type LucideIcon } from 'lucide-react';
 
 /**
  * Data-driven pricing + plain-language services for the homepage <PricingSection>. Editing the
  * numbers/features here is the only change needed to re-tune the section — no JSX edits.
  */
 
-/** Jargon → business benefit, so a client instantly gets the value. */
+/** Jargon → business benefit, so a client instantly gets the value. `to` links the card to the
+ *  matching service page so the section doubles as a navigation hub. */
 export interface PlainService {
   icon: LucideIcon;
   term: string;
   benefit: string;
+  to?: string;
 }
 
 export const PLAIN_SERVICES: PlainService[] = [
   {
+    icon: Bot,
+    term: 'מערכת JARVIS',
+    benefit:
+      'עוזר AI אוטונומי שמתחבר למיילים, ליומן ול-CRM ומבצע משימות מקצה לקצה בשבילכם — בקול או בטקסט, בעברית מלאה.',
+    to: '/jarvis',
+  },
+  {
+    icon: Bot,
+    term: 'סוכני AI ואוטומציה חכמה',
+    benefit:
+      'סוכן ייעודי לכל תהליך — מכירות, שירות, תפעול — שרץ 24/7, לומד את הדרך שבה אתם עובדים ומקצר משימות משעות לדקות.',
+    to: '/ai',
+  },
+  {
     icon: Globe,
     term: 'פיתוח אתרים ואפליקציות',
-    benefit: 'אתר או מערכת שנטענים מהר, עובדים בכל מכשיר וקל לתחזק — קוד שנכתב עבורכם, לא תבנית מהמדף.',
+    benefit:
+      'אתר או מערכת שנטענים מהר, עובדים בכל מכשיר וקל לתחזק — קוד שנכתב עבורכם ולא תבנית מהמדף, עם דגש על מהירות והמרות.',
+    to: '/digital',
   },
   {
     icon: Palette,
     term: 'עיצוב חוויית משתמש (UI/UX)',
-    benefit: 'מסכים שברור בהם מה לעשות. פחות נטישה, יותר פניות — עיצוב שמוביל את המשתמש אל המטרה.',
+    benefit:
+      'מסכים שברור בהם מה לעשות. פחות נטישה, יותר פניות — עיצוב שמוביל את המשתמש צעד-צעד אל הפעולה שאתם רוצים שיבצע.',
+    to: '/digital',
   },
   {
     icon: Database,
     term: 'ארכיטקטורת דאטה',
-    benefit: 'המידע שלכם מסודר נכון מהיום הראשון: דוחות מיידיים והחלטות מהר, בלי בלגן של גיליונות אקסל.',
+    benefit:
+      'המידע שלכם מסודר נכון מהיום הראשון: דוחות מיידיים, מקור אמת אחד והחלטות מהירות — בלי בלגן של עשרות גיליונות אקסל.',
+    to: '/architecture',
   },
   {
     icon: Workflow,
-    term: 'אוטומציה',
-    benefit: 'משימות חוזרות שקורות לבד. פחות עבודה ידנית, פחות טעויות, וצוות שמתפנה למה שבאמת חשוב.',
+    term: 'אוטומציה של תהליכים',
+    benefit:
+      'משימות חוזרות שקורות לבד: תזכורות, סנכרונים, עדכוני סטטוס. פחות עבודה ידנית, פחות טעויות, וצוות שמתפנה למה שבאמת חשוב.',
+    to: '/ai',
   },
   {
     icon: ServerCog,
     term: 'מעטפת IT ארגונית (Full-Stack)',
-    benefit: 'גורם אחד אחראי על הכל — פיתוח, שרתים, אבטחה ואינטגרציות — במקום לתאם בין חמישה ספקים.',
+    benefit:
+      'גורם אחד אחראי על הכל — פיתוח, שרתים, אבטחת סייבר ואינטגרציות — במקום לתאם בין חמישה ספקים שכל אחד מאשים את השני.',
+    to: '/cyber',
   },
 ];
 
@@ -44,9 +70,12 @@ export interface PricingPackage {
   id: string;
   name: string;
   tagline: string;
+  /** The headline figure. Empty when `hidePrice` is set. */
   priceLabel: string;
   priceNote: string;
   featured?: boolean;
+  /** Suppress the numeric price entirely and show a "custom quote" button in its place. */
+  hidePrice?: boolean;
   features: string[];
   cta: string;
   leadSubject: string;
@@ -73,9 +102,10 @@ export const PACKAGES: PricingPackage[] = [
     id: 'system',
     name: 'מערכת עסקית',
     tagline: 'אפליקציה / פלטפורמה שעובדת בשבילכם',
-    priceLabel: 'החל מ־₪18,000',
-    priceNote: 'אפיון → פיתוח → הטמעה',
+    priceLabel: '',
+    priceNote: 'אפיון → פיתוח → הטמעה · תמחור לפי היקף',
     featured: true,
+    hidePrice: true,
     features: [
       'אפליקציית ווב Full-Stack (React + Node)',
       'לוח ניהול, משתמשים והרשאות',
@@ -85,7 +115,7 @@ export const PACKAGES: PricingPackage[] = [
       'CI/CD, אבטחה ו-3 חודשי אחריות',
     ],
     cta: 'לאפיון פרויקט',
-    leadSubject: 'חבילת מערכת עסקית — אפליקציה / פלטפורמה',
+    leadSubject: 'חבילת מערכת עסקית — אפליקציה / פלטפורמה (הצעת מחיר בהתאמה אישית)',
   },
   {
     id: 'enterprise',
@@ -105,4 +135,3 @@ export const PACKAGES: PricingPackage[] = [
     leadSubject: 'חבילת Enterprise — מעטפת IT ארגונית',
   },
 ];
-

@@ -40,9 +40,27 @@ export function PageHero({
   );
 }
 
-export function SectionHeading({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
+export function SectionHeading({
+  icon: Icon,
+  title,
+  description,
+  sticky = false,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  /** Opt-in: on mobile the heading sticks below the site header while its section scrolls, so
+   *  the reader keeps context while swiping horizontal card rows. No effect on desktop. */
+  sticky?: boolean;
+}) {
   return (
-    <div className="mb-8">
+    <div
+      className={
+        sticky
+          ? 'mb-8 sticky top-14 z-20 -mx-4 bg-carbon-950/85 px-4 py-3 backdrop-blur-sm md:static md:z-auto md:mx-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none'
+          : 'mb-8'
+      }
+    >
       <h2 className="flex items-center gap-3 font-display font-black text-2xl md:text-3xl text-white mb-2">
         <Icon className="w-6 h-6 text-brand-400 shrink-0" />
         {title}
