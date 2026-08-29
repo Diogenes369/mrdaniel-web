@@ -255,26 +255,27 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
 export default function JarvisPage() {
   return (
     <div id="page-top" className="min-h-screen pb-24">
-      {/* ---- Hero: a strict vertical stack — clear header gap, then the JARVIS logo image, then
-             a clean gap, then the headline + intro. Everything fits within one viewport on
-             desktop and mobile (image vh tuned down so the text never crosses the fold). ---- */}
-      <section className="relative flex min-h-[90vh] flex-col items-center justify-start overflow-hidden pt-24 md:pt-32 pb-8 md:pb-12 text-center">
-        {/* JARVIS logo image — first in the stack, height-constrained, with a smooth bottom fade */}
+      {/* ---- Hero: full-bleed image band (edge-to-edge, NO container) with a mask bottom fade,
+             then the headline + intro directly below. Sits clear of the navbar and fits inside
+             one viewport on desktop and mobile. ---- */}
+      <section className="relative flex min-h-[90vh] flex-col items-center overflow-hidden pt-24 md:pt-28 pb-8 md:pb-10 text-center">
+        {/* Edge-to-edge JARVIS graphic — w-full, no wrapper, object-cover object-top, smooth
+            CSS-mask bottom fade so it dissolves into the dynamic particle background. */}
         <img
           src="/images/jarvis-hero-bg.png"
           alt="מערכת JARVIS"
           fetchPriority="high"
           loading="eager"
           decoding="async"
-          className="h-[26vh] sm:h-[34vh] md:h-[38vh] w-full object-contain object-top [mask-image:linear-gradient(to_bottom,black_50%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_50%,transparent_100%)]"
+          className="w-full h-[26vh] sm:h-[32vh] md:h-[38vh] object-cover object-center [mask-image:linear-gradient(to_bottom,black_60%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_60%,transparent_100%)]"
         />
 
-        {/* Text — immediately after the image in the flow, sitting fully below the logo */}
+        {/* Text — directly below the circular logo, no overlap */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="container-wide relative z-[1] mt-6 md:mt-10 flex flex-col items-center"
+          className="container-wide relative z-[1] mt-8 md:mt-12 flex flex-col items-center"
         >
           <h1 className="font-display font-black text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.85)]">
             JARVIS: סוכן בינה מלאכותית אוטונומי לניהול העסק שלך
