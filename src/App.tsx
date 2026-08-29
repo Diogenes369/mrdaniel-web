@@ -10,7 +10,8 @@ import LeadForm from './components/LeadForm';
 import AgentQualificationModal from './components/AgentQualificationModal';
 import CyberCookieBanner from './components/CyberCookieBanner';
 import CommandPalette from './components/CommandPalette';
-import { useLenis, smoothScrollTo, scrollToTopInstant, triggerRouteTransitionPulse } from './hooks/useLenis';
+import { useLenis, triggerRouteTransitionPulse } from './hooks/useLenis';
+import { useScrollRestoration } from './hooks/useScrollRestoration';
 import { useDeferredMount } from './hooks/useDeferredMount';
 import { ScrollTrigger } from './lib/gsap';
 import RouteSeo from './components/seo/RouteSeo';
@@ -47,21 +48,21 @@ import TermsPage from './pages/TermsPage';
 import AccessibilityPage from './pages/AccessibilityPage';
 
 function RouteScrollManager() {
-  const { pathname, hash } = useLocation();
+  const { pathname } = useLocation();
+
+  // Scroll position on route change is owned entirely by useScrollRestoration:
+  // back/forward (incl. mobile swipe-back) restores the saved position, a fresh link click
+  // starts at the top, and a #hash anchor-scrolls.
+  useScrollRestoration();
 
   useEffect(() => {
     triggerRouteTransitionPulse();
     loadTracker().then((t) => t.trackPageview(pathname));
-    const id = window.setTimeout(() => {
-      ScrollTrigger.refresh();
-      if (hash) {
-        smoothScrollTo(hash);
-      } else {
-        scrollToTopInstant();
-      }
-    }, 60);
+    // GSAP pins/triggers need a re-measure after the new route's DOM is in — kept separate from
+    // the scroll positioning above.
+    const id = window.setTimeout(() => ScrollTrigger.refresh(), 60);
     return () => window.clearTimeout(id);
-  }, [pathname, hash]);
+  }, [pathname]);
 
   return null;
 }

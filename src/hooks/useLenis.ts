@@ -60,12 +60,18 @@ export function smoothScrollTo(target: string | HTMLElement, offsetPx = -88) {
   el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export function scrollToTopInstant() {
+/** Jump to an exact Y position with no animation, routed through Lenis so its rAF loop doesn't
+ *  immediately override a raw `window.scrollTo`. Used by scroll restoration on back/forward. */
+export function scrollToInstant(y: number) {
   if (lenisInstance) {
-    lenisInstance.scrollTo(0, { immediate: true });
+    lenisInstance.scrollTo(Math.max(0, y), { immediate: true, force: true });
     return;
   }
-  window.scrollTo({ top: 0, behavior: 'auto' });
+  window.scrollTo({ top: Math.max(0, y), behavior: 'auto' });
+}
+
+export function scrollToTopInstant() {
+  scrollToInstant(0);
 }
 
 /** Smooth "back to top" — e.g. clicking the logo while already on the current page. Routed through
