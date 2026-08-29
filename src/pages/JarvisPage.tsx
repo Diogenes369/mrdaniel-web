@@ -255,8 +255,10 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
 export default function JarvisPage() {
   return (
     <div id="page-top" className="min-h-screen pb-24">
-      {/* ---- Hero — edge-to-edge background image with a bottom fade into the site bg ---- */}
-      <section className="relative w-full overflow-hidden pt-28 md:pt-36 pb-14 md:pb-20">
+      {/* ---- Cinematic hero image band — full-bleed, ABOVE the headline. The bottom is faded
+             with a CSS mask (not a solid overlay) so it dissolves into transparency and the
+             site's global particle background stays visible behind the text below. ---- */}
+      <div className="relative w-full h-[36vh] min-h-[240px] sm:h-[44vh] md:h-[52vh] overflow-hidden [mask-image:linear-gradient(to_bottom,black_0%,black_44%,transparent_92%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_44%,transparent_92%)]">
         <img
           src="/images/jarvis-hero-bg.png"
           alt=""
@@ -264,39 +266,31 @@ export default function JarvisPage() {
           fetchPriority="high"
           loading="eager"
           decoding="async"
-          className="pointer-events-none absolute inset-0 z-0 h-full w-full object-cover object-center"
+          className="absolute inset-0 h-full w-full object-cover object-center"
         />
-        {/* bottom fade: transparent at top → solid #08090C (site bg) at the bottom */}
+        {/* tiny top scrim so the fixed header stays legible over the image */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-[#08090C] via-[#08090C]/60 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#08090C]/70 to-transparent"
         />
-        {/* light flat scrim so the logo / headline / intro stay crisp over the image */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] bg-[#08090C]/25" />
+      </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="container-wide relative z-[2] flex flex-col items-center text-center"
-        >
-          <img
-            src="/images/jarvis_logo.png"
-            alt="מערכת JARVIS"
-            width={348}
-            height={348}
-            className="h-16 md:h-24 w-auto mx-auto object-contain mb-6 drop-shadow-[0_0_28px_rgba(118,185,0,0.45)]"
-          />
-          <h1 className="font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.75)]">
-            מערכת JARVIS לעסקים ולבית חכם: העוזר האישי של העתיד, כבר היום
-          </h1>
-          <p className="mt-6 text-base md:text-lg text-zinc-200 leading-[1.9] max-w-3xl [text-shadow:0_1px_16px_rgba(0,0,0,0.7)]">
-            מערכת JARVIS (Just A Rather Very Intelligent System) היא תפיסה מהפכנית של ניהול סביבה, פרויקטים
-            ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
-            המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
-          </p>
-        </motion.div>
-      </section>
+      {/* Headline + intro, pulled up into the tail of the image fade for a continuous flow. */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="container-wide relative z-[2] -mt-14 sm:-mt-20 md:-mt-28 flex flex-col items-center text-center pb-12 md:pb-16"
+      >
+        <h1 className="font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.8)]">
+          מערכת JARVIS לעסקים ולבית חכם: העוזר האישי של העתיד, כבר היום
+        </h1>
+        <p className="mt-6 text-base md:text-lg text-zinc-200 leading-[1.9] max-w-3xl [text-shadow:0_1px_16px_rgba(0,0,0,0.75)]">
+          מערכת JARVIS (Just A Rather Very Intelligent System) היא תפיסה מהפכנית של ניהול סביבה, פרויקטים
+          ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
+          המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
+        </p>
+      </motion.div>
 
       <div className="container-wide">
         <div className="pt-4">
