@@ -1,16 +1,16 @@
-import { useRef, useState } from 'react';
-import { Play, Film } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Play, Film, X } from 'lucide-react';
 
 /**
- * Custom local-file video gallery for the JARVIS page. NO YouTube / Vimeo / external embeds —
- * every clip streams from a statically-served path (default `/videos/jarvis/`). The source files
- * live in `public/videos/jarvis/` (copied from `C:\Projects\123`).
+ * JARVIS video gallery — local files only (NO YouTube / Vimeo / embeds), served from
+ * `/videos/jarvis/` (`public/videos/jarvis/`, copied from `C:\Projects\123`).
  *
- * Deliberately text-free: just the portrait 9:16 featured player (full native HTML5 controls —
- * play / pause / volume / scrub / fullscreen) and a row of clickable portrait thumbnails to
- * switch clips. No titles, captions, or overlay labels. Playback auto-advances to the next clip
- * once the viewer has started watching, so it cycles the whole set. A missing file degrades to a
- * bare icon tile.
+ * Layout: a responsive grid of 9:16 (TikTok/Reels) cover thumbnails with a Play overlay. There
+ * is NO inline player — clicking any thumbnail opens a centered lightbox modal that dims and
+ * blurs the whole page, plays the clip immediately, and closes on the X button, a backdrop
+ * click, or ESC. The modal video is height-capped to the viewport so it never clips on mobile
+ * or desktop.
  */
 export interface JarvisClip {
   src: string;
@@ -26,91 +26,97 @@ const DEFAULT_CLIPS: JarvisClip[] = [
 ];
 
 export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?: JarvisClip[] }) {
-  const [active, setActive] = useState(0);
-  const [engaged, setEngaged] = useState(false);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [errored, setErrored] = useState<Record<number, boolean>>({});
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  const current = clips[active];
-  const currentErrored = Boolean(errored[active]);
-
   const markErrored = (i: number) => setErrored((e) => ({ ...e, [i]: true }));
-  const next = () => setActive((i) => (i + 1) % clips.length);
+
+  useEffect(() => {
+    if (openIndex === null) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpenIndex(null);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [openIndex]);
 
   return (
     <div className="mb-16">
-      <div className="grid gap-6 md:grid-cols-[minmax(0,340px)_1fr] md:gap-8 md:items-start">
-        {/* Featured portrait player */}
-        <div className="relative mx-auto w-full max-w-[340px] overflow-hidden rounded-2xl border border-white/10 bg-black">
-          {currentErrored ? (
-            <div className="relative flex aspect-[9/16] items-center justify-center">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(118,185,0,0.16),transparent_60%)]" aria-hidden="true" />
-              <span className="relative flex h-14 w-14 items-center justify-center rounded-full border border-brand-500/40 bg-black/50">
-                <Film className="w-6 h-6 text-brand-300/80" />
-              </span>
-            </div>
-          ) : (
-            <video
-              key={current.src}
-              ref={videoRef}
-              src={current.src}
-              controls
-              autoPlay={engaged}
-              playsInline
-              preload="metadata"
-              onPlay={() => setEngaged(true)}
-              onEnded={next}
-              onError={() => markErrored(active)}
-              className="block aspect-[9/16] w-full bg-black object-contain"
-            />
-          )}
-        </div>
-
-        {/* Thumbnail selector — no text */}
-        <div className="grid grid-cols-4 gap-3 md:grid-cols-2 lg:grid-cols-4">
-          {clips.map((clip, i) => {
-            const on = i === active;
-            const bad = Boolean(errored[i]);
-            return (
-              <button
-                key={clip.src}
-                type="button"
-                onClick={() => setActive(i)}
-                aria-current={on ? 'true' : undefined}
-                aria-label={`מעבר לסרטון ${i + 1}`}
-                className={`group relative overflow-hidden rounded-xl border transition-colors ${
-                  on ? 'border-brand-500/60 ring-2 ring-brand-500/40' : 'border-white/10 hover:border-brand-500/40'
-                }`}
-              >
-                <div className="relative aspect-[9/16] w-full bg-black">
-                  {bad ? (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Film className="w-5 h-5 text-zinc-600" />
-                    </div>
-                  ) : (
-                    <video
-                      src={`${clip.src}#t=0.5`}
-                      muted
-                      playsInline
-                      preload="metadata"
-                      tabIndex={-1}
-                      onError={() => markErrored(i)}
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
-                  )}
-                  <span
-                    className={`absolute inset-0 flex items-center justify-center bg-black/30 transition-opacity ${
-                      on ? 'opacity-0' : 'opacity-100 group-hover:opacity-60'
-                    }`}
-                  >
-                    <Play className="w-5 h-5 translate-x-0.5 text-white/90" />
-                  </span>
+      {/* Cover thumbnail grid — 9:16 tiles, no inline player */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4">
+        {clips.map((clip, i) => {
+          const bad = Boolean(errored[i]);
+          return (
+            <button
+              key={clip.src}
+              type="button"
+              onClick={() => !bad && setOpenIndex(i)}
+              aria-label={`נגן סרטון ${i + 1}`}
+              className="group relative aspect-[9/16] overflow-hidden rounded-2xl border border-white/10 bg-black transition-colors hover:border-brand-500/50"
+            >
+              {bad ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Film className="w-6 h-6 text-zinc-600" />
                 </div>
-              </button>
-            );
-          })}
-        </div>
+              ) : (
+                <video
+                  src={`${clip.src}#t=0.6`}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  tabIndex={-1}
+                  onError={() => markErrored(i)}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              )}
+              <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" aria-hidden="true" />
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/25 bg-black/45 backdrop-blur-sm transition-transform group-hover:scale-110">
+                  <Play className="w-6 h-6 translate-x-0.5 text-white" />
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
+
+      {/* Centered lightbox modal */}
+      <AnimatePresence>
+        {openIndex !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 backdrop-blur-md p-4"
+            onClick={() => setOpenIndex(null)}
+          >
+            <div
+              className="relative aspect-[9/16] max-h-[86vh] max-w-[92vw] overflow-hidden rounded-2xl bg-black shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setOpenIndex(null)}
+                aria-label="סגירת הנגן"
+                className="absolute top-3 right-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/70 text-white transition-colors hover:border-brand-400/60 hover:text-brand-300"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <video
+                key={clips[openIndex].src}
+                src={clips[openIndex].src}
+                controls
+                autoPlay
+                playsInline
+                className="h-full w-full bg-black object-contain"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

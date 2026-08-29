@@ -175,10 +175,14 @@ export default function JarvisPage() {
             </p>
           </InfoBox>
 
-          {/* ---- Video showcase (local files, no YouTube, no titles/labels) ---- */}
-          <div className="mt-16 mb-4">
-            <JarvisShowcaseVideo />
+          {/* ---- Video showcase — cover grid + centered lightbox modal ---- */}
+          <div className="mt-16 mb-6 text-center">
+            <h2 className="font-display font-black text-2xl md:text-3xl text-white mb-3">משתמשי מערכת JARVIS</h2>
+            <p className="text-zinc-400 text-base md:text-lg leading-relaxed max-w-3xl mx-auto">
+              אלו משתמשים שעובדים כיום עם מערכת JARVIS שיכולה לנהל לכם את כל העסק/רעיון שלכם
+            </p>
           </div>
+          <JarvisShowcaseVideo />
 
           {/* ---- Core capabilities ---- */}
           <SectionHeading
