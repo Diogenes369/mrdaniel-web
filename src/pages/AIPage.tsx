@@ -125,21 +125,39 @@ export default function AIPage() {
       : CURATED_ARTICLES;
 
   return (
-    <div id="page-top" className="min-h-screen pt-24 md:pt-28">
-      <div className="container-wide">
-        <PageHero
-          badgeIcon={Sparkles}
-          badgeLabel="Enterprise AI Architecture & Practice"
-          title="פתרונות בינה מלאכותית וחוברת הלימוד המקיפה"
-          subtitle="מתיאוריה ליישום מעשי: פיתוח מערכות, ייעוץ ארגוני וספרי לימוד מתקדמים"
-          metaChips={[
-            { icon: User, label: 'מאת: דניאל' },
-            { icon: Calendar, label: 'מהדורה מעודכנת: 4/2026' },
-            { icon: Layers, label: 'Agentic AI • RAG • MCP Protocol' },
-          ]}
+    <div id="page-top" className="min-h-screen pb-24">
+      {/* ---- Hero: same setup as the JARVIS page. Full-width grayscale image pinned to the
+             ABSOLUTE top of the viewport (behind the news ticker + nav — section pulled up by the
+             desktop ticker height), NO top padding/margin on the image, smooth mask bottom fade
+             into the particle background. The inner wrapper carries the top padding so the hero
+             title sits below the graphic, all within one viewport. ---- */}
+      <section className="relative -mt-[34px] min-h-[92vh] overflow-hidden">
+        <img
+          src="/images/ai_agents_hero.jpg"
+          alt="סוכני AI"
+          fetchPriority="high"
+          loading="eager"
+          decoding="async"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[50vh] sm:h-[56vh] md:h-[62vh] w-full object-cover object-top [filter:grayscale(100%)_brightness(0.9)_contrast(1.1)] [mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)]"
         />
 
-        <div className="pt-10">
+        <div className="container-wide relative z-[1] pt-[40vh] sm:pt-[44vh] md:pt-[48vh] [&_h1]:[text-shadow:0_2px_20px_rgba(0,0,0,0.85)] [&_p]:[text-shadow:0_1px_14px_rgba(0,0,0,0.7)]">
+          <PageHero
+            badgeIcon={Sparkles}
+            badgeLabel="Enterprise AI Architecture & Practice"
+            title="פתרונות בינה מלאכותית וחוברת הלימוד המקיפה"
+            subtitle="מתיאוריה ליישום מעשי: פיתוח מערכות, ייעוץ ארגוני וספרי לימוד מתקדמים"
+            metaChips={[
+              { icon: User, label: 'מאת: דניאל' },
+              { icon: Calendar, label: 'מהדורה מעודכנת: 4/2026' },
+              { icon: Layers, label: 'Agentic AI • RAG • MCP Protocol' },
+            ]}
+          />
+        </div>
+      </section>
+
+      <div className="container-wide">
+        <div className="pt-6 md:pt-10">
           <AIPulseWidget />
 
           <SectionHeading
