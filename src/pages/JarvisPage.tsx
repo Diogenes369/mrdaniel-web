@@ -34,49 +34,6 @@ function openJarvisLead(sourceSection: string) {
   );
 }
 
-/** Custom cyber badge/logo element — an arc-reactor style ring with the JARVIS wordmark, pure
- * SVG + CSS glow, tuned to the dark site palette. */
-function JarvisBadge() {
-  return (
-    <div className="relative inline-flex items-center justify-center">
-      <div className="absolute inset-0 rounded-full bg-brand-500/25 blur-2xl" aria-hidden="true" />
-      <svg viewBox="0 0 120 120" className="relative w-28 h-28 md:w-32 md:h-32" role="img" aria-label="JARVIS">
-        <defs>
-          <linearGradient id="jarvisRing" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#9FE870" />
-            <stop offset="100%" stopColor="#4d7c0f" />
-          </linearGradient>
-        </defs>
-        <circle cx="60" cy="60" r="52" fill="none" stroke="url(#jarvisRing)" strokeWidth="2" opacity="0.5" />
-        <circle
-          cx="60"
-          cy="60"
-          r="44"
-          fill="none"
-          stroke="#76B900"
-          strokeWidth="3"
-          strokeDasharray="6 10"
-          strokeLinecap="round"
-        >
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="0 60 60"
-            to="360 60 60"
-            dur="18s"
-            repeatCount="indefinite"
-          />
-        </circle>
-        <circle cx="60" cy="60" r="30" fill="none" stroke="url(#jarvisRing)" strokeWidth="1.5" opacity="0.7" />
-        <circle cx="60" cy="60" r="6" fill="#9FE870" />
-      </svg>
-      <span className="absolute font-mono text-[11px] md:text-xs font-bold tracking-[0.35em] text-brand-200 translate-y-10 md:translate-y-11">
-        JARVIS
-      </span>
-    </div>
-  );
-}
-
 interface CapabilityGroup {
   icon: typeof Mic;
   title: string;
@@ -306,8 +263,14 @@ export default function JarvisPage() {
           transition={{ duration: 0.6 }}
           className="flex flex-col items-center text-center pt-8 pb-12 md:pt-12 md:pb-16"
         >
-          <JarvisBadge />
-          <h1 className="mt-8 font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl">
+          <img
+            src="/images/jarvis_logo.png"
+            alt="מערכת JARVIS"
+            width={348}
+            height={348}
+            className="h-16 md:h-24 w-auto mx-auto object-contain mb-6 drop-shadow-[0_0_28px_rgba(118,185,0,0.4)]"
+          />
+          <h1 className="font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl">
             מערכת JARVIS לעסקים ולבית חכם: העוזר האישי של העתיד, כבר היום
           </h1>
           <p className="mt-6 text-base md:text-lg text-zinc-300 leading-[1.9] max-w-3xl">
