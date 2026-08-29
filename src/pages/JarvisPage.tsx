@@ -254,11 +254,12 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
 
 export default function JarvisPage() {
   return (
-    <div id="page-top" className="min-h-screen pb-24">
-      {/* ---- Cinematic hero image band — full-bleed, ABOVE the headline. The bottom is faded
-             with a CSS mask (not a solid overlay) so it dissolves into transparency and the
-             site's global particle background stays visible behind the text below. ---- */}
-      <div className="relative w-full h-[36vh] min-h-[240px] sm:h-[44vh] md:h-[52vh] overflow-hidden [mask-image:linear-gradient(to_bottom,black_0%,black_44%,transparent_92%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_44%,transparent_92%)]">
+    <div id="page-top" className="min-h-screen pt-20 md:pt-28 pb-24">
+      {/* ---- Cinematic hero image band — full-bleed, ABOVE the headline, sitting clear of the
+             nav. The bottom is faded with a long, smooth CSS mask (not a solid overlay) so it
+             dissolves fully into transparency and the site's global particle background stays
+             visible behind the generous space below. ---- */}
+      <div className="relative w-full h-[42vh] min-h-[280px] sm:h-[50vh] md:h-[60vh] overflow-hidden [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)]">
         <img
           src="/images/jarvis-hero-bg.png"
           alt=""
@@ -268,24 +269,19 @@ export default function JarvisPage() {
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover object-center"
         />
-        {/* tiny top scrim so the fixed header stays legible over the image */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#08090C]/70 to-transparent"
-        />
       </div>
 
-      {/* Headline + intro, pulled up into the tail of the image fade for a continuous flow. */}
+      {/* Headline + intro — generous negative space below the faded image so the page breathes. */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="container-wide relative z-[2] -mt-14 sm:-mt-20 md:-mt-28 flex flex-col items-center text-center pb-12 md:pb-16"
+        className="container-wide relative z-[2] mt-16 md:mt-24 flex flex-col items-center text-center pb-14 md:pb-24"
       >
         <h1 className="font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.8)]">
-          מערכת JARVIS לעסקים ולבית חכם: העוזר האישי של העתיד, כבר היום
+          JARVIS: סוכן בינה מלאכותית אוטונומי לניהול העסק שלך
         </h1>
-        <p className="mt-6 text-base md:text-lg text-zinc-200 leading-[1.9] max-w-3xl [text-shadow:0_1px_16px_rgba(0,0,0,0.75)]">
+        <p className="mt-6 text-base md:text-lg text-zinc-200 leading-[1.9] max-w-2xl [text-shadow:0_1px_16px_rgba(0,0,0,0.75)]">
           מערכת JARVIS (Just A Rather Very Intelligent System) היא תפיסה מהפכנית של ניהול סביבה, פרויקטים
           ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
           המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
@@ -293,9 +289,9 @@ export default function JarvisPage() {
       </motion.div>
 
       <div className="container-wide">
-        <div className="pt-4">
+        <div className="pt-6 md:pt-12">
           {/* ---- Concept card — broad, full-width, centered text ---- */}
-          <Reveal className="bg-carbon-900/60 border border-white/10 rounded-2xl p-6 md:p-10 mb-16 text-center">
+          <Reveal className="bg-carbon-900/60 border border-white/10 rounded-2xl p-6 md:p-10 mb-16 md:mb-24 text-center">
             <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">🤖 מהי מערכת JARVIS?</h2>
             <p className="text-base md:text-lg text-zinc-300 leading-[1.85] max-w-full">
               JARVIS אינה סתם עוד תוכנה או צ'אטבוט רגיל. זהו סוכן בינה מלאכותית פרואקטיבי (
@@ -323,7 +319,7 @@ export default function JarvisPage() {
             title="🚀 יכולות הליבה של המערכת"
             description="שלושה תחומי ליבה שבהם JARVIS פועלת כמוח מרכזי אחד — קול, עסק ובית/משרד חכם. כל תחום מחליף שרשרת של כלים נפרדים בממשק אחד, קולי או טקסטואלי, שמדבר עם כל המערכות שכבר יש לכם."
           />
-          <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-16">
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-16 md:mb-24">
             {CAPABILITIES.map((group) => (
               <CapCard key={group.title} group={group} />
             ))}
@@ -399,7 +395,7 @@ export default function JarvisPage() {
             title="📊 היתרונות המרכזיים עבור הלקוח שלך"
             description="מה זה אומר בפועל, בשורה התחתונה — פחות עבודה ידנית, זמינות מלאה, התאמה מדויקת ואבטחה ברמה ארגונית."
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-16 md:mb-24">
             {CUSTOMER_BENEFITS.map((benefit) => (
               <div
                 key={benefit}
@@ -432,7 +428,7 @@ export default function JarvisPage() {
             title="דרישות מערכת וחומרה"
             description="מערכת JARVIS גמישה וניתנת להתקנה בשתי תצורות עיקריות, בהתאם לצרכי האבטחה והתקציב של העסק שלך:"
           />
-          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16">
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16 md:mb-24">
             {DEPLOYMENT_OPTIONS.map((opt) => (
               <ReqCard key={opt.title} opt={opt} />
             ))}
