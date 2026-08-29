@@ -1,82 +1,31 @@
 import {
   Sparkles,
   User,
-  Calendar,
   Layers,
   Cpu,
   Database,
   Bot,
   ShieldAlert,
-  Presentation,
-  BookOpen,
-  Users,
-  ListOrdered,
-  Compass,
-  Zap,
-  Briefcase,
-  Code2,
   Send,
-  Download,
-  ShoppingCart,
-  Mail,
   Check,
   Clapperboard,
   Newspaper,
   Clock,
   ExternalLink,
+  UserCog,
+  ShoppingCart,
+  Workflow,
+  Network,
+  ArrowLeft,
+  type LucideIcon,
 } from 'lucide-react';
-import {
-  PageHero,
-  SectionHeading,
-  ServiceGrid,
-  InfoBox,
-  SpecTable,
-  AudienceGrid,
-  TocGrid,
-  UnifiedCta,
-} from '../components/content/ContentPrimitives';
+import { PageHero, SectionHeading, ServiceGrid, UnifiedCta } from '../components/content/ContentPrimitives';
 import AIPulseWidget from '../components/content/AIPulseWidget';
+import AgentFinder from '../components/content/AgentFinder';
 import VideoEmbed from '../components/content/VideoEmbed';
-import NewsletterCapture from '../components/content/NewsletterCapture';
+import WebButton from '../components/WebButton';
 import { useAINewsFeed } from '../services/aiNewsService';
 import { formatRelativeTime } from '../services/newsService';
-
-const enterpriseAgentsImage = 'https://images.pexels.com/photos/3861957/pexels-photo-3861957.jpeg?auto=compress&cs=tinysrgb&w=1600';
-const aiInfraImage = 'https://images.pexels.com/photos/1597776/pexels-photo-1597776.jpeg?auto=compress&cs=tinysrgb&w=1600';
-const automationImage = 'https://images.pexels.com/photos/34207359/pexels-photo-34207359.jpeg?auto=compress&cs=tinysrgb&w=1600';
-
-interface FeaturePoint {
-  image: string;
-  imageAlt: string;
-  badge: string;
-  title: string;
-  description: string;
-  points: string[];
-  reverse?: boolean;
-}
-
-function ImageFeatureSection({ image, imageAlt, title, description, points, reverse = false }: FeaturePoint) {
-  return (
-    <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 items-center mb-14 ${reverse ? 'lg:[&>*:first-child]:order-2' : ''}`}>
-      <div className="relative rounded-2xl overflow-hidden border border-white/10 h-64 lg:h-80">
-        <img src={image} alt={imageAlt} className="absolute inset-0 w-full h-full object-cover grayscale opacity-90" loading="lazy" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-      </div>
-      <div>
-        <h3 className="font-display text-2xl md:text-3xl font-black text-white mb-4 leading-tight">{title}</h3>
-        <p className="text-zinc-300 text-base leading-relaxed mb-5">{description}</p>
-        <ul className="space-y-2">
-          {points.map((p) => (
-            <li key={p} className="flex items-start gap-2 text-sm text-zinc-400">
-              <Check className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
-              {p}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
 
 // Fallback content only — used while the live /api/ai-news feed is loading for the first time,
 // or if it fails/returns nothing, so this section is never empty or broken.
@@ -109,6 +58,108 @@ const CURATED_ARTICLES = [
   },
 ];
 
+interface ShowcaseAgent {
+  icon: LucideIcon;
+  title: string;
+  tagline: string;
+  roi: string;
+  features: string[];
+  subject: string;
+}
+
+const SHOWCASE_AGENTS: ShowcaseAgent[] = [
+  {
+    icon: UserCog,
+    title: 'עוזר AI למנהל',
+    tagline: 'ניהול משימות ולו"ז',
+    roi: 'מחזיר 8–12 שעות ניהול בשבוע',
+    features: [
+      'תיאום פגישות וניהול יומן אוטומטי',
+      'סיכום מיילים נכנסים ותדריך בוקר יומי',
+      'הכנת טיוטות מענה, מסמכים וסיכומים',
+    ],
+    subject: 'סוכן AI — עוזר אישי למנהל',
+  },
+  {
+    icon: ShoppingCart,
+    title: 'סוכן מכירות ושירות אוטונומי',
+    tagline: 'מכירות ושירות 24/7',
+    roi: 'זמן תגובה לליד — משעות לשניות',
+    features: [
+      'כשירות לידים ותיאום פגישות אוטומטי',
+      'מענה מלא לפניות שירות מקצה לקצה',
+      'follow-up יזום ועדכון ה-CRM בזמן אמת',
+    ],
+    subject: 'סוכן AI — מכירות ושירות אוטונומי',
+  },
+  {
+    icon: Database,
+    title: 'סוכן מחקר וניתוח נתונים (RAG)',
+    tagline: 'ידע ארגוני שאפשר לשאול',
+    roi: 'תשובות מבוססות-מקור בשניות במקום שעות חיפוש',
+    features: [
+      'RAG על מסמכים, מיילים ובסיסי נתונים פנימיים',
+      'הפקת דוחות ותובנות עסקיות לפי דרישה',
+      'סביבה מבודדת ומוצפנת — ללא דליפת מידע',
+    ],
+    subject: 'סוכן AI — מחקר וניתוח נתונים',
+  },
+  {
+    icon: Workflow,
+    title: 'סוכן אוטומציה תפעולית',
+    tagline: 'תהליכים שרצים לבד',
+    roi: 'מבטל עבודה ידנית חוזרת ושגיאות אנוש',
+    features: [
+      'תזרימי עבודה רב-שלביים שמחברים בין מערכות',
+      'לוגיקת החלטה מבוססת AI בתוך התהליך עצמו',
+      'ניטור וטיפול בחריגות ללא התערבות שוטפת',
+    ],
+    subject: 'סוכן AI — אוטומציה תפעולית',
+  },
+];
+
+function openAgentLead(subject: string) {
+  window.dispatchEvent(
+    new CustomEvent('open-lead-modal', { detail: { subject, sourceSection: 'AI Page · Agents Showcase' } })
+  );
+}
+
+function ShowcaseCard({ agent }: { agent: ShowcaseAgent }) {
+  const Icon = agent.icon;
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-carbon-fiber p-6 transition-colors hover:border-brand-500/40">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
+        <Icon className="w-6 h-6" />
+      </div>
+      <h3 className="font-display text-lg font-bold text-white leading-snug">{agent.title}</h3>
+      <p className="mt-1 text-sm text-zinc-400">{agent.tagline}</p>
+
+      <div className="mt-4 inline-flex items-start gap-2 rounded-lg border border-brand-500/25 bg-brand-500/[0.06] px-3 py-2 text-sm font-bold text-brand-300">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-brand-400/80 mt-0.5">ROI</span>
+        {agent.roi}
+      </div>
+
+      <ul className="mt-5 space-y-2.5 flex-grow">
+        {agent.features.map((f) => (
+          <li key={f} className="flex items-start gap-2 text-sm text-zinc-300">
+            <Check className="mt-0.5 w-4 h-4 shrink-0 text-brand-400" />
+            {f}
+          </li>
+        ))}
+      </ul>
+
+      <WebButton
+        variant="glass"
+        onClick={() => openAgentLead(agent.subject)}
+        className="mt-6 w-full justify-center"
+      >
+        אני רוצה סוכן כזה
+        <ArrowLeft className="w-4 h-4" />
+      </WebButton>
+    </div>
+  );
+}
+
 export default function AIPage() {
   const { data: aiNews, isLoading: aiNewsLoading } = useAINewsFeed();
 
@@ -125,111 +176,90 @@ export default function AIPage() {
       : CURATED_ARTICLES;
 
   return (
-    <div id="page-top" className="min-h-screen pb-24">
-      {/* ---- Hero: same setup as the JARVIS page. Full-width grayscale image pinned to the
-             ABSOLUTE top of the viewport (behind the news ticker + nav — section pulled up by the
-             desktop ticker height), NO top padding/margin on the image, smooth mask bottom fade
-             into the particle background. The inner wrapper carries the top padding so the hero
-             title sits below the graphic, all within one viewport. ---- */}
-      <section className="relative -mt-[34px] min-h-[92vh] overflow-hidden">
-        <img
-          src="/images/ai_agents_hero.jpg"
-          alt="סוכני AI"
-          fetchPriority="high"
-          loading="eager"
-          decoding="async"
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[50vh] sm:h-[56vh] md:h-[62vh] w-full object-cover object-top [filter:grayscale(100%)_brightness(0.9)_contrast(1.1)] [mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)]"
+    <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
+      <div className="container-wide">
+        <PageHero
+          badgeIcon={Sparkles}
+          badgeLabel="Custom AI Agents · Architecture & Deployment"
+          title="סוכני AI מותאמים אישית — לעסק ולניהול האישי"
+          subtitle="מ-Chatbot שעונה על שאלות לסוכן אוטונומי שמבצע משימות שלמות מקצה לקצה, מחובר למערכות שכבר יש לכם — תחת בקרה ואבטחת מידע."
+          metaChips={[
+            { icon: User, label: 'מאת: דניאל' },
+            { icon: Layers, label: 'Agentic AI • RAG • MCP' },
+            { icon: ShieldAlert, label: 'Guardian Agents & אבטחת מידע' },
+          ]}
         />
 
-        <div className="container-wide relative z-[1] pt-[40vh] sm:pt-[44vh] md:pt-[48vh] [&_h1]:[text-shadow:0_2px_20px_rgba(0,0,0,0.85)] [&_p]:[text-shadow:0_1px_14px_rgba(0,0,0,0.7)]">
-          <PageHero
-            badgeIcon={Sparkles}
-            badgeLabel="Enterprise AI Architecture & Practice"
-            title="פתרונות בינה מלאכותית וחוברת הלימוד המקיפה"
-            subtitle="מתיאוריה ליישום מעשי: פיתוח מערכות, ייעוץ ארגוני וספרי לימוד מתקדמים"
-            metaChips={[
-              { icon: User, label: 'מאת: דניאל' },
-              { icon: Calendar, label: 'מהדורה מעודכנת: 4/2026' },
-              { icon: Layers, label: 'Agentic AI • RAG • MCP Protocol' },
-            ]}
-          />
-        </div>
-      </section>
-
-      <div className="container-wide">
-        <div className="pt-6 md:pt-10">
-          <AIPulseWidget />
-
+        <div className="pt-8 md:pt-10">
+          {/* ---- Conversion engine: pick a use case → get a tailored setup + CTA ---- */}
           <SectionHeading
             icon={Cpu}
-            title="שירותי ייעוץ ופיתוח AI"
-            description="אם אתה מחפש להטמיע בינה מלאכותית בעסק, לבנות ארכיטקטורת ידע חכמה, או לקחת את צוות הפיתוח שלך שלב אחד קדימה — אלו הפתרונות שאני מציע:"
+            title="לא בטוחים איזה סוכן מתאים לכם? בואו נמצא ב-30 שניות"
+            description="בחרו את התחום שהכי כואב לכם כרגע, וקבלו מיד המלצה ממוקדת: ארכיטקטורה, יכולות מפתח והפלטפורמות שהסוכן יתחבר אליהן."
+          />
+          <AgentFinder />
+
+          {/* ---- Showcase grid ---- */}
+          <SectionHeading
+            icon={Bot}
+            title="סוכני AI מותאמים אישית — לעסק ולשימוש אישי"
+            description="כל סוכן נבנה סביב תהליך אחד שהוא עושה טוב יותר מכל כלי כללי — עם ROI ברור ונקודת כניסה ישירה."
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 md:gap-6 mb-16">
+            {SHOWCASE_AGENTS.map((agent) => (
+              <ShowcaseCard key={agent.title} agent={agent} />
+            ))}
+          </div>
+
+          {/* ---- Technical depth ---- */}
+          <SectionHeading
+            icon={Layers}
+            title="עומק טכני: מהארכיטקטורה עד הפריסה"
+            description="מה שמפריד בין דמו מרשים לסוכן שאפשר לסמוך עליו בייצור — ארבעה רכיבים שכל הטמעה רצינית נשענת עליהם."
           />
           <ServiceGrid
             items={[
-              { icon: Database, title: 'פיתוח ארכיטקטורת RAG וניהול ידע', description: 'חיבור מודלי שפה (LLMs) למאגרי המידע, ה-PDFים וה-DB הארגוניים שלכם בשיטות שליפה מתקדמות ללא דליפת מידע.' },
-              { icon: Bot, title: 'פיתוח סוכנים אוטונומיים (AI Agents & MCP)', description: 'בניית סוכנים מבוססי פרוטוקול MCP המבצעים משימות מורכבות, מפעילים כלי תוכנה חיצוניים, ומציגים תוצאות בזמן אמת.' },
-              { icon: ShieldAlert, title: 'ייעוץ, אבטחה והטמעה בארגונים', description: 'הגדרת מדיניות עבודה, מניעת הזיות (Hallucinations), ניהול עלויות API (Prompt Caching), והגנה מול משטחי תקיפה חדשים.' },
-              { icon: Presentation, title: 'הדרכות וסדנאות מעשיות', description: 'העברת סדנאות פרונטליות/דיגיטליות לצוותים טכניים ולמנהלים — ממאפס ועד ייצור (Production).' },
+              {
+                icon: Database,
+                title: 'ארכיטקטורת RAG וניהול ידע',
+                description:
+                  'חיבור מודלי שפה (LLMs) למאגרי המידע, ה-PDFים וה-DB הארגוניים בשיטות שליפה מתקדמות, עם מיסוך מידע רגיש (PII) בזמן ריצה.',
+              },
+              {
+                icon: Network,
+                title: 'תזמור רב-סוכני (Multi-Agent)',
+                description:
+                  'סוכן-על שמפרק משימה מורכבת לצעדים, מנתב אותם לסוכני-משנה ייעודיים, ומרכיב את התוצאה — עם retries ו-Rollback.',
+              },
+              {
+                icon: Bot,
+                title: 'אינטגרציה דרך MCP',
+                description:
+                  'חיבור הסוכן לכלים ולמערכות (CRM, ERP, יומן, מייל) דרך פרוטוקול MCP — סטנדרטי, מאובטח וקל לתחזוקה.',
+              },
+              {
+                icon: ShieldAlert,
+                title: 'Guardian Agents ואבטחה',
+                description:
+                  'שכבת פיקוח שמאשרת, חוסמת ומתעדת כל פעולת סוכן — הגנה מפני Prompt Injection, הזיות ודליפת מידע.',
+              },
             ]}
           />
 
-          <InfoBox badgeIcon={BookOpen} badgeLabel="ספר הלימוד והעבודה המלא" title="המוצר: חוברת הלימוד המלאה — מהדורת 2026">
-            <p className="text-brand-400 font-bold text-lg">ספר העבודה המקיף ביותר ללימוד, שליטה ובניית מערכות AI</p>
-            <p>
-              החוברת שנכתבה על ידי דניאל היא לא עוד תיאוריה — היא <strong className="text-white">ספר עבודה מעשי</strong> (31 פרקים | 3 נספחים). היא נבנתה מתוך עיקרון ברור: בינה מלאכותית היא מיומנות נלמדת, והדרך היחידה לשלוט בה היא דרך ניסוי, תרגול ובנייה.
-            </p>
-          </InfoBox>
+          {/* ---- Live AI tools pulse ---- */}
+          <SectionHeading
+            icon={Sparkles}
+            title="מה חדש בעולם ה-AI"
+            description="כלים, מודלים ועדכונים רלוונטיים — מתעדכן אוטומטית."
+          />
+          <AIPulseWidget />
 
-          <SpecTable
-            rows={[
-              { label: 'היקף', value: <><strong className="text-white">31 פרקים מלאים</strong> + 3 נספחים מקצועיים</> },
-              { label: 'עדכניות', value: <>מהדורת <strong className="text-white">4/2026</strong> (כוללת Agentic AI, MCP, Test-time compute)</> },
-              { label: 'אופי הלימוד', value: <><strong className="text-white">100% מעשי:</strong> כולל בלוקים של קוד, תרגילים, ואזהרות אבטחה</> },
-              { label: 'פורמט', value: 'דיגיטלי (PDF מותאם לקריאה/עבודה) / מודפס' },
-            ]}
+          {/* ---- Video showcase ---- */}
+          <SectionHeading
+            icon={Clapperboard}
+            title="סוכני AI בפעולה: הצצה ליכולות האוטונומיות"
+            description="הדגמות קצרות של סוכנים אוטונומיים מבצעים משימות אמיתיות מקצה לקצה."
           />
-
-          <SectionHeading icon={Layers} title="עומק טכני: מהארכיטקטורה עד התשתית" description="שלושה תחומים שכל ארגון שמטמיע AI ברצינות נתקל בהם במוקדם או במאוחר" />
-          <ImageFeatureSection
-            image={enterpriseAgentsImage}
-            imageAlt="לוח בקרה דיגיטלי עם נתונים וגרפים"
-            badge="Enterprise Agents"
-            title="סוכני AI ארגוניים שמבצעים עבודה בפועל"
-            description="מעבר מ-Chatbot שעונה על שאלות לסוכן שמבצע משימות עסקיות שלמות — קריאה למערכות פנימיות, קבלת החלטות בגבולות מוגדרים, ודיווח לאדם רק כשבאמת נדרש."
-            points={[
-              'תזמור Multi-Agent לתהליכים מרובי-שלבים',
-              'Guardian Agents לפיקוח ובלימת פעולות לא רצויות',
-              'חיבור ל-CRM, ERP ומערכות ארגוניות קיימות דרך MCP',
-            ]}
-          />
-          <ImageFeatureSection
-            image={aiInfraImage}
-            imageAlt="כבלי רשת וציוד תקשורת בחדר שרתים"
-            badge="AI Infrastructure"
-            title="התשתית שמאחורי כל מודל: רשת, Wi-Fi 7 וחומרה"
-            description="מודל AI מהיר על הנייר שרץ על רשת איטית הוא מודל איטי בפועל. דור הרשתות החדש (Wi-Fi 7) והתשתית התומכת בו הופכים לחלק בלתי נפרד מארכיטקטורת AI ארגונית רצינית — במיוחד עם עומסי Edge AI ואינפרנס בזמן אמת."
-            points={[
-              'רוחב פס ו-Latency נמוך לעומסי Inference בזמן אמת',
-              'תשתית רשת שתומכת בעומסי Multi-Link Operation של Wi-Fi 7',
-              'תכנון קיבולת לצמיחת עומסי AI מקומיים (Edge)',
-            ]}
-            reverse
-          />
-          <ImageFeatureSection
-            image={automationImage}
-            imageAlt="זרוע רובוטית תעשייתית בקו ייצור אוטומטי"
-            badge="Automation Workflows"
-            title="אוטומציה שמחליפה תהליכים ידניים שלמים"
-            description="לא עוד סקריפט בודד שרץ פעם ביום — תזרימי עבודה שלמים שמחברים בין מערכות, מקבלים החלטות ומתריעים כשמשהו חורג מהצפוי, בלי שאיש יצטרך להריץ אותם ידנית."
-            points={[
-              'חיבור בין כלים קיימים ללא צורך בפיתוח אינטגרציה מאפס',
-              'לוגיקת החלטה מבוססת AI בתוך תהליך האוטומציה עצמו',
-              'ניטור וטיפול בחריגות ללא התערבות ידנית שוטפת',
-            ]}
-          />
-
-          <SectionHeading icon={Clapperboard} title="עדכון יומי: סרטונים חדשים מבתי היוצר של ה-AI" description="נשלף אוטומטית מערוצי היוטיוב הרשמיים של Anthropic, OpenAI ו-Google DeepMind" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-16">
             {aiNewsLoading && !aiNews
               ? Array.from({ length: 2 }).map((_, idx) => (
@@ -238,6 +268,7 @@ export default function AIPage() {
               : videos.map((v) => <VideoEmbed key={v.youtubeId} youtubeId={v.youtubeId} title={v.title} channel={v.channel} />)}
           </div>
 
+          {/* ---- Recommended reading ---- */}
           <SectionHeading icon={Newspaper} title="עדכון יומי: מומלץ לקריאה" description="כתבות AI טריות מהפיד החי של האתר, מתעדכנות אוטומטית" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-16">
             {aiNewsLoading && !aiNews
@@ -245,96 +276,43 @@ export default function AIPage() {
                   <div key={idx} className="h-44 rounded-2xl bg-white/[0.03] border border-white/5 animate-pulse" />
                 ))
               : articles.map((a) => (
-              <a
-                key={a.url}
-                href={a.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex flex-col bg-carbon-fiber border border-white/10 rounded-2xl p-6 hover:border-brand-500/40 transition-colors"
-              >
-                <div className="flex items-center gap-2 flex-wrap mb-3">
-                  {a.tags.map((tag) => (
-                    <span key={tag} className="text-[10px] font-mono font-bold text-brand-400 bg-brand-500/10 border border-brand-500/25 rounded-full px-2.5 py-1">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                <h3 dir="auto" className="font-display font-bold text-base text-white mb-3 leading-snug flex-grow group-hover:text-brand-300 transition-colors">
-                  {a.title}
-                </h3>
-                <div className="flex items-center justify-between text-xs text-zinc-500 pt-3 border-t border-white/10">
-                  <span dir="ltr">{a.source}</span>
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3" />
-                    {a.readTime}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-400 group-hover:text-brand-400 transition-colors mt-3">
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  קריאה במקור
-                </div>
-              </a>
-            ))}
+                  <a
+                    key={a.url}
+                    href={a.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex flex-col bg-carbon-fiber border border-white/10 rounded-2xl p-6 hover:border-brand-500/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap mb-3">
+                      {a.tags.map((tag) => (
+                        <span key={tag} className="text-[10px] font-mono font-bold text-brand-400 bg-brand-500/10 border border-brand-500/25 rounded-full px-2.5 py-1">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <h3 dir="auto" className="font-display font-bold text-base text-white mb-3 leading-snug flex-grow group-hover:text-brand-300 transition-colors">
+                      {a.title}
+                    </h3>
+                    <div className="flex items-center justify-between text-xs text-zinc-500 pt-3 border-t border-white/10">
+                      <span dir="ltr">{a.source}</span>
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        {a.readTime}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-400 group-hover:text-brand-400 transition-colors mt-3">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      קריאה במקור
+                    </div>
+                  </a>
+                ))}
           </div>
 
-          <SectionHeading icon={Users} title="למי החוברת מתאימה?" description="תוכנית לימודים מדורגת המותאמת לכל רמות הידע בארגון" />
-          <AudienceGrid
-            items={[
-              { tag: '01 // BASIC', title: '1. המתחיל המוחלט', description: 'מי שרוצה להבין מה קורה מתחת למכסה המנוע, להפסיק לנחש פרומפטים, ולהפוך את כלי ה-AI לעוזר יומיומי אישי.' },
-              { tag: '02 // PRO USER', title: '2. המשתמש המקצועי', description: 'מנהלים, אנליסטים ומשווקים שרוצים לייעל תהליכי עבודה, לחסוך שעות שבועיות ולנהל משימות מורכבות.' },
-              { tag: '03 // DEVELOPER', title: '3. המפתח (Developer)', description: 'מי שרוצה לעבור מצ׳אט לבניית מערכות ייצור: עבודה מול APIs, פיתוח סוכנים, RAG, והערכת ביצועים (Evals).' },
-              { tag: '04 // LEADERSHIP', title: '4. היזם ומנהל הטכנולוגיות', description: 'מי שצריך להבין עלויות, לטנציה, סיכוני אבטחה, ושיקולי רגולציה לפני השקעת משאבים.' },
-            ]}
-          />
-
-          <SectionHeading icon={ListOrdered} title="תוכן העניינים בקצרה (8 חלקים)" description="מבנה פרקים סדור ומדורג ממעוף הציפור ועד ארכיטקטורת ייצור מלאה" />
-          <TocGrid
-            items={[
-              { badge: 'חלק א׳', title: 'יסודות הבינה המלאכותית', description: 'מהי AI באמת, למידת מכונה, ורשתות נוירונים.' },
-              { badge: 'חלק ב׳', title: 'מודלי שפה גדולים (LLMs)', description: 'ארכיטקטורת הטרנספורמר, טוקנים, אימון, ומפת המודלים.' },
-              { badge: 'חלק ג׳', title: 'הכלים בפועל', description: 'עבודה מול ChatGPT, Claude, Gemini, ועבודה חסכונית במכסות.' },
-              { badge: 'חלק ד׳', title: 'הנדסת פרומפט והקשר', description: 'טכניקות מתקדמות, הנדסת הקשר (Context Engineering), ומולטימודליות.' },
-              { badge: 'חלק ה׳', title: 'מערכות - ידע, כלים וסוכנים', description: 'RAG, פרוטוקול MCP, Function Calling, וארכיטקטורות רב-סוכניות.' },
-              { badge: 'חלק ו׳', title: 'בנייה בפועל', description: 'עבודה מול API, תכנות עם סוכנים, ופרויקט מקצה לקצה.' },
-              { badge: 'חלק ז׳', title: 'הפעלה בייצור (Production)', description: 'הערכה (Evals), אבטחה (Prompt Injection), ניהול עלויות ואתיקה.' },
-              { badge: 'חלק ח׳', title: 'הדרך קדימה', description: 'תוכנית עבודה 90 יום ומבט לעתיד.' },
-              { badge: 'נספחים', title: 'נספחים מקצועיים להרחבה', description: 'מילון מונחים מקצועי, ערכת פרומפטים מוכנה לפיתוח וניהול, וביבליוגרפיה.', wide: true },
-            ]}
-          />
-
-          <SectionHeading icon={Compass} title="מסלולי לימוד מומלצים בתוך החוברת" description="התאמה אישית לפי התפקיד והזמן העומד לרשותך" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-16">
-            {[
-              { icon: Zap, title: 'מסלול מהיר למתחילים', chapters: 'פרקים 1, 10–17', duration: '6–9 שעות' },
-              { icon: Briefcase, title: 'מסלול המשתמש המקצועי', chapters: 'פרקים 1, 3, 5–17, 29', duration: '10–15 שעות' },
-              { icon: Code2, title: 'מסלול המפתחים (Dev Track)', chapters: 'פרקים 5–9, 16, 18–28', duration: '15–25 שעות' },
-            ].map((track) => (
-              <div key={track.title} className="bg-carbon-900/60 border border-white/10 border-r-2 border-r-brand-500 rounded-xl p-5">
-                <div className="flex items-center gap-2 font-display font-bold text-white mb-2">
-                  <track.icon className="w-4 h-4 text-brand-400" />
-                  {track.title}
-                </div>
-                <div className="text-zinc-300 text-sm mb-1">{track.chapters}</div>
-                <div className="font-mono text-xs text-brand-400">משך משוער: {track.duration}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-gradient-to-br from-brand-500/10 to-carbon-900/60 border border-brand-500/30 rounded-2xl p-6 md:p-8 mb-16">
-            <div className="flex items-center gap-2.5 mb-3">
-              <Mail className="w-5 h-5 text-brand-400" />
-              <h3 className="font-display font-bold text-xl text-white">עדכוני AI ישירות למייל</h3>
-            </div>
-            <p className="text-zinc-300 text-sm leading-relaxed mb-5 max-w-xl">
-              הרשמה חד-פעמית, בלי ספאם — עדכונים תקופתיים על כלים חדשים, תובנות ארכיטקטורה ומאמרים מקצועיים בתחומי ה-AI.
-            </p>
-            <NewsletterCapture source="ai-page" />
-          </div>
-
-          <SectionHeading icon={Send} title="צור קשר והתחלה" description="קבלת החוברת, הורדת פרק ניסיון או תיאום ייעוץ מותאם אישית" />
+          {/* ---- Final CTA ---- */}
+          <SectionHeading icon={Send} title="הצעד הבא" description="פגישת אפיון קצרה — ממפים את התהליך, בוחרים סוכן ומגדירים שלב ראשון עם מדד הצלחה ברור" />
           <UnifiedCta
-            mailSubject="רכישת חוברת AI / ייעוץ AI ארגוני"
-            whatsappMessage="שלום דניאל, אשמח לפרטים על חוברת ה-AI ו/או ייעוץ להטמעת בינה מלאכותית בארגון שלי."
+            mailSubject="אפיון והטמעת סוכן AI מותאם אישית"
+            whatsappMessage="שלום דניאל, אשמח לתאם פגישת אפיון לסוכן AI מותאם אישית לעסק / לשימוש האישי שלי."
           />
         </div>
       </div>
