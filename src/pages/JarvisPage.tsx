@@ -1,6 +1,5 @@
 import { motion } from 'motion/react';
 import {
-  Cpu,
   Mic,
   Briefcase,
   Home,
@@ -12,7 +11,6 @@ import {
   Check,
   Layers,
   BarChart3,
-  CalendarClock,
   FileText,
 } from 'lucide-react';
 import { SectionHeading, ServiceGrid, InfoBox } from '../components/content/ContentPrimitives';
@@ -144,11 +142,7 @@ export default function JarvisPage() {
           className="flex flex-col items-center text-center pt-8 pb-12 md:pt-12 md:pb-16"
         >
           <JarvisBadge />
-          <span className="mt-8 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3.5 py-1.5 text-xs font-mono font-bold uppercase tracking-widest text-brand-300">
-            <Cpu className="w-3.5 h-3.5" />
-            Just A Rather Very Intelligent System
-          </span>
-          <h1 className="mt-5 font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl">
+          <h1 className="mt-8 font-display font-black text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl">
             מערכת JARVIS לעסקים ולבית חכם: העוזר האישי של העתיד, כבר היום
           </h1>
           <p className="mt-6 text-base md:text-lg text-zinc-300 leading-[1.9] max-w-3xl">
@@ -156,13 +150,6 @@ export default function JarvisPage() {
             ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
             המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
           </p>
-          {/* The page's ONE hero CTA — the only conversion trigger until the bottom section. */}
-          <div className="mt-8">
-            <WebButton variant="primary" onClick={() => openJarvisLead('JARVIS Page · Hero')}>
-              <CalendarClock className="w-4 h-4" />
-              תיאום פגישת אפיון והתאמה אישית
-            </WebButton>
-          </div>
         </motion.div>
 
         <div className="pt-4">
