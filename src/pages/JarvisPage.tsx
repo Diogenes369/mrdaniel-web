@@ -11,7 +11,6 @@ import {
   Lock,
   Check,
   Layers,
-  Activity,
   BarChart3,
   CalendarClock,
   FileText,
@@ -176,13 +175,10 @@ export default function JarvisPage() {
             </p>
           </InfoBox>
 
-          {/* ---- Video showcase (local files, no YouTube) ---- */}
-          <SectionHeading
-            icon={Activity}
-            title="הדגמות וידאו"
-            description="גלריית וידאו מקומית של מערכת JARVIS בפעולה — הסרטונים מוזרמים ישירות מהשרת, ללא הטמעות חיצוניות."
-          />
-          <JarvisShowcaseVideo />
+          {/* ---- Video showcase (local files, no YouTube, no titles/labels) ---- */}
+          <div className="mt-16 mb-4">
+            <JarvisShowcaseVideo />
+          </div>
 
           {/* ---- Core capabilities ---- */}
           <SectionHeading

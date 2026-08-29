@@ -6,24 +6,23 @@ import { Play, Film } from 'lucide-react';
  * every clip streams from a statically-served path (default `/videos/jarvis/`). The source files
  * live in `public/videos/jarvis/` (copied from `C:\Projects\123`).
  *
- * Built for TikTok / Reels format: a portrait 9:16 featured player (capped so it never dominates
- * a widescreen layout) with full native HTML5 controls (play / pause / volume / scrub /
- * fullscreen), plus a portrait thumbnail selector to switch clips. Playback auto-advances to the
- * next clip once the viewer has started watching, so it cycles through the whole set. A missing
- * file degrades to an on-brand placeholder instead of a broken player.
+ * Deliberately text-free: just the portrait 9:16 featured player (full native HTML5 controls —
+ * play / pause / volume / scrub / fullscreen) and a row of clickable portrait thumbnails to
+ * switch clips. No titles, captions, or overlay labels. Playback auto-advances to the next clip
+ * once the viewer has started watching, so it cycles the whole set. A missing file degrades to a
+ * bare icon tile.
  */
 export interface JarvisClip {
   src: string;
-  label: string;
 }
 
 const BASE = '/videos/jarvis/';
 
 const DEFAULT_CLIPS: JarvisClip[] = [
-  { src: `${BASE}clip-1.mp4`, label: 'סרטון 1' },
-  { src: `${BASE}clip-2.mp4`, label: 'סרטון 2' },
-  { src: `${BASE}clip-3.mp4`, label: 'סרטון 3' },
-  { src: `${BASE}clip-4.mp4`, label: 'סרטון 4' },
+  { src: `${BASE}clip-1.mp4` },
+  { src: `${BASE}clip-2.mp4` },
+  { src: `${BASE}clip-3.mp4` },
+  { src: `${BASE}clip-4.mp4` },
 ];
 
 export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?: JarvisClip[] }) {
@@ -44,15 +43,11 @@ export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?:
         {/* Featured portrait player */}
         <div className="relative mx-auto w-full max-w-[340px] overflow-hidden rounded-2xl border border-white/10 bg-black">
           {currentErrored ? (
-            <div className="flex aspect-[9/16] flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="relative flex aspect-[9/16] items-center justify-center">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(118,185,0,0.16),transparent_60%)]" aria-hidden="true" />
               <span className="relative flex h-14 w-14 items-center justify-center rounded-full border border-brand-500/40 bg-black/50">
                 <Film className="w-6 h-6 text-brand-300/80" />
               </span>
-              <p className="relative font-display text-base font-bold text-white">{current.label}</p>
-              <p className="relative text-xs text-zinc-400">
-                הסרטון לא נמצא בנתיב <code dir="ltr" className="font-mono text-brand-300">{BASE}</code>
-              </p>
             </div>
           ) : (
             <video
@@ -67,13 +62,11 @@ export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?:
               onEnded={next}
               onError={() => markErrored(active)}
               className="block aspect-[9/16] w-full bg-black object-contain"
-            >
-              הדפדפן שלך אינו תומך בתגית וידאו.
-            </video>
+            />
           )}
         </div>
 
-        {/* Thumbnail selector */}
+        {/* Thumbnail selector — no text */}
         <div className="grid grid-cols-4 gap-3 md:grid-cols-2 lg:grid-cols-4">
           {clips.map((clip, i) => {
             const on = i === active;
@@ -84,11 +77,9 @@ export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?:
                 type="button"
                 onClick={() => setActive(i)}
                 aria-current={on ? 'true' : undefined}
-                aria-label={`מעבר ל${clip.label}`}
+                aria-label={`מעבר לסרטון ${i + 1}`}
                 className={`group relative overflow-hidden rounded-xl border transition-colors ${
-                  on
-                    ? 'border-brand-500/60 ring-2 ring-brand-500/40'
-                    : 'border-white/10 hover:border-brand-500/40'
+                  on ? 'border-brand-500/60 ring-2 ring-brand-500/40' : 'border-white/10 hover:border-brand-500/40'
                 }`}
               >
                 <div className="relative aspect-[9/16] w-full bg-black">
@@ -113,9 +104,6 @@ export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?:
                     }`}
                   >
                     <Play className="w-5 h-5 translate-x-0.5 text-white/90" />
-                  </span>
-                  <span className="absolute bottom-1.5 right-2 text-[11px] font-bold text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
-                    {clip.label}
                   </span>
                 </div>
               </button>
