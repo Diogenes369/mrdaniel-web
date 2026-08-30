@@ -2,6 +2,7 @@ import { generateSocialContent, generateVideoScript, draftEngagementMessage, sco
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
 import { pushQueueItem, readAgentMode, readAgentWebhooks, readStrategicContext, writeAutoPilotRunTimestamp, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
+import { runAutoPublishCycle, dispatchPublish } from '../src/server/autoPublish.js';
 import { dispatchAgentNotifications } from '../src/agent/NotificationDispatcher.js';
 import { notifyNewContent, isWhatsAppBridgeConfigured } from '../src/agent/WhatsAppDispatcher.js';
 import type { Platform, ContentFormat, QueueItem } from '../src/agent/types.js';
@@ -131,17 +132,25 @@ export default async function handler(req: any, res: any) {
       res.status(401).json({ ok: false, error: 'unauthorized' });
       return;
     }
-    if (!isEngineConfigured() || !agentFirebaseConfigured) {
-      res.status(200).json({ ok: true, skipped: true, reason: 'not-configured' });
-      return;
+
+    // Two independent autonomous jobs share this one daily cron (Vercel Hobby caps functions at 12,
+    // so the news auto-publisher can't have its own): the social-content auto-pilot (only acts in
+    // Auto-Pilot mode) and the news auto-publisher (only acts while its own toggle is Active).
+    const agentMode = await readAgentMode();
+    let contentResult: Record<string, unknown> = { skipped: true, reason: 'not-in-auto-pilot', mode: agentMode };
+    if (isEngineConfigured() && agentFirebaseConfigured && agentMode === 'auto-pilot') {
+      contentResult = await runAutoPilotCycle();
     }
-    const mode = await readAgentMode();
-    if (mode !== 'auto-pilot') {
-      res.status(200).json({ ok: true, skipped: true, reason: 'not-in-auto-pilot', mode });
-      return;
+
+    let publishResult: Record<string, unknown> = { skipped: 'not-configured' };
+    try {
+      publishResult = await runAutoPublishCycle({ trigger: 'cron' });
+    } catch (err) {
+      console.error('[auto-publish] cron cycle failed:', (err as Error)?.message ?? err);
+      publishResult = { ok: false, error: 'auto-publish failed' };
     }
-    const result = await runAutoPilotCycle();
-    res.status(200).json({ ok: true, ...result });
+
+    res.status(200).json({ ok: true, content: contentResult, autoPublish: publishResult });
     return;
   }
 
@@ -187,6 +196,33 @@ export default async function handler(req: any, res: any) {
       const strategicContext = await readStrategicContext();
       const result = await generateAndPushOne({ platform, topic, format: resolvedFormat }, strategicContext);
       res.status(200).json({ ok: true, skipped: result.skipped, id: result.id, reason: result.reason });
+      return;
+    }
+
+    if (action === 'auto-publish-run') {
+      // Dashboard "run now" → trigger:'force' (bypasses gates). External scheduler at
+      // ?/action with force:false → trigger:'scheduler' (respects the configured hours).
+      const trigger = req.body?.force ? 'force' : 'scheduler';
+      const result = await runAutoPublishCycle({ trigger });
+      res.status(200).json(result);
+      return;
+    }
+
+    if (action === 'auto-publish-dispatch') {
+      const { platform, caption, hashtags, imageUrl, newsTitle, newsLink, category, webhookUrl } = req.body ?? {};
+      const result = await dispatchPublish(
+        {
+          platform: String(platform ?? ''),
+          caption: String(caption ?? ''),
+          hashtags: Array.isArray(hashtags) ? hashtags : [],
+          imageUrl: String(imageUrl ?? ''),
+          newsTitle: String(newsTitle ?? ''),
+          newsLink: typeof newsLink === 'string' ? newsLink : undefined,
+          category: typeof category === 'string' ? category : undefined,
+        },
+        typeof webhookUrl === 'string' ? webhookUrl : undefined
+      );
+      res.status(200).json(result);
       return;
     }
 

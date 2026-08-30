@@ -11,6 +11,9 @@ import {
 } from './autoPublisherTypes';
 
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
+// The auto-publisher shares the /api/agent-generate function (Vercel Hobby caps a deployment at
+// 12 Serverless Functions) via `action: 'auto-publish-run' | 'auto-publish-dispatch'`.
+const AGENT_API = `${SITE_ORIGIN}/api/agent-generate`;
 
 function authHeaders(): HeadersInit {
   return { 'Content-Type': 'application/json', ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}) };
@@ -73,10 +76,14 @@ export function useAutoPublisher() {
   /** Fire one cycle immediately, ignoring the active / slot / once-a-day gates (news-id dedup only). */
   const runNow = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
     try {
-      const res = await fetch(`${SITE_ORIGIN}/api/cron/auto-publish?manual=1&force=1`, { method: 'POST', headers: authHeaders() });
+      const res = await fetch(AGENT_API, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ action: 'auto-publish-run', force: true }),
+      });
       const data = await res.json();
       if (data.skipped) return { ok: true, message: `דילוג: ${data.skipped}` };
-      if (data.ok) return { ok: true, message: `רץ — ${data.newsTitle ?? ''} (${data.mode})` };
+      if (data.ok) return { ok: true, message: `רץ — ${data.newsTitle ?? ''} (${data.mode ?? ''})` };
       return { ok: false, message: data.error ?? 'הריצה נכשלה' };
     } catch {
       return { ok: false, message: 'שגיאת תקשורת מול השרת' };
@@ -86,10 +93,11 @@ export function useAutoPublisher() {
   /** Approve a pending draft: forward it to the webhook now, then mark the run success/failed. */
   const approveAndPublish = useCallback(async (run: AutoPublisherRun): Promise<{ ok: boolean; message: string }> => {
     try {
-      const res = await fetch(`${SITE_ORIGIN}/api/publish-post`, {
+      const res = await fetch(AGENT_API, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
+          action: 'auto-publish-dispatch',
           platform: run.platform,
           caption: run.caption,
           hashtags: run.hashtags,

@@ -212,8 +212,8 @@ export default function AutoPublisherPanel() {
             </p>
           )}
           <p className="text-[10px] text-zinc-600 mt-2 leading-relaxed">
-            שעות ב-UTC. ה-Cron המובנה של Vercel (תוכנית Hobby) רץ <strong>פעם ביום ב-13:00 UTC</strong>. ל-2× / שעות מותאמות — כוונו scheduler חיצוני (Make.com / n8n / cron-job.org) שיקרא{' '}
-            <code dir="ltr">POST /api/cron/auto-publish?manual=1</code> עם ה-header <code>x-admin-secret</code> בשעות שבחרתם (רק שעות שמסומנות כאן יפרסמו), או שדרגו ל-Vercel Pro.
+            שעות ב-UTC. ה-Cron המובנה של Vercel (תוכנית Hobby) רץ <strong>פעם ביום ב-08:00 UTC</strong> (משותף עם סוכן התוכן). ל-2× / שעות מותאמות — כוונו scheduler חיצוני (Make.com / n8n / cron-job.org) שיקרא{' '}
+            <code dir="ltr">POST /api/agent-generate</code> עם גוף <code dir="ltr">{'{ "action": "auto-publish-run" }'}</code> וה-header <code>x-admin-secret</code> בשעות שבחרתם (רק שעות שמסומנות כאן יפרסמו), או שדרגו ל-Vercel Pro.
           </p>
         </div>
 

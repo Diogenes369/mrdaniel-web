@@ -39,8 +39,7 @@ import {
   buildScriptFromText,
   type VideoScriptInput,
 } from './src/agent/VideoGenerationEngine';
-import autoPublishHandler from './api/cron/auto-publish';
-import publishPostHandler from './api/publish-post';
+import { runAutoPublishCycle, dispatchPublish } from './src/server/autoPublish';
 
 const PORT = Number(process.env.PORT) || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -244,10 +243,30 @@ app.get('/api/ai-news', async (_req: Request, res: Response) => {
   res.json(data);
 });
 
-// Autonomous news auto-publisher (local-dev mirrors of api/cron/auto-publish.ts and
-// api/publish-post.ts — the Vercel handlers are Express-compatible, so they're mounted directly).
-app.all('/api/cron/auto-publish', (req: Request, res: Response) => autoPublishHandler(req, res));
-app.all('/api/publish-post', (req: Request, res: Response) => publishPostHandler(req, res));
+// Autonomous news auto-publisher (local-dev mirror) — in production these actions live on
+// /api/agent-generate (POST { action: 'auto-publish-run' | 'auto-publish-dispatch' }); here they
+// get thin dedicated routes off the shared src/server/autoPublish.ts module.
+app.post('/api/auto-publish/run', async (req: Request, res: Response) => {
+  const trigger = req.body?.force ? 'force' : 'scheduler';
+  res.json(await runAutoPublishCycle({ trigger }));
+});
+app.post('/api/auto-publish/dispatch', async (req: Request, res: Response) => {
+  const b = req.body ?? {};
+  res.json(
+    await dispatchPublish(
+      {
+        platform: String(b.platform ?? ''),
+        caption: String(b.caption ?? ''),
+        hashtags: Array.isArray(b.hashtags) ? b.hashtags : [],
+        imageUrl: String(b.imageUrl ?? ''),
+        newsTitle: String(b.newsTitle ?? ''),
+        newsLink: typeof b.newsLink === 'string' ? b.newsLink : undefined,
+        category: typeof b.category === 'string' ? b.category : undefined,
+      },
+      typeof b.webhookUrl === 'string' ? b.webhookUrl : undefined
+    )
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Social Agent (local-dev mirror of api/agent-generate.ts) — see that file for the full
