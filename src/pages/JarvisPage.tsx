@@ -315,7 +315,6 @@ export default function JarvisPage() {
 
           {/* ---- Core capabilities ---- */}
           <SectionHeading
-            sticky
             icon={Layers}
             title="🚀 יכולות הליבה של המערכת"
             description="שלושה תחומי ליבה שבהם JARVIS פועלת כמוח מרכזי אחד — קול, עסק ובית/משרד חכם. כל תחום מחליף שרשרת של כלים נפרדים בממשק אחד, קולי או טקסטואלי, שמדבר עם כל המערכות שכבר יש לכם."
@@ -333,7 +332,6 @@ export default function JarvisPage() {
 
           {/* ---- Technical architecture ---- */}
           <SectionHeading
-            sticky
             icon={BrainCircuit}
             title="הארכיטקטורה הטכנולוגית של מערכת JARVIS"
             description="חמש תשתיות טכנולוגיות שפועלות במקביל תחת 'מוח מרכזי' אחד — כל אחת אחראית על חלק אחר: הבנת שפה, זיכרון ארגוני, חיבור למערכות, קול ואבטחה."
@@ -391,7 +389,6 @@ export default function JarvisPage() {
 
           {/* ---- Customer benefits ---- */}
           <SectionHeading
-            sticky
             icon={BarChart3}
             title="📊 היתרונות המרכזיים עבור הלקוח שלך"
             description="מה זה אומר בפועל, בשורה התחתונה — פחות עבודה ידנית, זמינות מלאה, התאמה מדויקת ואבטחה ברמה ארגונית."
@@ -424,7 +421,6 @@ export default function JarvisPage() {
 
           {/* ---- System & hardware requirements ---- */}
           <SectionHeading
-            sticky
             icon={Server}
             title="דרישות מערכת וחומרה"
             description="מערכת JARVIS גמישה וניתנת להתקנה בשתי תצורות עיקריות, בהתאם לצרכי האבטחה והתקציב של העסק שלך:"
@@ -442,7 +438,6 @@ export default function JarvisPage() {
 
           {/* ---- FAQ ---- */}
           <SectionHeading
-            sticky
             icon={HelpCircle}
             title="שאלות ותשובות נפוצות"
             description="כל מה שצריך לדעת על מערכת האוטונומיה העסקית JARVIS"
