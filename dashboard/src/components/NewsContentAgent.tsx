@@ -239,8 +239,8 @@ export default function NewsContentAgent() {
                 readOnly
                 value={post?.fullText ?? ''}
                 dir="rtl"
-                rows={16}
-                className="w-full flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-zinc-200 leading-relaxed resize-none"
+                rows={24}
+                className="w-full flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-zinc-200 leading-relaxed resize-y min-h-[420px]"
               />
               {post && (
                 <div className="mt-3">
