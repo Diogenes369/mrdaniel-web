@@ -656,22 +656,35 @@ html.a11y-large-cursor * {
 }
 
 /* ---------------------------------------------------------------------------
-   Tech-stack "arsenal" marquee (TechMarquee.tsx). Same seamless two-group
-   translateX(-50%) loop as the news ticker, but purely decorative: it is a
-   CSS animation only — the viewport is `overflow: clip`, NOT a touch-scroll
-   container, so it can never intercept a vertical swipe on Android. Pauses on
-   hover; static under reduced-motion.
+   Tech-stack "arsenal" marquee (TechMarquee.tsx) — structurally identical to
+   the live news ticker (`.news-ticker__*` above): two identical `__group`s
+   side by side inside `__track`; the track translates left by EXACTLY one
+   group width (`translateX(-50%)`, `linear`) and loops, so a group is always
+   filling the viewport — no blank frames, no seam, no jumpy reset. The gap
+   between the two groups equals the in-group gap (`padding-inline` = gap / 2
+   on each side) so the loop point is visually indistinguishable from any
+   other item boundary.
+
+   `overflow-x: clip` (not a scroll container) + `touch-action: pan-y` keep a
+   vertical swipe over the band going straight to the page on Android. Pauses
+   on hover; collapses to a static centered wrap under reduced-motion.
    --------------------------------------------------------------------------- */
 .tech-marquee__viewport {
-  overflow: clip;
+  /* `clip` on X + `visible` on Y: X is fully clipped (no horizontal scrollbox), Y stays visible
+     so chip shadows bleed and this is NOT a scroll container at all. `touch-action: pan-y`
+     forwards every vertical swipe straight to the page. */
   overflow-x: clip;
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
-  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  overflow-y: visible;
+  overflow-clip-margin: 12px;
+  touch-action: pan-y;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
 }
 .tech-marquee__track {
   display: flex;
   width: max-content;
-  animation: tech-marquee-scroll 42s linear infinite;
+  /* Static fallback; the component overrides `animation-duration` to scale with item count. */
+  animation: tech-marquee-scroll 50s linear infinite;
   will-change: transform;
 }
 .tech-marquee:hover .tech-marquee__track {
@@ -681,11 +694,17 @@ html.a11y-large-cursor * {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 1rem;
-  padding-inline: 0.5rem;
+  gap: 1.5rem;
+  padding-inline: 0.75rem;
 }
 .tech-marquee__group > * {
   flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .tech-marquee__group {
+    gap: 1rem;
+    padding-inline: 0.5rem;
+  }
 }
 @keyframes tech-marquee-scroll {
   from { transform: translateX(0); }
@@ -704,6 +723,67 @@ html.a11y-large-cursor * {
   }
   .tech-marquee__group:last-child {
     display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   ROI calculator range slider (RoiCalculator.tsx). `dir: ltr` is forced on the
+   input so min→max is always left→right regardless of the RTL page, which lets
+   the progress fill be a single static `to right` gradient driven by one CSS
+   custom property (`--fill`, a %) set inline from React. Changing `--fill`
+   repaints only this element's background — no layout, no sibling reflow, no
+   React re-render churn — so dragging is glitch-free. The thumb is GPU-cheap
+   (solid circle, no shadow animation).
+   --------------------------------------------------------------------------- */
+.roi-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--color-brand-500) 0%,
+    var(--color-brand-500) var(--fill, 0%),
+    rgba(255, 255, 255, 0.1) var(--fill, 0%),
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  cursor: pointer;
+  outline: none;
+}
+.roi-range:focus-visible {
+  box-shadow: 0 0 0 3px rgba(143, 212, 0, 0.4);
+}
+.roi-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 3px solid var(--color-brand-500);
+  box-shadow: 0 0 12px rgba(118, 185, 0, 0.5);
+  transition: transform 0.12s ease;
+}
+.roi-range::-webkit-slider-thumb:active {
+  transform: scale(1.15);
+}
+.roi-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 3px solid var(--color-brand-500);
+  box-shadow: 0 0 12px rgba(118, 185, 0, 0.5);
+}
+.roi-range::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .roi-range::-webkit-slider-thumb {
+    transition: none;
   }
 }
 

@@ -1,24 +1,27 @@
-import { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { memo, useMemo, useState, type CSSProperties } from 'react';
 import { Calculator, Clock, TrendingUp, Send, Users, Timer, Wallet } from 'lucide-react';
 import WebButton from '../WebButton';
 
 /**
  * Interactive "AI & Automation ROI Calculator" — a lead magnet, not a binding quote.
  *
- * The visitor sets three sliders (team size, hours/week each person burns on repetitive work,
- * loaded hourly cost). The output panel derives two headline figures — reclaimed operational hours
- * and estimated monthly saving — plus an annualised figure. Every coefficient is shown in the fine
- * print so the number is defensible rather than magic.
+ * Three sliders (team size, hours/week each person burns on repetitive work, loaded hourly cost)
+ * drive two headline figures — reclaimed operational hours and estimated monthly saving — plus an
+ * annualised figure. Every coefficient is shown in the fine print so the number is defensible.
  *
- * Layout-shift safety: the output panel is a fixed-height grid with `tabular-nums`, so digits
- * changing as a slider drags never reflow the card. Sliders are native `<input type="range">` with
- * `accent-color` — no JS drag handling, no custom thumb measurement.
+ * Flicker-free dragging:
+ *   - No `key`-based remount and no per-tick mount animation on the output (that was the flicker):
+ *     the numbers just update in place.
+ *   - `tabular-nums` + `whitespace-nowrap` + reserved min-heights so a changing digit count can
+ *     never reflow or twitch neighbouring content.
+ *   - The slider fill is a pure CSS gradient driven by one inline custom property (`--fill`), so
+ *     moving a thumb repaints only that input — no sibling layout, no wasted React work.
+ *   - Each `<Slider>` is memoised and gets a stable `useState` setter, so dragging one slider
+ *     doesn't re-render the other two.
  */
 
 const WEEKS_PER_MONTH = 4.33;
 // Share of identified repetitive hours a well-scoped automation / agent build typically removes.
-// Deliberately conservative — real projects often clear more, but this keeps the estimate credible.
 const AUTOMATION_RECLAIM = 0.6;
 
 const FMT_INT = new Intl.NumberFormat('he-IL', { maximumFractionDigits: 0 });
@@ -36,42 +39,50 @@ interface SliderProps {
   display: string;
 }
 
-function Slider({ id, icon: Icon, label, value, min, max, step, onChange, display }: SliderProps) {
+const Slider = memo(function Slider({ id, icon: Icon, label, value, min, max, step, onChange, display }: SliderProps) {
+  const fill = `${((value - min) / (max - min)) * 100}%`;
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <label htmlFor={id} className="flex items-center gap-2 text-sm font-bold text-zinc-300">
+      <div className="flex items-center justify-between mb-2.5 gap-3">
+        <label htmlFor={id} className="flex items-center gap-2 text-sm font-bold text-zinc-200">
           <Icon className="w-4 h-4 text-brand-400 shrink-0" />
           {label}
         </label>
-        <span className="font-mono text-sm font-bold text-brand-300 tabular-nums" dir="ltr">
+        <span className="shrink-0 font-mono text-sm font-bold text-brand-300 tabular-nums whitespace-nowrap" dir="ltr">
           {display}
         </span>
       </div>
       <input
         id={id}
         type="range"
+        dir="ltr"
         min={min}
         max={max}
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-2 cursor-pointer appearance-none rounded-full bg-white/10 [accent-color:#76B900] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
+        className="roi-range"
+        style={{ '--fill': fill } as CSSProperties}
       />
     </div>
   );
-}
+});
 
 export default function RoiCalculator() {
   const [employees, setEmployees] = useState(8);
   const [hoursPerWeek, setHoursPerWeek] = useState(10);
   const [hourlyCost, setHourlyCost] = useState(90);
 
-  const { reclaimedHours, monthlySavings, annualSavings } = useMemo(() => {
+  const { reclaimedHours, monthlySavings, annualSavings, weeklyHours } = useMemo(() => {
     const repetitiveMonthly = employees * hoursPerWeek * WEEKS_PER_MONTH;
     const reclaimed = repetitiveMonthly * AUTOMATION_RECLAIM;
     const monthly = reclaimed * hourlyCost;
-    return { reclaimedHours: reclaimed, monthlySavings: monthly, annualSavings: monthly * 12 };
+    return {
+      reclaimedHours: Math.round(reclaimed),
+      monthlySavings: monthly,
+      annualSavings: monthly * 12,
+      weeklyHours: Math.round(reclaimed / WEEKS_PER_MONTH),
+    };
   }, [employees, hoursPerWeek, hourlyCost]);
 
   const requestScoping = () => {
@@ -79,7 +90,7 @@ export default function RoiCalculator() {
       new CustomEvent('open-lead-modal', {
         detail: {
           subject: `אפיון אוטומציה — ${employees} עובדים, חיסכון חודשי משוער ${ils(monthlySavings)} / ${FMT_INT.format(
-            Math.round(reclaimedHours)
+            reclaimedHours
           )} שעות`,
           sourceSection: 'ROI Calculator',
         },
@@ -106,7 +117,7 @@ export default function RoiCalculator() {
               <Calculator className="w-5 h-5 text-brand-400" />
               <h3 className="font-display font-bold text-xl text-white">הנתונים שלכם</h3>
             </div>
-            <div className="space-y-7 flex-1">
+            <div className="space-y-8 flex-1">
               <Slider
                 id="roi-employees"
                 icon={Users}
@@ -147,42 +158,44 @@ export default function RoiCalculator() {
             </p>
           </div>
 
-          {/* ---- Output ---- */}
-          <motion.div
-            key={`${Math.round(reclaimedHours)}-${Math.round(monthlySavings)}`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="bg-gradient-to-br from-brand-500/[0.12] to-carbon-900 border border-brand-500/30 rounded-2xl p-6 md:p-8 flex flex-col"
-          >
-            <div className="grid sm:grid-cols-2 gap-5 flex-1 content-center">
-              <div className="min-h-[132px]">
-                <div className="flex items-center gap-2 text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest mb-2">
-                  <Clock className="w-4 h-4 text-brand-400" />
+          {/* ---- Output (updates in place — no remount, no per-tick animation) ---- */}
+          <div className="relative bg-gradient-to-br from-brand-500/[0.14] to-carbon-900 border border-brand-500/30 rounded-2xl p-6 md:p-8 flex flex-col">
+            <div
+              className="pointer-events-none absolute -inset-px rounded-2xl bg-brand-500/10 blur-2xl opacity-60"
+              aria-hidden="true"
+            />
+            <div className="relative grid sm:grid-cols-2 gap-x-8 gap-y-7 flex-1 content-center">
+              <div className="min-h-[128px]">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest mb-2.5">
+                  <Clock className="w-4 h-4 text-brand-400 shrink-0" />
                   שעות תפעול שמוחזרות / חודש
                 </div>
-                <div className="font-display text-4xl md:text-5xl font-black text-brand-400 tabular-nums leading-none">
-                  {FMT_INT.format(Math.round(reclaimedHours))}
+                <div className="font-display text-[2rem] sm:text-4xl md:text-[2.75rem] font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_30px_rgba(118,185,0,0.4)]">
+                  {FMT_INT.format(reclaimedHours)}
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-2">≈ {FMT_INT.format(Math.round(reclaimedHours / WEEKS_PER_MONTH))} שעות בשבוע חוזרות לצוות</p>
+                <p className="text-[11px] text-zinc-500 mt-2.5 tabular-nums">
+                  ≈ <span dir="ltr">{FMT_INT.format(weeklyHours)}</span> שעות בשבוע חוזרות לצוות
+                </p>
               </div>
-              <div className="min-h-[132px]">
-                <div className="flex items-center gap-2 text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest mb-2">
-                  <TrendingUp className="w-4 h-4 text-brand-400" />
+              <div className="min-h-[128px]">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest mb-2.5">
+                  <TrendingUp className="w-4 h-4 text-brand-400 shrink-0" />
                   חיסכון תפעולי משוער / חודש
                 </div>
-                <div className="font-display text-4xl md:text-5xl font-black text-brand-400 tabular-nums leading-none" dir="ltr">
+                <div className="font-display text-[2rem] sm:text-4xl md:text-[2.75rem] font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_30px_rgba(118,185,0,0.5)]">
                   {ils(monthlySavings)}
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-2" dir="ltr">≈ {ils(annualSavings)} / שנה</p>
+                <p className="text-[11px] text-zinc-500 mt-2.5 tabular-nums">
+                  ≈ <span dir="ltr">{ils(annualSavings)}</span> / שנה
+                </p>
               </div>
             </div>
 
-            <WebButton variant="primary" onClick={requestScoping} className="mt-6 w-full justify-center">
+            <WebButton variant="primary" onClick={requestScoping} className="relative mt-6 w-full justify-center">
               <Send className="w-4 h-4" />
               תאם שיחת אפיון טכנית
             </WebButton>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>
