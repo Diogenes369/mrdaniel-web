@@ -12,12 +12,16 @@
     { "source": "/api/generate-video", "destination": "/api/generate-video.ts" },
     { "source": "/api/pexels-search", "destination": "/api/pexels-search.ts" },
     { "source": "/api/img-proxy", "destination": "/api/img-proxy.ts" },
+    { "source": "/api/publish-post", "destination": "/api/publish-post.ts" },
+    { "source": "/api/cron/auto-publish", "destination": "/api/cron/auto-publish.ts" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/agent-generate", "schedule": "0 8 * * *" }
+    { "path": "/api/agent-generate", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/auto-publish", "schedule": "0 6-22 * * *" }
   ],
   "functions": {
-    "api/generate-video.ts": { "maxDuration": 60 }
+    "api/generate-video.ts": { "maxDuration": 60 },
+    "api/cron/auto-publish.ts": { "maxDuration": 60 }
   }
 }

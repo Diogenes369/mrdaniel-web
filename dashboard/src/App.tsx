@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Wifi, WifiOff } from 'lucide-react';
+import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Wifi, WifiOff } from 'lucide-react';
 import { useAuthUser, logout } from './lib/auth';
 import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
 import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
@@ -21,10 +21,11 @@ import ExportControls from './components/ExportControls';
 import { PrintableLeadsReport } from './components/PrintableReport';
 import AgentControlPanel from './components/AgentControlPanel';
 import NewsContentAgent from './components/NewsContentAgent';
+import AutoPublisherPanel from './components/AutoPublisherPanel';
 import WeeklyPlanCalendar from './components/WeeklyPlanCalendar';
 import ErrorBoundary from './components/ErrorBoundary';
 
-type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'weekly-plan';
+type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'auto-publisher' | 'weekly-plan';
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'overview', label: 'סקירה כללית', icon: LayoutGrid },
@@ -34,6 +35,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'security', label: 'אבטחה ופעילות סוכן', icon: ShieldAlert },
   { id: 'agent', label: 'סוכן AI חברתי', icon: Bot },
   { id: 'news-agent', label: 'מחולל תוכן מחדשות', icon: Newspaper },
+  { id: 'auto-publisher', label: 'אוטונומיה', icon: Rocket },
   { id: 'weekly-plan', label: 'לוח תוכן שבועי', icon: Calendar },
 ];
 
@@ -212,6 +214,12 @@ export default function App() {
         {tab === 'news-agent' && (
           <ErrorBoundary label="מחולל תוכן מחדשות">
             <NewsContentAgent />
+          </ErrorBoundary>
+        )}
+
+        {tab === 'auto-publisher' && (
+          <ErrorBoundary label="אוטונומיה">
+            <AutoPublisherPanel />
           </ErrorBoundary>
         )}
 

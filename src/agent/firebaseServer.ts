@@ -231,3 +231,84 @@ export async function updateVideoJob(id: string, patch: Record<string, unknown>)
     console.error('[agent] failed to update video job:', err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Autonomous news auto-publisher (api/cron/auto-publish.ts, api/publish-post.ts)
+// RTDB paths: `auto_publish_config` (dashboard-owned settings) and `published_posts`
+// (append-only run history + dedup source). Same "add the rule in the Firebase console"
+// caveat as agent_queue above.
+// ---------------------------------------------------------------------------
+
+export interface AutoPublishConfig {
+  active?: boolean;
+  /** UTC hours at which a cron tick should post — [] or absent = never. */
+  slotsUTC?: number[];
+  platform?: 'linkedin' | 'instagram' | 'all';
+  category?: 'cyber' | 'ai' | 'tech' | 'auto';
+  mode?: 'full-auto' | 'drafts';
+  publishWebhookUrl?: string;
+}
+
+export interface PublishedPostRecord {
+  newsId: string;
+  newsTitle: string;
+  newsLink: string;
+  category: string;
+  topic: string;
+  platform: string;
+  imageUrl: string;
+  caption: string;
+  hashtags: string[];
+  status: 'success' | 'failed' | 'pending_approval';
+  detail?: string;
+  mode: string;
+  slotKey: string; // `${YYYY-MM-DD}-${HH}` — de-dups a cron slot from re-running
+  createdAt: number;
+}
+
+export async function readAutoPublishConfig(): Promise<AutoPublishConfig | null> {
+  const db = getServerDb();
+  if (!db) return null;
+  try {
+    const snapshot = await get(ref(db, 'auto_publish_config'));
+    return snapshot.exists() ? (snapshot.val() as AutoPublishConfig) : {};
+  } catch (err) {
+    console.error('[auto-publish] failed to read config:', err);
+    return null;
+  }
+}
+
+/** Every history record — used both for the dashboard log and as the dedup source. */
+export async function readPublishedPosts(): Promise<Record<string, PublishedPostRecord>> {
+  const db = getServerDb();
+  if (!db) return {};
+  try {
+    const snapshot = await get(ref(db, 'published_posts'));
+    return snapshot.exists() ? (snapshot.val() as Record<string, PublishedPostRecord>) : {};
+  } catch (err) {
+    console.error('[auto-publish] failed to read published_posts:', err);
+    return {};
+  }
+}
+
+export async function recordPublishedPost(record: PublishedPostRecord): Promise<string | null> {
+  const db = getServerDb();
+  if (!db) return null;
+  try {
+    const result = await push(ref(db, 'published_posts'), record);
+    return result.key;
+  } catch (err) {
+    console.error('[auto-publish] failed to record published post:', err);
+    return null;
+  }
+}
+
+export async function updatePublishedPost(id: string, patch: Partial<PublishedPostRecord>): Promise<void> {
+  const db = getServerDb();
+  if (!db) return;
+  try {
+    await update(ref(db, `published_posts/${id}`), patch);
+  } catch (err) {
+    console.error('[auto-publish] failed to update published post:', err);
+  }
+}
