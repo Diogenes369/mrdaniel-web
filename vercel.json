@@ -18,7 +18,7 @@
   ],
   "crons": [
     { "path": "/api/agent-generate", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/auto-publish", "schedule": "0 6-22 * * *" }
+    { "path": "/api/cron/auto-publish", "schedule": "0 13 * * *" }
   ],
   "functions": {
     "api/generate-video.ts": { "maxDuration": 60 },

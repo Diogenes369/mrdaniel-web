@@ -11,17 +11,19 @@ import { dispatchToWebhook } from '../publish-post.js';
 
 // Autonomous news auto-publisher — the cron loop.
 //
-// Vercel Cron fires this hourly (see vercel.json). Each tick:
+// Vercel Cron (Hobby) fires this ONCE daily at 13:00 UTC (see vercel.json). Each run:
 //   1. reads auto_publish_config (dashboard-owned)
-//   2. bails unless the engine is active AND the current UTC hour is a configured slot AND that
-//      slot hasn't already run today (slotKey de-dup in published_posts)
+//   2. bails unless the engine is active AND no cron-origin run has happened yet today
 //   3. picks the newest news item in the target category that isn't already in published_posts
 //   4. composes the caption(s) for the target platform(s) and picks the image URL
 //   5. mode "full-auto"  → POSTs to the publish webhook, records the run (success/failed)
 //      mode "drafts"     → records the run as pending_approval for the dashboard to approve
 //
-// Manual trigger: GET/POST with `x-admin-secret` and `?manual=1` runs steps 3-5 immediately,
-// ignoring the active/slot gates (but still de-duping by news id).
+// Higher frequency (2x / custom hours): Vercel Hobby can't schedule sub-daily crons, so point an
+// external scheduler (Make.com / n8n / cron-job.org) at
+// `POST /api/cron/auto-publish?manual=1` with the `x-admin-secret` header at the desired hours.
+// The `slotsUTC` config is honoured for those `manual` calls (fromScheduler) so they only post at
+// the hours you picked; the dashboard's "run now" button passes `manual=1&force=1` to bypass that.
 
 const SITE_ORIGIN = 'https://mrdaniel.co.il';
 
@@ -72,6 +74,8 @@ export default async function handler(req: any, res: any) {
 
   const url = new URL(req.url ?? '/', 'http://localhost');
   const manual = url.searchParams.get('manual') === '1';
+  // `force=1` (dashboard "run now") bypasses the slot-hour check on a manual call.
+  const force = url.searchParams.get('force') === '1';
 
   if (manual ? !isAdminAuthorized(req) : !isCronAuthorized(req)) {
     res.status(401).json({ ok: false, error: 'unauthorized' });
@@ -86,15 +90,17 @@ export default async function handler(req: any, res: any) {
   try {
     const cfg = (await readAutoPublishConfig()) ?? {};
     const nowHourUTC = new Date().getUTCHours();
-    const slotKey = `${new Date().toISOString().slice(0, 10)}-${String(nowHourUTC).padStart(2, '0')}`;
+    const today = new Date().toISOString().slice(0, 10);
+    const slotKey = `${today}-${String(nowHourUTC).padStart(2, '0')}`;
 
-    if (!manual) {
-      if (!cfg.active) {
-        res.status(200).json({ ok: true, skipped: 'paused' });
-        return;
-      }
+    if (!cfg.active && !manual) {
+      res.status(200).json({ ok: true, skipped: 'paused' });
+      return;
+    }
+    // Manual scheduler calls (no `force`) still respect the configured hours.
+    if (manual && !force) {
       const slots = Array.isArray(cfg.slotsUTC) ? cfg.slotsUTC : [];
-      if (!slots.includes(nowHourUTC)) {
+      if (slots.length > 0 && !slots.includes(nowHourUTC)) {
         res.status(200).json({ ok: true, skipped: 'not-a-slot', nowHourUTC, slots });
         return;
       }
@@ -103,10 +109,18 @@ export default async function handler(req: any, res: any) {
     const history = await readPublishedPosts();
     const runs = Object.values(history);
 
-    // Slot de-dup — a cron slot that already produced a run today does nothing on a retry.
-    if (!manual && runs.some((r) => r.slotKey === slotKey && r.mode !== 'manual')) {
-      res.status(200).json({ ok: true, skipped: 'slot-already-ran', slotKey });
-      return;
+    // Once-a-day guard: the built-in Vercel cron fires daily, and a scheduler retry shouldn't
+    // double-post the same slot. `force` (dashboard "run now") skips this.
+    if (!force) {
+      const scope = manual ? slotKey : today;
+      const already = runs.some((r) => {
+        if (r.mode === 'manual' || r.mode === 'approved') return false;
+        return manual ? r.slotKey === slotKey : (r.slotKey ?? '').slice(0, 10) === today;
+      });
+      if (already) {
+        res.status(200).json({ ok: true, skipped: 'already-ran', scope });
+        return;
+      }
     }
 
     const publishedIds = new Set(runs.map((r) => r.newsId));
@@ -143,7 +157,9 @@ export default async function handler(req: any, res: any) {
         imageUrl,
         caption: post.fullText,
         hashtags: post.hashtags,
-        mode: manual ? 'manual' : mode,
+        // `force` (dashboard "run now") records as 'manual' so it never blocks a real cron run;
+        // cron and scheduler calls record the publish mode so the day/slot guards can see them.
+        mode: force ? 'manual' : mode,
         slotKey,
         createdAt: Date.now(),
       };

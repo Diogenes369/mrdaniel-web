@@ -70,10 +70,10 @@ export function useAutoPublisher() {
     update(ref(db, 'auto_publish_config'), next).catch((err) => console.error('[auto-publish] config save failed:', err));
   }, []);
 
-  /** Fire one cycle immediately, ignoring the active / slot gates (still de-dups by news id). */
+  /** Fire one cycle immediately, ignoring the active / slot / once-a-day gates (news-id dedup only). */
   const runNow = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
     try {
-      const res = await fetch(`${SITE_ORIGIN}/api/cron/auto-publish?manual=1`, { method: 'POST', headers: authHeaders() });
+      const res = await fetch(`${SITE_ORIGIN}/api/cron/auto-publish?manual=1&force=1`, { method: 'POST', headers: authHeaders() });
       const data = await res.json();
       if (data.skipped) return { ok: true, message: `דילוג: ${data.skipped}` };
       if (data.ok) return { ok: true, message: `רץ — ${data.newsTitle ?? ''} (${data.mode})` };
