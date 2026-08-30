@@ -99,7 +99,7 @@ function ServiceTile({ s }: { s: PlainService }) {
 
 export default function PricingSection() {
   return (
-    <section id="pricing" className="relative py-20 md:py-32 border-t border-white/5 overflow-hidden cv-auto">
+    <section id="pricing" className="relative py-20 md:py-32 border-t border-white/5 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
         <Reveal className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">

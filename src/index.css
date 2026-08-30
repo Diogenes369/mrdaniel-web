@@ -183,10 +183,13 @@ body::before {
   contain-intrinsic-size: 1px 1200px;
 }
 
-/* Native-like momentum scrolling for scrollable panels (iOS) */
+/* Native-like momentum scrolling for scrollable panels (iOS). These are all VERTICAL panels
+   (modal bodies, chat logs) — `pan-y` keeps the gesture on their own scroll axis and stops it
+   leaking into a page-level scroll fight. */
 .momentum-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 /* Web3-style glassy form input — 16px+ base size prevents iOS auto-zoom-on-focus */
@@ -352,6 +355,10 @@ body::before {
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
+    /* Claim ONLY the horizontal axis: a vertical swipe that lands on this row is handed straight
+       back to the page so it scrolls down normally — the row never traps or hijacks vertical
+       scroll on Android. Horizontal drags still scroll the cards. */
+    touch-action: pan-x;
     transform: translate3d(0, 0, 0);
     will-change: transform;
   }

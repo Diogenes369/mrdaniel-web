@@ -31,7 +31,7 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
   return (
     <section
       id={offer.id}
-      className="relative py-20 md:py-32 border-t border-white/5 overflow-hidden cv-auto"
+      className="relative py-20 md:py-32 border-t border-white/5 overflow-x-clip cv-auto"
     >
       <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
@@ -50,7 +50,7 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
           ))}
         </div>
 
-        {/* Mobile: scroll-locked horizontal rail — vertical scroll drives the cards through 1:1. */}
+        {/* Mobile: native horizontal swipe rail — vertical swipes pass straight through to page scroll. */}
         <ScrollLockRail className="md:hidden mb-10" ariaLabel={offer.eyebrow}>
           {offer.bullets.map((b) => (
             <BulletCard key={b.title} bullet={b} />
