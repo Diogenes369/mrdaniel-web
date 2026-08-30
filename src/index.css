@@ -635,6 +635,8 @@ html.a11y-large-cursor * {
   /* Static fallback; the component overrides `animation-duration` to scale with item count. */
   animation: tech-marquee-scroll 50s linear infinite;
   will-change: transform;
+  /* Vertical swipe over the track goes straight to page scroll on touch devices. */
+  touch-action: pan-y;
 }
 .tech-marquee:hover .tech-marquee__track,
 .tech-marquee[data-tt='open'] .tech-marquee__track {
