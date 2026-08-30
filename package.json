@@ -9,7 +9,10 @@
     "dev:all": "concurrently -n website,dashboard -c blue,magenta \"npm run dev\" \"npm run dev --prefix dashboard\"",
     "build": "vite build",
     "start": "tsx server.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "vercel --prod",
+    "deploy:dashboard": "cd dashboard && vercel --prod",
+    "deploy:all": "npm run deploy && npm run deploy:dashboard"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
