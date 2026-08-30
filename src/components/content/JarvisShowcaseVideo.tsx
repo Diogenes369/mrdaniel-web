@@ -94,7 +94,7 @@ export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?:
             onClick={() => setOpenIndex(null)}
           >
             <div
-              className="relative aspect-[9/16] max-h-[86vh] max-w-[92vw] overflow-hidden rounded-2xl bg-black shadow-2xl"
+              className="relative aspect-[9/16] max-h-[86dvh] max-w-[92vw] overflow-hidden rounded-2xl bg-black shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <button

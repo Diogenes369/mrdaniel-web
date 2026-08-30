@@ -91,8 +91,21 @@ html {
   text-rendering: optimizeLegibility;
 }
 
+/* Mobile-safe viewport height: the address bar auto-hiding/showing on Android & iOS must NOT
+   snap layout heights. Override Tailwind's `.min-h-screen` (100vh) to the dynamic viewport unit,
+   keeping a plain-vh fallback for the rare browser without dvh support. */
+.min-h-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 body {
+  /* `clip` (not `hidden`) so this does NOT become a scroll container — `overflow: hidden` on a
+     page-level ancestor silently breaks `position: sticky` descendants and throws off GSAP
+     ScrollTrigger / IntersectionObserver offset math, which surfaced as hidden sections on
+     Android. `clip` still suppresses horizontal scroll; older engines fall back to `hidden`. */
   overflow-x: hidden;
+  overflow-x: clip;
   background-color: #08090C;
   overscroll-behavior-y: none;
   /* Ambient corner glow — a fixed, low-opacity radial wash (brand green + electric blue) behind

@@ -450,7 +450,7 @@ function PreviewModal({ product, onClose }: { product: Product | null; onClose: 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 60, scale: 0.96 }}
             transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-            className="relative w-full max-w-lg max-h-[90vh] flex flex-col bg-[#0b0c10] border border-white/15 shadow-[0_30px_80px_rgba(0,0,0,0.9)] rounded-3xl overflow-hidden"
+            className="relative w-full max-w-lg max-h-[90dvh] flex flex-col bg-[#0b0c10] border border-white/15 shadow-[0_30px_80px_rgba(0,0,0,0.9)] rounded-3xl overflow-hidden"
           >
             <div className="relative p-6 md:p-8 pb-4 bg-[#0D0E12] border-b border-white/10">
               <button

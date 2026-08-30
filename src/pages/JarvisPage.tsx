@@ -261,14 +261,14 @@ export default function JarvisPage() {
              padding/margin; the inner content wrapper carries the top padding that pushes the
              circle clear of the sticky header and drops the H1 into a clean gap below it. The
              bottom of the image keeps its mask fade into the particle background. ---- */}
-      <section className="relative -mt-[34px] min-h-[95vh] overflow-hidden">
+      <section className="relative -mt-[34px] min-h-[95dvh] overflow-hidden">
         <img
           src="/images/jarvis-hero-bg.png"
           alt="מערכת JARVIS"
           fetchPriority="high"
           loading="eager"
           decoding="async"
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[50vh] sm:h-[56vh] md:h-[62vh] w-full object-cover object-center [mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)]"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[50dvh] sm:h-[56dvh] md:h-[62dvh] w-full object-cover object-center [mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_55%,transparent_100%)]"
         />
 
         {/* Inner content wrapper — the ONLY place with top padding. */}
@@ -276,7 +276,7 @@ export default function JarvisPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="container-wide relative z-[1] flex flex-col items-center text-center pt-[46vh] sm:pt-[50vh] md:pt-[54vh] pb-10 md:pb-14"
+          className="container-wide relative z-[1] flex flex-col items-center text-center pt-[46dvh] sm:pt-[50dvh] md:pt-[54dvh] pb-10 md:pb-14"
         >
           <h1 className="font-display font-black text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.85)]">
             JARVIS: סוכן בינה מלאכותית אוטונומי לניהול העסק שלך

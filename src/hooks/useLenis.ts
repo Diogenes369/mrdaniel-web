@@ -16,6 +16,12 @@ export function useLenis() {
   useEffect(() => {
     if (prefersReducedMotion()) return;
 
+    // Touch devices (phones/tablets, Android especially): let the NATIVE scroll engine drive.
+    // JS-driven smooth scroll fights the browser's URL-bar auto-hide and causes scroll jumps /
+    // flicker on mobile. `lenisInstance` stays null and every helper here already has a native
+    // fallback; ScrollTrigger updates itself off native scroll events. Desktop keeps Lenis.
+    if (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches) return;
+
     // syncTouch intentionally left at Lenis's default (off) on every platform, including iOS —
     // a previous attempt turned it on for iOS specifically to try to fix Lenis's `.velocity`
     // reporting, but reading Lenis's source showed that doesn't actually help (see the long

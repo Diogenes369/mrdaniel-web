@@ -39,7 +39,7 @@ export default function AboutPage() {
           בעולם טכנולוגי שנע במהירות שיא, הפער בין אימוץ טכנולוגיה חדשה לבין יצירת יתרון עסקי אמיתי טמון בחיבור הנכון בין תשתיות רשת חזקות, הגנה היקפית מודרנית ואוטומציה חכמה מבוססת AI — לא בכל רכיב בנפרד.
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }} className="bg-carbon-900/50 border border-white/10 rounded-2xl p-7 md:p-9 mb-16 max-w-4xl">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="bg-carbon-900/50 border border-white/10 rounded-2xl p-7 md:p-9 mb-16 max-w-4xl">
           <h2 className="flex items-center gap-3 font-display font-bold text-xl md:text-2xl text-white mb-5">
             <ShieldCheck className="w-6 h-6 text-brand-400" />
             על הפעילות והחזון המקצועי
@@ -106,7 +106,7 @@ export default function AboutPage() {
           <SocialLinks className="justify-center" iconClassName="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 hover:shadow-[0_0_16px_rgba(0,255,102,0.35)] transition-all outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" glyphClassName="w-5 h-5" />
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }} className="bg-carbon-900 border border-brand-500/30 rounded-2xl p-8 md:p-12 text-center mb-16 max-w-4xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="bg-carbon-900 border border-brand-500/30 rounded-2xl p-8 md:p-12 text-center mb-16 max-w-4xl mx-auto">
           <p className="font-display text-xl md:text-2xl font-bold text-white leading-relaxed mb-4">
             "טכנולוגיה איכותית אינה נמדדת בסיבוכיות שלה, אלא בשקט התפעולי ובערך העסקי שהיא מייצרת."
           </p>
