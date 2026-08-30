@@ -13,6 +13,8 @@ export interface NewsItem {
   excerpt: string;
   summary: string;
   publishedAt: string;
+  /** Optional lead image from the feed (see server/newsFeed.ts `extractImage`). */
+  image?: string;
 }
 
 interface NewsResponse {

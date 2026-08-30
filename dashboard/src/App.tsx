@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Wifi, WifiOff } from 'lucide-react';
+import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Wifi, WifiOff } from 'lucide-react';
 import { useAuthUser, logout } from './lib/auth';
 import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
 import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
@@ -20,10 +20,11 @@ import ThreatAuditPanel from './components/ThreatAuditPanel';
 import ExportControls from './components/ExportControls';
 import { PrintableLeadsReport } from './components/PrintableReport';
 import AgentControlPanel from './components/AgentControlPanel';
+import NewsContentAgent from './components/NewsContentAgent';
 import WeeklyPlanCalendar from './components/WeeklyPlanCalendar';
 import ErrorBoundary from './components/ErrorBoundary';
 
-type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'weekly-plan';
+type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'weekly-plan';
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'overview', label: 'סקירה כללית', icon: LayoutGrid },
@@ -32,6 +33,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'leads', label: 'לידים וניוזלטר', icon: UserPlus },
   { id: 'security', label: 'אבטחה ופעילות סוכן', icon: ShieldAlert },
   { id: 'agent', label: 'סוכן AI חברתי', icon: Bot },
+  { id: 'news-agent', label: 'מחולל תוכן מחדשות', icon: Newspaper },
   { id: 'weekly-plan', label: 'לוח תוכן שבועי', icon: Calendar },
 ];
 
@@ -204,6 +206,12 @@ export default function App() {
         {tab === 'agent' && (
           <ErrorBoundary label="סוכן AI חברתי">
             <AgentControlPanel />
+          </ErrorBoundary>
+        )}
+
+        {tab === 'news-agent' && (
+          <ErrorBoundary label="מחולל תוכן מחדשות">
+            <NewsContentAgent />
           </ErrorBoundary>
         )}
 

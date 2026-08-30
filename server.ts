@@ -161,8 +161,71 @@ app.get('/api/health', (_req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 
 app.get('/api/news', async (_req: Request, res: Response) => {
+  // CORS open (mirrors api/news.ts) so the dashboard, on its own origin, can read the feed for the
+  // news-driven content generator. Public read-only news metadata.
+  res.setHeader('Access-Control-Allow-Origin', '*');
   const data = await getNewsItems();
   res.json(data);
+});
+
+// Same-origin image relay (local-dev mirror of api/img-proxy.ts) — lets the dashboard draw a
+// remote news photo onto a <canvas> without tainting it. Same SSRF guards as the Vercel function.
+const IMG_PROXY_BLOCKED_HOST =
+  /^(localhost|0\.0\.0\.0|\[?::1\]?|127(\.\d{1,3}){3}|10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|169\.254(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2})$/i;
+
+app.get('/api/img-proxy', async (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const raw = typeof req.query.url === 'string' ? req.query.url : '';
+  if (!raw) {
+    res.status(400).json({ error: 'missing ?url' });
+    return;
+  }
+  let target: URL;
+  try {
+    target = new URL(raw);
+  } catch {
+    res.status(400).json({ error: 'invalid url' });
+    return;
+  }
+  if ((target.protocol !== 'https:' && target.protocol !== 'http:') || IMG_PROXY_BLOCKED_HOST.test(target.hostname)) {
+    res.status(403).json({ error: 'blocked' });
+    return;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const upstream = await fetch(target.toString(), {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8',
+      },
+    });
+    if (!upstream.ok) {
+      res.status(502).json({ error: `upstream ${upstream.status}` });
+      return;
+    }
+    const contentType = upstream.headers.get('content-type') ?? '';
+    if (!contentType.startsWith('image/')) {
+      res.status(415).json({ error: 'not an image' });
+      return;
+    }
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    if (buf.length > 8 * 1024 * 1024) {
+      res.status(413).json({ error: 'image too large' });
+      return;
+    }
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.status(200).send(buf);
+  } catch (err) {
+    console.error('[api/img-proxy] fetch failed:', (err as Error)?.message ?? err);
+    res.status(502).json({ error: 'fetch failed' });
+  } finally {
+    clearTimeout(timer);
+  }
 });
 
 app.get('/api/news/item/:slug', async (req: Request, res: Response) => {

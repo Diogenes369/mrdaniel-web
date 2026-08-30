@@ -14,6 +14,10 @@ export interface NewsItem {
   excerpt: string;
   summary: string;
   publishedAt: string;
+  /** Lead image URL pulled from the feed item (enclosure / media:* / first inline <img>), when the
+   * source provides one — many Hebrew RSS feeds don't. Absolute `https:`/`http:` only; consumers
+   * that draw it onto a <canvas> must route it through `/api/img-proxy` for CORS. */
+  image?: string;
 }
 
 interface FeedSource {
@@ -59,7 +63,60 @@ const parser = new Parser({
     'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
   },
   timeout: 15000,
+  // Media namespaces so an item's lead image can be recovered even when it isn't a plain
+  // <enclosure> — keepArray on media:content because feeds often list several (image + video).
+  customFields: {
+    item: [
+      ['media:content', 'mediaContent', { keepArray: true }],
+      ['media:thumbnail', 'mediaThumbnail'],
+      ['content:encoded', 'contentEncoded'],
+    ],
+  },
 });
+
+/** Best-effort lead-image recovery from a feed item: <enclosure>, then media:thumbnail, then the
+ * first image in media:content, then the first inline <img> in the item's HTML body. Returns an
+ * absolute http(s) URL (protocol-relative `//host/…` is upgraded to https) or undefined. */
+function extractImage(item: Record<string, any>): string | undefined {
+  const normalize = (u: unknown): string | undefined => {
+    if (typeof u !== 'string') return undefined;
+    const trimmed = u.trim();
+    if (trimmed.startsWith('//')) return `https:${trimmed}`;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return undefined;
+  };
+
+  const enc = item.enclosure;
+  if (enc?.url && (!enc.type || String(enc.type).startsWith('image/'))) {
+    const u = normalize(enc.url);
+    if (u) return u;
+  }
+
+  const thumb = normalize(item.mediaThumbnail?.$?.url);
+  if (thumb) return thumb;
+
+  const mc = Array.isArray(item.mediaContent) ? item.mediaContent : item.mediaContent ? [item.mediaContent] : [];
+  for (const m of mc) {
+    const attrs = m?.$ ?? {};
+    const isImage =
+      attrs.medium === 'image' ||
+      (typeof attrs.type === 'string' && attrs.type.startsWith('image/')) ||
+      (typeof attrs.url === 'string' && /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(attrs.url));
+    if (isImage) {
+      const u = normalize(attrs.url);
+      if (u) return u;
+    }
+  }
+
+  const html = String(item.contentEncoded || item.content || '');
+  const m = /<img[^>]+src=["']([^"']+)["']/i.exec(html);
+  if (m) {
+    const u = normalize(m[1]);
+    if (u) return u;
+  }
+
+  return undefined;
+}
 
 // Keyword heuristics over title + summary + feed categories. Checked cyber first so a
 // security-flavored AI story (e.g. "AI-powered phishing") lands under cyber, not ai.
@@ -179,6 +236,7 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
       excerpt: truncate(summary, 160),
       summary,
       publishedAt,
+      image: extractImage(item as Record<string, any>),
     });
   }
 
