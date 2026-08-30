@@ -687,7 +687,8 @@ html.a11y-large-cursor * {
   animation: tech-marquee-scroll 50s linear infinite;
   will-change: transform;
 }
-.tech-marquee:hover .tech-marquee__track {
+.tech-marquee:hover .tech-marquee__track,
+.tech-marquee[data-tt='open'] .tech-marquee__track {
   animation-play-state: paused;
 }
 .tech-marquee__group {
