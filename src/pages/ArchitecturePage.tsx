@@ -7,8 +7,6 @@ import {
   KeyRound,
   Radar,
   Server,
-  MessageSquare,
-  Mail,
   Send,
   ShieldAlert,
   Target,
