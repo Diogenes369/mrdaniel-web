@@ -57,7 +57,7 @@ export default function ContactPortal() {
           </span>
           <span className="inline-flex items-center gap-2 font-sans text-[11px] md:text-xs font-medium tracking-[0.15em] text-zinc-400 transition-colors group-hover:text-brand-300">
             <span className="block h-px w-4 bg-brand-500 transition-[width] duration-500 group-hover:w-7" aria-hidden="true" />
-            צור קשר
+            תיאום שיחת אפיון
           </span>
         </div>
       </button>

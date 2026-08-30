@@ -75,11 +75,14 @@ export default function Seo({ title, description, path, type = 'website', image 
     setMeta('property', 'og:type', type);
     setMeta('property', 'og:url', url);
     setMeta('property', 'og:site_name', SITE_NAME);
+    setMeta('property', 'og:locale', 'he_IL');
     setMeta('property', 'og:image', image);
+    setMeta('property', 'og:image:alt', title);
     setMeta('name', 'twitter:card', 'summary_large_image');
     setMeta('name', 'twitter:title', title);
     setMeta('name', 'twitter:description', description);
     setMeta('name', 'twitter:image', image);
+    setMeta('name', 'twitter:image:alt', title);
 
     // Replace only the JSON-LD blocks this component manages; the base graph in index.html stays.
     document.head.querySelectorAll('script[data-managed-seo]').forEach((s) => s.remove());

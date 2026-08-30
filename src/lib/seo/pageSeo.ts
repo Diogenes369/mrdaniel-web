@@ -55,9 +55,9 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
     ],
   },
   '/cyber': {
-    title: 'אבטחת סייבר לעסקים קטנים ובינוניים ולארגונים | דניאל בן ברוך',
+    title: 'אבטחת סייבר וניהול IT ארגוני — רשת, זהויות והגנת קצה | דניאל בן ברוך',
     description:
-      'פתרונות אבטחת מידע וסייבר מותאמים לעסקים קטנים ובינוניים ולסביבות ארגוניות — ארכיטקטורת Zero-Trust, הקשחה, ניטור איומים והגנה על מערכות AI ונתונים.',
+      'אבטחת מידע וסייבר לעסקים ולארגונים יחד עם ניהול IT ברמת Enterprise: הנדסת רשת Fortinet (FortiGate/FortiSwitch, VLAN, VPN), ניהול זהויות Active Directory ו-Entra ID, ארכיטקטורת Zero-Trust, הגנת קצה ESET PROTECT ו-Cyber 2.0. כולל תרחישי הנדסה מהשטח.',
     path: '/cyber',
     jsonLd: [
       serviceLd({

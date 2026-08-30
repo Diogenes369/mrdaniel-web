@@ -16,8 +16,12 @@ import {
   AlertTriangle,
   Send,
   Network,
+  Wrench,
+  ServerCog,
 } from 'lucide-react';
 import { PageHero, SectionHeading, InteractiveServiceGrid, InfoBox, SpecTable, AudienceGrid, UnifiedCta } from '../components/content/ContentPrimitives';
+import EnterpriseServicesSection from '../components/content/EnterpriseServicesSection';
+import CaseStudies from '../components/content/CaseStudies';
 
 export default function CyberPage() {
   return (
@@ -55,6 +59,20 @@ export default function CyberPage() {
               { icon: Users, title: 'הדרכות מודעות לארגונים ולצוותים', description: 'סדנאות מעשיות להגברת מודעות העובדים מול מתקפות פישינג, הנדסה חברתית ושימוש בטוח בכלי תוכנה וענן.' },
             ]}
           />
+
+          <SectionHeading
+            icon={ServerCog}
+            title="ניהול IT ואבטחה ברמת Enterprise"
+            description="שכבת התשתית שעליה יושבת ההגנה — רשת, זהויות והגנת קצה, מנוהלות תחת מדיניות אחת. מיועד למנהלי IT ולדרג ניהולי."
+          />
+          <EnterpriseServicesSection />
+
+          <SectionHeading
+            icon={Wrench}
+            title="Real-World Engineering — תרחישים מהשטח"
+            description="שלושה פרויקטים אמיתיים (בעילום שם), במבנה אחיד: האתגר ← הפתרון הטכני ← ההשפעה המדידה."
+          />
+          <CaseStudies />
 
           <SectionHeading icon={CheckCircle2} title="הערך המוסף שאתה מקבל בעבודה איתי" description="שילוב ייחודי של פרקטיקה בשטח, שקט תפעולי וראייה טכנולוגית רחבה" />
           <SpecTable
@@ -94,10 +112,10 @@ export default function CyberPage() {
             </div>
           </InfoBox>
 
-          <SectionHeading icon={Send} title="צור קשר והתחלה" description="ייעוץ אבטחה ראשוני או קבלת חוברות ההדרכה והמגזינים" />
+          <SectionHeading icon={Send} title="בדוק את רמת האבטחה שלך" description="שיחת אפיון טכנית קצרה — ממפים את מצב הרשת, הזהויות וההגנה הקיים ומגדירים צעד ראשון" />
           <UnifiedCta
-            mailSubject="ייעוץ אבטחת סייבר ורשתות"
-            whatsappMessage="שלום דניאל, אשמח לייעוץ ראשוני בנושא אבטחת סייבר ורשתות עבור הארגון שלי."
+            mailSubject="שיחת אפיון טכנית — אבטחת סייבר, רשת וזהויות"
+            whatsappMessage="שלום דניאל, אשמח לתאם שיחת אפיון טכנית בנושא אבטחת סייבר, רשת וזהויות עבור הארגון שלי."
           />
         </div>
       </div>

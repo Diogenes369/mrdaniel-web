@@ -656,6 +656,58 @@ html.a11y-large-cursor * {
 }
 
 /* ---------------------------------------------------------------------------
+   Tech-stack "arsenal" marquee (TechMarquee.tsx). Same seamless two-group
+   translateX(-50%) loop as the news ticker, but purely decorative: it is a
+   CSS animation only — the viewport is `overflow: clip`, NOT a touch-scroll
+   container, so it can never intercept a vertical swipe on Android. Pauses on
+   hover; static under reduced-motion.
+   --------------------------------------------------------------------------- */
+.tech-marquee__viewport {
+  overflow: clip;
+  overflow-x: clip;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+.tech-marquee__track {
+  display: flex;
+  width: max-content;
+  animation: tech-marquee-scroll 42s linear infinite;
+  will-change: transform;
+}
+.tech-marquee:hover .tech-marquee__track {
+  animation-play-state: paused;
+}
+.tech-marquee__group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 1rem;
+  padding-inline: 0.5rem;
+}
+.tech-marquee__group > * {
+  flex-shrink: 0;
+}
+@keyframes tech-marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tech-marquee__track {
+    animation: none;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: center;
+  }
+  .tech-marquee__viewport {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .tech-marquee__group:last-child {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Wide, immersive page shell — replaces the tight Tailwind `container` on
    desktop. Caps at 1700px with fluid gutters (~1rem on phones → 4rem on wide
    screens). Prose inside still self-limits its line length via `max-w-*` /

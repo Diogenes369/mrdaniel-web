@@ -87,7 +87,7 @@ export default function CapabilitiesPage() {
             ]}
           />
 
-          <SectionHeading icon={Send} title="צור קשר והתחלה" description="התאמת הטכנולוגיות והיכולות המתאימות ביותר לארגון שלכם" />
+          <SectionHeading icon={Send} title="תאם שיחת אפיון טכנית" description="התאמת הטכנולוגיות והיכולות המתאימות ביותר לארגון שלכם" />
           <UnifiedCta
             mailSubject="התאמת מטריצת יכולות לעסק"
             whatsappMessage="שלום דניאל, אשמח לשיחה על התאמת היכולות מהמטריצה (AI / סייבר / פיתוח) לארגון שלי."

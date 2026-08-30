@@ -97,7 +97,7 @@ export default function ArchitecturePage() {
             ]}
           />
 
-          <SectionHeading icon={Send} title="צור קשר והתחלה" description="מיפוי ארכיטקטורת ההגנה הקיימת בארגון שלכם" />
+          <SectionHeading icon={Send} title="תאם שיחת אפיון טכנית" description="מיפוי ארכיטקטורת ההגנה הקיימת בארגון שלכם ובחינת פערים מול Zero-Trust" />
           <UnifiedCta
             mailSubject="התאמת ארכיטקטורת הגנה ופריסת AI"
             whatsappMessage="שלום דניאל, אשמח למיפוי ארכיטקטורת ההגנה הקיימת אצלנו ובחינת פערים מול Zero-Trust."
