@@ -119,49 +119,38 @@ const OG_IMAGE_RES = [
   /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
 ];
 
-/** Last-resort image recovery for feeds that ship no inline media at all (TechTime, Israel
- * Defense): fetch the article page and read its `og:image` / `twitter:image`. Bounded — browser
- * UA, tight timeout, reads at most ~256 KB (the tags live in <head>). Returns an absolute URL or
- * undefined; never throws. */
-async function fetchOgImage(articleUrl: string, timeoutMs = 6000): Promise<string | undefined> {
+function pickOgImage(html: string, baseUrl: string): string | undefined {
+  for (const re of OG_IMAGE_RES) {
+    const m = html.match(re);
+    if (!m?.[1]) continue;
+    let candidate = m[1].trim().replace(/&amp;/g, '&');
+    if (candidate.startsWith('//')) candidate = `https:${candidate}`;
+    if (candidate.startsWith('/')) {
+      try {
+        candidate = new URL(candidate, baseUrl).toString();
+      } catch {
+        continue;
+      }
+    }
+    if (!/^https?:\/\//i.test(candidate) || JUNK_IMAGE_RE.test(candidate)) continue;
+    return upscaleCdnImage(candidate);
+  }
+  return undefined;
+}
+
+// Optional Jina Reader key (https://jina.ai/reader) — lifts the anonymous rate limit. Works
+// without it, just slower / more likely to 429 under load.
+const JINA_KEY = process.env.JINA_API_KEY?.trim();
+
+/** GET a URL as text with a hard timeout; returns the body or undefined. Never throws. */
+async function getText(url: string, timeoutMs: number, headers: Record<string, string>): Promise<string | undefined> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(articleUrl, {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
-      },
-    });
-    if (!res.ok || !res.body) return undefined;
-
-    // Stream just the head — stop once we've seen </head> or hit the byte cap.
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder('utf-8', { fatal: false });
-    let html = '';
-    for (let read = 0; read < 262_144; ) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      read += value.byteLength;
-      html += decoder.decode(value, { stream: true });
-      if (/<\/head>/i.test(html)) break;
-    }
-    reader.cancel().catch(() => {});
-
-    for (const re of OG_IMAGE_RES) {
-      const m = html.match(re);
-      if (!m?.[1]) continue;
-      let candidate = m[1].trim().replace(/&amp;/g, '&');
-      if (candidate.startsWith('//')) candidate = `https:${candidate}`;
-      if (candidate.startsWith('/')) candidate = new URL(candidate, articleUrl).toString();
-      if (!/^https?:\/\//i.test(candidate) || JUNK_IMAGE_RE.test(candidate)) continue;
-      return upscaleCdnImage(candidate);
-    }
-    return undefined;
+    const res = await fetch(url, { signal: controller.signal, redirect: 'follow', headers });
+    if (!res.ok) return undefined;
+    const body = await res.text();
+    return body.length > 1_500_000 ? body.slice(0, 1_500_000) : body;
   } catch {
     return undefined;
   } finally {
@@ -169,18 +158,50 @@ async function fetchOgImage(articleUrl: string, timeoutMs = 6000): Promise<strin
   }
 }
 
-/** Fills in `image` for items that came out of their feed with none, by scraping the article's
- * `og:image`. Concurrency-limited and best-effort: bounded to the first `limit` imageless items
- * (the feed's consumers only ever surface the newest handful per category), 6 in flight, and any
- * individual failure is silently skipped. */
-async function enrichImages(items: NewsItem[], limit = 48): Promise<void> {
+/** Recover an article's lead image from its `og:image` / `twitter:image` when the feed carried no
+ * inline media (TechTime, Israel Defense, most Google-News entries). Tries a direct fetch first;
+ * if that fails — which it does for any outlet whose origin WAF-blocks datacenter IPs — retries
+ * through the Jina Reader proxy (`r.jina.ai`), which fetches from its own infrastructure. Bounded
+ * and best-effort; returns an absolute URL or undefined, never throws. */
+async function fetchOgImage(articleUrl: string): Promise<string | undefined> {
+  const browserHeaders = {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
+  };
+
+  const direct = await getText(articleUrl, 5000, browserHeaders);
+  if (direct) {
+    const hit = pickOgImage(direct, articleUrl);
+    if (hit) return hit;
+  }
+
+  const viaJina = await getText(
+    `https://r.jina.ai/${articleUrl}`,
+    7000,
+    JINA_KEY ? { Authorization: `Bearer ${JINA_KEY}`, 'X-Return-Format': 'html' } : { 'X-Return-Format': 'html' },
+  );
+  if (viaJina) {
+    const hit = pickOgImage(viaJina, articleUrl);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** Fills in `image` for the newest items whose feed carried none, by scraping the article
+ * `og:image` (see `fetchOgImage`). Concurrency-limited AND under a single overall deadline so a
+ * batch of slow/blocked outlets can never balloon the `/api/news` refresh — whatever's filled
+ * when the clock runs out is kept. Best-effort: any individual failure is silently skipped. */
+async function enrichImages(items: NewsItem[], limit = 28, overallMs = 12_000): Promise<void> {
   const targets = items.filter((it) => !it.image).slice(0, limit);
   if (targets.length === 0) return;
 
+  const deadline = Date.now() + overallMs;
   let cursor = 0;
   let filled = 0;
   const worker = async () => {
-    while (cursor < targets.length) {
+    while (cursor < targets.length && Date.now() < deadline) {
       const it = targets[cursor++];
       const og = await fetchOgImage(it.link);
       if (og) {
@@ -189,8 +210,11 @@ async function enrichImages(items: NewsItem[], limit = 48): Promise<void> {
       }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(6, targets.length) }, worker));
-  console.info(`[news] og:image enrichment — filled ${filled}/${targets.length} imageless items`);
+  const run = Promise.all(Array.from({ length: Math.min(6, targets.length) }, worker));
+  await Promise.race([run, new Promise((r) => setTimeout(r, overallMs + 500))]);
+  console.info(
+    `[news] og:image enrichment — filled ${filled}/${targets.length} imageless items in ${Date.now() - (deadline - overallMs)}ms`,
+  );
 }
 
 /** Best-effort lead-image recovery, tried in order across every feed shape we've seen from the
