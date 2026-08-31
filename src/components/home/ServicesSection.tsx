@@ -123,7 +123,7 @@ export default function ServicesSection() {
   }, []);
 
   return (
-    <section id="services" className="relative isolate py-20 md:py-28 overflow-x-clip cv-auto">
+    <section id="services" className="relative bg-carbon-950 py-20 md:py-28 overflow-hidden cv-auto">
       <SectionBackdrop tone="a" />
 
       <div className="container-wide relative z-10">

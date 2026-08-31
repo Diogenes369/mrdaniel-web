@@ -11,22 +11,20 @@ interface PopHeadlineProps {
 }
 
 /**
- * Giant section headline that projects toward the viewer as it scrolls into frame: it rises out
- * of depth (translateZ −→ +), un-tilts from a backward lean (rotateX), and settles from a hair of
- * roll (rotateZ) — a "pops out of the screen" entrance — then holds flat and readable.
+ * Giant section title that floats in 3D above the section's cards.
  *
- * Performance / GPU contract:
- *   - Only the <h2> transforms — transform + opacity, `transformPerspective` on the same element
- *     (matches DepthSection), `will-change: transform, opacity` so it's on its own layer up front.
- *     No layout or paint work per frame.
- *   - ONE `useScroll` progress per instance, mapped: headline top enters viewport → headline
- *     centre reaches ~58% up. Clamps at both ends, so it holds settled once past.
- *   - Touch devices get a lighter profile (shorter travel, softer angle) for 60fps on older
- *     mobile GPUs. `prefers-reduced-motion` renders the headline flat and static — an
- *     accessibility choice, respected, not bypassed.
- *   - Rendered OUTSIDE the section's <DepthSection> so the two 3D effects never compound.
+ * `perspective: 1000px` lives on the (never-clipped) container; only the inner motion element
+ * transforms. As the title scrolls into frame it lifts from depth and forward, then RESTS at a
+ * gentle permanent float — rotateX ~8°, translateZ ~20px, pivoting from its bottom edge so the
+ * headline "stands up" off the cards below it. It does not settle flat: the pop-out is the
+ * resting state.
+ *
+ * - Transform + opacity only, on one element, `will-change`-hinted → no layout/paint per frame.
+ * - The container has no `overflow` and generous margin, so the tilt never cuts a glyph.
+ * - Touch: a shallower float for 60fps on older GPUs. `prefers-reduced-motion`: flat + static.
+ * - Rendered OUTSIDE the section's <DepthSection>, so the two 3D effects never compound.
  */
-export default function PopHeadline({ lead, accent, className = 'mb-6 md:mb-8' }: PopHeadlineProps) {
+export default function PopHeadline({ lead, accent, className = 'mb-7 md:mb-9' }: PopHeadlineProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [mode] = useState<'full' | 'lite' | 'off'>(() => {
     if (typeof window === 'undefined' || prefersReducedMotion()) return 'off';
@@ -34,14 +32,13 @@ export default function PopHeadline({ lead, accent, className = 'mb-6 md:mb-8' }
   });
   const lite = mode === 'lite';
 
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'center 0.58'] });
-  const rotateX = useTransform(scrollYProgress, [0, 1], lite ? [15, 0] : [24, 0]);
-  const rotateZ = useTransform(scrollYProgress, [0, 1], lite ? [-1.4, 0] : [-2.4, 0]);
-  const z = useTransform(scrollYProgress, [0, 0.72, 1], lite ? [-90, 12, 0] : [-170, 26, 0]);
-  const opacity = useTransform(scrollYProgress, [0, 0.32], [0, 1]);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'center 0.62'] });
+  const rotateX = useTransform(scrollYProgress, [0, 1], lite ? [16, 6] : [22, 8]);
+  const z = useTransform(scrollYProgress, [0, 1], lite ? [-60, 14] : [-90, 22]);
+  const opacity = useTransform(scrollYProgress, [0, 0.34], [0, 1]);
 
   const heading = (
-    <h2 className="text-pop font-display font-black text-white text-center [text-shadow:0_10px_44px_rgba(0,0,0,0.6)]">
+    <h2 className="text-pop font-display font-black text-white text-center">
       {lead}
       {accent != null && (
         <>
@@ -55,15 +52,14 @@ export default function PopHeadline({ lead, accent, className = 'mb-6 md:mb-8' }
   if (mode === 'off') return <div className={className}>{heading}</div>;
 
   return (
-    <div ref={ref} className={className}>
+    <div ref={ref} className={className} style={{ perspective: '1000px' }}>
       <motion.div
         style={{
           rotateX,
-          rotateZ,
           z,
           opacity,
-          transformPerspective: lite ? 820 : 1050,
           transformStyle: 'preserve-3d',
+          transformOrigin: 'center bottom',
           willChange: 'transform, opacity',
         }}
       >

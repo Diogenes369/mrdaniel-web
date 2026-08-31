@@ -79,37 +79,39 @@
   text-wrap: pretty;
 }
 
-/* "Pop-out" section headline — a full step larger than the fluid-h2 scale (36px → 72px) with
-   tighter tracking for big display Rubik. Paired with PopHeadline.tsx's scroll-driven 3D lift. */
+/* Giant "pop-out" section headline — text-3xl → text-6xl (30px → 60px), balanced, with a subtle
+   neon green bloom over a dark depth shadow. Paired with PopHeadline.tsx's 3D float. Deliberately
+   NOT larger than 60px: keeps the glyphs crisp and clear of any ancestor clip. */
 .text-pop {
-  font-size: clamp(2.25rem, 4.6vw + 1.2rem, 4.5rem);
-  line-height: 1.03;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.875rem, 3.4vw + 1rem, 3.75rem);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
   text-wrap: balance;
+  text-shadow: 0 0 22px rgba(118, 185, 0, 0.3), 0 12px 34px rgba(0, 0, 0, 0.55);
 }
 
-/* Angled section backdrop (SectionBackdrop.tsx) — a barely-there glass panel clipped to a shallow
-   parallelogram and bled past the section, so consecutive sections' panels OVERLAP on a diagonal
-   instead of meeting on a hard rule. `.angle-grid` is the faint mesh inside it, radial-masked so
-   it never terminates on a visible edge; `.backdrop-glow-*` are the two alternating ambient tints
-   (green / blue-with-green-undertone) that drift down the page for depth without any line. */
+/* Section background decoration (SectionBackdrop.tsx). CONTAINED — `absolute inset-0`, never bled
+   past the section, so it can't paint over a neighbour's cards or expose the document root. The
+   diagonal character is a raked light gradient only (no clip-path, no skew, no geometry that can
+   break section bounds). `.angle-grid` is a whisper-faint mesh, radial-masked to fade before
+   every edge. `.section-sheen-*` alternate green / blue tints down the page. */
 .angle-grid {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
   background-size: 58px 58px;
-  -webkit-mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 40%, transparent 88%);
-  mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 40%, transparent 88%);
+  -webkit-mask-image: radial-gradient(ellipse 76% 80% at 50% 44%, #000 38%, transparent 86%);
+  mask-image: radial-gradient(ellipse 76% 80% at 50% 44%, #000 38%, transparent 86%);
 }
-.backdrop-glow-a {
+.section-sheen-a {
   background:
-    radial-gradient(120% 72% at 50% 0%, rgba(118, 185, 0, 0.06), transparent 72%),
-    radial-gradient(92% 60% at 50% 100%, rgba(118, 185, 0, 0.035), transparent 76%);
+    linear-gradient(198deg, rgba(118, 185, 0, 0.05), transparent 44%),
+    radial-gradient(90% 52% at 50% 0%, rgba(118, 185, 0, 0.04), transparent 72%);
 }
-.backdrop-glow-b {
+.section-sheen-b {
   background:
-    radial-gradient(120% 72% at 50% 0%, rgba(56, 189, 248, 0.05), transparent 72%),
-    radial-gradient(92% 60% at 50% 100%, rgba(118, 185, 0, 0.03), transparent 76%);
+    linear-gradient(198deg, rgba(56, 189, 248, 0.045), transparent 44%),
+    radial-gradient(90% 52% at 50% 0%, rgba(56, 189, 248, 0.035), transparent 72%);
 }
 
 h1, h2, h3, h4 {

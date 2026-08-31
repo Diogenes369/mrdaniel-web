@@ -102,7 +102,7 @@ export default function RoiCalculator() {
   };
 
   return (
-    <section id="roi-calculator" className="relative isolate py-20 md:py-28 overflow-x-clip cv-auto">
+    <section id="roi-calculator" className="relative bg-carbon-950 py-20 md:py-28 overflow-hidden cv-auto">
       <SectionBackdrop tone="b" />
 
       <div className="container-wide relative z-10">

@@ -40,7 +40,7 @@ export default function OfferSection({ offer, tone = 'a' }: { offer: HomeOffer; 
   return (
     <section
       id={offer.id}
-      className="relative isolate py-20 md:py-28 overflow-x-clip cv-auto"
+      className="relative bg-carbon-950 py-20 md:py-28 overflow-hidden cv-auto"
     >
       <SectionBackdrop tone={tone} />
 

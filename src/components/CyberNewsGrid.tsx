@@ -41,7 +41,7 @@ export default function CyberNewsGrid() {
       : null;
 
   return (
-    <section id="news" className="py-16 md:py-24 relative isolate overflow-x-clip cv-auto">
+    <section id="news" className="py-16 md:py-24 relative bg-carbon-950 overflow-hidden cv-auto">
       <SectionBackdrop tone="a" />
       <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-8 md:mb-10">

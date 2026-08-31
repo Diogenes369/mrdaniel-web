@@ -224,7 +224,7 @@ export default function TechMarquee() {
   };
 
   return (
-    <section className="relative isolate py-20 md:py-28 overflow-x-clip cv-auto">
+    <section className="relative bg-carbon-950 py-20 md:py-28 overflow-hidden cv-auto">
       <SectionBackdrop tone="b" />
       <div className="container-wide relative z-10 mb-10 text-center md:mb-14">
         <PopHeadline lead="הסטאק" accent="שמפעיל את כל זה" className="mb-3 md:mb-4" />
