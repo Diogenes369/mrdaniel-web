@@ -6,7 +6,6 @@ import WebButton from './WebButton';
 import NewsCard from './NewsCard';
 import NewsTicker from './NewsTicker';
 import ScrollLockRail from './mobile/ScrollLockRail';
-import SectionBackdrop from './home/SectionBackdrop';
 import { useNewsFeed, type NewsTopic } from '../services/newsService';
 
 // Homepage news section: category tab filters, reading-time tags (in NewsCard), an "updated"
@@ -41,8 +40,7 @@ export default function CyberNewsGrid() {
       : null;
 
   return (
-    <section id="news" className="py-16 md:py-24 relative bg-carbon-950 overflow-hidden cv-auto">
-      <SectionBackdrop tone="a" />
+    <section id="news" className="py-16 md:py-24 relative overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-8 md:mb-10">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-4">

@@ -17,7 +17,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { prefersReducedMotion } from '../lib/gsap';
-import SectionBackdrop from './home/SectionBackdrop';
 import PopHeadline from './home/PopHeadline';
 
 /**
@@ -224,8 +223,7 @@ export default function TechMarquee() {
   };
 
   return (
-    <section className="relative bg-carbon-950 py-20 md:py-28 overflow-hidden cv-auto">
-      <SectionBackdrop tone="b" />
+    <section className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10 mb-10 text-center md:mb-14">
         <PopHeadline lead="הסטאק" accent="שמפעיל את כל זה" className="mb-3 md:mb-4" />
         <p className="font-mono text-[11px] md:text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">

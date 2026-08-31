@@ -2,7 +2,6 @@ import { memo, useMemo, useState, type CSSProperties } from 'react';
 import { Calculator, Clock, TrendingUp, Send, Users, Timer, Wallet } from 'lucide-react';
 import WebButton from '../WebButton';
 import DepthSection from './DepthSection';
-import SectionBackdrop from './SectionBackdrop';
 import PopHeadline from './PopHeadline';
 
 /**
@@ -102,9 +101,7 @@ export default function RoiCalculator() {
   };
 
   return (
-    <section id="roi-calculator" className="relative bg-carbon-950 py-20 md:py-28 overflow-hidden cv-auto">
-      <SectionBackdrop tone="b" />
-
+    <section id="roi-calculator" className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
           <PopHeadline lead="כמה" accent="האוטומציה מחזירה לכם?" />

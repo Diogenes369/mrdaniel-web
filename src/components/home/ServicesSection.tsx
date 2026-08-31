@@ -5,7 +5,6 @@ import Reveal from '../Reveal';
 import WebButton from '../WebButton';
 import TiltCard from '../TiltCard';
 import DepthSection from './DepthSection';
-import SectionBackdrop from './SectionBackdrop';
 import PopHeadline from './PopHeadline';
 import { SERVICES, type ServiceEntry } from '../../data/homeServices';
 
@@ -116,9 +115,7 @@ export default function ServicesSection() {
   }, []);
 
   return (
-    <section id="services" className="relative bg-carbon-950 py-20 md:py-28 overflow-hidden cv-auto">
-      <SectionBackdrop tone="a" />
-
+    <section id="services" className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
         <div className="mx-auto mb-12 max-w-3xl text-center md:mb-16">
           <PopHeadline lead="פתרונות AI ופיתוח" accent="לעצמאים ולעסקים קטנים" />

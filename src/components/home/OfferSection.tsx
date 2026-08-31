@@ -3,7 +3,6 @@ import { ArrowLeft } from 'lucide-react';
 import WebButton from '../WebButton';
 import TiltCard from '../TiltCard';
 import DepthSection from './DepthSection';
-import SectionBackdrop from './SectionBackdrop';
 import PopHeadline from './PopHeadline';
 import ScrollLockRail from '../mobile/ScrollLockRail';
 import type { HomeOffer, OfferBullet } from '../../data/homeOffers';
@@ -22,7 +21,7 @@ function BulletCard({ bullet }: { bullet: OfferBullet }) {
   );
 }
 
-export default function OfferSection({ offer, tone = 'a' }: { offer: HomeOffer; tone?: 'a' | 'b' }) {
+export default function OfferSection({ offer }: { offer: HomeOffer }) {
   const navigate = useNavigate();
 
   const openLead = () =>
@@ -35,10 +34,8 @@ export default function OfferSection({ offer, tone = 'a' }: { offer: HomeOffer; 
   return (
     <section
       id={offer.id}
-      className="relative bg-carbon-950 py-20 md:py-28 overflow-hidden cv-auto"
+      className="relative py-20 md:py-28 overflow-x-clip cv-auto"
     >
-      <SectionBackdrop tone={tone} />
-
       {/* Header sits ABOVE the depth plane so the pop-out title and the card-grid tilt don't stack. */}
       <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">

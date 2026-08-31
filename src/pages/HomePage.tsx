@@ -13,19 +13,18 @@ import { HOME_OFFERS } from '../data/homeOffers';
  * web development + marketing) → interactive ROI calculator (lead magnet) → services bento →
  * tech-stack marquee → live news dashboard → contact.
  *
- * There are NO divider elements between sections. Each section paints its own <SectionBackdrop> —
- * a translucent glass panel clipped to a shallow diagonal and bled past its bounds, so adjacent
- * panels overlap and interlock on an angle with no hard line anywhere. The ambient tint alternates
- * a/b down the page. Section bodies ride a <DepthSection> 3D scroll plane; section titles are
- * <PopHeadline>s that project toward the viewer as they scroll in.
+ * Every section wrapper is fully transparent — no divider elements, no per-section backdrop — so
+ * the fixed Scene3D particle/mesh layer (`.scene3d-layer`, z-0 in App.tsx) runs unobstructed from
+ * top to bottom. The `.cyber-glass` cards float directly over it. Section bodies ride a
+ * <DepthSection> 3D scroll plane; section titles are <PopHeadline>s that project toward the viewer.
  */
 export default function HomePage() {
   return (
     <>
       <Hero />
       <WordRotator />
-      {HOME_OFFERS.map((offer, i) => (
-        <OfferSection key={offer.id} offer={offer} tone={i % 2 === 0 ? 'a' : 'b'} />
+      {HOME_OFFERS.map((offer) => (
+        <OfferSection key={offer.id} offer={offer} />
       ))}
       <RoiCalculator />
       <ServicesSection />

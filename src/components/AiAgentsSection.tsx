@@ -71,7 +71,7 @@ function AgentCard({ agent }: { agent: AiAgent }) {
     >
       <TiltCard strength={5} className="h-full">
         <div
-          className={`relative h-full flex flex-col overflow-hidden bg-[#0D0E12] border border-white/10 rounded-2xl p-6 transition-all duration-500 hover:border-[#76B900]/50 hover:-translate-y-1.5 ${agent.glow}`}
+          className={`cyber-glass cyber-glass--marketing h-full flex flex-col rounded-2xl p-6 ${agent.glow}`}
         >
           <div className="flex items-start gap-4 mb-4">
             <div className={`w-14 h-14 shrink-0 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center ${agent.accent === 'text-black' ? 'text-brand-400' : agent.accent}`}>
