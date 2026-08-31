@@ -21,6 +21,14 @@ interface TickerRow {
   href: string;
 }
 
+// The ticker is a "what's new TODAY" strip: it shows only items published within the last 24h.
+// If that window is thin (a quiet news day, or the feed just cold-started), it falls back to the
+// newest items overall so the marquee is never sparse — a short group would leave a visible gap
+// mid-scroll in the seamless loop.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MIN_TODAY_ITEMS = 5;
+const FALLBACK_ITEM_COUNT = 8;
+
 // Shown while the feed is loading, empty, or errored — the ticker is never blank.
 const FALLBACK_TICKER: TickerRow[] = [
   { id: 'fb-ai', title: 'סוכני AI בארגונים — מגמת האוטומציה שמשנה תהליכים עסקיים', stamp: 'עדכני', href: '/ai' },
@@ -46,25 +54,39 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
   const { data: allItems } = useNewsFeed();
   const reduced = prefersReducedMotion();
 
-  // Every item from the feed — no slicing/truncation, so the loop shows the full updated set —
-  // sorted STRICT newest-first by publication date/time, so the absolute newest headline is the
-  // first one visible when the marquee starts (applies to both placements: desktop top bar and
-  // mobile in-section ticker).
+  // TODAY only: sort the feed strict newest-first, keep the items from the last 24h. If that's
+  // fewer than MIN_TODAY_ITEMS, widen to the newest items overall so the loop stays full. Never
+  // truncate the "today" set — the marquee shows every fresh headline.
   const rows: TickerRow[] = useMemo(() => {
     const ts = (iso: string) => {
       const t = new Date(iso).getTime();
       return Number.isNaN(t) ? -Infinity : t;
     };
-    const mapped = [...(allItems ?? [])]
-      .sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt))
-      .map((i) => ({
-        id: i.id,
-        title: i.title,
-        stamp: stampFor(i.publishedAt),
-        href: i.link,
-      }));
+    const now = Date.now();
+    const sorted = [...(allItems ?? [])].sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt));
+    const todays = sorted.filter((i) => {
+      const t = ts(i.publishedAt);
+      return t <= now + 60_000 && now - t <= DAY_MS;
+    });
+    const chosen = todays.length >= MIN_TODAY_ITEMS ? todays : sorted.slice(0, FALLBACK_ITEM_COUNT);
+    const mapped = chosen.map((i) => ({
+      id: i.id,
+      title: i.title,
+      stamp: stampFor(i.publishedAt),
+      href: i.link,
+    }));
     return mapped.length >= 4 ? mapped : FALLBACK_TICKER;
   }, [allItems]);
+
+  // Each seamless-loop `__group` must be at least as wide as the viewport, or a gap opens between
+  // the two groups mid-scroll. On a thin news day (few "today" items) tile the set until there are
+  // enough rows to guarantee that.
+  const marqueeRows: TickerRow[] = useMemo(() => {
+    if (rows.length === 0 || rows.length >= 10) return rows;
+    const out: TickerRow[] = [];
+    while (out.length < 10) out.push(...rows);
+    return out;
+  }, [rows]);
 
   const openRow = (href: string) => {
     if (href.startsWith('/')) navigate(href);
@@ -106,7 +128,7 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
   // Scale the loop time with how many headlines are in it (~6s per headline) so adding more feed
   // items keeps the on-screen reading pace comfortable instead of speeding the marquee up. The
   // CSS keyframe carries a static fallback duration.
-  const animationDuration = `${Math.max(60, rows.length * 6)}s`;
+  const animationDuration = `${Math.max(60, marqueeRows.length * 6)}s`;
 
   const wrapperClass = isTop
     ? 'news-ticker relative z-30 hidden md:block w-full border-b border-white/10 bg-carbon-950/95 backdrop-blur-sm pt-safe overflow-hidden'
@@ -153,8 +175,8 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
           <div className="news-ticker__track" style={{ animationDuration }}>
             {[0, 1].map((dup) => (
               <div className="news-ticker__group" key={dup} aria-hidden={dup === 1}>
-                {rows.map((row) => (
-                  <Item key={`${dup}-${row.id}`} row={row} />
+                {marqueeRows.map((row, i) => (
+                  <Item key={`${dup}-${i}-${row.id}`} row={row} />
                 ))}
               </div>
             ))}

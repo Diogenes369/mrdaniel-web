@@ -21,52 +21,54 @@ function ServiceTile({ s }: { s: ServiceEntry }) {
   return (
     <Link
       to={s.to}
-      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border p-5 backdrop-blur-md transition-all duration-300 md:p-6 ${
+      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border p-6 backdrop-blur-md transition-all duration-300 md:p-7 lg:p-8 ${
         s.flagship
-          ? 'bento-mesh border-brand-500/30 bg-white/[0.035] shadow-[0_0_44px_-16px_rgba(118,185,0,0.45)] hover:border-brand-500/55 hover:shadow-[0_0_60px_-14px_rgba(118,185,0,0.6)]'
-          : 'border-white/10 bg-white/[0.03] hover:border-brand-500/40 hover:bg-white/[0.055]'
+          ? 'bento-mesh border-brand-500/35 bg-white/[0.04] shadow-[0_0_44px_-16px_rgba(118,185,0,0.5)] hover:border-brand-500/60 hover:shadow-[0_0_64px_-12px_rgba(118,185,0,0.65)]'
+          : 'border-white/12 bg-white/[0.035] hover:border-brand-500/45 hover:bg-white/[0.06] hover:shadow-[0_0_36px_-18px_rgba(118,185,0,0.45)]'
       }`}
     >
       <div className="relative z-10 flex h-full flex-col">
-        <div className="mb-3 flex items-center gap-3">
+        <div className="mb-4 flex items-center gap-3">
           <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-colors ${
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors lg:h-12 lg:w-12 ${
               s.flagship
-                ? 'border-brand-500/40 bg-brand-500/15 text-brand-300'
-                : 'border-white/10 bg-black/30 text-brand-400 group-hover:border-brand-500/40 group-hover:text-brand-300'
+                ? 'border-brand-500/45 bg-brand-500/20 text-brand-300'
+                : 'border-white/12 bg-black/30 text-brand-300 group-hover:border-brand-500/45'
             }`}
           >
-            <Icon className="h-5 w-5" />
+            <Icon className="h-5 w-5 lg:h-6 lg:w-6" />
           </span>
           {s.badge && (
-            <span className="rounded-full border border-brand-500/40 bg-brand-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-300">
+            <span className="rounded-full border border-brand-500/45 bg-brand-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-300 lg:text-xs">
               {s.badge}
             </span>
           )}
-          <ArrowUpLeft className="ml-auto h-4 w-4 text-zinc-600 transition-colors group-hover:text-brand-400" aria-hidden="true" />
+          <ArrowUpLeft className="ml-auto h-4 w-4 text-zinc-500 transition-colors group-hover:text-brand-400 lg:h-5 lg:w-5" aria-hidden="true" />
         </div>
 
         <h3
-          className={`font-display font-bold text-[#F1F5F9] ${
-            s.flagship ? 'text-lg md:text-xl' : 'text-base'
+          className={`font-display font-bold text-white ${
+            s.flagship ? 'text-xl lg:text-2xl' : 'text-lg md:text-lg lg:text-xl'
           }`}
         >
           {s.title}
         </h3>
-        <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">{s.blurb}</p>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-300 md:text-base lg:mt-2.5 lg:text-lg lg:leading-relaxed">
+          {s.blurb}
+        </p>
 
         {s.flagship && s.points && (
-          <ul className="mt-4 space-y-1.5 border-t border-white/10 pt-4">
+          <ul className="mt-4 space-y-2 border-t border-white/10 pt-4 lg:mt-5 lg:space-y-2.5 lg:pt-5">
             {s.points.map((p) => (
-              <li key={p} className="flex items-start gap-2 text-[13px] text-zinc-300">
-                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-400" />
+              <li key={p} className="flex items-start gap-2.5 text-sm leading-relaxed text-zinc-200 lg:text-base">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-400 lg:h-[18px] lg:w-[18px]" />
                 <span>{p}</span>
               </li>
             ))}
           </ul>
         )}
 
-        <span className="mt-auto pt-4 text-[13px] font-bold text-brand-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+        <span className="mt-auto pt-5 text-sm font-bold text-brand-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100 lg:pt-6 lg:text-[15px]">
           לפרטים על השירות ←
         </span>
       </div>
@@ -131,7 +133,7 @@ export default function ServicesSection() {
 
         {/* Desktop / tablet: asymmetric bento. lg = 6-col with per-tile spans; md = plain 2-col. */}
         <Reveal>
-          <div className="mx-auto hidden max-w-[1400px] gap-4 md:grid md:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(184px,1fr)] lg:gap-5">
+          <div className="mx-auto hidden max-w-[1440px] gap-4 md:grid md:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(210px,1fr)] lg:gap-5">
             {SERVICES.map((s) => (
               <div key={s.id} className={s.span}>
                 <ServiceTile s={s} />
