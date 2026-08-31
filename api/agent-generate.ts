@@ -3,6 +3,7 @@ import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
 import { pushQueueItem, readAgentMode, readAgentWebhooks, readStrategicContext, writeAutoPilotRunTimestamp, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
 import { runAutoPublishCycle, dispatchPublish } from '../src/server/autoPublish.js';
+import { generateEmailCampaign, isCopywriterConfigured } from '../src/server/emailCopywriter.js';
 import { dispatchAgentNotifications } from '../src/agent/NotificationDispatcher.js';
 import { notifyNewContent, isWhatsAppBridgeConfigured } from '../src/agent/WhatsAppDispatcher.js';
 import type { Platform, ContentFormat, QueueItem } from '../src/agent/types.js';
@@ -205,6 +206,26 @@ export default async function handler(req: any, res: any) {
       const trigger = req.body?.force ? 'force' : 'scheduler';
       const result = await runAutoPublishCycle({ trigger });
       res.status(200).json(result);
+      return;
+    }
+
+    if (action === 'email-generate') {
+      if (!isCopywriterConfigured()) {
+        res.status(200).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { goal, tone, notes, preset } = req.body ?? {};
+      if (typeof goal !== 'string' || !goal.trim()) {
+        res.status(400).json({ ok: false, error: 'missing goal' });
+        return;
+      }
+      const result = await generateEmailCampaign({
+        goal: goal.trim().slice(0, 400),
+        tone: typeof tone === 'string' ? tone.slice(0, 200) : undefined,
+        notes: typeof notes === 'string' ? notes.slice(0, 1200) : undefined,
+        preset: typeof preset === 'string' ? (preset as never) : undefined,
+      });
+      res.status(200).json({ ok: true, ...result });
       return;
     }
 

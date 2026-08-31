@@ -40,6 +40,7 @@ import {
   type VideoScriptInput,
 } from './src/agent/VideoGenerationEngine';
 import { runAutoPublishCycle, dispatchPublish } from './src/server/autoPublish';
+import { generateEmailCampaign, isCopywriterConfigured } from './src/server/emailCopywriter';
 import leadsHandler from './api/leads';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -297,6 +298,26 @@ app.post('/api/agent-generate', async (req: Request, res: Response) => {
       const imageGenerationPrompt = await generateImageGenerationPrompt(platform, topic, body);
       const id = await pushQueueItem({ kind: 'content', platform, format: resolvedFormat, topic, body, carouselSlides: carouselSlides ?? null, hashtags: hashtags ?? null, mediaPreview, imageGenerationPrompt, status: 'pending_approval', security, createdAt: Date.now() });
       res.json({ ok: true, id, body, carouselSlides, hashtags, imageGenerationPrompt, security });
+      return;
+    }
+
+    if (action === 'email-generate') {
+      if (!isCopywriterConfigured()) {
+        res.status(200).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { goal, tone, notes, preset } = req.body ?? {};
+      if (typeof goal !== 'string' || !goal.trim()) {
+        res.status(400).json({ ok: false, error: 'missing goal' });
+        return;
+      }
+      const result = await generateEmailCampaign({
+        goal: goal.trim().slice(0, 400),
+        tone: typeof tone === 'string' ? tone.slice(0, 200) : undefined,
+        notes: typeof notes === 'string' ? notes.slice(0, 1200) : undefined,
+        preset: typeof preset === 'string' ? (preset as never) : undefined,
+      });
+      res.json({ ok: true, ...result });
       return;
     }
 

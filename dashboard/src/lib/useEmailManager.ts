@@ -5,6 +5,7 @@ import { SITE_ORIGIN } from './useDashboardRefresh';
 
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 const API = `${SITE_ORIGIN}/api/leads`;
+const AGENT_API = `${SITE_ORIGIN}/api/agent-generate`;
 
 function authHeaders(): HeadersInit {
   return { 'Content-Type': 'application/json', ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}) };
@@ -138,14 +139,41 @@ export function useEmailManager() {
   }, []);
 
   const sendTest = useCallback(
-    (to: string, subject: string, html: string, extraSections = '') => post({ action: 'send-test', to, subject, html, extraSections }),
+    (to: string, subject: string, html: string, extraSections = '', preheader = '') =>
+      post({ action: 'send-test', to, subject, html, extraSections, preheader }),
     [post]
   );
   /** `recipients` is the exact, already-resolved address list from the picker. */
   const sendCampaign = useCallback(
-    (subject: string, html: string, recipients: string[], extraSections = '') =>
-      post({ action: 'send-campaign', subject, html, audience: 'selection', recipients, extraSections }),
+    (subject: string, html: string, recipients: string[], extraSections = '', preheader = '') =>
+      post({ action: 'send-campaign', subject, html, audience: 'selection', recipients, extraSections, preheader }),
     [post]
+  );
+
+  /** AI email copywriter (Gemini via /api/agent-generate). Returns the full structured result. */
+  const generateEmail = useCallback(
+    async (input: { goal: string; tone?: string; notes?: string; preset?: string }): Promise<{
+      ok: boolean;
+      error?: string;
+      subjectOptions?: string[];
+      preheader?: string;
+      bodyHtml?: string;
+      includeNews?: boolean;
+      includeServices?: boolean;
+      retryAfterSeconds?: number;
+    }> => {
+      try {
+        const res = await fetch(AGENT_API, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'email-generate', ...input }) });
+        if (res.status === 429) {
+          const j = await res.json();
+          return { ok: false, error: j.message ?? 'rate limited', retryAfterSeconds: j.retryAfterSeconds };
+        }
+        return await res.json();
+      } catch {
+        return { ok: false, error: 'network' };
+      }
+    },
+    []
   );
 
   return {
@@ -161,5 +189,6 @@ export function useEmailManager() {
     saveConfig,
     sendTest,
     sendCampaign,
+    generateEmail,
   };
 }

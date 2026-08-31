@@ -163,13 +163,22 @@ function StatCard({ icon: Icon, label, value }: { icon: typeof Users; label: str
   );
 }
 
+const AI_PRESETS: { id: string; label: string; goal: string }[] = [
+  { id: 'digest', label: 'עדכון חודשי לארגונים', goal: 'עדכון טכנולוגי חודשי לארגונים — מגמות, חדשות ושירותים' },
+  { id: 'announcement', label: 'הכרזה על מוצר/שירות', goal: 'הכרזה על שירות סייבר חדש עם יתרונות מרכזיים ו-CTA לתיאום שיחה' },
+  { id: 'insight', label: 'מכתב מומחה / Insight', goal: 'מכתב מומחה מעמיק בנושא סוכני AI אוטונומיים בארגון' },
+];
+const AI_TONES = ['מקצועי-סמכותי', 'ידידותי-נגיש', 'ישיר וחד', 'שיווקי-אנרגטי'];
+
 export default function EmailManagerPanel() {
-  const { templates, config, campaigns, contacts, subscriberCount, leadCount, loaded, saveTemplate, deleteTemplate, saveConfig, sendTest, sendCampaign } =
+  const { templates, config, campaigns, contacts, subscriberCount, leadCount, loaded, saveTemplate, deleteTemplate, saveConfig, sendTest, sendCampaign, generateEmail } =
     useEmailManager();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
+  const [preheader, setPreheader] = useState('');
+  const [subjectOptions, setSubjectOptions] = useState<string[]>([]);
   const [html, setHtml] = useState(STARTER_HTML);
   const [tab, setTab] = useState<'edit' | 'preview'>('preview');
 
@@ -177,11 +186,46 @@ export default function EmailManagerPanel() {
   const [withNews, setWithNews] = useState(false);
   const [newsItems, setNewsItems] = useState<EmailNewsItem[]>([]);
 
+  const [aiOpen, setAiOpen] = useState(true);
+  const [aiGoal, setAiGoal] = useState('');
+  const [aiTone, setAiTone] = useState(AI_TONES[0]);
+  const [aiNotes, setAiNotes] = useState('');
+  const [aiPreset, setAiPreset] = useState<string>('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
+
   const [recipients, setRecipients] = useState<string[]>([]);
   const [testTo, setTestTo] = useState('');
   const [busy, setBusy] = useState<'test' | 'campaign' | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [confirmBlast, setConfirmBlast] = useState(false);
+
+  const runAi = async () => {
+    const goal = (aiGoal.trim() || AI_PRESETS.find((p) => p.id === aiPreset)?.goal || '').trim();
+    if (!goal) {
+      setAiMsg('הזינו מטרה או בחרו תבנית מהירה.');
+      return;
+    }
+    setAiBusy(true);
+    setAiMsg(null);
+    const r = await generateEmail({ goal, tone: aiTone, notes: aiNotes.trim() || undefined, preset: aiPreset || undefined });
+    setAiBusy(false);
+    if (!r.ok || !r.bodyHtml) {
+      setAiMsg(r.retryAfterSeconds ? `מגבלת API — נסו שוב בעוד ${r.retryAfterSeconds}s` : `הפקה נכשלה: ${r.error ?? ''}`);
+      return;
+    }
+    const opts = r.subjectOptions ?? [];
+    setSubject(opts[0] ?? goal);
+    setSubjectOptions(opts.slice(1));
+    setPreheader(r.preheader ?? '');
+    setHtml(r.bodyHtml);
+    setWithServices(Boolean(r.includeServices));
+    setWithNews(Boolean(r.includeNews));
+    setEditingId(null);
+    setName(name || goal.slice(0, 40));
+    setTab('preview');
+    setAiMsg('נוצר ✓ — ערכו והתאימו לפני שמירה/שליחה.');
+  };
 
   useEffect(() => {
     if (!withNews || newsItems.length) return;
@@ -225,7 +269,7 @@ export default function EmailManagerPanel() {
     if (!testTo || !subject.trim() || !html.trim()) return;
     setBusy('test');
     setMsg(null);
-    const r = await sendTest(testTo.trim(), subject.trim(), html, extraSections);
+    const r = await sendTest(testTo.trim(), subject.trim(), html, extraSections, preheader);
     setMsg(r.ok ? 'מייל בדיקה נשלח ✓' : `שליחה נכשלה: ${r.error ?? ''}`);
     setBusy(null);
   };
@@ -237,7 +281,7 @@ export default function EmailManagerPanel() {
     }
     setBusy('campaign');
     setMsg(null);
-    const r = await sendCampaign(subject.trim(), html, recipients, extraSections);
+    const r = await sendCampaign(subject.trim(), html, recipients, extraSections, preheader);
     setMsg(r.ok ? `נשלח ל-${r.sent}/${r.total} נמענים` : `נשלח חלקית: ${r.sent ?? 0}/${r.total ?? 0} · ${r.error ?? ''}`);
     setBusy(null);
     setConfirmBlast(false);
@@ -294,6 +338,53 @@ export default function EmailManagerPanel() {
         </div>
       </div>
 
+      {/* AI email generator */}
+      <div className="dash-card p-6">
+        <button onClick={() => setAiOpen((v) => !v)} className="flex items-center gap-2 text-zinc-300 text-xs font-mono uppercase tracking-wider mb-4 cursor-pointer">
+          <Sparkles className="w-4 h-4 text-brand-400" /> מחולל מייל / קמפיין עם AI
+          {aiOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+        {aiOpen && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {AI_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => { setAiPreset(p.id); if (!aiGoal.trim()) setAiGoal(p.goal); }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold cursor-pointer ${
+                    aiPreset === p.id ? 'bg-brand-500 text-black' : 'bg-white/5 text-zinc-400 border border-white/10 hover:text-white'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              {aiPreset && (
+                <button onClick={() => setAiPreset('')} className="text-[11px] text-zinc-500 hover:text-white cursor-pointer">נקה תבנית</button>
+              )}
+            </div>
+            <input value={aiGoal} onChange={(e) => setAiGoal(e.target.value)} placeholder="מטרת / נושא המייל (למשל: השקת שירות סייבר חדש)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600" />
+            <div className="flex flex-wrap gap-2">
+              {AI_TONES.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setAiTone(t)}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-bold cursor-pointer ${aiTone === t ? 'bg-brand-500/20 border border-brand-500/50 text-brand-300' : 'bg-white/5 border border-white/10 text-zinc-400'}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <textarea value={aiNotes} onChange={(e) => setAiNotes(e.target.value)} rows={2} placeholder="הערות נוספות (אופציונלי) — נקודות שחייבות להיכנס, הצעה מיוחדת, קהל יעד..." className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 resize-y" />
+            <div className="flex items-center gap-3 flex-wrap">
+              <button onClick={runAi} disabled={aiBusy} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand-500 text-black text-sm font-bold cursor-pointer disabled:opacity-50">
+                {aiBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} צור מייל עם AI
+              </button>
+              {aiMsg && <span className="text-[11px] text-zinc-400">{aiMsg}</span>}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {/* Builder */}
         <div className="dash-card p-6">
@@ -322,6 +413,21 @@ export default function EmailManagerPanel() {
           <div className="space-y-3">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="שם התבנית (פנימי)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600" />
             <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="נושא המייל" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600" />
+            {subjectOptions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {subjectOptions.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSubject(s)}
+                    title="השתמש בשורת נושא זו"
+                    className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-400 hover:text-brand-300 hover:border-brand-500/40 cursor-pointer"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            <input value={preheader} onChange={(e) => setPreheader(e.target.value)} placeholder="Pre-header / טקסט teaser (מופיע לצד הנושא בתיבת הדואר)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[13px] text-zinc-300 placeholder-zinc-600" />
 
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">

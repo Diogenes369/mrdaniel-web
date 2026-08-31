@@ -123,7 +123,7 @@ export default async function handler(req: any, res: any) {
         res.status(400).json({ ok: false, error: 'need valid to / subject / html' });
         return;
       }
-      const html = body.wrap === false ? rawHtml : wrapBrandedEmail(rawHtml, { title: subject, preheader: subject, extraSections });
+      const html = body.wrap === false ? rawHtml : wrapBrandedEmail(rawHtml, { title: subject, preheader: (typeof body.preheader === 'string' && body.preheader.trim()) || subject, extraSections });
       res.status(200).json(await sendOne({ to, subject: `[בדיקה] ${subject}`, html }));
       return;
     }
@@ -154,7 +154,7 @@ export default async function handler(req: any, res: any) {
       recipients = [...new Set([...nl, ...ld, ...explicit])];
     }
     const extraSections = typeof body.extraSections === 'string' ? body.extraSections : '';
-    const html = body.wrap === false ? rawHtml : wrapBrandedEmail(rawHtml, { title: subject, preheader: subject, extraSections });
+    const html = body.wrap === false ? rawHtml : wrapBrandedEmail(rawHtml, { title: subject, preheader: (typeof body.preheader === 'string' && body.preheader.trim()) || subject, extraSections });
     const result = await sendCampaign({ subject, html, recipients });
     await recordEmailCampaign({
       subject,
