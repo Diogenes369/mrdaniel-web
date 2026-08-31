@@ -118,11 +118,12 @@ export default async function handler(req: any, res: any) {
       const to = String(body.to ?? '');
       const subject = String(body.subject ?? '').trim();
       const rawHtml = String(body.html ?? '');
+      const extraSections = typeof body.extraSections === 'string' ? body.extraSections : '';
       if (!isEmail(to) || !subject || !rawHtml) {
         res.status(400).json({ ok: false, error: 'need valid to / subject / html' });
         return;
       }
-      const html = body.wrap === false ? rawHtml : wrapBrandedEmail(rawHtml, { title: subject });
+      const html = body.wrap === false ? rawHtml : wrapBrandedEmail(rawHtml, { title: subject, preheader: subject, extraSections });
       res.status(200).json(await sendOne({ to, subject: `[בדיקה] ${subject}`, html }));
       return;
     }
@@ -134,14 +135,26 @@ export default async function handler(req: any, res: any) {
       res.status(400).json({ ok: false, error: 'need subject / html' });
       return;
     }
-    const audience = String(body.audience ?? 'newsletter'); // newsletter | leads | all
-    const [nl, ld] = await Promise.all([
-      audience === 'leads' ? Promise.resolve<string[]>([]) : readNewsletterEmails(),
-      audience === 'newsletter' ? Promise.resolve<string[]>([]) : readLeadEmails(),
-    ]);
-    const extra = Array.isArray(body.extraRecipients) ? (body.extraRecipients as unknown[]).filter(isEmail) : [];
-    const recipients = [...new Set([...nl, ...ld, ...extra])];
-    const html = body.wrap === false ? rawHtml : wrapBrandedEmail(rawHtml, { title: subject, preheader: subject });
+    const audience = String(body.audience ?? 'newsletter'); // newsletter | leads | all | selection
+    const explicit = Array.isArray(body.recipients)
+      ? (body.recipients as unknown[]).filter(isEmail)
+      : Array.isArray(body.extraRecipients)
+        ? (body.extraRecipients as unknown[]).filter(isEmail)
+        : [];
+
+    let recipients: string[];
+    if (audience === 'selection') {
+      // The dashboard's recipient picker already resolved the exact address list.
+      recipients = [...new Set(explicit)];
+    } else {
+      const [nl, ld] = await Promise.all([
+        audience === 'leads' ? Promise.resolve<string[]>([]) : readNewsletterEmails(),
+        audience === 'newsletter' ? Promise.resolve<string[]>([]) : readLeadEmails(),
+      ]);
+      recipients = [...new Set([...nl, ...ld, ...explicit])];
+    }
+    const extraSections = typeof body.extraSections === 'string' ? body.extraSections : '';
+    const html = body.wrap === false ? rawHtml : wrapBrandedEmail(rawHtml, { title: subject, preheader: subject, extraSections });
     const result = await sendCampaign({ subject, html, recipients });
     await recordEmailCampaign({
       subject,

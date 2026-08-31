@@ -23,3 +23,11 @@ export async function fetchLatestNewsItem(category: NewsCategory): Promise<NewsI
 export function proxiedImageUrl(url: string): string {
   return `${SITE_ORIGIN}/api/img-proxy?url=${encodeURIComponent(url)}`;
 }
+
+/** The N newest items overall — for the email "featured articles" block. */
+export async function fetchTopNews(n = 3): Promise<NewsItem[]> {
+  const res = await fetch(`${SITE_ORIGIN}/api/news`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`news feed responded ${res.status}`);
+  const data = (await res.json()) as { items?: NewsItem[] };
+  return (Array.isArray(data.items) ? data.items : []).slice(0, n);
+}

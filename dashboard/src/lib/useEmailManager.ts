@@ -35,18 +35,41 @@ export interface CampaignRun {
   ts: number;
 }
 
+export interface Contact {
+  id: string;
+  email: string;
+  name: string;
+  kind: 'lead' | 'newsletter';
+  ts: number;
+}
+
 const DEFAULT_CONFIG: EmailConfig = { autoWelcome: false, welcomeTemplateId: '', fromName: 'דניאל בן ברוך' };
 
 function sanitizeKey(s: string): string {
   return s.replace(/[.#$/[\]\s]/g, '_').slice(0, 60) || `tpl_${Date.now()}`;
 }
 
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+function toContacts(raw: unknown, kind: Contact['kind']): Contact[] {
+  if (!raw || typeof raw !== 'object') return [];
+  return Object.entries(raw as Record<string, any>)
+    .map(([id, v]) => ({
+      id,
+      email: String(v?.email ?? '').trim().toLowerCase(),
+      name: String(v?.name ?? '').trim(),
+      kind,
+      ts: Number(v?.ts ?? v?.createdAt ?? 0),
+    }))
+    .filter((c) => EMAIL_RE.test(c.email));
+}
+
 export function useEmailManager() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [config, setConfig] = useState<EmailConfig>(DEFAULT_CONFIG);
   const [campaigns, setCampaigns] = useState<CampaignRun[]>([]);
-  const [subscriberCount, setSubscriberCount] = useState(0);
-  const [leadCount, setLeadCount] = useState(0);
+  const [newsletterContacts, setNewsletterContacts] = useState<Contact[]>([]);
+  const [leadContacts, setLeadContacts] = useState<Contact[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -69,11 +92,22 @@ export function useEmailManager() {
         const val = (snap.val() ?? {}) as Record<string, Omit<CampaignRun, 'id'>>;
         setCampaigns(Object.entries(val).map(([id, c]) => ({ id, ...c })).sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0)));
       }),
-      onValue(ref(db, 'newsletter_signups'), (snap) => setSubscriberCount(snap.size)),
-      onValue(ref(db, 'leads'), (snap) => setLeadCount(snap.size)),
+      onValue(dbQuery(ref(db, 'newsletter_signups'), limitToLast(1000)), (snap) => setNewsletterContacts(toContacts(snap.val(), 'newsletter'))),
+      onValue(dbQuery(ref(db, 'leads'), limitToLast(1000)), (snap) => setLeadContacts(toContacts(snap.val(), 'lead'))),
     ];
     return () => offs.forEach((o) => o());
   }, []);
+
+  /** De-duplicated by email — a newsletter subscriber who is also a lead appears once (as lead). */
+  const contacts = useMemo<Contact[]>(() => {
+    const byEmail = new Map<string, Contact>();
+    for (const c of newsletterContacts) byEmail.set(c.email, c);
+    for (const c of leadContacts) byEmail.set(c.email, c); // lead wins the label
+    return [...byEmail.values()].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0));
+  }, [newsletterContacts, leadContacts]);
+
+  const subscriberCount = newsletterContacts.length;
+  const leadCount = leadContacts.length;
 
   const saveTemplate = useCallback((tpl: { id?: string; name: string; subject: string; html: string }) => {
     if (!db) return '';
@@ -104,27 +138,23 @@ export function useEmailManager() {
   }, []);
 
   const sendTest = useCallback(
-    (to: string, subject: string, html: string) => post({ action: 'send-test', to, subject, html }),
+    (to: string, subject: string, html: string, extraSections = '') => post({ action: 'send-test', to, subject, html, extraSections }),
     [post]
   );
+  /** `recipients` is the exact, already-resolved address list from the picker. */
   const sendCampaign = useCallback(
-    (subject: string, html: string, audience: 'newsletter' | 'leads' | 'all', extraRecipients: string[] = []) =>
-      post({ action: 'send-campaign', subject, html, audience, extraRecipients }),
+    (subject: string, html: string, recipients: string[], extraSections = '') =>
+      post({ action: 'send-campaign', subject, html, audience: 'selection', recipients, extraSections }),
     [post]
-  );
-
-  const audienceSize = useMemo(
-    () => ({ newsletter: subscriberCount, leads: leadCount, all: subscriberCount + leadCount }),
-    [subscriberCount, leadCount]
   );
 
   return {
     templates,
     config,
     campaigns,
+    contacts,
     subscriberCount,
     leadCount,
-    audienceSize,
     loaded,
     saveTemplate,
     deleteTemplate,
