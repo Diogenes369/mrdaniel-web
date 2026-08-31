@@ -73,11 +73,16 @@ src/
 │   ├── seo/pageSeo.ts       # קונפיג SEO לכל route
 │   └── structuredData.ts    # בוני JSON-LD
 ├── services/
-│   ├── newsService.ts       # useNewsFeed → /api/news (עברית: Geektime, pc.co.il, Techtime…)
+│   ├── newsService.ts       # useNewsFeed → /api/news (Geektime, TechTime, גלובס, ynet, Israel Defense, Google News)
 │   ├── aiNewsService.ts     # useAINewsFeed → /api/ai-news (YouTube AI)
 │   └── aiPulseService.ts    # useAIPulse → rss2json (TechCrunch/VentureBeat/HN)
 ├── server/                  # קוד שרת משותף (לא React) — נצרך מ-/api ומ-server.ts
-│   ├── newsFeed.ts          # אגרגציית RSS, extractImage (enclosure/media/<img>)
+│   ├── newsFeed.ts          # אגרגציית RSS רב-מקורית: SOURCES עם priority/timeoutMs/onlyTopics,
+│   │                        #   withTimeout לכל פיד, extractImage (enclosure/media:*/itunes/<img>),
+│   │                        #   classifyTopic (cyber/ai/cloud/general) + deriveCategory (תג עברי:
+│   │                        #   סייבר/בינה מלאכותית/ענן ותשתיות/כלכלה/טכנולוגיה), dedupe חוצה-מקורות
+│   │                        #   (לפי קישור קנוני + כותרת מנורמלת, שומר את המקור בעדיפות הגבוהה).
+│   │                        #   Calcalist מגיע רק דרך Google News (ה-RSS שלו מחזיר 403).
 │   ├── aiNewsFeed.ts
 │   ├── newsPostComposer.ts  # מחבר קופי ארוך (Hook→מה קרה→למה חשוב→עיקרי הדברים→מומחה→#→footer)
 │   ├── storySlides.ts       # פירוק פריט חדשות ל-4 שקופיות סטורי (טקסט בלבד)

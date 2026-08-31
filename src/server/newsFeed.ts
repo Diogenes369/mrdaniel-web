@@ -23,30 +23,53 @@ export interface NewsItem {
 interface FeedSource {
   name: string;
   url: string;
+  /** Lower = higher priority when the same story surfaces in more than one feed (see `dedupe`). */
+  priority: number;
+  /** Per-feed hard cap so one slow/hanging outlet can't stall `/api/news`. Default 8s. */
+  timeoutMs?: number;
   /** Google News RSS titles are formatted "Headline - Publisher" — when set, that suffix is
    * split off so the article's real outlet shows in the source badge (and `category` fallback)
    * instead of the generic aggregator name, and doesn't linger inside the displayed headline. */
   stripTitleSuffix?: boolean;
+  /** Single-topic feeds (e.g. Israel Defense) can pin their display category directly. */
+  defaultCategory?: string;
+  /** Keep only items whose classified `topic` is in this list. Used for broad-mandate outlets
+   * (Israel Defense carries naval / air / ground stories too) so the feed contributes only the
+   * slice that's on-topic for this site — its cyber coverage — instead of military noise. */
+  onlyTopics?: NewsTopic[];
 }
 
-// Real Israeli Hebrew tech/cyber outlets — matches the sources named in CyberNewsGrid's copy. The
-// last entry is a Google News RSS search for Hebrew cloud-computing coverage (aggregated from
-// Globes, TheMarker, ynet, etc.) — the four named outlets above are general tech/cyber/business
-// press and rarely cover cloud-provider news specifically, so without a dedicated source the
-// "cloud" topic filter had nothing reliable to populate it with.
+// Aggregated Israeli tech / AI / cyber / economy coverage. Native RSS from each outlet first, with
+// a Google-News search as a safety net so one 404'd feed never leaves a gap. Ordered by dedup
+// priority: the outlets we most want to attribute a shared story to come first.
+const GNEWS_QUERY = '(טכנולוגיה OR סייבר OR "בינה מלאכותית" OR הייטק OR סטארטאפ) when:14d';
+const GNEWS_URL = `https://news.google.com/rss/search?q=${encodeURIComponent(GNEWS_QUERY)}&hl=iw&gl=IL&ceid=IL:iw`;
+
 const SOURCES: FeedSource[] = [
-  { name: 'Geektime', url: 'https://www.geektime.co.il/feed/' },
-  { name: 'אנשים ומחשבים', url: 'https://www.pc.co.il/feed/' },
-  { name: 'Techtime', url: 'https://techtime.co.il/feed/' },
-  { name: 'Israel Defense', url: 'https://www.israeldefense.co.il/rss.xml' },
-  {
-    // `when:30d` keeps this aligned with the "daily update" framing elsewhere on the site —
-    // without it, Google News' relevance ranking surfaces results going back to 2010.
-    name: 'Google News',
-    url: 'https://news.google.com/rss/search?q=%22%D7%9E%D7%97%D7%A9%D7%95%D7%91%20%D7%A2%D7%A0%D7%9F%22%20when:30d&hl=iw&gl=IL&ceid=IL:iw',
-    stripTitleSuffix: true,
-  },
+  { name: 'Geektime', url: 'https://www.geektime.co.il/feed/', priority: 1 },
+  { name: 'TechTime', url: 'https://techtime.co.il/feed/', priority: 1 },
+  { name: 'גלובס', url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=1725', priority: 2, timeoutMs: 9000 },
+  { name: 'ynet דיגיטל', url: 'https://www.ynet.co.il/Integration/StoryRss544.xml', priority: 2, timeoutMs: 9000 },
+  { name: 'Israel Defense', url: 'https://www.israeldefense.co.il/rss.xml', priority: 3, onlyTopics: ['cyber'] },
+  // Fallback aggregator — fills gaps from any Israeli outlet whose native feed failed above, and
+  // is the sole path for Calcalist (כלכליסט), whose own RSS endpoints all return 403 to
+  // non-browser clients (server-side bot block, not a bad URL).
+  { name: 'Google News', url: GNEWS_URL, priority: 6, stripTitleSuffix: true, timeoutMs: 9000 },
 ];
+
+const PER_FEED_ITEM_CAP = 30;
+
+/** Rejects a source promise if it hasn't settled within `ms` — so `Promise.allSettled` in
+ * `refreshAll` never waits on a hanging outlet longer than its own cap. */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    p.finally(() => clearTimeout(timer)),
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} feed timed out after ${ms}ms`)), ms);
+    }),
+  ]);
+}
 
 const CACHE_TTL_MS = 45 * 60 * 1000;
 
@@ -74,16 +97,23 @@ const parser = new Parser({
   },
 });
 
-/** Best-effort lead-image recovery from a feed item: <enclosure>, then media:thumbnail, then the
- * first image in media:content, then the first inline <img> in the item's HTML body. Returns an
- * absolute http(s) URL (protocol-relative `//host/…` is upgraded to https) or undefined. */
+// Feed-plumbing / tracking artefacts that show up as "images" but aren't editorial photos.
+const JUNK_IMAGE_RE =
+  /(feedburner|feedsportal|feeds\.wordpress|doubleclick|googlesyndication|scorecardresearch|\/pixel|pixel\.|1x1|blank\.(gif|png)|spacer\.(gif|png)|gravatar\.com\/avatar\/0{16}|\/wp-includes\/images\/)/i;
+
+/** Best-effort lead-image recovery, tried in order across every feed shape we've seen from the
+ * Israeli outlets: <enclosure>, media:thumbnail, media:content / media:group, itunes:image, and
+ * finally the first real <img>/<img data-src> inside the item body (contentEncoded / content /
+ * summary / description). Protocol-relative `//host/…` is upgraded to https; obvious tracking
+ * pixels and feed chrome are skipped. Returns an absolute http(s) URL or undefined. */
 function extractImage(item: Record<string, any>): string | undefined {
   const normalize = (u: unknown): string | undefined => {
     if (typeof u !== 'string') return undefined;
-    const trimmed = u.trim();
-    if (trimmed.startsWith('//')) return `https:${trimmed}`;
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    return undefined;
+    let s = u.trim().replace(/&amp;/g, '&');
+    if (s.startsWith('//')) s = `https:${s}`;
+    if (!/^https?:\/\//i.test(s)) return undefined;
+    if (JUNK_IMAGE_RE.test(s)) return undefined;
+    return s;
   };
 
   const enc = item.enclosure;
@@ -92,25 +122,32 @@ function extractImage(item: Record<string, any>): string | undefined {
     if (u) return u;
   }
 
-  const thumb = normalize(item.mediaThumbnail?.$?.url);
+  const thumb = normalize(item.mediaThumbnail?.$?.url ?? item.mediaThumbnail?.url);
   if (thumb) return thumb;
 
-  const mc = Array.isArray(item.mediaContent) ? item.mediaContent : item.mediaContent ? [item.mediaContent] : [];
+  const group = item['media:group'];
+  const mcRaw = item.mediaContent ?? group?.['media:content'] ?? group?.mediaContent;
+  const mc = Array.isArray(mcRaw) ? mcRaw : mcRaw ? [mcRaw] : [];
   for (const m of mc) {
-    const attrs = m?.$ ?? {};
+    const attrs = m?.$ ?? m ?? {};
+    const url = attrs.url ?? attrs.href;
     const isImage =
       attrs.medium === 'image' ||
       (typeof attrs.type === 'string' && attrs.type.startsWith('image/')) ||
-      (typeof attrs.url === 'string' && /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(attrs.url));
+      (typeof url === 'string' && /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(url));
     if (isImage) {
-      const u = normalize(attrs.url);
+      const u = normalize(url);
       if (u) return u;
     }
   }
 
-  const html = String(item.contentEncoded || item.content || '');
-  const m = /<img[^>]+src=["']([^"']+)["']/i.exec(html);
-  if (m) {
+  const itunes = normalize(item.itunes?.image ?? item['itunes:image']?.$?.href);
+  if (itunes) return itunes;
+
+  const html = String(item.contentEncoded || item.content || item.summary || item['content:encoded'] || '');
+  const imgRe = /<img[^>]+(?:data-src|src)=["']([^"'\s]+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = imgRe.exec(html))) {
     const u = normalize(m[1]);
     if (u) return u;
   }
@@ -148,6 +185,70 @@ function classifyTopic(text: string): NewsTopic {
   if (AI_PATTERNS.some((re) => re.test(text))) return 'ai';
   if (CLOUD_PATTERNS.some((re) => re.test(text))) return 'cloud';
   return 'general';
+}
+
+// Business/finance signals — used only to refine the DISPLAY `category` label (kept as a free
+// string), NOT the `topic` enum that the site's category filters run on.
+const ECONOMY_PATTERNS = [
+  /גיוס(\s|$)/, /גיוס הון/, /הנפק(ה|ת)/, /מיזוג/, /רכישת חברה/, /נרכשה/, /שווי חברה/, /הון סיכון/,
+  /קרן(ות)? הון/, /אקזיט/, /בורסה/, /מנייה|מניה|מניות/, /רבעון/, /דוחות כספיים/, /הכנסות/, /רווח נקי/,
+  /\bIPO\b/i, /\bVC\b/, /\bM&A\b/i, /valuation/i, /funding round/i, /\bseed\b/i, /series [a-e]\b/i, /raised \$/i,
+];
+
+/** Clean Hebrew display tag: סייבר / בינה מלאכותית / ענן ותשתיות / כלכלה / טכנולוגיה. */
+function deriveCategory(topic: NewsTopic, text: string): string {
+  if (topic === 'cyber') return 'סייבר';
+  if (topic === 'ai') return 'בינה מלאכותית';
+  if (topic === 'cloud') return 'ענן ותשתיות';
+  if (ECONOMY_PATTERNS.some((re) => re.test(text))) return 'כלכלה';
+  return 'טכנולוגיה';
+}
+
+/** Normalised headline key for cross-source de-duplication. */
+function normTitle(t: string): string {
+  return t
+    .toLowerCase()
+    .replace(/["'׳״“”‘’.,:;!?()\[\]{}\-–—|/\\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 70);
+}
+
+/** host + path, no protocol / www / trailing slash / query — same article at different trackers. */
+function canonicalLink(link: string): string {
+  try {
+    const u = new URL(link);
+    return `${u.hostname.replace(/^www\./, '')}${u.pathname.replace(/\/+$/, '')}`.toLowerCase();
+  } catch {
+    return link.toLowerCase();
+  }
+}
+
+/** Drops duplicate stories across feeds. Keeps the copy from the highest-priority source (then the
+ * newest), so a story that Geektime and Google News both carry is attributed to Geektime. */
+function dedupe(items: NewsItem[], priorityOf: (source: string) => number): NewsItem[] {
+  const isAggregatorLink = (l: string) => /(^|\.)news\.google\.com/i.test(l);
+  const sorted = [...items].sort((a, b) => {
+    const p = priorityOf(a.source) - priorityOf(b.source);
+    if (p !== 0) return p;
+    // Same outlet via two feeds: keep the direct article link, not a Google-News redirect.
+    const agg = Number(isAggregatorLink(a.link)) - Number(isAggregatorLink(b.link));
+    if (agg !== 0) return agg;
+    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+  });
+  const seenTitle = new Set<string>();
+  const seenLink = new Set<string>();
+  const out: NewsItem[] = [];
+  for (const it of sorted) {
+    const tk = normTitle(it.title);
+    const lk = canonicalLink(it.link);
+    if (seenLink.has(lk)) continue;
+    if (tk.length > 10 && seenTitle.has(tk)) continue;
+    seenLink.add(lk);
+    if (tk.length > 10) seenTitle.add(tk);
+    out.push(it);
+  }
+  return out;
 }
 
 const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
@@ -202,13 +303,13 @@ function buildSlug(title: string, link: string): string {
 const TITLE_SUFFIX_RE = /\s-\s([^-]+)$/;
 
 async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
-  const feed = await parser.parseURL(source.url);
+  const feed = await withTimeout(parser.parseURL(source.url), source.timeoutMs ?? 8000, source.name);
   const items: NewsItem[] = [];
 
   for (const item of feed.items ?? []) {
     let title = (item.title ?? '').trim();
     const link = item.link ?? '';
-    if (!title || !link) continue;
+    if (!title || !link || !/^https?:\/\//i.test(link)) continue;
 
     let sourceName = source.name;
     if (source.stripTitleSuffix) {
@@ -221,7 +322,9 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
 
     const summary = cleanText(item.contentSnippet || item.content, title) || title;
     const categories = item.categories ?? [];
-    const topic = classifyTopic(`${title} ${summary} ${categories.join(' ')}`);
+    const classifierText = `${title} ${summary} ${categories.join(' ')}`;
+    const topic = classifyTopic(classifierText);
+    if (source.onlyTopics && !source.onlyTopics.includes(topic)) continue;
     const publishedAt = item.isoDate || (item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString());
     const slug = buildSlug(title, link);
 
@@ -229,7 +332,7 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
       id: slug,
       slug,
       source: sourceName,
-      category: categories[0] || sourceName,
+      category: source.defaultCategory ?? deriveCategory(topic, classifierText),
       topic,
       title,
       link,
@@ -240,25 +343,35 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
     });
   }
 
-  return items;
+  return items.slice(0, PER_FEED_ITEM_CAP);
 }
 
 let cache: { items: NewsItem[]; fetchedAt: number } | null = null;
 let inFlight: Promise<NewsItem[]> | null = null;
 
 async function refreshAll(): Promise<NewsItem[]> {
+  const priorityByName = new Map(SOURCES.map((s) => [s.name, s.priority]));
+  const priorityOf = (name: string) => priorityByName.get(name) ?? 9;
+
   const results = await Promise.allSettled(SOURCES.map(fetchSource));
-  const items: NewsItem[] = [];
+  const raw: NewsItem[] = [];
+  const stats: string[] = [];
 
   results.forEach((result, idx) => {
     if (result.status === 'fulfilled') {
-      items.push(...result.value);
+      raw.push(...result.value);
+      stats.push(`${SOURCES[idx].name}:${result.value.length}`);
     } else {
+      stats.push(`${SOURCES[idx].name}:FAIL`);
       console.error(`[news] failed to fetch ${SOURCES[idx].name}:`, result.reason?.message ?? result.reason);
     }
   });
 
-  items.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  const items = dedupe(raw, priorityOf).sort(
+    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+  );
+  console.info(`[news] refreshed — ${items.length} items after dedup (${raw.length} raw) · ${stats.join(' ')}`);
+
   cache = { items, fetchedAt: Date.now() };
   return items;
 }
