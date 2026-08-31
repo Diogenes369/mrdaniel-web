@@ -225,26 +225,88 @@ body::before {
   background-size: 8px 8px;
 }
 
-/* Bento tile decoration for the Services section: a soft two-tone mesh wash (brand green from the
-   top-start corner, electric-blue from the bottom-end) plus a faint SVG grain, painted on an
-   `::after` so it sits above the glass fill but below the content. The host element must be
-   `position: relative` + `overflow-hidden`; `rounded` radius is inherited. */
-.bento-mesh::after {
+/* ── Unified frosted cyber-glass card system ─────────────────────────────────────────────────
+   ONE surface language for every homepage card. `.cyber-glass` is the frost: zinc-950/60 fill,
+   blur-xl, a hairline border, plus a radius-inherited mesh-glow + fine grain on `::before` and a
+   specular top edge on `::after`. Both pseudo-layers sit at `z-index:-1` — above the fill, below
+   the card's content — so NO `relative z-10` content wrapper is needed; `isolation:isolate`
+   keeps them contained. Modifiers set intent:
+     --marketing : vivid green/cyan glow, lifts + brightens on hover (Offers, Services)
+     --flagship  : --marketing with a stronger bloom (the large Services tiles)
+     --info      : restrained, no hover motion, maximum text contrast (ROI, News)
+   These rules are UNLAYERED so they beat Tailwind utilities — do not also put `border-*` /
+   `bg-*` / `backdrop-blur-*` / hover-`shadow-*` utilities on a `.cyber-glass` element; use the
+   modifiers. Radius and padding come from the element's own `rounded-*` / `p-*`. ── */
+.cyber-glass {
+  position: relative;
+  isolation: isolate;
+  background-color: rgba(9, 9, 11, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.cyber-glass::before {
   content: '';
   position: absolute;
   inset: 0;
+  z-index: -1;
   border-radius: inherit;
   pointer-events: none;
   background-image:
-    radial-gradient(58% 78% at 12% 0%, rgba(118, 185, 0, 0.16), transparent 72%),
-    radial-gradient(52% 64% at 100% 100%, rgba(56, 189, 248, 0.10), transparent 70%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+    radial-gradient(62% 80% at 14% 0%, rgba(118, 185, 0, 0.11), transparent 72%),
+    radial-gradient(54% 66% at 100% 100%, rgba(56, 189, 248, 0.07), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='cg'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23cg)' opacity='0.28'/%3E%3C/svg%3E");
   background-size: 100% 100%, 100% 100%, 140px 140px;
-  opacity: 0.9;
-  transition: opacity 0.3s ease;
+  opacity: 0.8;
+  transition: opacity 0.35s ease;
 }
-.bento-mesh:hover::after {
+.cyber-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 20%);
+}
+
+.cyber-glass--marketing {
+  border-color: rgba(118, 185, 0, 0.22);
+  box-shadow: 0 0 40px -22px rgba(118, 185, 0, 0.4);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, background-color 0.3s ease;
+}
+.cyber-glass--marketing:hover {
+  border-color: rgba(118, 185, 0, 0.5);
+  box-shadow: 0 0 60px -14px rgba(118, 185, 0, 0.55);
+  transform: translateY(-3px);
+  background-color: rgba(9, 9, 11, 0.5);
+}
+.cyber-glass--marketing:hover::before {
   opacity: 1;
+}
+
+.cyber-glass--flagship {
+  border-color: rgba(118, 185, 0, 0.32);
+  box-shadow: 0 0 52px -16px rgba(118, 185, 0, 0.5);
+}
+.cyber-glass--flagship:hover {
+  border-color: rgba(118, 185, 0, 0.6);
+  box-shadow: 0 0 72px -12px rgba(118, 185, 0, 0.68);
+}
+
+.cyber-glass--info {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.cyber-glass--info:hover {
+  border-color: rgba(118, 185, 0, 0.3);
+}
+.cyber-glass--info::before {
+  background-image:
+    radial-gradient(64% 72% at 50% 0%, rgba(118, 185, 0, 0.05), transparent 74%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='cg'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23cg)' opacity='0.24'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 140px 140px;
+  opacity: 0.7;
 }
 
 /* Footer's subtle geometric grid accent — faint green grid lines, masked to fade toward the

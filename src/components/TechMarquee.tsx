@@ -50,7 +50,7 @@ const STACK: Tech[] = [
   {
     name: 'Fortinet',
     icon: ShieldHalf,
-    detail: 'חומות אש ארגוניות (FortiGate), ניתוב VLAN, SSL-VPN וניהול איומים מאוחד (UTM).',
+    detail: 'חומות אש מתקדמות (FortiGate), ניתוב VLAN, SSL-VPN וניהול איומים מאוחד (UTM).',
   },
   {
     name: 'Entra ID / AD',
@@ -60,7 +60,7 @@ const STACK: Tech[] = [
   {
     name: 'Microsoft 365',
     icon: Grid3x3,
-    detail: 'ניהול טננט ענן ארגוני, זרימת דואר ב-Exchange Online, אבטחת Defender ותאימות.',
+    detail: 'ניהול סביבת ענן, זרימת דואר ב-Exchange Online, אבטחת Defender ותאימות.',
   },
   {
     name: 'PowerShell',

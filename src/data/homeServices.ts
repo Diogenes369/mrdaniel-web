@@ -6,7 +6,7 @@ import { Bot, BrainCircuit, Globe, Palette, Database, Workflow, ServerCog, type 
  *
  * `span` carries the desktop (lg+) bento placement as Tailwind classes; below `lg` every tile
  * falls back to a plain 1-col / 2-col cell, and on phones the whole grid becomes a snap carousel.
- * `flagship` tiles get the neon border, glow, mesh texture, a badge and the bullet list.
+ * `flagship` tiles get the stronger cyber-glass bloom and the bullet list.
  */
 export interface ServiceEntry {
   id: string;
@@ -17,7 +17,6 @@ export interface ServiceEntry {
   points?: string[];
   to: string;
   flagship?: boolean;
-  badge?: string;
   /** lg+ bento span. Grid is `lg:grid-cols-6`, rows `auto-rows-[minmax(184px,1fr)]`. */
   span: string;
 }
@@ -28,11 +27,10 @@ export const SERVICES: ServiceEntry[] = [
     icon: Bot,
     title: 'מערכת JARVIS',
     blurb:
-      'עוזר AI אוטונומי בעברית מלאה שמתחבר למיילים, ליומן ול-CRM ומריץ תהליכים שלמים — בפקודה קולית או בטקסט. כמו שכיר בכיר, בלי המשכורת.',
+      'עוזר AI אוטונומי בעברית מלאה שמתחבר למיילים, ליומן ול-CRM ומריץ תהליכים שלמים — בפקודה קולית או בטקסט. כמו עובד בכיר, בלי המשכורת.',
     points: ['מבצע פעולות אמת מול המערכות שלכם', 'זוכר הקשר ולומד את דפוסי העבודה', 'הרשאות, לוגים ובקרת גישה מלאה'],
     to: '/jarvis',
     flagship: true,
-    badge: 'מערכת דגל',
     span: 'lg:col-span-3 lg:row-span-2',
   },
   {
@@ -44,19 +42,17 @@ export const SERVICES: ServiceEntry[] = [
     points: ['מתחבר למקורות הנתונים שלכם', 'Human-in-the-loop בנקודות ההכרעה', 'ROI נמדד לכל תהליך'],
     to: '/ai',
     flagship: true,
-    badge: 'הכי מבוקש',
     span: 'lg:col-span-3',
   },
   {
-    id: 'enterprise-it',
+    id: 'fullstack-it',
     icon: ServerCog,
-    title: 'מעטפת IT ארגונית (Full-Stack)',
+    title: 'פיתוח ותשתית Full-Stack',
     blurb:
       'גורם אחד אחראי על כל הסטאק — פיתוח, ענן, סייבר ואינטגרציות — במקום לתאם בין חמישה ספקים שמאשימים זה את זה.',
-    points: ['ארכיטקטורת ענן ותשתית-כקוד', 'אבטחת Zero-Trust מקצה לקצה', 'DevOps, ניטור ו-SLA'],
+    points: ['ארכיטקטורת ענן ותשתית-כקוד', 'אבטחה מקצה לקצה כברירת מחדל', 'DevOps, ניטור ופריסה אוטומטית'],
     to: '/cyber',
     flagship: true,
-    badge: 'Enterprise',
     span: 'lg:col-span-3',
   },
   {
@@ -86,9 +82,9 @@ export const SERVICES: ServiceEntry[] = [
   {
     id: 'process-automation',
     icon: Workflow,
-    title: 'אוטומציה של תהליכים',
+    title: 'אוטומציות חכמות שחוסכות זמן וכסף',
     blurb:
-      'תזכורות, סנכרונים ועדכוני סטטוס שקורים לבד. פחות עבודה ידנית, פחות טעויות, וצוות שמתפנה למה שבאמת מזיז את המחט.',
+      'תזכורות, סנכרונים ועדכוני סטטוס שקורים לבד. פחות עבודה ידנית, פחות טעויות, ויותר זמן למה שבאמת מזיז את המחט.',
     to: '/ai',
     span: 'lg:col-span-6',
   },

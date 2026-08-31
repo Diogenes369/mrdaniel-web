@@ -73,12 +73,6 @@ function AgentCard({ agent }: { agent: AiAgent }) {
         <div
           className={`relative h-full flex flex-col overflow-hidden bg-[#0D0E12] border border-white/10 rounded-2xl p-6 transition-all duration-500 hover:border-[#76B900]/50 hover:-translate-y-1.5 ${agent.glow}`}
         >
-          {agent.badge && (
-            <span className="absolute top-4 left-4 z-10 text-[10px] font-mono font-bold tracking-widest uppercase bg-brand-500 text-black px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(0,255,102,0.5)]">
-              {agent.badge}
-            </span>
-          )}
-
           <div className="flex items-start gap-4 mb-4">
             <div className={`w-14 h-14 shrink-0 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center ${agent.accent === 'text-black' ? 'text-brand-400' : agent.accent}`}>
               <agent.icon className="w-7 h-7" />

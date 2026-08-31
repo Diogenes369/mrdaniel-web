@@ -16,22 +16,20 @@ function openLead(subject: string) {
 }
 
 /**
- * One bento tile. Glassmorphism base (`backdrop-blur-md bg-white/[0.03] border-white/10`); flagship
- * tiles add a neon-green edge, an outer glow, the `.bento-mesh` texture, a badge, and up to three
- * proof points. The whole tile is a <Link> to the matching service page.
+ * One bento tile — the unified `.cyber-glass` surface (`--marketing`, `--flagship` for the large
+ * tiles). No badges; just the icon, the giant title, the blurb, and (on flagship tiles) a short
+ * proof list. The whole tile is a <Link> to the matching service page.
  */
 function ServiceTile({ s }: { s: ServiceEntry }) {
   const Icon = s.icon;
   return (
     <Link
       to={s.to}
-      className={`group relative flex h-full flex-col overflow-hidden rounded-3xl border p-7 backdrop-blur-md transition-all duration-300 md:p-8 lg:p-12 ${
-        s.flagship
-          ? 'bento-mesh border-brand-500/35 bg-white/[0.04] shadow-[0_0_44px_-16px_rgba(118,185,0,0.5)] hover:border-brand-500/60 hover:shadow-[0_0_64px_-12px_rgba(118,185,0,0.65)]'
-          : 'border-white/12 bg-white/[0.035] hover:border-brand-500/45 hover:bg-white/[0.06] hover:shadow-[0_0_36px_-18px_rgba(118,185,0,0.45)]'
+      className={`cyber-glass cyber-glass--marketing group flex h-full flex-col rounded-3xl p-7 md:p-8 lg:p-12 ${
+        s.flagship ? 'cyber-glass--flagship' : ''
       }`}
     >
-      <div className="relative z-10 flex h-full flex-col">
+      <div className="flex h-full flex-col">
         <div className="mb-4 flex items-center gap-3">
           <span
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors lg:h-12 lg:w-12 ${
@@ -42,11 +40,6 @@ function ServiceTile({ s }: { s: ServiceEntry }) {
           >
             <Icon className="h-5 w-5 lg:h-6 lg:w-6" />
           </span>
-          {s.badge && (
-            <span className="rounded-full border border-brand-500/45 bg-brand-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-300 lg:text-xs">
-              {s.badge}
-            </span>
-          )}
           <ArrowUpLeft className="ml-auto h-4 w-4 text-zinc-500 transition-colors group-hover:text-brand-400 lg:h-5 lg:w-5" aria-hidden="true" />
         </div>
 
@@ -128,10 +121,10 @@ export default function ServicesSection() {
 
       <div className="container-wide relative z-10">
         <div className="mx-auto mb-12 max-w-3xl text-center md:mb-16">
-          <PopHeadline lead="שירותים" accent="ופתרונות טכנולוגיים" />
+          <PopHeadline lead="פתרונות AI ופיתוח" accent="לעצמאים ולעסקים קטנים" />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
-            כל מה שצריך כדי שהטכנולוגיה תעבוד בשבילכם — סוכני AI ואוטומציה, הגנת סייבר, ותשתית דיגיטלית
-            פול-סטאק מקצה לקצה. נבנה בהתאמה אישית, מתומחר לפי אפיון — לא לפי מחירון.
+            סוכני AI, אוטומציה ופיתוח למפתחים, לפרילנסרים, ליוצרים ולעסקים קטנים — נבנים בהתאמה אישית,
+            מתומחרים לפי הצורך האמיתי שלכם, לא לפי מחירון של תאגיד.
           </p>
         </div>
       </div>

@@ -47,7 +47,7 @@ const Slider = memo(function Slider({ id, icon: Icon, label, value, min, max, st
   return (
     <div>
       <div className="flex items-center justify-between mb-2.5 gap-3">
-        <label htmlFor={id} className="flex items-center gap-2 text-sm font-bold text-zinc-200">
+        <label htmlFor={id} className="flex items-center gap-2 text-sm font-bold text-zinc-200 leading-tight">
           <Icon className="w-4 h-4 text-brand-400 shrink-0" />
           {label}
         </label>
@@ -109,7 +109,7 @@ export default function RoiCalculator() {
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
           <PopHeadline lead="כמה" accent="האוטומציה מחזירה לכם?" />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
-            הצוות שלכם שורף שעות על עבודה חוזרת. הזיזו את המחוונים וראו כמה מזה חוזר אליכם — בשעות ובשקלים, כל חודש.
+            אתם (או הצוות הקטן) שורפים שעות על עבודה חוזרת. הזיזו את המחוונים וראו כמה מזה חוזר אליכם — בשעות ובשקלים, כל חודש.
           </p>
         </div>
       </div>
@@ -117,7 +117,7 @@ export default function RoiCalculator() {
       <DepthSection className="container-wide relative z-10">
         <div className="grid lg:grid-cols-2 gap-6 md:gap-8 max-w-6xl mx-auto items-stretch">
           {/* ---- Inputs ---- */}
-          <div className="bg-carbon-900/60 backdrop-blur-md border border-white/12 rounded-3xl p-7 md:p-8 lg:p-12 flex flex-col">
+          <div className="cyber-glass cyber-glass--info rounded-3xl p-7 md:p-8 lg:p-12 flex flex-col">
             <div className="flex items-center gap-3 mb-8">
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-black/40 text-brand-300">
                 <Calculator className="w-5 h-5" />
@@ -128,7 +128,7 @@ export default function RoiCalculator() {
               <Slider
                 id="roi-employees"
                 icon={Users}
-                label="מספר עובדים רלוונטיים"
+                label="כמה אנשים עושים את העבודה (גם אם זה רק אתם)"
                 value={employees}
                 min={1}
                 max={200}
@@ -139,7 +139,7 @@ export default function RoiCalculator() {
               <Slider
                 id="roi-hours"
                 icon={Timer}
-                label="שעות שבועיות למשימות חוזרות (לעובד)"
+                label="שעות שבועיות על משימות חוזרות (לאדם)"
                 value={hoursPerWeek}
                 min={1}
                 max={40}
@@ -166,22 +166,18 @@ export default function RoiCalculator() {
           </div>
 
           {/* ---- Output (updates in place — no remount, no per-tick animation) ---- */}
-          <div className="relative bg-gradient-to-br from-brand-500/[0.14] to-carbon-900 backdrop-blur-md border border-brand-500/35 rounded-3xl p-7 md:p-8 lg:p-12 flex flex-col shadow-[0_0_56px_-18px_rgba(118,185,0,0.5)]">
-            <div
-              className="pointer-events-none absolute -inset-px rounded-3xl bg-brand-500/10 blur-2xl opacity-60"
-              aria-hidden="true"
-            />
-            <div className="relative grid sm:grid-cols-2 gap-x-8 gap-y-8 flex-1 content-center">
+          <div className="cyber-glass cyber-glass--info rounded-3xl p-7 md:p-8 lg:p-12 flex flex-col shadow-[0_0_48px_-20px_rgba(118,185,0,0.4)]">
+            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-8 flex-1 content-center">
               <div className="min-h-[140px]">
                 <div className="flex items-center gap-2 text-sm lg:text-base font-display font-bold text-zinc-200 tracking-tight mb-3">
                   <Clock className="w-4 h-4 lg:w-5 lg:h-5 text-brand-400 shrink-0" />
-                  הזמן שחוזר לצוות / חודש
+                  הזמן שחוזר אליכם / חודש
                 </div>
                 <div className="font-display text-[2.25rem] sm:text-5xl lg:text-6xl font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_36px_rgba(118,185,0,0.45)]">
                   {FMT_INT.format(reclaimedHours)}
                 </div>
                 <p className="text-xs lg:text-sm text-zinc-400 mt-3 tabular-nums">
-                  ≈ <span dir="ltr">{FMT_INT.format(weeklyHours)}</span> שעות בשבוע חוזרות לצוות
+                  ≈ <span dir="ltr">{FMT_INT.format(weeklyHours)}</span> שעות בשבוע חוזרות אליכם
                 </p>
               </div>
               <div className="min-h-[140px]">
