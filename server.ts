@@ -110,8 +110,19 @@ app.post('/api/leads', (req: Request, res: Response) => leadsHandler(req, res));
 // Health check — pinged by src/lib/tracker.ts to derive real client-measured latency
 // ---------------------------------------------------------------------------
 
-app.get('/api/health', (_req: Request, res: Response) => {
-  res.json({ ok: true, ts: Date.now() });
+app.get('/api/health', (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const h = req.headers || {};
+  const first = (v: unknown) => String(Array.isArray(v) ? v[0] : (v ?? '')).split(',')[0].trim();
+  res.json({
+    ok: true,
+    ts: Date.now(),
+    region: process.env.VERCEL_REGION ?? null,
+    ip: first(h['x-real-ip']) || first(h['x-forwarded-for']) || null,
+    country: first(h['x-vercel-ip-country']) || null,
+    countryRegion: first(h['x-vercel-ip-country-region']) || null,
+    city: h['x-vercel-ip-city'] ? decodeURIComponent(first(h['x-vercel-ip-city'])) : null,
+  });
 });
 
 // ---------------------------------------------------------------------------

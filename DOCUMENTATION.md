@@ -163,7 +163,7 @@ Cron: header `Authorization: Bearer ${CRON_SECRET}`.
 ### 5.1 סכמה (paths)
 | Path | נכתב על ידי | נקרא על ידי | מבנה |
 |---|---|---|---|
-| `presence/` | tracker (אתר) | דשבורד | `{ <sessionId>: { device, ts, path } }` |
+| `presence/` | tracker (אתר) | דשבורד | `{ <sessionId>: { device, path, startedAt, browser, screen, lang, timezone, referrer, ip (ממוסך), countryCode, region, city } }`. ה-IP והגאו נלכדים פעם אחת ב-init דרך `/api/health` (headers של `x-vercel-ip-*`), ה-IP ממוסך לפני כתיבה. הרשומה נמחקת אוטומטית ב-`onDisconnect`. |
 | `events/` | tracker (אתר) | דשבורד | אירועי גלישה/המרה |
 | `health/latest` | tracker | דשבורד | מדדי בריאות |
 | `leads/` | tracker (`push`) | דשבורד, `api/leads` (איסוף נמענים) | `{ <id>: { name, email, phone, sourceSection, status, ts } }` |

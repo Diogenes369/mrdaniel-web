@@ -6,12 +6,9 @@ import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboard
 import { firebaseConfigured } from './firebase';
 import type { DeviceType } from './lib/types';
 import LoginGate from './components/LoginGate';
-import LiveCounter from './components/LiveCounter';
-import TrafficChart from './components/TrafficChart';
-import DeviceBreakdown from './components/DeviceBreakdown';
+import OverviewPanel from './components/OverviewPanel';
+import VisitorsPanel from './components/VisitorsPanel';
 import EventFeed from './components/EventFeed';
-import HealthGauge from './components/HealthGauge';
-import VisitorBreakdown from './components/VisitorBreakdown';
 import ContentHeatmap from './components/ContentHeatmap';
 import { NewsletterLog } from './components/LeadsLog';
 import LeadPipeline from './components/LeadPipeline';
@@ -99,12 +96,6 @@ export default function App() {
     return <LoginGate />;
   }
 
-  const presenceList = Object.values(presence);
-  const counts: Record<DeviceType, number> = { mobile: 0, desktop: 0, tablet: 0 };
-  presenceList.forEach((p) => {
-    counts[p.device] = (counts[p.device] ?? 0) + 1;
-  });
-
   return (
     <div dir="rtl" className="dash-root min-h-screen bg-carbon-950 text-zinc-100 p-5 md:p-8 font-sans">
       <div className="w-full">
@@ -154,29 +145,13 @@ export default function App() {
 
         {tab === 'overview' && (
           <ErrorBoundary label="סקירה כללית">
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <LiveCounter count={presenceList.length} mobile={counts.mobile} desktop={counts.desktop} tablet={counts.tablet} />
-                <HealthGauge health={health} />
-                <DeviceBreakdown presence={presence} />
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <TrafficChart events={events} />
-                <EventFeed events={events} />
-              </div>
-            </div>
+            <OverviewPanel presence={presence} events={events} health={health} />
           </ErrorBoundary>
         )}
 
         {tab === 'visitors' && (
           <ErrorBoundary label="מבקרים">
-            <div className="space-y-5">
-              <VisitorBreakdown presence={presence} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <LiveCounter count={presenceList.length} mobile={counts.mobile} desktop={counts.desktop} tablet={counts.tablet} />
-                <DeviceBreakdown presence={presence} />
-              </div>
-            </div>
+            <VisitorsPanel presence={presence} />
           </ErrorBoundary>
         )}
 

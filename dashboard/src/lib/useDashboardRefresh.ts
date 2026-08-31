@@ -24,6 +24,65 @@ export function useHeartbeat(ms = 4000): number {
   return tick;
 }
 
+export interface AutoRefreshState {
+  /** Bumps every `ms` (and on `refreshNow`) — depend on it to recompute live values. */
+  tick: number;
+  /** Whole seconds remaining until the next automatic tick (`periodMs/1000` … 1). */
+  secondsToNext: number;
+  /** 0 → 1 progress toward the next tick, for a ring/bar indicator. */
+  progress: number;
+  /** True for ~600ms after a manual refresh — drive a spin animation off this. */
+  refreshing: boolean;
+  refreshNow: () => void;
+}
+
+/**
+ * A fixed auto-refresh cycle for the live views. Firebase data is already push-based; this drives
+ * the per-second dwell counters, the "next tick" countdown, and a manual "Refresh Now" that
+ * re-synchronises the cycle. One interval, cleaned up on unmount — no leak.
+ */
+export function useAutoRefresh(periodMs = 5000): AutoRefreshState {
+  const [tick, setTick] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const anchorRef = useRef(Date.now());
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const spinTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    const clock = window.setInterval(() => {
+      const now = Date.now();
+      setNowMs(now);
+      if (now - anchorRef.current >= periodMs) {
+        anchorRef.current = now;
+        setTick((t) => t + 1);
+      }
+    }, 250);
+    return () => {
+      window.clearInterval(clock);
+      if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
+    };
+  }, [periodMs]);
+
+  const refreshNow = () => {
+    anchorRef.current = Date.now();
+    setNowMs(Date.now());
+    setTick((t) => t + 1);
+    setRefreshing(true);
+    if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
+    spinTimer.current = window.setTimeout(() => setRefreshing(false), 600);
+  };
+
+  const elapsed = Math.min(periodMs, Math.max(0, nowMs - anchorRef.current));
+  const remaining = periodMs - elapsed;
+  return {
+    tick,
+    secondsToNext: Math.max(1, Math.ceil(remaining / 1000)),
+    progress: elapsed / periodMs,
+    refreshing,
+    refreshNow,
+  };
+}
+
 /** Production origin whose `/api/health` this dashboard probes. Override with VITE_SITE_ORIGIN. */
 export const SITE_ORIGIN: string =
   (import.meta.env.VITE_SITE_ORIGIN as string | undefined)?.replace(/\/$/, '') || 'https://mrdaniel.co.il';

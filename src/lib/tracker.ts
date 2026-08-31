@@ -1,4 +1,4 @@
-import { ref, push, set, remove, onDisconnect } from 'firebase/database';
+import { ref, push, set, update, remove, onDisconnect } from 'firebase/database';
 import { getDb, firebaseConfigured } from './firebaseClient';
 
 export type DeviceType = 'mobile' | 'tablet' | 'desktop';
@@ -109,6 +109,15 @@ function logEvent(type: EventType, extra: Partial<Omit<TrackedEvent, keyof Event
   push(ref(db, 'events'), event).catch(() => {});
 }
 
+/** Coarsens an IP for storage — v4 → `a.b.c.0`, v6 → first three hextets + `::`. The dashboard
+ * only ever needs a rough "who / from where", never the exact address. */
+function maskIp(ip: string): string {
+  const v = ip.trim();
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(v)) return v.replace(/\.\d{1,3}$/, '.0');
+  if (v.includes(':')) return `${v.split(':').slice(0, 3).join(':')}::`;
+  return v;
+}
+
 function pingHealth() {
   const db = getDb();
   if (!db) return;
@@ -117,6 +126,29 @@ function pingHealth() {
     .then(() => {
       const latencyMs = Math.round(performance.now() - start);
       set(ref(db, 'health/latest'), { latencyMs, ts: Date.now() }).catch(() => {});
+    })
+    .catch(() => {});
+}
+
+/** One-shot: read this visitor's IP + edge geo from `/api/health` (same-origin, so the Vercel
+ * `x-vercel-ip-*` headers describe THIS visitor) and merge it onto their presence record. IP is
+ * masked before it's written. */
+function captureGeo() {
+  const db = getDb();
+  if (!db || !sessionId) return;
+  fetch('/api/health', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      if (!d) return;
+      update(
+        ref(db, `presence/${sessionId}`),
+        clean({
+          ip: typeof d.ip === 'string' && d.ip ? maskIp(d.ip) : undefined,
+          countryCode: typeof d.country === 'string' && d.country ? d.country : undefined,
+          region: typeof d.countryRegion === 'string' && d.countryRegion ? d.countryRegion : undefined,
+          city: typeof d.city === 'string' && d.city ? d.city : undefined,
+        })
+      ).catch(() => {});
     })
     .catch(() => {});
 }
@@ -257,6 +289,7 @@ export function initTracker() {
     startedAt: ctx.ts,
   }).catch(() => {});
   onDisconnect(presenceRef).remove();
+  captureGeo();
 
   lastPath = ctx.path;
   logEvent('session_start');

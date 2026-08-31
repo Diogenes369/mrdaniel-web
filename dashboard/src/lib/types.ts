@@ -9,6 +9,13 @@ export interface PresenceRecord {
   lang?: string;
   timezone?: string;
   referrer?: string;
+  /** Enhanced session details captured once at init (src/lib/tracker.ts `captureGeo`). */
+  ip?: string;
+  /** ISO country code from Vercel's edge (`x-vercel-ip-country`), e.g. "IL". */
+  countryCode?: string;
+  /** Country subdivision / region code (`x-vercel-ip-country-region`). */
+  region?: string;
+  city?: string;
 }
 
 export type EventType =
