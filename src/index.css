@@ -1,13 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Heebo', sans-serif;
-  --font-display: 'Rubik', sans-serif;
-  /* Latin-only cyber/tech display face — Orbitron has no Hebrew glyphs, so it's used deliberately
-     for short English/mono tech chrome (badges, ticker items, stat values) rather than as the
-     primary heading font, which must stay Hebrew-safe (Rubik). */
-  --font-cyber: 'Orbitron', 'Rubik', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* One brand type system, shared verbatim with dashboard/src/index.css. Heebo = body/UI,
+     Rubik = display/headings. Every family below ends in a Hebrew-capable fallback (Heebo, then a
+     system Hebrew face) so that if a webfont is slow/blocked — OR the family has no Hebrew glyphs
+     at all (JetBrains Mono, Orbitron) — Hebrew text still renders in the brand sans instead of the
+     browser's thin/condensed default. This is what fixes `font-mono` Hebrew micro-labels (ROI
+     calculator, badges, eyebrows) reading as a different, spindly font from the rest of the UI. */
+  --font-sans: 'Heebo', 'Segoe UI', Arial, sans-serif;
+  --font-display: 'Rubik', 'Heebo', 'Segoe UI', sans-serif;
+  /* Orbitron has no Hebrew glyphs — used deliberately for short English/mono tech chrome; Rubik
+     then Heebo carry any Hebrew that lands in one of these elements. */
+  --font-cyber: 'Orbitron', 'Rubik', 'Heebo', sans-serif;
+  /* JetBrains Mono has no Hebrew glyphs: Latin/digits render monospaced, Hebrew falls to Heebo. */
+  --font-mono: 'JetBrains Mono', 'Heebo', ui-monospace, 'Segoe UI', monospace;
 
   /* NVIDIA solid-green brand ramp — one hue, only opacity/shade varies */
   --color-brand-300: #9FE870;
@@ -78,6 +84,29 @@ h1, h2, h3, h4 {
 }
 p {
   text-wrap: pretty;
+}
+
+/* One typographic baseline for the whole site. Every element inherits the brand sans (Heebo);
+   headings default to the brand display face (Rubik). Kept in `@layer base` so a `font-*` utility
+   on the element (`.font-mono`, `.font-cyber`) still wins — intentional mono/tech chrome is
+   unaffected — but nothing falls through to a system serif/monospace/condensed face, and no
+   component can quietly drop to a thin default. `font-synthesis: none` stops the browser
+   faux-bolding a weight when (briefly) only the regular webfont has loaded. */
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-synthesis: none;
+  }
+  body {
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+  }
+  button, input, select, textarea, optgroup {
+    font-family: inherit;
+  }
 }
 
 html {

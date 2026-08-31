@@ -1,9 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Heebo', sans-serif;
-  --font-display: 'Rubik', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* One brand type system, kept identical to the main site (src/index.css). Every family ends in
+     a Hebrew-capable fallback (Heebo, then a system Hebrew face) so a slow/blocked webfont — or a
+     family with no Hebrew glyphs at all (JetBrains Mono) — still renders Hebrew in the brand sans
+     instead of the browser's thin/condensed default. */
+  --font-sans: 'Heebo', 'Segoe UI', Arial, sans-serif;
+  --font-display: 'Rubik', 'Heebo', 'Segoe UI', sans-serif;
+  /* JetBrains Mono has no Hebrew glyphs: Latin/digits stay monospaced, Hebrew falls to Heebo. */
+  --font-mono: 'JetBrains Mono', 'Heebo', ui-monospace, 'Segoe UI', monospace;
 
   /* Same one-hue NVIDIA-green brand ramp as the main site (src/index.css) — kept in sync so this
      dashboard reads as the same product, not a different tool bolted on. */
@@ -24,6 +29,20 @@ html,
 body {
   background-color: var(--color-carbon-950);
   font-family: var(--font-sans);
+  font-synthesis: none;
+}
+
+/* Same typographic baseline as the main site: brand sans everywhere, brand display on headings.
+   In `@layer base` so a `font-*` utility on the element still wins — `.font-mono` stat chrome is
+   unaffected — but nothing drops to a system serif/monospace/condensed face. */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+  }
+  button, input, select, textarea, optgroup {
+    font-family: inherit;
+  }
 }
 
 ::-webkit-scrollbar {

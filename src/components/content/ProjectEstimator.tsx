@@ -149,7 +149,7 @@ export default function ProjectEstimator() {
                 <Check size={13} strokeWidth={3} />
               </span>
               <span className="text-sm text-zinc-300">{f.label}</span>
-              <span className="mr-auto text-xs font-mono text-zinc-500 shrink-0" dir="ltr">
+              <span className="mr-auto text-xs font-display font-semibold text-zinc-400 tabular-nums shrink-0" dir="ltr">
                 +₪{f.add.toLocaleString('he-IL')}
               </span>
             </button>
@@ -165,7 +165,7 @@ export default function ProjectEstimator() {
         className="bg-gradient-to-br from-brand-500/15 to-carbon-900 border border-brand-500/30 rounded-xl p-5 md:p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
       >
         <div>
-          <div className="text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest mb-1">טווח משוער</div>
+          <div className="text-[13px] font-display font-bold text-zinc-300 tracking-tight mb-1">טווח משוער</div>
           <div className="text-2xl md:text-3xl font-black text-brand-400" dir="ltr">
             {formatIls(min)}–{formatIls(max)}
           </div>

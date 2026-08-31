@@ -48,7 +48,7 @@ const Slider = memo(function Slider({ id, icon: Icon, label, value, min, max, st
           <Icon className="w-4 h-4 text-brand-400 shrink-0" />
           {label}
         </label>
-        <span className="shrink-0 font-mono text-sm font-bold text-brand-300 tabular-nums whitespace-nowrap" dir="ltr">
+        <span className="shrink-0 font-display text-sm font-bold text-brand-300 tabular-nums whitespace-nowrap" dir="ltr">
           {display}
         </span>
       </div>
@@ -166,7 +166,7 @@ export default function RoiCalculator() {
             />
             <div className="relative grid sm:grid-cols-2 gap-x-8 gap-y-7 flex-1 content-center">
               <div className="min-h-[128px]">
-                <div className="flex items-center gap-2 text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest mb-2.5">
+                <div className="flex items-center gap-2 text-[13px] font-display font-bold text-zinc-300 tracking-tight mb-2.5">
                   <Clock className="w-4 h-4 text-brand-400 shrink-0" />
                   שעות תפעול שמוחזרות / חודש
                 </div>
@@ -178,7 +178,7 @@ export default function RoiCalculator() {
                 </p>
               </div>
               <div className="min-h-[128px]">
-                <div className="flex items-center gap-2 text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest mb-2.5">
+                <div className="flex items-center gap-2 text-[13px] font-display font-bold text-zinc-300 tracking-tight mb-2.5">
                   <TrendingUp className="w-4 h-4 text-brand-400 shrink-0" />
                   חיסכון תפעולי משוער / חודש
                 </div>
