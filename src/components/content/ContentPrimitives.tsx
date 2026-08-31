@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Mail, MessageCircle, type LucideIcon } from 'lucide-react';
 import WebButton from '../WebButton';
 import SocialLinks, { CONTACT_EMAIL, buildWhatsAppUrl } from '../SocialLinks';
+import TitleUnderline from '../TitleUnderline';
 
 export function PageHero({
   title,
@@ -56,10 +57,13 @@ export function SectionHeading({
 }) {
   return (
     <div className="mb-8">
-      <h2 className="flex items-center gap-3 font-display font-black text-2xl md:text-3xl text-white mb-2">
-        <Icon className="w-6 h-6 text-brand-400 shrink-0" />
-        {title}
-      </h2>
+      <div className="group inline-flex max-w-full flex-col items-start mb-3">
+        <h2 className="flex items-center gap-3 font-display font-black text-2xl sm:text-3xl lg:text-4xl text-white">
+          <Icon className="w-6 h-6 lg:w-7 lg:h-7 text-brand-400 shrink-0" />
+          <span>{title}</span>
+        </h2>
+        <TitleUnderline className="w-full" base="w-12" />
+      </div>
       {/* Description stays a comfortable measure even inside a wide `.container-wide` page. */}
       <p className="text-zinc-400 text-base md:text-lg max-w-3xl">{description}</p>
     </div>

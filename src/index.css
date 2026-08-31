@@ -872,9 +872,11 @@ html.a11y-large-cursor * {
    --------------------------------------------------------------------------- */
 .container-wide {
   width: 100%;
-  max-width: 1700px;
+  max-width: 1760px;
   margin-inline: auto;
-  padding-inline: clamp(1rem, 5vw, 4rem);
+  /* Tighter side gutter than before (was clamp(1rem, 5vw, 4rem)) so grids reclaim ~2rem of usable
+     width on desktop — matches a px-4 / sm:px-8 / lg:px-12 rhythm. */
+  padding-inline: clamp(1rem, 4vw, 3rem);
 }
 .measure {
   max-width: 72ch;

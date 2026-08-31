@@ -1,3 +1,5 @@
+import TitleUnderline from './TitleUnderline';
+
 /**
  * Site outro: a bold closing question above a compact circular "בואו נדבר" CTA that opens the lead
  * modal, framed by a slow rotating dashed ring.
@@ -17,9 +19,12 @@ export default function ContactPortal() {
       {/* ── Site outro: bold closing question, framing the CTA below it. Sized with `text-fluid-hero`
           (the exact token the Hero <h1> uses) so the closing headline visually matches the opening
           one; stays an <h2> for heading hierarchy. text-wrap:balance from the base rule. ── */}
-      <h2 className="relative z-10 font-display font-black text-fluid-hero leading-[1.08] text-white max-w-[16ch] md:max-w-[22ch] mx-auto px-6 [text-shadow:0_2px_22px_rgba(0,0,0,0.9)]">
-        יש לכם רעיון? בואו נהפוך אותו למערכת.
-      </h2>
+      <div className="group relative z-10 inline-flex max-w-full flex-col items-center px-6">
+        <h2 className="font-display font-black text-fluid-hero leading-[1.08] text-white max-w-[16ch] md:max-w-[22ch] [text-shadow:0_2px_22px_rgba(0,0,0,0.9)]">
+          יש לכם רעיון? בואו נהפוך אותו למערכת.
+        </h2>
+        <TitleUnderline className="w-full" base="w-12" />
+      </div>
 
       {/* ── Compact CTA badge — a sleek, elegant button rather than the previous oversized circle. ── */}
       <button

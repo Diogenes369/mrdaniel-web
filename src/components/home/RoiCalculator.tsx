@@ -103,7 +103,7 @@ export default function RoiCalculator() {
   return (
     <section id="roi-calculator" className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
-        <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
+        <div className="max-w-4xl mx-auto text-center mb-12 md:mb-16">
           <PopHeadline lead="כמה" accent="האוטומציה מחזירה לכם?" />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
             אתם (או הצוות הקטן) שורפים שעות על עבודה חוזרת. הזיזו את המחוונים וראו כמה מזה חוזר אליכם — בשעות ובשקלים, כל חודש.
@@ -112,7 +112,7 @@ export default function RoiCalculator() {
       </div>
 
       <DepthSection className="container-wide relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 max-w-6xl mx-auto items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 max-w-[1400px] mx-auto items-stretch">
           {/* ---- Inputs ---- */}
           <div className="cyber-glass cyber-glass--info w-full min-w-0 rounded-3xl p-5 sm:p-7 lg:p-10 flex flex-col">
             <div className="flex items-center gap-3 mb-8">

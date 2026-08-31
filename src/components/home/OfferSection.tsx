@@ -38,7 +38,7 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
     >
       {/* Header sits ABOVE the depth plane so the pop-out title and the card-grid tilt don't stack. */}
       <div className="container-wide relative z-10">
-        <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
+        <div className="max-w-4xl mx-auto text-center mb-12 md:mb-16">
           <PopHeadline lead={offer.title} accent={offer.accent} />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">{offer.intro}</p>
         </div>

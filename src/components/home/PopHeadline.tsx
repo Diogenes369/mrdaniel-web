@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { prefersReducedMotion } from '../../lib/gsap';
+import TitleUnderline from '../TitleUnderline';
 
 interface PopHeadlineProps {
   lead: ReactNode;
@@ -49,22 +50,34 @@ export default function PopHeadline({ lead, accent, className = 'mb-7 md:mb-9' }
     </h2>
   );
 
-  if (mode === 'off') return <div className={className}>{heading}</div>;
+  if (mode === 'off') {
+    return (
+      <div className={className}>
+        <div className="group inline-flex max-w-full flex-col items-center">
+          {heading}
+          <TitleUnderline className="w-full" base="w-12" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className={className} style={{ perspective: '1000px' }}>
-      <motion.div
-        style={{
-          rotateX,
-          z,
-          opacity,
-          transformStyle: 'preserve-3d',
-          transformOrigin: 'center bottom',
-          willChange: 'transform, opacity',
-        }}
-      >
-        {heading}
-      </motion.div>
+      <div className="group inline-flex max-w-full flex-col items-center">
+        <motion.div
+          style={{
+            rotateX,
+            z,
+            opacity,
+            transformStyle: 'preserve-3d',
+            transformOrigin: 'center bottom',
+            willChange: 'transform, opacity',
+          }}
+        >
+          {heading}
+        </motion.div>
+        <TitleUnderline className="w-full" base="w-12" />
+      </div>
     </div>
   );
 }

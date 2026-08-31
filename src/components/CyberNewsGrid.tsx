@@ -6,6 +6,7 @@ import WebButton from './WebButton';
 import NewsCard from './NewsCard';
 import NewsTicker from './NewsTicker';
 import ScrollLockRail from './mobile/ScrollLockRail';
+import TitleUnderline from './TitleUnderline';
 import { useNewsFeed, type NewsTopic } from '../services/newsService';
 
 // Homepage news section: category tab filters, reading-time tags (in NewsCard), an "updated"
@@ -42,10 +43,13 @@ export default function CyberNewsGrid() {
   return (
     <section id="news" className="py-16 md:py-24 relative overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
-        <div className="max-w-3xl mx-auto text-center mb-8 md:mb-10">
-          <h2 className="font-display text-fluid-h2 font-black text-white mb-4">
-            חדשות <span className="text-brand-500">סייבר, AI וטכנולוגיה</span>
-          </h2>
+        <div className="max-w-4xl mx-auto text-center mb-8 md:mb-10">
+          <div className="group inline-flex max-w-full flex-col items-center mb-4">
+            <h2 className="text-pop font-display font-black text-white text-center">
+              חדשות <span className="text-brand-500">סייבר, AI וטכנולוגיה</span>
+            </h2>
+            <TitleUnderline className="w-full" base="w-12" />
+          </div>
           <p className="font-sans text-zinc-300 text-base md:text-lg leading-relaxed [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
             כל מה שזז בטכנולוגיה הישראלית, במקום אחד — מתעדכן אוטומטית מגיקטיים, גלובס, ynet, TechTime ו-Israel Defense.
           </p>

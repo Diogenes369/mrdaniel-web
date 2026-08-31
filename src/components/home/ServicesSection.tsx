@@ -117,7 +117,7 @@ export default function ServicesSection() {
   return (
     <section id="services" className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
-        <div className="mx-auto mb-12 max-w-3xl text-center md:mb-16">
+        <div className="mx-auto mb-12 max-w-4xl text-center md:mb-16">
           <PopHeadline lead="פתרונות AI ופיתוח" accent="לעצמאים ולעסקים קטנים" />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
             סוכני AI, אוטומציה ופיתוח למפתחים, לפרילנסרים, ליוצרים ולעסקים קטנים — נבנים בהתאמה אישית,
@@ -130,7 +130,7 @@ export default function ServicesSection() {
         {/* Desktop / tablet: asymmetric bento. lg = 6-col with per-tile spans; md = plain 2-col.
             Each tile carries a gentle mouse-tilt over the section's scroll-depth plane. */}
         <Reveal>
-          <div className="mx-auto hidden max-w-[1500px] gap-5 md:grid md:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(240px,1fr)] lg:gap-6">
+          <div className="mx-auto hidden max-w-[1600px] gap-5 md:grid md:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(240px,1fr)] lg:gap-6">
             {SERVICES.map((s) => (
               <div key={s.id} className={s.span}>
                 <TiltCard strength={3} className="h-full">
