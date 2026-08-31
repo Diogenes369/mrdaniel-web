@@ -190,6 +190,28 @@ body::before {
   background-size: 8px 8px;
 }
 
+/* Bento tile decoration for the Services section: a soft two-tone mesh wash (brand green from the
+   top-start corner, electric-blue from the bottom-end) plus a faint SVG grain, painted on an
+   `::after` so it sits above the glass fill but below the content. The host element must be
+   `position: relative` + `overflow-hidden`; `rounded` radius is inherited. */
+.bento-mesh::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image:
+    radial-gradient(58% 78% at 12% 0%, rgba(118, 185, 0, 0.16), transparent 72%),
+    radial-gradient(52% 64% at 100% 100%, rgba(56, 189, 248, 0.10), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 100% 100%, 140px 140px;
+  opacity: 0.9;
+  transition: opacity 0.3s ease;
+}
+.bento-mesh:hover::after {
+  opacity: 1;
+}
+
 /* Footer's subtle geometric grid accent — faint green grid lines, masked to fade toward the
    edges so it reads as a decorative accent rather than a busy uniform pattern. */
 .footer-grid {
