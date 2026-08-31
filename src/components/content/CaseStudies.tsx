@@ -16,7 +16,7 @@ const BLOCKS = [
 function Card({ study }: { study: CaseStudy }) {
   const Icon = study.icon;
   return (
-    <article className="rounded-2xl border border-white/10 bg-carbon-900/60 p-6 md:p-8">
+    <article className="rounded-2xl cyber-glass cyber-glass--info p-6 md:p-8">
       <header className="flex items-start gap-4 mb-6">
         <div className="w-12 h-12 shrink-0 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-brand-400">
           <Icon className="w-6 h-6" />

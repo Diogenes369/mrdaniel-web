@@ -160,7 +160,7 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
 function CapCard({ group }: { group: CapabilityGroup }) {
   const Icon = group.icon;
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-carbon-fiber p-6 hover:border-brand-500/40 transition-colors">
+    <div className="cyber-glass cyber-glass--marketing flex h-full flex-col rounded-2xl p-5 sm:p-6 lg:p-8">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
         <Icon className="w-6 h-6" />
       </div>
@@ -213,7 +213,7 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <div className="mx-auto max-w-4xl divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-carbon-900/40">
+    <div className="mx-auto max-w-4xl divide-y divide-white/10 overflow-hidden rounded-2xl cyber-glass cyber-glass--info">
       {items.map((item, i) => {
         const isOpen = openIndex === i;
         return (
@@ -292,7 +292,7 @@ export default function JarvisPage() {
       <div className="container-wide">
         <div className="pt-6 md:pt-12">
           {/* ---- Concept card — broad, full-width, centered text ---- */}
-          <Reveal className="bg-carbon-900/60 border border-white/10 rounded-2xl p-6 md:p-10 mb-16 md:mb-24 text-center">
+          <Reveal className="cyber-glass cyber-glass--marketing rounded-2xl p-6 sm:p-8 lg:p-10 mb-16 md:mb-24 text-center">
             <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">🤖 מהי מערכת JARVIS?</h2>
             <p className="text-base md:text-lg text-zinc-300 leading-[1.85] max-w-full">
               JARVIS אינה סתם עוד תוכנה או צ'אטבוט רגיל. זהו סוכן בינה מלאכותית פרואקטיבי (
@@ -397,7 +397,7 @@ export default function JarvisPage() {
             {CUSTOMER_BENEFITS.map((benefit) => (
               <div
                 key={benefit}
-                className="flex items-start gap-3 rounded-2xl border border-white/10 bg-carbon-900/60 p-5"
+                className="flex items-start gap-3 cyber-glass cyber-glass--info rounded-2xl p-5"
               >
                 <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400">
                   <Check className="w-4 h-4" />

@@ -153,7 +153,7 @@ export default function LiveSimulation({ title, description, steps, intervalMs =
   }, []);
 
   return (
-    <div className="bg-[#0D0E12] border border-white/10 rounded-2xl p-6 md:p-8 mb-16 min-h-[500px] max-w-5xl">
+    <div className="cyber-glass cyber-glass--info rounded-2xl p-5 sm:p-6 lg:p-8 mb-16 min-h-[500px] max-w-5xl">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
         <h3 className="font-display font-bold text-xl text-white">{title}</h3>
         <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-brand-400 uppercase tracking-widest border border-brand-500/30 rounded-full px-2.5 py-1 shrink-0">

@@ -324,7 +324,7 @@ function ProductCard({ product, onPreview }: { product: Product; onPreview: () =
       data-search-target={product.id}
       className="group"
     >
-      <div className={`relative overflow-hidden bg-[#0D0E12] border border-white/10 rounded-2xl p-5 md:p-6 transition-all duration-500 hover:border-[#76B900]/50 ${product.glow}`}>
+      <div className={`cyber-glass cyber-glass--marketing rounded-2xl p-5 sm:p-6 ${product.glow}`}>
         {product.badge && (
           <span className="absolute top-4 left-4 z-10 text-[10px] font-mono font-bold tracking-widest uppercase bg-brand-500 text-black px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(0,255,102,0.5)]">
             {product.badge}
@@ -532,7 +532,7 @@ function RoiMeter() {
   const active = ROLES.find((r) => r.id === activeId)!;
 
   return (
-    <div className="max-w-3xl mx-auto bg-carbon-900/60 border border-white/10 rounded-[1.75rem] p-6 md:p-9 mb-24">
+    <div className="cyber-glass cyber-glass--info max-w-3xl mx-auto rounded-[1.75rem] p-6 sm:p-8 mb-24">
       <div className="flex items-center gap-2.5 mb-2 justify-center">
         <Gauge className="w-5 h-5 text-brand-400" />
         <h3 className="font-display font-black text-2xl text-white">מד ערך: כמה זמן החבילה חוסכת לכם?</h3>
@@ -604,7 +604,7 @@ function FaqAccordion() {
       {FAQ_ITEMS.map((item, idx) => {
         const isOpen = open === idx;
         return (
-          <div key={item.q} className="bg-carbon-900/60 border border-white/10 rounded-2xl overflow-hidden">
+          <div key={item.q} className="cyber-glass cyber-glass--info rounded-2xl overflow-hidden">
             <button
               type="button"
               onClick={() => setOpen(isOpen ? null : idx)}
@@ -636,7 +636,7 @@ function FaqAccordion() {
 
 function SocialFollowBanner() {
   return (
-    <div className="max-w-2xl mx-auto text-center bg-carbon-900/60 border border-white/10 rounded-2xl p-6 md:p-8">
+    <div className="cyber-glass cyber-glass--marketing max-w-2xl mx-auto text-center rounded-2xl p-6 sm:p-8">
       <p className="text-zinc-200 text-base md:text-lg font-medium mb-5 leading-relaxed">
         עקבו אחריי ב-LinkedIn ו-Instagram לקבלת עדכונים חמים, ניתוחי ארכיטקטורה וטיפים מעשיים ב-AI וסייבר
       </p>

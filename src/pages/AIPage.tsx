@@ -99,7 +99,7 @@ function openAgentLead(subject: string) {
 function ShowcaseCard({ agent }: { agent: ShowcaseAgent }) {
   const Icon = agent.icon;
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-carbon-fiber p-6 transition-colors hover:border-brand-500/40">
+    <div className="flex h-full flex-col cyber-glass cyber-glass--marketing rounded-2xl p-5 sm:p-6 lg:p-8">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
         <Icon className="w-6 h-6" />
       </div>

@@ -131,7 +131,7 @@ export default function NewsArticlePage() {
             </button>
           </div>
 
-          <div className="relative overflow-hidden bg-[#0D0E12] border border-white/10 rounded-2xl p-6 md:p-10 mb-10">
+          <div className="relative overflow-hidden cyber-glass cyber-glass--info rounded-2xl p-5 sm:p-6 lg:p-10 mb-10">
             <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" aria-hidden="true" />
             <p dir="auto" className="relative text-zinc-300 text-lg leading-[1.9]">
               {item.summary}

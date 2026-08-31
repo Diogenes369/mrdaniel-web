@@ -62,7 +62,7 @@ export default function EnterpriseServicesSection() {
         return (
           <div
             key={s.title}
-            className="flex flex-col rounded-2xl border border-white/10 bg-carbon-fiber p-6 md:p-7 hover:border-brand-500/40 transition-colors"
+            className="flex flex-col rounded-2xl cyber-glass cyber-glass--marketing p-6 md:p-7 hover:border-brand-500/40 transition-colors"
           >
             <div className="w-12 h-12 shrink-0 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-brand-400 mb-4">
               <Icon className="w-6 h-6" />

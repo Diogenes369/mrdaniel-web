@@ -12,7 +12,7 @@ import { AI_AGENTS, type AiAgent, type AgentAudience } from '../data/aiAgents';
  * "אפיון וחיבור: {name} - ₪{price}" header and carries the same context through to the lead payload. */
 type CtaKind = 'fit-check' | 'consult' | 'order';
 const CTA_SUBJECT: Record<CtaKind, (name: string) => string> = {
-  'fit-check': (name) => `בדיקת התאמה לארגון: ${name}`,
+  'fit-check': (name) => `בדיקת התאמה: ${name}`,
   consult: (name) => `תיאום אפיון טכנולוגי: ${name}`,
   order: (name) => `הזמנת אפיון ארכיטקטורה: ${name}`,
 };
@@ -38,7 +38,7 @@ function openAgentLead(kind: CtaKind, agent?: AiAgent) {
 
 function AgentWizardTrigger() {
   return (
-    <div className="max-w-2xl mx-auto bg-carbon-900/60 border border-white/10 rounded-[1.75rem] p-6 md:p-9 mb-14 text-center">
+    <div className="cyber-glass cyber-glass--info max-w-2xl mx-auto rounded-[1.75rem] p-6 sm:p-8 mb-14 text-center">
       <div className="flex items-center gap-2.5 mb-2 justify-center">
         <Sparkles className="w-5 h-5 text-brand-400" />
         <h3 className="font-display font-black text-2xl text-white">שאלון התאמת סוכן AI</h3>
@@ -121,8 +121,8 @@ function AgentCard({ agent }: { agent: AiAgent }) {
               <button
                 type="button"
                 onClick={() => openAgentLead('fit-check', agent)}
-                title="בדיקת התאמה לארגון"
-                aria-label="בדיקת התאמה לארגון"
+                title="בדיקת התאמה מהירה"
+                aria-label="בדיקת התאמה מהירה"
                 className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full border border-white/15 text-zinc-300 hover:text-brand-400 hover:border-brand-400/50 transition-colors"
               >
                 <PhoneCall className="w-4 h-4" />
@@ -240,7 +240,7 @@ export default function AiAgentsSection() {
   }, [filter]);
 
   return (
-    <section id="ai-agents" className="py-20 md:py-32 border-t border-white/5 relative overflow-hidden cv-auto">
+    <section id="ai-agents" className="py-20 md:py-32 relative overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
         <div className="text-center mb-10 max-w-3xl mx-auto">
           <motion.h2

@@ -187,7 +187,7 @@ export default function CapabilityMatrix() {
   };
 
   return (
-    <section id="matrix" ref={dissolveRef} className="py-20 md:py-32 border-t border-white/5 relative overflow-hidden">
+    <section id="matrix" ref={dissolveRef} className="py-20 md:py-32 relative overflow-x-clip">
       <div className="container-wide">
         <motion.div
           className="text-center mb-12"
@@ -238,7 +238,7 @@ export default function CapabilityMatrix() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.04, duration: 0.3 }}
-                  className="relative overflow-hidden bg-[#0D0E12] border border-white/10 rounded-xl px-4 py-3.5 min-h-11 text-right transition-all duration-500 hover:border-[#76B900]/50 hover:-translate-y-1 hover:shadow-[0_10px_40px_-10px_rgba(118,185,0,0.2)] cursor-pointer"
+                  className="cyber-glass cyber-glass--marketing relative rounded-xl px-4 py-3.5 min-h-11 text-right cursor-pointer"
                 >
                   <span className="block text-sm text-[#F1F5F9] font-medium mb-1.5">{item.label}</span>
                   <span className="block text-xs text-zinc-400 leading-relaxed line-clamp-2">{item.businessValue}</span>

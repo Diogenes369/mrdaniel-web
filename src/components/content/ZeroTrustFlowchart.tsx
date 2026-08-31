@@ -48,7 +48,7 @@ export default function ZeroTrustFlowchart() {
   const active = NODES[activeIndex];
 
   return (
-    <div className="bg-[#0D0E12] border border-white/10 rounded-2xl p-6 md:p-8 mb-16">
+    <div className="cyber-glass cyber-glass--info rounded-2xl p-5 sm:p-6 lg:p-8 mb-16">
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 mb-8">
         {NODES.map((node, idx) => (
           <div key={node.id} className="flex items-center gap-2 flex-1">
