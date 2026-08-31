@@ -12,7 +12,7 @@ export default function ContactPortal() {
   return (
     <section
       id="contact-portal"
-      className="relative min-h-[92dvh] flex flex-col items-center justify-center py-40 md:py-64 border-t border-white/5 overflow-hidden text-center"
+      className="relative min-h-[92dvh] flex flex-col items-center justify-center py-40 md:py-64 overflow-hidden text-center"
     >
       {/* ── Site outro: bold closing question, framing the CTA below it. Sized with `text-fluid-hero`
           (the exact token the Hero <h1> uses) so the closing headline visually matches the opening

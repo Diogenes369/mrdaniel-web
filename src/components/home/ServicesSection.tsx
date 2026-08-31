@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ArrowUpLeft, Check } from 'lucide-react';
 import Reveal from '../Reveal';
 import WebButton from '../WebButton';
+import TiltCard from '../TiltCard';
+import DepthSection from './DepthSection';
 import { SERVICES, type ServiceEntry } from '../../data/homeServices';
 
 function openLead(subject: string) {
@@ -21,7 +23,7 @@ function ServiceTile({ s }: { s: ServiceEntry }) {
   return (
     <Link
       to={s.to}
-      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border p-6 backdrop-blur-md transition-all duration-300 md:p-7 lg:p-8 ${
+      className={`group relative flex h-full flex-col overflow-hidden rounded-3xl border p-7 backdrop-blur-md transition-all duration-300 md:p-8 lg:p-12 ${
         s.flagship
           ? 'bento-mesh border-brand-500/35 bg-white/[0.04] shadow-[0_0_44px_-16px_rgba(118,185,0,0.5)] hover:border-brand-500/60 hover:shadow-[0_0_64px_-12px_rgba(118,185,0,0.65)]'
           : 'border-white/12 bg-white/[0.035] hover:border-brand-500/45 hover:bg-white/[0.06] hover:shadow-[0_0_36px_-18px_rgba(118,185,0,0.45)]'
@@ -47,8 +49,8 @@ function ServiceTile({ s }: { s: ServiceEntry }) {
         </div>
 
         <h3
-          className={`font-display font-bold text-white ${
-            s.flagship ? 'text-xl lg:text-2xl' : 'text-lg md:text-lg lg:text-xl'
+          className={`font-display font-extrabold text-white ${
+            s.flagship ? 'text-2xl lg:text-4xl lg:leading-tight' : 'text-xl lg:text-2xl'
           }`}
         >
           {s.title}
@@ -119,8 +121,8 @@ export default function ServicesSection() {
   }, []);
 
   return (
-    <section id="services" className="relative border-t border-white/5 py-20 md:py-32 overflow-x-clip cv-auto">
-      <div className="container-wide relative z-10">
+    <section id="services" className="relative py-16 md:py-28 overflow-x-clip cv-auto">
+      <DepthSection className="container-wide relative z-10">
         <Reveal className="mx-auto mb-12 max-w-3xl text-center md:mb-16">
           <h2 className="mb-5 font-display text-fluid-h2 font-black text-white">
             שירותים <span className="text-brand-500">ופתרונות טכנולוגיים</span>
@@ -131,12 +133,15 @@ export default function ServicesSection() {
           </p>
         </Reveal>
 
-        {/* Desktop / tablet: asymmetric bento. lg = 6-col with per-tile spans; md = plain 2-col. */}
+        {/* Desktop / tablet: asymmetric bento. lg = 6-col with per-tile spans; md = plain 2-col.
+            Each tile carries a gentle mouse-tilt over the section's scroll-depth plane. */}
         <Reveal>
-          <div className="mx-auto hidden max-w-[1440px] gap-4 md:grid md:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(210px,1fr)] lg:gap-5">
+          <div className="mx-auto hidden max-w-[1500px] gap-5 md:grid md:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(240px,1fr)] lg:gap-6">
             {SERVICES.map((s) => (
               <div key={s.id} className={s.span}>
-                <ServiceTile s={s} />
+                <TiltCard strength={3} className="h-full">
+                  <ServiceTile s={s} />
+                </TiltCard>
               </div>
             ))}
           </div>
@@ -173,7 +178,7 @@ export default function ServicesSection() {
             בואו נאפיין את הפתרון שלכם
           </WebButton>
         </div>
-      </div>
+      </DepthSection>
     </section>
   );
 }

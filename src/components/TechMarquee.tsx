@@ -222,7 +222,7 @@ export default function TechMarquee() {
   };
 
   return (
-    <section className="relative py-14 md:py-20 border-t border-white/5 overflow-x-clip cv-auto">
+    <section className="relative py-14 md:py-20 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
         <p className="text-center text-xs md:text-sm font-mono font-bold uppercase tracking-[0.25em] text-zinc-500 mb-8">
           הסטאק שמפעיל את כל זה — Infrastructure · Security · AI · Automation

@@ -1,6 +1,7 @@
 import { memo, useMemo, useState, type CSSProperties } from 'react';
 import { Calculator, Clock, TrendingUp, Send, Users, Timer, Wallet } from 'lucide-react';
 import WebButton from '../WebButton';
+import DepthSection from './DepthSection';
 
 /**
  * Interactive "AI & Automation ROI Calculator" — a lead magnet, not a binding quote.
@@ -99,8 +100,8 @@ export default function RoiCalculator() {
   };
 
   return (
-    <section id="roi-calculator" className="relative py-20 md:py-32 border-t border-white/5 overflow-x-clip cv-auto">
-      <div className="container-wide relative z-10">
+    <section id="roi-calculator" className="relative py-16 md:py-28 overflow-x-clip cv-auto">
+      <DepthSection className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
             כמה <span className="text-brand-500">האוטומציה מחזירה לכם?</span>
@@ -110,12 +111,14 @@ export default function RoiCalculator() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6 md:gap-8 max-w-5xl mx-auto items-stretch">
+        <div className="grid lg:grid-cols-2 gap-6 md:gap-8 max-w-6xl mx-auto items-stretch">
           {/* ---- Inputs ---- */}
-          <div className="bg-carbon-900/60 border border-white/10 rounded-2xl p-6 md:p-8 flex flex-col">
-            <div className="flex items-center gap-2.5 mb-7">
-              <Calculator className="w-5 h-5 text-brand-400" />
-              <h3 className="font-display font-bold text-xl text-white">הנתונים שלכם</h3>
+          <div className="bg-carbon-900/60 backdrop-blur-md border border-white/12 rounded-3xl p-7 md:p-8 lg:p-12 flex flex-col">
+            <div className="flex items-center gap-3 mb-8">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-black/40 text-brand-300">
+                <Calculator className="w-5 h-5" />
+              </span>
+              <h3 className="font-display font-extrabold text-2xl lg:text-3xl text-white">הנתונים שלכם</h3>
             </div>
             <div className="space-y-8 flex-1">
               <Slider
@@ -152,40 +155,40 @@ export default function RoiCalculator() {
                 display={ils(hourlyCost)}
               />
             </div>
-            <p className="text-[11px] text-zinc-500 mt-7 leading-relaxed">
+            <p className="text-xs text-zinc-500 mt-8 leading-relaxed">
               ההערכה מניחה ש-{Math.round(AUTOMATION_RECLAIM * 100)}% מהשעות החוזרות שזוהו עוברות לאוטומציה / סוכן AI, לפי{' '}
               {WEEKS_PER_MONTH} שבועות בחודש. מספרים להמחשה בלבד — ההיקף המדויק נקבע בשיחת אפיון.
             </p>
           </div>
 
           {/* ---- Output (updates in place — no remount, no per-tick animation) ---- */}
-          <div className="relative bg-gradient-to-br from-brand-500/[0.14] to-carbon-900 border border-brand-500/30 rounded-2xl p-6 md:p-8 flex flex-col">
+          <div className="relative bg-gradient-to-br from-brand-500/[0.14] to-carbon-900 backdrop-blur-md border border-brand-500/35 rounded-3xl p-7 md:p-8 lg:p-12 flex flex-col shadow-[0_0_56px_-18px_rgba(118,185,0,0.5)]">
             <div
-              className="pointer-events-none absolute -inset-px rounded-2xl bg-brand-500/10 blur-2xl opacity-60"
+              className="pointer-events-none absolute -inset-px rounded-3xl bg-brand-500/10 blur-2xl opacity-60"
               aria-hidden="true"
             />
-            <div className="relative grid sm:grid-cols-2 gap-x-8 gap-y-7 flex-1 content-center">
-              <div className="min-h-[128px]">
-                <div className="flex items-center gap-2 text-[13px] font-display font-bold text-zinc-300 tracking-tight mb-2.5">
-                  <Clock className="w-4 h-4 text-brand-400 shrink-0" />
+            <div className="relative grid sm:grid-cols-2 gap-x-8 gap-y-8 flex-1 content-center">
+              <div className="min-h-[140px]">
+                <div className="flex items-center gap-2 text-sm lg:text-base font-display font-bold text-zinc-200 tracking-tight mb-3">
+                  <Clock className="w-4 h-4 lg:w-5 lg:h-5 text-brand-400 shrink-0" />
                   הזמן שחוזר לצוות / חודש
                 </div>
-                <div className="font-display text-[2rem] sm:text-4xl md:text-[2.75rem] font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_30px_rgba(118,185,0,0.4)]">
+                <div className="font-display text-[2.25rem] sm:text-5xl lg:text-6xl font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_36px_rgba(118,185,0,0.45)]">
                   {FMT_INT.format(reclaimedHours)}
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-2.5 tabular-nums">
+                <p className="text-xs lg:text-sm text-zinc-400 mt-3 tabular-nums">
                   ≈ <span dir="ltr">{FMT_INT.format(weeklyHours)}</span> שעות בשבוע חוזרות לצוות
                 </p>
               </div>
-              <div className="min-h-[128px]">
-                <div className="flex items-center gap-2 text-[13px] font-display font-bold text-zinc-300 tracking-tight mb-2.5">
-                  <TrendingUp className="w-4 h-4 text-brand-400 shrink-0" />
+              <div className="min-h-[140px]">
+                <div className="flex items-center gap-2 text-sm lg:text-base font-display font-bold text-zinc-200 tracking-tight mb-3">
+                  <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-brand-400 shrink-0" />
                   הכסף שנשאר אצלכם / חודש
                 </div>
-                <div className="font-display text-[2rem] sm:text-4xl md:text-[2.75rem] font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_30px_rgba(118,185,0,0.5)]">
+                <div className="font-display text-[2.25rem] sm:text-5xl lg:text-6xl font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_36px_rgba(118,185,0,0.55)]">
                   {ils(monthlySavings)}
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-2.5 tabular-nums">
+                <p className="text-xs lg:text-sm text-zinc-400 mt-3 tabular-nums">
                   ≈ <span dir="ltr">{ils(annualSavings)}</span> / שנה
                 </p>
               </div>
@@ -197,7 +200,7 @@ export default function RoiCalculator() {
             </WebButton>
           </div>
         </div>
-      </div>
+      </DepthSection>
     </section>
   );
 }
