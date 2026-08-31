@@ -98,8 +98,11 @@ const parser = new Parser({
 });
 
 // Feed-plumbing / tracking artefacts that show up as "images" but aren't editorial photos.
+// `googleusercontent|gstatic|/logos/` catches the generic branding image that Google's consent
+// wall / News interstitial pages expose as their og:image — it was getting scraped off
+// `news.google.com` redirect links and pinned onto a dozen unrelated stories.
 const JUNK_IMAGE_RE =
-  /(feedburner|feedsportal|feeds\.wordpress|doubleclick|googlesyndication|scorecardresearch|\/pixel|pixel\.|1x1|blank\.(gif|png)|spacer\.(gif|png)|gravatar\.com\/avatar\/0{16}|\/wp-includes\/images\/)/i;
+  /(feedburner|feedsportal|feeds\.wordpress|doubleclick|googlesyndication|scorecardresearch|googleusercontent\.com|gstatic\.com|\/logos?\/|\/pixel|pixel\.|1x1|blank\.(gif|png)|spacer\.(gif|png)|gravatar\.com\/avatar\/0{16}|\/wp-includes\/images\/)/i;
 
 /** Rewrites a known-CDN thumbnail URL to a larger rendition so the dashboard's 1080px canvas has a
  * sharp source to cover-crop from. Currently: Globes' Cloudinary named crops (`t_800X392` etc.) →
@@ -118,6 +121,14 @@ const OG_IMAGE_RES = [
   /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
   /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
 ];
+
+function safeHost(u: string): string {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return '';
+  }
+}
 
 function pickOgImage(html: string, baseUrl: string): string | undefined {
   for (const re of OG_IMAGE_RES) {
@@ -194,18 +205,26 @@ async function fetchOgImage(articleUrl: string): Promise<string | undefined> {
  * batch of slow/blocked outlets can never balloon the `/api/news` refresh — whatever's filled
  * when the clock runs out is kept. Best-effort: any individual failure is silently skipped. */
 async function enrichImages(items: NewsItem[], limit = 28, overallMs = 12_000): Promise<void> {
-  const targets = items.filter((it) => !it.image).slice(0, limit);
+  // Skip Google-News entries: their `link` is a news.google.com redirect, not a scrapeable
+  // article — fetching it just yields Google's consent-wall og:image.
+  const targets = items
+    .filter((it) => !it.image && !/(^|\.)news\.google\.com/i.test(safeHost(it.link)))
+    .slice(0, limit);
   if (targets.length === 0) return;
 
   const deadline = Date.now() + overallMs;
+  const assigned = new Set<string>(items.map((it) => it.image).filter(Boolean) as string[]);
   let cursor = 0;
   let filled = 0;
   const worker = async () => {
     while (cursor < targets.length && Date.now() < deadline) {
       const it = targets[cursor++];
       const og = await fetchOgImage(it.link);
-      if (og) {
+      // Reject a URL we've already used this refresh — a repeat almost always means a generic
+      // placeholder / error-page image rather than the real article photo.
+      if (og && !assigned.has(og)) {
         it.image = og;
+        assigned.add(og);
         filled++;
       }
     }
