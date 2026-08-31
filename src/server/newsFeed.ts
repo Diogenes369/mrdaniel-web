@@ -101,6 +101,98 @@ const parser = new Parser({
 const JUNK_IMAGE_RE =
   /(feedburner|feedsportal|feeds\.wordpress|doubleclick|googlesyndication|scorecardresearch|\/pixel|pixel\.|1x1|blank\.(gif|png)|spacer\.(gif|png)|gravatar\.com\/avatar\/0{16}|\/wp-includes\/images\/)/i;
 
+/** Rewrites a known-CDN thumbnail URL to a larger rendition so the dashboard's 1080px canvas has a
+ * sharp source to cover-crop from. Currently: Globes' Cloudinary named crops (`t_800X392` etc.) →
+ * a 1600px-wide limit-fit at auto quality. Any URL we don't recognise is returned unchanged. */
+function upscaleCdnImage(url: string): string {
+  if (/res\.cloudinary\.com\/globes\/image\/upload\//.test(url)) {
+    return url.replace(/\/upload\/(t_[^/]+|c_[^/]+|w_\d+[^/]*)\//, '/upload/w_1600,c_limit,q_auto:good/');
+  }
+  return url;
+}
+
+const OG_IMAGE_RES = [
+  /<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i,
+  /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+  /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+  /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
+  /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
+];
+
+/** Last-resort image recovery for feeds that ship no inline media at all (TechTime, Israel
+ * Defense): fetch the article page and read its `og:image` / `twitter:image`. Bounded — browser
+ * UA, tight timeout, reads at most ~256 KB (the tags live in <head>). Returns an absolute URL or
+ * undefined; never throws. */
+async function fetchOgImage(articleUrl: string, timeoutMs = 6000): Promise<string | undefined> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(articleUrl, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
+    });
+    if (!res.ok || !res.body) return undefined;
+
+    // Stream just the head — stop once we've seen </head> or hit the byte cap.
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+    let html = '';
+    for (let read = 0; read < 262_144; ) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      read += value.byteLength;
+      html += decoder.decode(value, { stream: true });
+      if (/<\/head>/i.test(html)) break;
+    }
+    reader.cancel().catch(() => {});
+
+    for (const re of OG_IMAGE_RES) {
+      const m = html.match(re);
+      if (!m?.[1]) continue;
+      let candidate = m[1].trim().replace(/&amp;/g, '&');
+      if (candidate.startsWith('//')) candidate = `https:${candidate}`;
+      if (candidate.startsWith('/')) candidate = new URL(candidate, articleUrl).toString();
+      if (!/^https?:\/\//i.test(candidate) || JUNK_IMAGE_RE.test(candidate)) continue;
+      return upscaleCdnImage(candidate);
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Fills in `image` for items that came out of their feed with none, by scraping the article's
+ * `og:image`. Concurrency-limited and best-effort: bounded to the first `limit` imageless items
+ * (the feed's consumers only ever surface the newest handful per category), 6 in flight, and any
+ * individual failure is silently skipped. */
+async function enrichImages(items: NewsItem[], limit = 48): Promise<void> {
+  const targets = items.filter((it) => !it.image).slice(0, limit);
+  if (targets.length === 0) return;
+
+  let cursor = 0;
+  let filled = 0;
+  const worker = async () => {
+    while (cursor < targets.length) {
+      const it = targets[cursor++];
+      const og = await fetchOgImage(it.link);
+      if (og) {
+        it.image = og;
+        filled++;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, targets.length) }, worker));
+  console.info(`[news] og:image enrichment — filled ${filled}/${targets.length} imageless items`);
+}
+
 /** Best-effort lead-image recovery, tried in order across every feed shape we've seen from the
  * Israeli outlets: <enclosure>, media:thumbnail, media:content / media:group, itunes:image, and
  * finally the first real <img>/<img data-src> inside the item body (contentEncoded / content /
@@ -113,7 +205,7 @@ function extractImage(item: Record<string, any>): string | undefined {
     if (s.startsWith('//')) s = `https:${s}`;
     if (!/^https?:\/\//i.test(s)) return undefined;
     if (JUNK_IMAGE_RE.test(s)) return undefined;
-    return s;
+    return upscaleCdnImage(s);
   };
 
   const enc = item.enclosure;
@@ -370,7 +462,15 @@ async function refreshAll(): Promise<NewsItem[]> {
   const items = dedupe(raw, priorityOf).sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
-  console.info(`[news] refreshed — ${items.length} items after dedup (${raw.length} raw) · ${stats.join(' ')}`);
+
+  // Scrape og:image for the newest items whose feed carried no inline media (TechTime, Israel
+  // Defense, most Google-News entries) so the Content Agent has a real article photo to render.
+  await enrichImages(items).catch((err) => console.error('[news] enrichImages failed:', err));
+
+  const withImg = items.filter((i) => i.image).length;
+  console.info(
+    `[news] refreshed — ${items.length} items after dedup (${raw.length} raw), ${withImg} with image · ${stats.join(' ')}`
+  );
 
   cache = { items, fetchedAt: Date.now() };
   return items;

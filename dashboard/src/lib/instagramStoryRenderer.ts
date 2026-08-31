@@ -1,8 +1,7 @@
 import type { NewsItem } from './newsAgentTypes';
 import { proxiedImageUrl } from './newsFeedClient';
-import { loadPhoto, resolveSlidePhotoUrl, hashSeed } from './pexelsBackground';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
-import { BRAND_GREEN, CHARCOAL, getLogo, loadFont, drawImageCover, wrapRtl } from './newsImageComposer';
+import { BRAND_GREEN, CHARCOAL, getLogo, loadFont, drawImageCover, wrapRtl, resolveNewsBackground } from './newsImageComposer';
 import { buildStorySlides, type StorySlide, type StoryPayload } from './storySlides';
 
 /**
@@ -18,16 +17,9 @@ const H = 1920;
 const PAD = W * 0.09;
 
 async function resolveStoryBg(item: NewsItem): Promise<HTMLImageElement | null> {
-  if (item.image) {
-    const fromFeed = await loadPhoto(proxiedImageUrl(item.image));
-    if (fromFeed) return fromFeed;
-  }
-  try {
-    const url = await resolveSlidePhotoUrl(item.title, item.topic, 'portrait', hashSeed(item.title || item.topic), new Set());
-    return await loadPhoto(url);
-  } catch {
-    return null;
-  }
+  // Shared resolver: original article image (proxied, retried) → direct CORS → topic stock photo.
+  const { img } = await resolveNewsBackground(item, '4:5');
+  return img;
 }
 
 function drawProgressBar(ctx: CanvasRenderingContext2D, index: number, total: number) {

@@ -22,7 +22,7 @@ import {
 } from '../lib/newsAgentTypes';
 import { fetchLatestNewsItem } from '../lib/newsFeedClient';
 import { composeNewsPost, type ComposedPost } from '../lib/newsPostComposer';
-import { renderNewsImage } from '../lib/newsImageComposer';
+import { renderNewsImage, type BgSource } from '../lib/newsImageComposer';
 
 const CATEGORIES: NewsCategory[] = ['cyber', 'ai', 'tech', 'all'];
 const PLATFORM_ICON: Record<SocialPlatform, typeof Linkedin> = { linkedin: Linkedin, instagram: Instagram };
@@ -48,6 +48,7 @@ export default function NewsContentAgent() {
   const [copied, setCopied] = useState(false);
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageSource, setImageSource] = useState<BgSource | null>(null);
   const [rendering, setRendering] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const renderSeq = useRef(0);
@@ -80,14 +81,18 @@ export default function NewsContentAgent() {
   useEffect(() => {
     if (!item) {
       setImageUrl(null);
+      setImageSource(null);
       return;
     }
     const seq = ++renderSeq.current;
     setRendering(true);
     setRenderError(null);
     renderNewsImage(item, { aspect, headline })
-      .then((url) => {
-        if (seq === renderSeq.current) setImageUrl(url);
+      .then(({ dataUrl, imageSource: src }) => {
+        if (seq === renderSeq.current) {
+          setImageUrl(dataUrl);
+          setImageSource(src);
+        }
       })
       .catch(() => {
         if (seq === renderSeq.current) setRenderError('רינדור התמונה נכשל.');
@@ -163,7 +168,18 @@ export default function NewsContentAgent() {
               <span>{item.source}</span>
               <span>·</span>
               <span>{timeLabel(item.publishedAt)}</span>
-              {item.image ? <span className="text-brand-400/70">· תמונה מקורית ✓</span> : <span>· תמונת סטוק</span>}
+              <span>·</span>
+              {imageSource === 'original' ? (
+                <span className="text-brand-400">תמונת המקור מהכתבה ✓</span>
+              ) : imageSource === 'stock' ? (
+                <span className="text-amber-400/90">תמונת סטוק (לא נמצאה תמונת מקור)</span>
+              ) : imageSource === 'none' ? (
+                <span className="text-zinc-500">רקע גרפי בלבד</span>
+              ) : item.image ? (
+                <span className="text-brand-400/70">תמונת מקור זמינה</span>
+              ) : (
+                <span className="text-zinc-500">אין תמונה בפיד</span>
+              )}
             </div>
             <p className="text-sm text-zinc-200 font-bold leading-snug">{item.title}</p>
             <a

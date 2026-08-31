@@ -7,9 +7,11 @@ import { sanitizeHebrewText } from './hebrewTextSanitizer';
  * Client-side branded social image for a news item — one <canvas>, no server render.
  *
  * Layers, bottom to top:
- *   1. Background photo (`object-fit: cover`): the item's own image via the site's CORS relay
- *      (`/api/img-proxy`); if the feed has no image or the relay fails, a topic-matched stock
- *      photo from the shared Pexels pool; if that also fails, a flat charcoal fill.
+ *   1. Background photo (`object-fit: cover`), ORIGINAL ARTICLE IMAGE FIRST: `item.image` (the
+ *      RSS media / og:image from Globes, Ynet, Geektime, TechTime, Israel Defense) via the site's
+ *      CORS relay (`/api/img-proxy`), retried, then a direct CORS attempt. Only if the item has
+ *      no image at all, or every attempt fails, a topic-matched stock photo from the Pexels pool;
+ *      if that also fails, a flat charcoal fill. See `resolveNewsBackground`.
  *   2. Bottom-to-top dark gradient for text/logo contrast.
  *   3. Optional stylised headline (lower area, RTL, sanitised).
  *   4. Category kicker pill, top-right (RTL start).
@@ -72,19 +74,55 @@ export function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElem
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
-async function resolveBackground(item: NewsItem, aspect: ImageAspect): Promise<HTMLImageElement | null> {
+/** Where the rendered background photo actually came from — surfaced to the UI so the operator
+ * sees the truth (a "stock" badge is a prompt to pick a different article), not just whether the
+ * feed happened to include an image URL. */
+export type BgSource = 'original' | 'stock' | 'none';
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** `loadPhoto` with retries — a cold `/api/img-proxy` Lambda or a momentary CDN hiccup shouldn't
+ * be enough to knock the real article image out and drop us to a stock photo. */
+async function loadPhotoRetry(url: string, attempts = 3): Promise<HTMLImageElement | null> {
+  for (let i = 0; i < attempts; i++) {
+    const img = await loadPhoto(url);
+    if (img) return img;
+    if (i < attempts - 1) await sleep(300 * (i + 1));
+  }
+  return null;
+}
+
+/**
+ * Resolve the background photo for a news item, ORIGINAL ARTICLE IMAGE FIRST.
+ *
+ *   1. `item.image` through the CORS relay (`/api/img-proxy`), retried — this is the exact photo
+ *      from the source article (Globes / Ynet / Geektime / TechTime / Israel Defense og:image).
+ *   2. `item.image` loaded directly in CORS mode — succeeds on the CDNs that do send
+ *      `Access-Control-Allow-Origin` (fails clean, never taints the canvas, if they don't).
+ *   3. Only if the item genuinely has NO image, or every attempt above failed: a topic-matched
+ *      stock photo from the shared Pexels pool.
+ *   4. Nothing loaded at all → caller paints the flat charcoal + gradient.
+ */
+export async function resolveNewsBackground(
+  item: NewsItem,
+  aspect: ImageAspect,
+): Promise<{ img: HTMLImageElement | null; source: BgSource }> {
   if (item.image) {
-    const fromFeed = await loadPhoto(proxiedImageUrl(item.image));
-    if (fromFeed) return fromFeed;
+    const viaProxy = await loadPhotoRetry(proxiedImageUrl(item.image), 3);
+    if (viaProxy) return { img: viaProxy, source: 'original' };
+    const direct = await loadPhoto(item.image);
+    if (direct) return { img: direct, source: 'original' };
+    console.warn('[newsImageComposer] original image failed to load, falling back to stock:', item.image);
   }
   try {
     const orientation = ORIENTATION_FOR_ASPECT[aspect];
     const seed = hashSeed(item.title || item.topic);
     // 2nd arg is the raw topic — resolveSlidePhotoUrl derives its own Pexels query from it.
     const url = await resolveSlidePhotoUrl(item.title, item.topic, orientation, seed, new Set());
-    return await loadPhoto(url);
+    const stock = await loadPhoto(url);
+    return { img: stock, source: stock ? 'stock' : 'none' };
   } catch {
-    return null;
+    return { img: null, source: 'none' };
   }
 }
 
@@ -137,20 +175,29 @@ export interface NewsImageOptions {
   headline: boolean;
 }
 
-export async function renderNewsImage(item: NewsItem, opts: NewsImageOptions): Promise<string> {
+export interface RenderedNewsImage {
+  dataUrl: string;
+  /** Provenance of the background photo — `'original'` means the real article image rendered. */
+  imageSource: BgSource;
+}
+
+export async function renderNewsImage(item: NewsItem, opts: NewsImageOptions): Promise<RenderedNewsImage> {
   const { w, h } = ASPECT_SIZE[opts.aspect];
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas 2d context unavailable');
+  // Best-quality resample when cover-cropping the source photo into the fixed export size.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
   const pad = w * 0.07;
 
-  // 1. Background
+  // 1. Background — original article image first, stock only as a fallback (see resolveNewsBackground)
   ctx.fillStyle = CHARCOAL;
   ctx.fillRect(0, 0, w, h);
-  const photo = await resolveBackground(item, opts.aspect);
+  const { img: photo, source: imageSource } = await resolveNewsBackground(item, opts.aspect);
   if (photo) drawImageCover(ctx, photo, 0, 0, w, h);
 
   // 2. Bottom-to-top dark gradient
@@ -210,5 +257,5 @@ export async function renderNewsImage(item: NewsItem, opts: NewsImageOptions): P
     ctx.fillText('MR. DANIEL', w - pad, h - pad);
   }
 
-  return canvas.toDataURL('image/png');
+  return { dataUrl: canvas.toDataURL('image/png'), imageSource };
 }
