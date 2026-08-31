@@ -264,6 +264,9 @@ export interface PublishedPostRecord {
   mode: string;
   slotKey: string; // `${YYYY-MM-DD}-${HH}` — de-dups a cron slot from re-running
   createdAt: number;
+  /** 4-slide Instagram Story text payload (see src/server/storySlides.ts), rendered by the
+   * dashboard's Story Studio. Also mirrored to `story_drafts/<newsId>`. */
+  storySlides?: unknown[];
 }
 
 export async function readAutoPublishConfig(): Promise<AutoPublishConfig | null> {
@@ -310,5 +313,16 @@ export async function updatePublishedPost(id: string, patch: Partial<PublishedPo
     await update(ref(db, `published_posts/${id}`), patch);
   } catch (err) {
     console.error('[auto-publish] failed to update published post:', err);
+  }
+}
+
+/** Mirrors the 4-slide Story payload to `story_drafts/<newsId>` (overwrites — one draft per item). */
+export async function writeStoryDraft(newsId: string, payload: Record<string, unknown>): Promise<void> {
+  const db = getServerDb();
+  if (!db) return;
+  try {
+    await set(ref(db, `story_drafts/${newsId.replace(/[.#$\/[\]]/g, '_')}`), payload);
+  } catch (err) {
+    console.error('[auto-publish] failed to write story draft:', err);
   }
 }

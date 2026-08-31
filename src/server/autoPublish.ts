@@ -4,9 +4,11 @@ import {
   readAutoPublishConfig,
   readPublishedPosts,
   recordPublishedPost,
+  writeStoryDraft,
   agentFirebaseConfigured,
   type PublishedPostRecord,
 } from '../agent/firebaseServer.js';
+import { buildStorySlides } from './storySlides.js';
 
 /**
  * Autonomous news auto-publisher core — a plain module (no HTTP handler) so it can be driven from
@@ -149,6 +151,11 @@ export async function runAutoPublishCycle(opts: RunOpts): Promise<Record<string,
   const imageUrl = publishImageUrl(candidate, SITE_ORIGIN);
   const platforms = platformsFor((cfg.platform ?? 'linkedin') as 'linkedin' | 'instagram' | 'all');
 
+  // 4-slide Instagram-Story text payload — saved alongside the caption for the dashboard's
+  // Story Studio (canvas rendering is client-side there).
+  const story = buildStorySlides(candidate, imageUrl);
+  await writeStoryDraft(candidate.id, story as unknown as Record<string, unknown>);
+
   const results: { platform: string; status: PublishedPostRecord['status']; detail: string; id: string | null }[] = [];
 
   for (const platform of platforms) {
@@ -163,6 +170,7 @@ export async function runAutoPublishCycle(opts: RunOpts): Promise<Record<string,
       imageUrl,
       caption: post.fullText,
       hashtags: post.hashtags,
+      storySlides: story.slides,
       mode: force ? 'manual' : mode,
       slotKey,
       createdAt: Date.now(),

@@ -16,20 +16,20 @@ import { sanitizeHebrewText } from './hebrewTextSanitizer';
  *   5. "MR. DANIEL" logo, bottom-right.
  */
 
-const BRAND_GREEN = '#76B900';
-const CHARCOAL = '#0B0F0E';
+export const BRAND_GREEN = '#76B900';
+export const CHARCOAL = '#0B0F0E';
 const LOGO_URL = '/logo.png';
 
 const ORIENTATION_FOR_ASPECT: Record<ImageAspect, PhotoOrientation> = { '1:1': 'square', '4:5': 'portrait' };
 
-const TOPIC_KICKER: Record<NewsTopic, string> = {
+export const TOPIC_KICKER: Record<NewsTopic, string> = {
   cyber: 'סייבר ואבטחה',
   ai: 'בינה מלאכותית',
   cloud: 'ענן ותשתיות',
   general: 'טכנולוגיה',
 };
 
-function loadImage(src: string): Promise<HTMLImageElement | null> {
+export function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -40,12 +40,12 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
 }
 
 let logoPromise: Promise<HTMLImageElement | null> | null = null;
-function getLogo(): Promise<HTMLImageElement | null> {
+export function getLogo(): Promise<HTMLImageElement | null> {
   if (!logoPromise) logoPromise = loadImage(LOGO_URL);
   return logoPromise;
 }
 
-async function loadFont(spec: string): Promise<void> {
+export async function loadFont(spec: string): Promise<void> {
   try {
     await document.fonts.load(spec);
   } catch {
@@ -54,7 +54,7 @@ async function loadFont(spec: string): Promise<void> {
 }
 
 /** `object-fit: cover` semantics: crop to fill the destination rect, never letterbox. */
-function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number) {
+export function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number) {
   const imgRatio = img.naturalWidth / img.naturalHeight;
   const rectRatio = dw / dh;
   let sx: number, sy: number, sw: number, sh: number;
@@ -115,7 +115,7 @@ function drawKicker(ctx: CanvasRenderingContext2D, label: string, rightX: number
   ctx.fillText(label, rightX - padX, y + boxH / 2 + fontSize * 0.04);
 }
 
-function wrapRtl(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+export function wrapRtl(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = '';
