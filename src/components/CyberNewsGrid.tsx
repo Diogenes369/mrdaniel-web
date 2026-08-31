@@ -47,7 +47,7 @@ export default function CyberNewsGrid() {
             חדשות <span className="text-brand-500">סייבר, AI וטכנולוגיה</span>
           </h2>
           <p className="font-sans text-zinc-300 text-base md:text-lg leading-relaxed [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
-            לוח חדשות חי — ריכוז אוטומטי מגיקטיים, אנשים ומחשבים, Techtime ו-Israel Defense, בעברית.
+            כל מה שזז בטכנולוגיה הישראלית, במקום אחד — מתעדכן אוטומטית מגיקטיים, גלובס, ynet, TechTime ו-Israel Defense.
           </p>
         </div>
 

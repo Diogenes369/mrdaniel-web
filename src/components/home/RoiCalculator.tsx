@@ -103,10 +103,10 @@ export default function RoiCalculator() {
       <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
           <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
-            מחשבון <span className="text-brand-500">ROI לאוטומציה ו-AI</span>
+            כמה <span className="text-brand-500">האוטומציה מחזירה לכם?</span>
           </h2>
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
-            כמה זמן ותקציב הצוות שלכם מאבד על עבודה חוזרת שאפשר להעביר לסוכן AI — הזיזו את המחוונים וקבלו הערכה מיידית.
+            הצוות שלכם שורף שעות על עבודה חוזרת. הזיזו את המחוונים וראו כמה מזה חוזר אליכם — בשעות ובשקלים, כל חודש.
           </p>
         </div>
 
@@ -168,7 +168,7 @@ export default function RoiCalculator() {
               <div className="min-h-[128px]">
                 <div className="flex items-center gap-2 text-[13px] font-display font-bold text-zinc-300 tracking-tight mb-2.5">
                   <Clock className="w-4 h-4 text-brand-400 shrink-0" />
-                  שעות תפעול שמוחזרות / חודש
+                  הזמן שחוזר לצוות / חודש
                 </div>
                 <div className="font-display text-[2rem] sm:text-4xl md:text-[2.75rem] font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_30px_rgba(118,185,0,0.4)]">
                   {FMT_INT.format(reclaimedHours)}
@@ -180,7 +180,7 @@ export default function RoiCalculator() {
               <div className="min-h-[128px]">
                 <div className="flex items-center gap-2 text-[13px] font-display font-bold text-zinc-300 tracking-tight mb-2.5">
                   <TrendingUp className="w-4 h-4 text-brand-400 shrink-0" />
-                  חיסכון תפעולי משוער / חודש
+                  הכסף שנשאר אצלכם / חודש
                 </div>
                 <div className="font-display text-[2rem] sm:text-4xl md:text-[2.75rem] font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_30px_rgba(118,185,0,0.5)]">
                   {ils(monthlySavings)}
@@ -193,7 +193,7 @@ export default function RoiCalculator() {
 
             <WebButton variant="primary" onClick={requestScoping} className="relative mt-6 w-full justify-center">
               <Send className="w-4 h-4" />
-              תאם שיחת אפיון טכנית
+              נתרגם את המספרים לתוכנית עבודה
             </WebButton>
           </div>
         </div>

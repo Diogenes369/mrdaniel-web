@@ -339,9 +339,9 @@ export default function LeadForm() {
                   >
                     <Check className="w-8 h-8 text-brand-400" />
                   </motion.div>
-                  <h4 className="font-display text-2xl font-bold text-white mb-2">הפנייה נשלחה בהצלחה!</h4>
+                  <h4 className="font-display text-2xl font-bold text-white mb-2">קיבלתי. מדבר איתך בקרוב.</h4>
                   <p className="text-zinc-300 text-base leading-relaxed max-w-xs">
-                    תודה {form.name.split(' ')[0]}, הפרטים התקבלו. דניאל יחזור אליך בהקדם למייל שהשארת.
+                    תודה {form.name.split(' ')[0]} — הפרטים אצלי. אחזור אליך למייל שהשארת, בדרך כלל תוך יום עסקים.
                   </p>
                   <WebButton variant="glass" onClick={close} className="mt-8">
                     סגירה
@@ -571,7 +571,7 @@ export default function LeadForm() {
                   </WebButton>
                 ) : (
                   <WebButton variant="primary" disabled={status === 'sending'} onClick={submit}>
-                    {status === 'sending' ? 'שולח...' : 'שליחת פנייה'}
+                    {status === 'sending' ? 'שולח…' : 'שלחו — ואחזור אליכם'}
                   </WebButton>
                 )}
               </div>

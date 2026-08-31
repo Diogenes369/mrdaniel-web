@@ -11,11 +11,11 @@ import { prefersReducedMotion } from '../lib/gsap';
  * a monospace face; the "terminal" character comes entirely from the caret + typing motion.
  */
 const TERMS = [
-  'ארכיטקטורת AI אוטונומית',
-  'סוכני אינטליגנציה מלאכותית',
-  'מערכות Web3 מתקדמות',
-  'פיתוח אפליקציות מקצה לקצה',
-  'אבטחת מידע וסייבר',
+  'סוכני AI שעובדים בשבילכם',
+  'אוטומציה שרצה 24/7',
+  'הגנת סייבר בלי פשרות',
+  'פיתוח פול-סטאק מקצה לקצה',
+  'נוכחות דיגיטלית שממירה',
 ] as const;
 
 const TYPE_MS = 58;      // per-character while typing

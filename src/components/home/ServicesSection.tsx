@@ -124,8 +124,8 @@ export default function ServicesSection() {
             שירותים <span className="text-brand-500">ופתרונות טכנולוגיים</span>
           </h2>
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
-            מעטפת ביצוע ברמה ארגונית, בהתאמה מלאה לצרכים שלכם — סוכני AI ואוטומציה, אבטחת סייבר, ותשתית
-            דיגיטלית Full-Stack מקצה לקצה. כל פרויקט נבנה בהתאמה אישית ומתומחר לפי אפיון, לא לפי מחירון.
+            כל מה שצריך כדי שהטכנולוגיה תעבוד בשבילכם — סוכני AI ואוטומציה, הגנת סייבר, ותשתית דיגיטלית
+            פול-סטאק מקצה לקצה. נבנה בהתאמה אישית, מתומחר לפי אפיון — לא לפי מחירון.
           </p>
         </Reveal>
 
@@ -161,14 +161,14 @@ export default function ServicesSection() {
 
         <div className="mx-auto mt-12 max-w-2xl text-center md:mt-16">
           <p className="mb-5 text-xs text-zinc-500">
-            לא בטוחים איזה שילוב מתאים לכם? נתחיל באפיון קצר — נמפה את הצורך, נגדיר היקף ונחזור עם תוכנית עבודה.
+            לא בטוחים מאיפה להתחיל? שיחת אפיון קצרה — נמפה את הצורך, נגדיר היקף, ונחזור עם תוכנית עבודה ברורה.
           </p>
           <WebButton
             variant="primary"
             onClick={() => openLead('אפיון פתרון טכנולוגי מותאם — שירותים')}
             className="!px-8"
           >
-            לאפיון פתרון מותאם
+            בואו נאפיין את הפתרון שלכם
           </WebButton>
         </div>
       </div>

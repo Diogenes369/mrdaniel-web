@@ -6,7 +6,7 @@ import WebButton from './WebButton';
 export default function Hero() {
   const handleCtaClick = (e: React.MouseEvent<HTMLButtonElement | HTMLAnchorElement>) => {
     e.preventDefault();
-    window.dispatchEvent(new CustomEvent('open-lead-modal', { detail: { subject: 'ייעוץ אסטרטגי', sourceSection: 'Hero CTA' } }));
+    window.dispatchEvent(new CustomEvent('open-lead-modal', { detail: { subject: 'שיחת אפיון — פרויקט חדש', sourceSection: 'Hero CTA' } }));
   };
 
   return (
@@ -22,18 +22,18 @@ export default function Hero() {
           className="max-w-5xl mx-auto text-center px-4"
         >
           <h1 className="font-display text-fluid-hero font-black text-white mb-7 [text-shadow:0_2px_18px_rgba(0,0,0,0.85),0_6px_44px_rgba(0,0,0,0.75)]">
-            הופכים טכנולוגיה מורכבת
+            סוכני AI, סייבר ואוטומציה
             <br />
-            <span className="text-brand-500 [text-shadow:0_2px_18px_rgba(0,0,0,0.85),0_0_30px_rgba(0,255,102,0.35)]">לפתרון תחרותי.</span>
+            <span className="text-brand-500 [text-shadow:0_2px_18px_rgba(0,0,0,0.85),0_0_30px_rgba(0,255,102,0.35)]">שנותנים לכם יתרון בלתי הוגן.</span>
           </h1>
 
           <p className="text-base md:text-xl text-zinc-300 font-light max-w-2xl mx-auto leading-relaxed mb-10 [text-shadow:0_2px_14px_rgba(0,0,0,0.9)]">
-            מייעול תהליכים בעזרת <span className="text-white font-medium">בינה מלאכותית אוטונומית</span>, דרך אבטחת סייבר מקיפה ברמת <span className="text-white font-medium">Zero-Trust</span>, ועד לפיתוח נוכחות דיגיטלית מתקדמת ותוכן מקצועי.
+            בונים לעסק שלכם <span className="text-white font-medium">מערכות AI אוטונומיות</span> שעובדות 24/7, שכבת הגנת סייבר ברמת <span className="text-white font-medium">Zero-Trust</span>, ונוכחות דיגיטלית שממירה — הכל בהתאמה אישית, עם ROI שאפשר למדוד.
           </p>
 
           <div className="flex justify-center">
             <WebButton variant="primary" magnetic onClick={handleCtaClick} className="w-full sm:w-auto">
-              נתחיל פרויקט
+              בואו נזניק את העסק
               <ArrowLeft className="w-5 h-5" />
             </WebButton>
           </div>

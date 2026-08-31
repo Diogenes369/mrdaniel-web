@@ -18,7 +18,7 @@ export default function ContactPortal() {
           (the exact token the Hero <h1> uses) so the closing headline visually matches the opening
           one; stays an <h2> for heading hierarchy. text-wrap:balance from the base rule. ── */}
       <h2 className="relative z-10 font-display font-black text-fluid-hero leading-[1.08] text-white max-w-[16ch] md:max-w-[22ch] mx-auto px-6 [text-shadow:0_2px_22px_rgba(0,0,0,0.9)]">
-        מוכנים לקחת את המערכות שלכם לשלב הבא?
+        יש לכם רעיון? בואו נהפוך אותו למערכת.
       </h2>
 
       {/* ── Compact CTA badge — a sleek, elegant button rather than the previous oversized circle. ── */}
@@ -65,7 +65,7 @@ export default function ContactPortal() {
       {/* ── Expanded closing statement. Balanced onto ~3 even lines on desktop via the
           `#contact-portal p` rule in index.css; scales down cleanly on mobile. ── */}
       <p className="relative z-10 mt-16 md:mt-24 font-sans text-base md:text-lg text-zinc-400 max-w-[34rem] md:max-w-[42rem] mx-auto leading-relaxed md:leading-[1.75] px-6 sm:px-8">
-        מענה אישי, מקצועי וישיר תמיד — ללא בוטים וללא מוקדי שירות. זמין לייעוץ, אפיון פרויקטים, או סתם לשיחת פיתוח מעמיקה. מחכה למייל שלכם.
+        מדבר איתכם אני — לא בוט ולא מוקד. לייעוץ, לאפיון פרויקט, או סתם לשיחת פיתוח מעמיקה. שלחו הודעה ואחזור אליכם.
       </p>
     </section>
   );

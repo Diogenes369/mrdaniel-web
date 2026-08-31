@@ -63,7 +63,7 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
             <ArrowLeft className="w-4 h-4" />
           </WebButton>
           <WebButton variant="ghost" onClick={openLead} className="!px-6">
-            תיאום שיחת אפיון
+            תיאום שיחת אפיון טכנולוגית
           </WebButton>
         </div>
       </div>

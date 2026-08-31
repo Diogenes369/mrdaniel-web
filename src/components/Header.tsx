@@ -21,7 +21,7 @@ const navLinks: NavLink[] = [
   { name: 'סייבר ואבטחה', to: '/cyber' },
   { name: 'פיתוח ושיווק', to: '/digital' },
   { name: 'חדשות', to: '/news' },
-  { name: 'צור קשר', action: 'contact' },
+  { name: 'דברו איתי', action: 'contact' },
 ];
 
 // "Surprise me" destinations for the shuffle toolbar icon.
