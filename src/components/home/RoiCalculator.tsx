@@ -2,6 +2,8 @@ import { memo, useMemo, useState, type CSSProperties } from 'react';
 import { Calculator, Clock, TrendingUp, Send, Users, Timer, Wallet } from 'lucide-react';
 import WebButton from '../WebButton';
 import DepthSection from './DepthSection';
+import SectionBackdrop from './SectionBackdrop';
+import PopHeadline from './PopHeadline';
 
 /**
  * Interactive "AI & Automation ROI Calculator" — a lead magnet, not a binding quote.
@@ -100,17 +102,19 @@ export default function RoiCalculator() {
   };
 
   return (
-    <section id="roi-calculator" className="relative py-16 md:py-28 overflow-x-clip cv-auto">
-      <DepthSection className="container-wide relative z-10">
+    <section id="roi-calculator" className="relative isolate py-20 md:py-28 overflow-x-clip cv-auto">
+      <SectionBackdrop tone="b" />
+
+      <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
-          <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
-            כמה <span className="text-brand-500">האוטומציה מחזירה לכם?</span>
-          </h2>
+          <PopHeadline lead="כמה" accent="האוטומציה מחזירה לכם?" />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
             הצוות שלכם שורף שעות על עבודה חוזרת. הזיזו את המחוונים וראו כמה מזה חוזר אליכם — בשעות ובשקלים, כל חודש.
           </p>
         </div>
+      </div>
 
+      <DepthSection className="container-wide relative z-10">
         <div className="grid lg:grid-cols-2 gap-6 md:gap-8 max-w-6xl mx-auto items-stretch">
           {/* ---- Inputs ---- */}
           <div className="bg-carbon-900/60 backdrop-blur-md border border-white/12 rounded-3xl p-7 md:p-8 lg:p-12 flex flex-col">

@@ -79,6 +79,39 @@
   text-wrap: pretty;
 }
 
+/* "Pop-out" section headline — a full step larger than the fluid-h2 scale (36px → 72px) with
+   tighter tracking for big display Rubik. Paired with PopHeadline.tsx's scroll-driven 3D lift. */
+.text-pop {
+  font-size: clamp(2.25rem, 4.6vw + 1.2rem, 4.5rem);
+  line-height: 1.03;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* Angled section backdrop (SectionBackdrop.tsx) — a barely-there glass panel clipped to a shallow
+   parallelogram and bled past the section, so consecutive sections' panels OVERLAP on a diagonal
+   instead of meeting on a hard rule. `.angle-grid` is the faint mesh inside it, radial-masked so
+   it never terminates on a visible edge; `.backdrop-glow-*` are the two alternating ambient tints
+   (green / blue-with-green-undertone) that drift down the page for depth without any line. */
+.angle-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 58px 58px;
+  -webkit-mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 40%, transparent 88%);
+  mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 40%, transparent 88%);
+}
+.backdrop-glow-a {
+  background:
+    radial-gradient(120% 72% at 50% 0%, rgba(118, 185, 0, 0.06), transparent 72%),
+    radial-gradient(92% 60% at 50% 100%, rgba(118, 185, 0, 0.035), transparent 76%);
+}
+.backdrop-glow-b {
+  background:
+    radial-gradient(120% 72% at 50% 0%, rgba(56, 189, 248, 0.05), transparent 72%),
+    radial-gradient(92% 60% at 50% 100%, rgba(118, 185, 0, 0.03), transparent 76%);
+}
+
 h1, h2, h3, h4 {
   text-wrap: balance;
 }

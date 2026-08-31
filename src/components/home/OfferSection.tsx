@@ -3,6 +3,8 @@ import { ArrowLeft } from 'lucide-react';
 import WebButton from '../WebButton';
 import TiltCard from '../TiltCard';
 import DepthSection from './DepthSection';
+import SectionBackdrop from './SectionBackdrop';
+import PopHeadline from './PopHeadline';
 import ScrollLockRail from '../mobile/ScrollLockRail';
 import type { HomeOffer, OfferBullet } from '../../data/homeOffers';
 
@@ -25,7 +27,7 @@ function BulletCard({ bullet }: { bullet: OfferBullet }) {
   );
 }
 
-export default function OfferSection({ offer }: { offer: HomeOffer }) {
+export default function OfferSection({ offer, tone = 'a' }: { offer: HomeOffer; tone?: 'a' | 'b' }) {
   const navigate = useNavigate();
 
   const openLead = () =>
@@ -38,16 +40,19 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
   return (
     <section
       id={offer.id}
-      className="relative py-16 md:py-28 overflow-x-clip cv-auto"
+      className="relative isolate py-20 md:py-28 overflow-x-clip cv-auto"
     >
-      <DepthSection className="container-wide relative z-10">
+      <SectionBackdrop tone={tone} />
+
+      {/* Header sits ABOVE the depth plane so the pop-out title and the card-grid tilt don't stack. */}
+      <div className="container-wide relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
-          <h2 className="font-display text-fluid-h2 font-black text-white mb-5">
-            {offer.title} <span className="text-brand-500">{offer.accent}</span>
-          </h2>
+          <PopHeadline lead={offer.title} accent={offer.accent} />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">{offer.intro}</p>
         </div>
+      </div>
 
+      <DepthSection className="container-wide relative z-10">
         {/* Desktop / tablet: 4-up grid of hero-scale cards — mouse-tilt layered on the section's
             scroll-depth plane. */}
         <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6 max-w-[1600px] mx-auto mb-12">

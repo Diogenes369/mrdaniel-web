@@ -5,6 +5,8 @@ import Reveal from '../Reveal';
 import WebButton from '../WebButton';
 import TiltCard from '../TiltCard';
 import DepthSection from './DepthSection';
+import SectionBackdrop from './SectionBackdrop';
+import PopHeadline from './PopHeadline';
 import { SERVICES, type ServiceEntry } from '../../data/homeServices';
 
 function openLead(subject: string) {
@@ -121,18 +123,20 @@ export default function ServicesSection() {
   }, []);
 
   return (
-    <section id="services" className="relative py-16 md:py-28 overflow-x-clip cv-auto">
-      <DepthSection className="container-wide relative z-10">
-        <Reveal className="mx-auto mb-12 max-w-3xl text-center md:mb-16">
-          <h2 className="mb-5 font-display text-fluid-h2 font-black text-white">
-            שירותים <span className="text-brand-500">ופתרונות טכנולוגיים</span>
-          </h2>
+    <section id="services" className="relative isolate py-20 md:py-28 overflow-x-clip cv-auto">
+      <SectionBackdrop tone="a" />
+
+      <div className="container-wide relative z-10">
+        <div className="mx-auto mb-12 max-w-3xl text-center md:mb-16">
+          <PopHeadline lead="שירותים" accent="ופתרונות טכנולוגיים" />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
             כל מה שצריך כדי שהטכנולוגיה תעבוד בשבילכם — סוכני AI ואוטומציה, הגנת סייבר, ותשתית דיגיטלית
             פול-סטאק מקצה לקצה. נבנה בהתאמה אישית, מתומחר לפי אפיון — לא לפי מחירון.
           </p>
-        </Reveal>
+        </div>
+      </div>
 
+      <DepthSection className="container-wide relative z-10">
         {/* Desktop / tablet: asymmetric bento. lg = 6-col with per-tile spans; md = plain 2-col.
             Each tile carries a gentle mouse-tilt over the section's scroll-depth plane. */}
         <Reveal>

@@ -17,6 +17,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { prefersReducedMotion } from '../lib/gsap';
+import SectionBackdrop from './home/SectionBackdrop';
+import PopHeadline from './home/PopHeadline';
 
 /**
  * "Arsenal" — infinite tech-stack marquee with detail popovers.
@@ -222,10 +224,12 @@ export default function TechMarquee() {
   };
 
   return (
-    <section className="relative py-14 md:py-20 overflow-x-clip cv-auto">
-      <div className="container-wide relative z-10">
-        <p className="text-center text-xs md:text-sm font-mono font-bold uppercase tracking-[0.25em] text-zinc-500 mb-8">
-          הסטאק שמפעיל את כל זה — Infrastructure · Security · AI · Automation
+    <section className="relative isolate py-20 md:py-28 overflow-x-clip cv-auto">
+      <SectionBackdrop tone="b" />
+      <div className="container-wide relative z-10 mb-10 text-center md:mb-14">
+        <PopHeadline lead="הסטאק" accent="שמפעיל את כל זה" className="mb-3 md:mb-4" />
+        <p className="font-mono text-[11px] md:text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">
+          Infrastructure · Security · AI · Automation
         </p>
       </div>
 
