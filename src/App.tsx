@@ -107,7 +107,7 @@ export default function App() {
           ticker instead renders inline inside the homepage news section (CyberNewsGrid). */}
       <NewsTicker placement="top" />
       <Header />
-      <main key={location.pathname} className="relative z-[1]">
+      <main key={location.pathname} className="relative z-[1] w-full max-w-full overflow-x-clip">
         <Routes location={location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />

@@ -45,10 +45,10 @@ const Slider = memo(function Slider({ id, icon: Icon, label, value, min, max, st
   const fill = `${((value - min) / (max - min)) * 100}%`;
   return (
     <div>
-      <div className="flex items-center justify-between mb-2.5 gap-3">
-        <label htmlFor={id} className="flex items-center gap-2 text-sm font-bold text-zinc-200 leading-tight">
-          <Icon className="w-4 h-4 text-brand-400 shrink-0" />
-          {label}
+      <div className="flex items-start justify-between mb-2.5 gap-3">
+        <label htmlFor={id} className="flex min-w-0 items-start gap-2 text-sm font-bold text-zinc-200 leading-snug">
+          <Icon className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
+          <span className="break-words">{label}</span>
         </label>
         <span className="shrink-0 font-display text-sm font-bold text-brand-300 tabular-nums whitespace-nowrap" dir="ltr">
           {display}
@@ -112,14 +112,14 @@ export default function RoiCalculator() {
       </div>
 
       <DepthSection className="container-wide relative z-10">
-        <div className="grid lg:grid-cols-2 gap-6 md:gap-8 max-w-6xl mx-auto items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 max-w-6xl mx-auto items-stretch">
           {/* ---- Inputs ---- */}
-          <div className="cyber-glass cyber-glass--info rounded-3xl p-7 md:p-8 lg:p-12 flex flex-col">
+          <div className="cyber-glass cyber-glass--info w-full min-w-0 rounded-3xl p-5 sm:p-7 lg:p-10 flex flex-col">
             <div className="flex items-center gap-3 mb-8">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-black/40 text-brand-300">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-black/40 text-brand-300">
                 <Calculator className="w-5 h-5" />
               </span>
-              <h3 className="font-display font-extrabold text-2xl lg:text-3xl text-white">הנתונים שלכם</h3>
+              <h3 className="font-display font-extrabold text-xl sm:text-2xl lg:text-3xl text-white">הנתונים שלכם</h3>
             </div>
             <div className="space-y-8 flex-1">
               <Slider
@@ -163,26 +163,26 @@ export default function RoiCalculator() {
           </div>
 
           {/* ---- Output (updates in place — no remount, no per-tick animation) ---- */}
-          <div className="cyber-glass cyber-glass--info rounded-3xl p-7 md:p-8 lg:p-12 flex flex-col shadow-[0_0_48px_-20px_rgba(118,185,0,0.4)]">
-            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-8 flex-1 content-center">
-              <div className="min-h-[140px]">
+          <div className="cyber-glass cyber-glass--info w-full min-w-0 break-words rounded-3xl p-5 sm:p-7 lg:p-10 flex flex-col shadow-[0_0_48px_-20px_rgba(118,185,0,0.4)]">
+            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-7 flex-1 content-center">
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 text-sm lg:text-base font-display font-bold text-zinc-200 tracking-tight mb-3">
                   <Clock className="w-4 h-4 lg:w-5 lg:h-5 text-brand-400 shrink-0" />
-                  הזמן שחוזר אליכם / חודש
+                  <span>הזמן שחוזר אליכם / חודש</span>
                 </div>
-                <div className="font-display text-[2.25rem] sm:text-5xl lg:text-6xl font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_36px_rgba(118,185,0,0.45)]">
+                <div className="font-display text-xl sm:text-3xl lg:text-4xl font-black text-brand-400 tabular-nums break-words leading-none [text-shadow:0_0_36px_rgba(118,185,0,0.45)]">
                   {FMT_INT.format(reclaimedHours)}
                 </div>
                 <p className="text-xs lg:text-sm text-zinc-400 mt-3 tabular-nums">
                   ≈ <span dir="ltr">{FMT_INT.format(weeklyHours)}</span> שעות בשבוע חוזרות אליכם
                 </p>
               </div>
-              <div className="min-h-[140px]">
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 text-sm lg:text-base font-display font-bold text-zinc-200 tracking-tight mb-3">
                   <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-brand-400 shrink-0" />
-                  הכסף שנשאר אצלכם / חודש
+                  <span>הכסף שנשאר אצלכם / חודש</span>
                 </div>
-                <div className="font-display text-[2.25rem] sm:text-5xl lg:text-6xl font-black text-brand-400 tabular-nums whitespace-nowrap leading-none [text-shadow:0_0_36px_rgba(118,185,0,0.55)]">
+                <div className="font-display text-xl sm:text-3xl lg:text-4xl font-black text-brand-400 tabular-nums break-words leading-none [text-shadow:0_0_36px_rgba(118,185,0,0.55)]">
                   {ils(monthlySavings)}
                 </div>
                 <p className="text-xs lg:text-sm text-zinc-400 mt-3 tabular-nums">
@@ -191,8 +191,8 @@ export default function RoiCalculator() {
               </div>
             </div>
 
-            <WebButton variant="primary" onClick={requestScoping} className="relative mt-6 w-full justify-center">
-              <Send className="w-4 h-4" />
+            <WebButton variant="primary" onClick={requestScoping} className="relative mt-8 w-full justify-center">
+              <Send className="w-4 h-4 shrink-0" />
               נתרגם את המספרים לתוכנית עבודה
             </WebButton>
           </div>
