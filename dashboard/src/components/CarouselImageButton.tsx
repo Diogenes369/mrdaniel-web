@@ -58,7 +58,7 @@ export default function CarouselImageButton({ state, onGenerate }: Props) {
   const images = state.compositedImages ?? [];
   return (
     <div className="space-y-2">
-      <div className="flex items-start gap-1.5 overflow-x-auto pb-1 flex-wrap">
+      <div className="flex flex-wrap items-start gap-1.5">
         {images.map((src, i) => (
           <a
             key={i}

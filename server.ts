@@ -40,6 +40,7 @@ import {
   type VideoScriptInput,
 } from './src/agent/VideoGenerationEngine';
 import { runAutoPublishCycle, dispatchPublish } from './src/server/autoPublish';
+import leadsHandler from './api/leads';
 
 const PORT = Number(process.env.PORT) || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -97,57 +98,12 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Lead capture
+// Lead capture + email engine — delegate to the Vercel handler (api/leads.ts), which is
+// Express-compatible. Keeps the lead flow and the send-campaign / send-test / newsletter-signup
+// actions identical between local dev and production.
 // ---------------------------------------------------------------------------
 
-const LEAD_EMAIL_TO = process.env.LEAD_EMAIL_TO || 'danihell3039@gmail.com';
-
-function getMailTransporter() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) return null;
-
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: Number(SMTP_PORT) === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-  });
-}
-
-app.post('/api/leads', async (req: Request, res: Response) => {
-  const { name, email, phone, project, notes, sourceSection, selectedProduct, productCategory, price, userCompanySize } = req.body ?? {};
-
-  if (!name || !email) {
-    res.status(400).json({ ok: false, error: 'missing name/email' });
-    return;
-  }
-
-  const transporter = getMailTransporter();
-  if (!transporter) {
-    console.log('[lead] (SMTP not configured, logging only)', { name, email, phone, project, notes, sourceSection, selectedProduct, productCategory, price, userCompanySize });
-    res.json({ ok: true });
-    return;
-  }
-
-  const productLines = selectedProduct
-    ? `\nמוצר/סוכן נבחר: ${selectedProduct}${productCategory ? ` (${productCategory})` : ''}\nמחיר: ${price ? `₪${price}` : '-'}\nגודל ארגון: ${userCompanySize || '-'}\n`
-    : '';
-  const subjectPrefix = selectedProduct ? `ליד חדש · ${selectedProduct}` : 'ליד חדש מהאתר';
-
-  try {
-    await transporter.sendMail({
-      from: `"אתר דניאל בן ברוך" <${process.env.SMTP_USER}>`,
-      to: LEAD_EMAIL_TO,
-      replyTo: email,
-      subject: `${subjectPrefix}: ${name}`,
-      text: `שם: ${name}\nאימייל: ${email}\nטלפון: ${phone || '-'}\nמקור הפנייה: ${sourceSection || '-'}\nפרויקט: ${project || '-'}${productLines}\nהערות:\n${notes || '-'}`,
-    });
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Lead email error:', err);
-    res.status(500).json({ ok: false, error: 'send failed' });
-  }
-});
+app.post('/api/leads', (req: Request, res: Response) => leadsHandler(req, res));
 
 // ---------------------------------------------------------------------------
 // Health check — pinged by src/lib/tracker.ts to derive real client-measured latency

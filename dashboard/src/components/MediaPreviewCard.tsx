@@ -52,7 +52,7 @@ export default function MediaPreviewCard({ frames, platform }: { frames: MediaFr
       </div>
 
       {frames.length > 1 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-[220px] mx-auto">
+        <div className="flex flex-wrap justify-center items-center gap-1.5 max-w-[240px] mx-auto">
           {frames.map((f) => (
             <FrameTile key={f.frameIndex} frame={f} />
           ))}

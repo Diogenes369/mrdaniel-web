@@ -326,3 +326,96 @@ export async function writeStoryDraft(newsId: string, payload: Record<string, un
     console.error('[auto-publish] failed to write story draft:', err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Email engine (api/leads.ts email actions, src/server/emailEngine.ts)
+// RTDB: `newsletter_signups` (append-only), `email_config` + `email_templates`
+// (dashboard-owned). Same "add the rule in the Firebase console" caveat.
+// ---------------------------------------------------------------------------
+
+export interface EmailConfig {
+  autoWelcome?: boolean;
+  welcomeTemplateId?: string;
+  fromName?: string;
+}
+
+export async function pushNewsletterSignup(record: Record<string, unknown>): Promise<string | null> {
+  const db = getServerDb();
+  if (!db) return null;
+  try {
+    const r = await push(ref(db, 'newsletter_signups'), record);
+    return r.key;
+  } catch (err) {
+    console.error('[email] failed to push newsletter signup:', err);
+    return null;
+  }
+}
+
+function collectEmails(node: unknown): string[] {
+  if (!node || typeof node !== 'object') return [];
+  const out = new Set<string>();
+  for (const v of Object.values(node as Record<string, any>)) {
+    const email = typeof v?.email === 'string' ? v.email.trim().toLowerCase() : '';
+    if (email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) out.add(email);
+  }
+  return [...out];
+}
+
+export async function readNewsletterEmails(): Promise<string[]> {
+  const db = getServerDb();
+  if (!db) return [];
+  try {
+    const snap = await get(ref(db, 'newsletter_signups'));
+    return collectEmails(snap.val());
+  } catch (err) {
+    console.error('[email] failed to read newsletter_signups:', err);
+    return [];
+  }
+}
+
+export async function readLeadEmails(): Promise<string[]> {
+  const db = getServerDb();
+  if (!db) return [];
+  try {
+    const snap = await get(ref(db, 'leads'));
+    return collectEmails(snap.val());
+  } catch (err) {
+    console.error('[email] failed to read leads:', err);
+    return [];
+  }
+}
+
+export async function readEmailConfig(): Promise<EmailConfig> {
+  const db = getServerDb();
+  if (!db) return {};
+  try {
+    const snap = await get(ref(db, 'email_config'));
+    return snap.exists() ? (snap.val() as EmailConfig) : {};
+  } catch (err) {
+    console.error('[email] failed to read email_config:', err);
+    return {};
+  }
+}
+
+export async function readEmailTemplate(id: string): Promise<{ subject?: string; html?: string; name?: string } | null> {
+  const db = getServerDb();
+  if (!db || !id) return null;
+  try {
+    const snap = await get(ref(db, `email_templates/${id.replace(/[.#$\/[\]]/g, '_')}`));
+    return snap.exists() ? snap.val() : null;
+  } catch (err) {
+    console.error('[email] failed to read email template:', err);
+    return null;
+  }
+}
+
+/** Records a campaign send into `email_campaigns` for the dashboard history. */
+export async function recordEmailCampaign(record: Record<string, unknown>): Promise<void> {
+  const db = getServerDb();
+  if (!db) return;
+  try {
+    await push(ref(db, 'email_campaigns'), record);
+  } catch (err) {
+    console.error('[email] failed to record campaign:', err);
+  }
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Wifi, WifiOff } from 'lucide-react';
+import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff } from 'lucide-react';
 import { useAuthUser, logout } from './lib/auth';
 import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
 import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
@@ -23,10 +23,11 @@ import AgentControlPanel from './components/AgentControlPanel';
 import NewsContentAgent from './components/NewsContentAgent';
 import AutoPublisherPanel from './components/AutoPublisherPanel';
 import InstagramStoryCanvas from './components/InstagramStoryCanvas';
+import EmailManagerPanel from './components/EmailManagerPanel';
 import WeeklyPlanCalendar from './components/WeeklyPlanCalendar';
 import ErrorBoundary from './components/ErrorBoundary';
 
-type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'auto-publisher' | 'weekly-plan';
+type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'auto-publisher' | 'email' | 'weekly-plan';
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'overview', label: 'סקירה כללית', icon: LayoutGrid },
@@ -38,6 +39,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'news-agent', label: 'מחולל תוכן מחדשות', icon: Newspaper },
   { id: 'story', label: 'מחולל סטורי', icon: Film },
   { id: 'auto-publisher', label: 'אוטונומיה', icon: Rocket },
+  { id: 'email', label: 'מערכת דיוור ומיילים', icon: Mail },
   { id: 'weekly-plan', label: 'לוח תוכן שבועי', icon: Calendar },
 ];
 
@@ -104,8 +106,8 @@ export default function App() {
   });
 
   return (
-    <div dir="rtl" className="dash-root min-h-screen bg-carbon-950 text-zinc-100 p-6 md:p-10 font-sans">
-      <div className="max-w-7xl mx-auto">
+    <div dir="rtl" className="dash-root min-h-screen bg-carbon-950 text-zinc-100 p-5 md:p-8 font-sans">
+      <div className="w-full">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
           <div>
             <h1 className="font-display font-black text-2xl md:text-3xl text-white">לוח בקרה בזמן אמת</h1>
@@ -130,8 +132,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab nav */}
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+        {/* Tab nav — wraps onto multiple rows instead of a horizontal scrollbar. */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -228,6 +230,12 @@ export default function App() {
         {tab === 'auto-publisher' && (
           <ErrorBoundary label="אוטונומיה">
             <AutoPublisherPanel />
+          </ErrorBoundary>
+        )}
+
+        {tab === 'email' && (
+          <ErrorBoundary label="מערכת דיוור ומיילים">
+            <EmailManagerPanel />
           </ErrorBoundary>
         )}
 
