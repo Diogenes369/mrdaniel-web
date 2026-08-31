@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { useAutoRefresh } from '../lib/useDashboardRefresh';
-import type { DeviceType, HealthRecord, PresenceRecord, TrackedEvent } from '../lib/types';
-
-type EventRow = TrackedEvent & { id: string };
+import { selectActiveSessions, selectActivePresence, deviceCounts } from '../lib/presence';
+import type { HealthRecord, PresenceRecord, TrackedEvent } from '../lib/types';
 import LiveStatusBar from './LiveStatusBar';
 import LiveCounter from './LiveCounter';
 import HealthGauge from './HealthGauge';
@@ -10,11 +9,14 @@ import DeviceBreakdown from './DeviceBreakdown';
 import TrafficChart from './TrafficChart';
 import EventFeed from './EventFeed';
 
+type EventRow = TrackedEvent & { id: string };
+
 /**
- * "Overview" tab — the live snapshot. Owns a 5-second auto-refresh cycle (LiveStatusBar's badge,
- * countdown ring, and manual "רענן עכשיו"); the Firebase-backed data itself is already push-based,
- * so the cycle only drives the countdown and any relative-time recomputation. One interval,
- * cleaned up by useAutoRefresh on unmount.
+ * "Overview" tab — the live snapshot. Owns a 5-second auto-refresh cycle: `refresh.tick` changes
+ * every 5s (and on the manual "רענן עכשיו"), which re-runs the active-session filter against a
+ * fresh `Date.now()`, so a session whose heartbeat goes stale disappears from EVERY card within
+ * ≤5s even if Firebase sends no new `presence` event. All cards read the SAME filtered set, so the
+ * total count always equals the device breakdown.
  */
 export default function OverviewPanel({
   presence,
@@ -27,20 +29,25 @@ export default function OverviewPanel({
 }) {
   const refresh = useAutoRefresh(5000);
 
-  const { list, counts } = useMemo(() => {
-    const list = Object.values(presence);
-    const counts: Record<DeviceType, number> = { mobile: 0, desktop: 0, tablet: 0 };
-    for (const p of list) counts[p.device] = (counts[p.device] ?? 0) + 1;
-    return { list, counts };
-  }, [presence]);
+  const { activePresence, counts, count } = useMemo(() => {
+    const now = Date.now();
+    const sessions = selectActiveSessions(presence, now);
+    return {
+      activePresence: selectActivePresence(presence, now),
+      counts: deviceCounts(sessions),
+      count: sessions.length,
+    };
+    // refresh.tick is a deliberate dep — it re-ages the freshness window on the 5s cadence.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presence, refresh.tick]);
 
   return (
     <div className="space-y-5">
-      <LiveStatusBar refresh={refresh} activeUsers={list.length} />
+      <LiveStatusBar refresh={refresh} activeUsers={count} />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <LiveCounter count={list.length} mobile={counts.mobile} desktop={counts.desktop} tablet={counts.tablet} />
+        <LiveCounter count={count} mobile={counts.mobile} desktop={counts.desktop} tablet={counts.tablet} />
         <HealthGauge health={health} />
-        <DeviceBreakdown presence={presence} />
+        <DeviceBreakdown presence={activePresence} />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <TrafficChart events={events} />

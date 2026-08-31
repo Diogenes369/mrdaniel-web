@@ -163,7 +163,7 @@ Cron: header `Authorization: Bearer ${CRON_SECRET}`.
 ### 5.1 סכמה (paths)
 | Path | נכתב על ידי | נקרא על ידי | מבנה |
 |---|---|---|---|
-| `presence/` | tracker (אתר) | דשבורד | `{ <sessionId>: { device, path, startedAt, browser, screen, lang, timezone, referrer, ip (ממוסך), countryCode, region, city } }`. ה-IP והגאו נלכדים פעם אחת ב-init דרך `/api/health` (headers של `x-vercel-ip-*`), ה-IP ממוסך לפני כתיבה. הרשומה נמחקת אוטומטית ב-`onDisconnect`. |
+| `presence/` | tracker (אתר) | דשבורד | `{ <sessionId>: { device, path, startedAt, lastSeen, browser, screen, lang, timezone, referrer, ip (ממוסך), countryCode, region, city } }`. `writePresence()` כותב את הרשומה המלאה ב-init, בכל route change, ב-heartbeat כל 25 שניות, וב-`visibilitychange` — וכל פעם מזיין מחדש `onDisconnect().remove()`. ה-IP והגאו נלכדים פעם אחת דרך `/api/health` (headers `x-vercel-ip-*`), ה-IP ממוסך. **הדשבורד סופר "פעיל" רק רשומה תקינה (device מוכר + startedAt מספרי) שה-`lastSeen`/`startedAt` שלה בטווח 60 שניות** (`dashboard/src/lib/presence.ts`) — כך הספירה הכוללת תמיד שווה לפירוט המכשירים, ורשומות "רפאים" (partial write ישן) או תקועות (onDisconnect שנכשל) נושרות תוך ≤5ש׳. |
 | `events/` | tracker (אתר) | דשבורד | אירועי גלישה/המרה |
 | `health/latest` | tracker | דשבורד | מדדי בריאות |
 | `leads/` | tracker (`push`) | דשבורד, `api/leads` (איסוף נמענים) | `{ <id>: { name, email, phone, sourceSection, status, ts } }` |

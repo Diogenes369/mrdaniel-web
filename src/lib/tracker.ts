@@ -1,4 +1,4 @@
-import { ref, push, set, update, remove, onDisconnect } from 'firebase/database';
+import { ref, push, set, remove, onDisconnect } from 'firebase/database';
 import { getDb, firebaseConfigured } from './firebaseClient';
 
 export type DeviceType = 'mobile' | 'tablet' | 'desktop';
@@ -79,8 +79,47 @@ function detectBrowser(): string {
 const sessionId = firebaseConfigured ? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}` : '';
 let started = false;
 let healthIntervalId: number | null = null;
+let presenceIntervalId: number | null = null;
 let lastPath = '';
 const scrolledMilestones = new Set<number>();
+
+/** Fixed for the life of the session — every presence write reuses it so "dwell time" on the
+ * dashboard is stable, while `lastSeen` (written fresh each time) is what proves the session is
+ * still alive. */
+const presenceStartedAt = Date.now();
+/** IP + edge geo, filled in once by `captureGeo()` and merged into every subsequent presence
+ * write so a heartbeat re-write never drops it. */
+let geoExtra: Record<string, string> = {};
+
+/**
+ * Writes THIS session's full presence record and (re-)arms its `onDisconnect` cleanup. Called on
+ * init, on every route change, on a ~25s heartbeat, and when the tab regains focus — so a record
+ * that Firebase's `onDisconnect` removed during a background/blip is fully restored (with a fresh
+ * `onDisconnect` armed) the moment the tab is active again, and its `lastSeen` never goes stale
+ * while the user is really here. A partial `set(presence/<id>/path, …)` is deliberately NOT used:
+ * that would resurrect a removed node as a device-less "ghost" that inflates the dashboard count.
+ */
+function writePresence(): void {
+  const db = getDb();
+  if (!db || !sessionId) return;
+  const presenceRef = ref(db, `presence/${sessionId}`);
+  set(
+    presenceRef,
+    clean({
+      device: detectDevice(),
+      browser: detectBrowser(),
+      path: window.location.pathname,
+      screen: `${window.screen.width}x${window.screen.height}`,
+      lang: navigator.language || '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+      referrer: document.referrer || '',
+      startedAt: presenceStartedAt,
+      lastSeen: Date.now(),
+      ...geoExtra,
+    })
+  ).catch(() => {});
+  onDisconnect(presenceRef).remove();
+}
 
 function baseContext(): EventContext {
   return {
@@ -131,24 +170,22 @@ function pingHealth() {
 }
 
 /** One-shot: read this visitor's IP + edge geo from `/api/health` (same-origin, so the Vercel
- * `x-vercel-ip-*` headers describe THIS visitor) and merge it onto their presence record. IP is
- * masked before it's written. */
+ * `x-vercel-ip-*` headers describe THIS visitor), stash it in `geoExtra`, and re-write presence so
+ * it lands on the record. IP is masked before it's written. Goes through `writePresence()` (a full
+ * `set`, not a partial `update`) so it can't recreate a device-less ghost node. */
 function captureGeo() {
-  const db = getDb();
-  if (!db || !sessionId) return;
+  if (!getDb() || !sessionId) return;
   fetch('/api/health', { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => {
       if (!d) return;
-      update(
-        ref(db, `presence/${sessionId}`),
-        clean({
-          ip: typeof d.ip === 'string' && d.ip ? maskIp(d.ip) : undefined,
-          countryCode: typeof d.country === 'string' && d.country ? d.country : undefined,
-          region: typeof d.countryRegion === 'string' && d.countryRegion ? d.countryRegion : undefined,
-          city: typeof d.city === 'string' && d.city ? d.city : undefined,
-        })
-      ).catch(() => {});
+      geoExtra = clean({
+        ip: typeof d.ip === 'string' && d.ip ? maskIp(d.ip) : undefined,
+        countryCode: typeof d.country === 'string' && d.country ? d.country : undefined,
+        region: typeof d.countryRegion === 'string' && d.countryRegion ? d.countryRegion : undefined,
+        city: typeof d.city === 'string' && d.city ? d.city : undefined,
+      }) as Record<string, string>;
+      if (started) writePresence();
     })
     .catch(() => {});
 }
@@ -276,25 +313,21 @@ export function initTracker() {
   if (!db || started) return;
   started = true;
 
-  const ctx = baseContext();
   const presenceRef = ref(db, `presence/${sessionId}`);
-  set(presenceRef, {
-    device: ctx.device,
-    browser: ctx.browser,
-    path: ctx.path,
-    screen: ctx.screen,
-    lang: ctx.lang,
-    timezone: ctx.timezone,
-    referrer: ctx.referrer,
-    startedAt: ctx.ts,
-  }).catch(() => {});
-  onDisconnect(presenceRef).remove();
+  writePresence();
   captureGeo();
 
-  lastPath = ctx.path;
+  lastPath = window.location.pathname;
   logEvent('session_start');
   pingHealth();
   healthIntervalId = window.setInterval(pingHealth, 30_000);
+  // Heartbeat: refresh `lastSeen` (and re-arm onDisconnect) well inside the dashboard's ~60s
+  // freshness window, so a live session is never dropped and any stranded ghost self-expires.
+  presenceIntervalId = window.setInterval(writePresence, 25_000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') writePresence();
+  });
 
   setupClickTracking();
   setupHoverTracking();
@@ -302,6 +335,7 @@ export function initTracker() {
 
   window.addEventListener('beforeunload', () => {
     if (healthIntervalId !== null) window.clearInterval(healthIntervalId);
+    if (presenceIntervalId !== null) window.clearInterval(presenceIntervalId);
     remove(presenceRef).catch(() => {});
   });
 }
@@ -310,7 +344,9 @@ export function initTracker() {
 export function trackPageview(path: string) {
   const db = getDb();
   if (!db) return;
-  set(ref(db, `presence/${sessionId}/path`), path).catch(() => {});
+  // Full re-write (not a partial `set(.../path)`): heals the record if onDisconnect removed it
+  // during a background/blip, re-arms onDisconnect, and refreshes `lastSeen`.
+  writePresence();
   scrolledMilestones.clear();
   logEvent('pageview', { fromPath: lastPath || undefined });
   lastPath = path;

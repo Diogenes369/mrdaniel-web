@@ -9,6 +9,9 @@ export interface PresenceRecord {
   lang?: string;
   timezone?: string;
   referrer?: string;
+  /** Heartbeat — refreshed by the tracker every ~25s (and on route change / tab focus). A session
+   * is "active" only while this (or `startedAt`) is within ACTIVE_WINDOW_MS. */
+  lastSeen?: number;
   /** Enhanced session details captured once at init (src/lib/tracker.ts `captureGeo`). */
   ip?: string;
   /** ISO country code from Vercel's edge (`x-vercel-ip-country`), e.g. "IL". */
