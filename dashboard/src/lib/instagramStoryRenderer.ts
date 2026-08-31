@@ -9,7 +9,8 @@ import { buildStorySlides, type StorySlide, type StoryPayload } from './storySli
  * Instagram Story renderer — 9:16 (1080×1920), one <canvas> per slide, no server render.
  * Every slide shares: the full-bleed brand background (the news photo, prominent on the cover /
  * heavily darkened as texture elsewhere) + dark gradient, a 4-segment progress bar up top, the
- * topic kicker, the MR. DANIEL logo, and the `mrdaniel.co.il` footer.
+ * topic kicker, and the MR. DANIEL logo bottom-right. The `mrdaniel.co.il` domain text appears
+ * ONLY on slide 4 (the CTA slide) — as the footer AND the prominent link pill.
  */
 
 const W = 1080;
@@ -62,7 +63,9 @@ function drawKicker(ctx: CanvasRenderingContext2D, label: string, y: number) {
   ctx.fillText(label, rightX - padX, y + boxH / 2 + fontSize * 0.04);
 }
 
-async function drawFooter(ctx: CanvasRenderingContext2D) {
+/** Branded MR. DANIEL logo, bottom-right, on every slide. The `mrdaniel.co.il` domain text is
+ * drawn bottom-left ONLY on the CTA slide (`withDomain`) — the link belongs on slide 4. */
+async function drawFooter(ctx: CanvasRenderingContext2D, withDomain: boolean) {
   const logo = await getLogo();
   const y = H - PAD * 0.85;
   if (logo) {
@@ -70,12 +73,14 @@ async function drawFooter(ctx: CanvasRenderingContext2D) {
     const logoW = logoH * (logo.naturalWidth / logo.naturalHeight);
     ctx.drawImage(logo, W - PAD - logoW, y - logoH, logoW, logoH);
   }
-  ctx.font = `600 ${Math.round(W * 0.026)}px Rubik, sans-serif`;
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.direction = 'ltr';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText('mrdaniel.co.il', PAD, y);
+  if (withDomain) {
+    ctx.font = `600 ${Math.round(W * 0.026)}px Rubik, sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.direction = 'ltr';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('mrdaniel.co.il', PAD, y);
+  }
 }
 
 function paintBackground(ctx: CanvasRenderingContext2D, photo: HTMLImageElement | null, kind: StorySlide['kind']) {
@@ -226,7 +231,7 @@ async function renderSlide(slide: StorySlide, photo: HTMLImageElement | null): P
     ctx.direction = 'rtl';
   }
 
-  await drawFooter(ctx);
+  await drawFooter(ctx, slide.kind === 'cta');
   return canvas.toDataURL('image/png');
 }
 
