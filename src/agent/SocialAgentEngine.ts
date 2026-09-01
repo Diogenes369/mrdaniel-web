@@ -368,3 +368,95 @@ export function scoreLeadIntent(query: string): LeadScoreResultShape {
   const intent: LeadIntent = score >= 5 ? 'high' : score >= 2 ? 'medium' : 'low';
   return { intent, score, reasons };
 }
+
+// --- Story-slide synthesis (strict article grounding) -------------------------------------
+// Replaces the deterministic sentence-splitter in storySlides.ts when GEMINI_API_KEY is set.
+// The model receives the FULL cleaned article text and must summarise only what's in it — no
+// generic filler, no bullet lists, and the first sentence of each body must not restate its title.
+
+export interface SynthesizedSlide {
+  kind: 'cover' | 'body' | 'takeaway' | 'cta';
+  title: string;
+  narrativeText: string;
+}
+
+const STORY_SYNTH_SYSTEM_INSTRUCTION = `אתה עורך חדשות טכנולוגי מנוסה שכותב סטוריז לאינסטגרם. קיבלת טקסט מלא של כתבת חדשות. הפק 4–6 שקופיות בעברית שמסכמות אך ורק את מה שכתוב בכתבה עצמה.
+
+חוקים מחייבים:
+1. הסתמכות מוחלטת על הטקסט: כל עובדה בשקופית חייבת להופיע בכתבה שסופקה. אסור להמציא, אסור להוסיף ידע כללי, ואסור להשתמש במשפטי מדף גנריים (למשל "יש בינה מלאכותית", "סוכן טוב נבנה סביב תהליך אחד", "אבטחה היא חלק מהאפיון"). אם עובדה לא מופיעה בטקסט — היא לא נכנסת.
+2. חילוץ עובדות חמות: מספרים, אחוזים, סכומי כסף, שמות חברות ומוצרים, גרסאות, תאריכים, ציטוטים ישירים, והשפעה טכנולוגית מדידה — הכניסו אותם לשקופיות.
+3. אין תבליטים ואין רשימות. כל שקופית = פסקה נרטיבית אחת, קצרה וחדה (2–4 משפטים, עד 55 מילים), בטון עיתונאי מקצועי, טבעי וזורם — לא "AI פלאפי".
+4. איסור כפילות כותרת–גוף: המשפט הראשון של narrativeText לא יחזור ולא ינסח מחדש את ה-title של אותה שקופית. ה-title הוא זווית/כותרת משנה; ה-narrativeText מביא את הפרטים החדשים.
+5. כל title מובחן וספציפי למה שהשקופית מכסה. אין כותרות גנריות ("מה קרה", "למה זה חשוב", "קריאה לפעולה").
+
+מבנה (שדה kind):
+- "cover": title = הכותרת החדשותית החדה ביותר; narrativeText = משפט פתיחה אחד עם העובדה/הנתון הכי חזק בכתבה.
+- "body" (2–3 שקופיות): כל אחת מכסה עובדה או היבט אחר — נתונים, השקה, מחיר, יכולת טכנית, תגובת שוק, מגבלה.
+- "takeaway": המשמעות המעשית לעצמאי / פרילנסר / עסק קטן — נגזרת מהכתבה, לא סיסמה.
+- "cta": title = הזמנה קצרה; narrativeText = משפט אחד על השירותים ב-mrdaniel.co.il (סוכני AI, אוטומציה, אבטחת סייבר לעסקים קטנים).
+
+פלט: JSON array בלבד, בלי טקסט מסביב. כל איבר: { "kind": "cover|body|takeaway|cta", "title": "...", "narrativeText": "..." }`;
+
+function mapSynthKind(k: unknown): SynthesizedSlide['kind'] {
+  const s = String(k || '').toLowerCase();
+  if (/cta|קריא|הזמנ/.test(s)) return 'cta';
+  if (/take|לקח|תובנ|משמע/.test(s)) return 'takeaway';
+  if (/cover|שער|כותרת ראשית/.test(s)) return 'cover';
+  return 'body';
+}
+
+/** First-sentence-of-body must not paraphrase the title — drop it if it does. */
+function dropRedundantLead(title: string, body: string): string {
+  const norm = (t: string) => t.replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const parts = body.split(/(?<=[.!?…])\s+/);
+  if (parts.length < 2) return body;
+  const t = new Set(norm(title).split(' ').filter((w) => w.length > 2));
+  const firstWords = norm(parts[0]).split(' ').filter((w) => w.length > 2);
+  if (firstWords.length === 0) return body;
+  const overlap = firstWords.filter((w) => t.has(w)).length / firstWords.length;
+  return overlap >= 0.6 ? parts.slice(1).join(' ').trim() : body;
+}
+
+export async function synthesizeStorySlides(input: {
+  title: string;
+  source: string;
+  topic: string;
+  articleText: string;
+}): Promise<SynthesizedSlide[]> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean } = sanitizeInput(input.articleText.slice(0, 8000));
+  if (clean.trim().length < 40) throw new Error('article text too thin to summarise');
+
+  const response = await genAI.models.generateContent({
+    model: 'gemini-3.6-flash',
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: `כותרת המקור: ${input.title}\nמקור: ${input.source}\nנושא: ${input.topic}\n\nטקסט הכתבה המלא (הבסיס היחיד לתוכן — אין להיעזר בשום מידע אחר):\n"""\n${clean}\n"""`,
+          },
+        ],
+      },
+    ],
+    config: { systemInstruction: STORY_SYNTH_SYSTEM_INSTRUCTION, temperature: 0.4, topP: 0.9, responseMimeType: 'application/json' },
+  });
+
+  const raw = stripCodeFence(response.text?.trim() || '[]');
+  const parsed = JSON.parse(raw) as unknown;
+  const arr = Array.isArray(parsed) ? parsed : (parsed as { slides?: unknown[] })?.slides;
+  if (!Array.isArray(arr)) throw new Error('model did not return a slide array');
+
+  const slides = arr
+    .map((s): SynthesizedSlide => {
+      const rec = s as Record<string, unknown>;
+      const title = sanitizeHebrewText(String(rec.title ?? '').trim()).slice(0, 90);
+      let narrativeText = sanitizeHebrewText(String(rec.narrativeText ?? rec.body ?? rec.text ?? '').trim());
+      narrativeText = dropRedundantLead(title, narrativeText).slice(0, 420);
+      return { kind: mapSynthKind(rec.kind), title, narrativeText };
+    })
+    .filter((s) => s.narrativeText.length > 12 && s.title.length > 1);
+
+  if (slides.length < 3) throw new Error('model returned too few usable slides');
+  return slides;
+}

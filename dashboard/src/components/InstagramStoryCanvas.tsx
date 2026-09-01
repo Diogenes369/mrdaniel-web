@@ -266,7 +266,12 @@ export default function InstagramStoryCanvas() {
 
           {payload && (
             <p className="text-[11px] text-zinc-600 text-center mt-3">
-              1080×1920 · {images.length} שקופיות · שקופית {active + 1}
+              1080×1920 · {images.length} שקופיות · שקופית {active + 1} ·{' '}
+              {payload.synthesized ? (
+                <span className="text-brand-400">טקסט נכתב ע״י מנוע ה-AI מהכתבה</span>
+              ) : (
+                <span className="text-amber-400/80">מצב גיבוי — סיכום מקומי מהכתבה (ללא AI)</span>
+              )}
             </p>
           )}
         </div>

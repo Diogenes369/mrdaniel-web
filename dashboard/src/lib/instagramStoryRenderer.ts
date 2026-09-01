@@ -1,8 +1,11 @@
 import type { NewsItem } from './newsAgentTypes';
 import { proxiedImageUrl } from './newsFeedClient';
+import { SITE_ORIGIN } from './useDashboardRefresh';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
 import { BRAND_GREEN, CHARCOAL, getLogo, loadFont, drawImageCover, wrapRtl, resolveNewsBackground } from './newsImageComposer';
-import { buildStorySlides, type StorySlide, type StoryPayload } from './storySlides';
+import { buildStorySlides, synthesizeStory, type StorySlide, type StoryPayload } from './storySlides';
+
+const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
 /**
  * Instagram Story renderer — 9:16 (1080×1920), one <canvas> per slide, no server render.
@@ -159,56 +162,48 @@ async function renderSlide(slide: StorySlide, photo: HTMLImageElement | null): P
       ctx.fillText(line, rightX, y);
       y += lh;
     }
+    // Cover: one strong opening fact under the headline (narrative, no bullet).
+    const lead = slide.narrativeText?.trim();
+    if (lead) {
+      ctx.font = `500 ${Math.round(W * 0.04)}px Rubik, sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      const leadLh = W * 0.04 * 1.5;
+      for (const line of wrapRtl(ctx, sanitizeHebrewText(lead), maxW).slice(0, 4)) {
+        ctx.fillText(line, rightX, y);
+        y += leadLh;
+      }
+      y += W * 0.02;
+    }
     if (slide.source) {
       ctx.font = `600 ${Math.round(W * 0.03)}px Rubik, sans-serif`;
-      ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.fillText(`מקור: ${slide.source}`, rightX, y + fontSize * 0.3);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText(`מקור: ${slide.source}`, rightX, y + fontSize * 0.2);
     }
-  } else if (slide.kind === 'bullets') {
-    const headSpec = `800 ${Math.round(W * 0.06)}px Rubik, sans-serif`;
-    await loadFont(headSpec);
-    ctx.font = headSpec;
-    ctx.fillStyle = BRAND_GREEN;
-    let y = H * 0.24;
-    ctx.fillText(slide.heading ?? '', rightX, y);
-    // styled accent line directly under the heading
-    drawAccentLine(ctx, rightX, y + W * 0.03, W * 0.22);
-    y += W * 0.06 * 1.4;
-
-    const bodySpec = `500 ${Math.round(W * 0.042)}px Rubik, sans-serif`;
-    await loadFont(bodySpec);
-    const bulletFont = W * 0.042;
-    for (const point of slide.points ?? []) {
-      ctx.font = bodySpec;
-      const lines = wrapRtl(ctx, sanitizeHebrewText(point), maxW - W * 0.06);
-      // green dot
-      ctx.fillStyle = BRAND_GREEN;
-      ctx.beginPath();
-      ctx.arc(rightX - 8, y - bulletFont * 0.35, 9, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], i === 0 ? rightX - W * 0.055 : rightX - W * 0.055, y);
-        y += bulletFont * 1.35;
-      }
-      y += bulletFont * 0.6;
-    }
-  } else if (slide.kind === 'insight') {
-    const headSpec = `800 ${Math.round(W * 0.06)}px Rubik, sans-serif`;
+  } else if (slide.kind === 'bullets' || slide.kind === 'insight') {
+    // Both content kinds render the SAME way now: heading + accent line + narrative paragraph.
+    // No bullet dots, no lists. `points[]` (legacy cached payloads) is flattened to prose.
+    const headSpec = `800 ${Math.round(W * 0.058)}px Rubik, sans-serif`;
     await loadFont(headSpec);
     ctx.font = headSpec;
     ctx.fillStyle = BRAND_GREEN;
     let y = H * 0.26;
-    ctx.fillText(slide.heading ?? '', rightX, y);
-    drawAccentLine(ctx, rightX, y + W * 0.03, W * 0.22);
-    y += W * 0.06 * 1.6;
+    const heading = (slide.heading ?? '').trim();
+    if (heading) {
+      for (const line of wrapRtl(ctx, sanitizeHebrewText(heading), maxW).slice(0, 2)) {
+        ctx.fillText(line, rightX, y);
+        y += W * 0.058 * 1.3;
+      }
+      drawAccentLine(ctx, rightX, y - W * 0.03, W * 0.2);
+      y += W * 0.05;
+    }
 
+    const bodyText = (slide.narrativeText || slide.body || (slide.points ?? []).join('. ')).trim();
     const bodySpec = `500 ${Math.round(W * 0.046)}px Rubik, sans-serif`;
     await loadFont(bodySpec);
     ctx.font = bodySpec;
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    const lh = W * 0.046 * 1.5;
-    for (const line of wrapRtl(ctx, sanitizeHebrewText(slide.body ?? ''), maxW).slice(0, 12)) {
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    const lh = W * 0.046 * 1.52;
+    for (const line of wrapRtl(ctx, sanitizeHebrewText(bodyText), maxW).slice(0, 14)) {
       ctx.fillText(line, rightX, y);
       y += lh;
     }
@@ -229,7 +224,7 @@ async function renderSlide(slide: StorySlide, photo: HTMLImageElement | null): P
     await loadFont(bodySpec);
     ctx.font = bodySpec;
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    for (const line of wrapRtl(ctx, sanitizeHebrewText(slide.body ?? ''), maxW)) {
+    for (const line of wrapRtl(ctx, sanitizeHebrewText(slide.narrativeText || slide.body || ''), maxW)) {
       ctx.fillText(line, W / 2, y);
       y += W * 0.042 * 1.45;
     }
@@ -266,11 +261,23 @@ export async function renderStorySlides(payload: StoryPayload, photo: HTMLImageE
   return out;
 }
 
-/** Convenience: build slides for an item and render them in one call. */
+/**
+ * Build slides for an item and render them. Tries the LLM synthesis endpoint first (strict
+ * article grounding, no bullets, no filler); falls back to the deterministic article-grounded
+ * builder if there's no key / the call fails.
+ */
 export async function renderStoryForItem(item: NewsItem): Promise<{ payload: StoryPayload; images: string[] }> {
   const photo = await resolveStoryBg(item);
   const imageUrl = item.image ? proxiedImageUrl(item.image) : '';
-  const payload = buildStorySlides(item, imageUrl);
+
+  let payload: StoryPayload;
+  try {
+    payload = await synthesizeStory(item, imageUrl, { apiBase: SITE_ORIGIN, adminSecret: ADMIN_SECRET });
+  } catch (err) {
+    console.warn('[story] LLM synthesis unavailable, using deterministic fallback:', (err as Error)?.message);
+    payload = buildStorySlides(item, imageUrl);
+  }
+
   const images = await renderStorySlides(payload, photo);
   return { payload, images };
 }

@@ -1,4 +1,4 @@
-import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt } from '../src/agent/SocialAgentEngine.js';
+import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides } from '../src/agent/SocialAgentEngine.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
 import { pushQueueItem, readAgentMode, readAgentWebhooks, readStrategicContext, writeAutoPilotRunTimestamp, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
@@ -276,6 +276,31 @@ export default async function handler(req: any, res: any) {
         createdAt: Date.now(),
       });
       res.status(200).json({ ok: true, id, draftMessage, scored, security });
+      return;
+    }
+
+    if (action === 'story-synthesize') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { title, source, topic, articleText } = req.body ?? {};
+      if (typeof articleText !== 'string' || articleText.trim().length < 40) {
+        res.status(400).json({ ok: false, error: 'articleText (>= 40 chars) required' });
+        return;
+      }
+      const slides = await synthesizeStorySlides({
+        title: String(title ?? ''),
+        source: String(source ?? ''),
+        topic: String(topic ?? 'general'),
+        articleText,
+      });
+      const security = sanitizeOutput(slides.map((s) => `${s.title}\n${s.narrativeText}`).join('\n\n'));
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, slides });
       return;
     }
 
