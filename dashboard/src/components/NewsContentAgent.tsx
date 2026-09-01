@@ -20,12 +20,19 @@ import {
   type NewsItem,
   type SocialPlatform,
 } from '../lib/newsAgentTypes';
-import { fetchLatestNewsItem } from '../lib/newsFeedClient';
+import { fetchNewsList } from '../lib/newsFeedClient';
 import { composeNewsPost, type ComposedPost } from '../lib/newsPostComposer';
 import { renderNewsImage, type BgSource } from '../lib/newsImageComposer';
 
 const CATEGORIES: NewsCategory[] = ['cyber', 'ai', 'tech', 'all'];
 const PLATFORM_ICON: Record<SocialPlatform, typeof Linkedin> = { linkedin: Linkedin, instagram: Instagram };
+
+const TOPIC_LABEL: Record<string, string> = {
+  ai: 'AI',
+  cyber: 'סייבר',
+  cloud: 'ענן / IT',
+  general: 'גאדג׳טים / טק',
+};
 
 function timeLabel(iso: string): string {
   const d = new Date(iso);
@@ -41,6 +48,8 @@ export default function NewsContentAgent() {
   const [headline, setHeadline] = useState(true);
 
   const [item, setItem] = useState<NewsItem | null>(null);
+  const [list, setList] = useState<NewsItem[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loadingNews, setLoadingNews] = useState(false);
   const [newsError, setNewsError] = useState<string | null>(null);
 
@@ -53,23 +62,34 @@ export default function NewsContentAgent() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const renderSeq = useRef(0);
 
-  const fetchNews = useCallback(async () => {
-    setLoadingNews(true);
-    setNewsError(null);
-    try {
-      const next = await fetchLatestNewsItem(category);
-      if (!next) {
-        setNewsError('לא נמצאו כתבות בקטגוריה הזו כרגע.');
+  const fetchNews = useCallback(
+    async (autoSelect = false) => {
+      setLoadingNews(true);
+      setNewsError(null);
+      try {
+        const items = await fetchNewsList(category);
+        setList(items);
+        if (items.length === 0) {
+          setNewsError('לא נמצאו כתבות בקטגוריה הזו כרגע.');
+          setItem(null);
+        } else if (autoSelect || !items.some((i) => i.id === item?.id)) {
+          setItem(items[0]);
+        }
+      } catch {
+        setNewsError('משיכת הפיד נכשלה — בדקו חיבור ל-mrdaniel.co.il/api/news.');
+        setList([]);
         setItem(null);
-      } else {
-        setItem(next);
+      } finally {
+        setLoadingNews(false);
       }
-    } catch {
-      setNewsError('משיכת הפיד נכשלה — בדקו חיבור ל-mrdaniel.co.il/api/news.');
-      setItem(null);
-    } finally {
-      setLoadingNews(false);
-    }
+    },
+    [category, item?.id]
+  );
+
+  // Refresh the candidate list whenever the category changes (keeps the picker in sync with the chips).
+  useEffect(() => {
+    void fetchNews(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
   // Recompose copy whenever the item or platform changes.
@@ -145,14 +165,23 @@ export default function NewsContentAgent() {
             </button>
           ))}
         </div>
-        <button
-          onClick={fetchNews}
-          disabled={loadingNews}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand-500 text-black text-sm font-bold cursor-pointer disabled:opacity-50"
-        >
-          {loadingNews ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          משוך חדשות אחרונות
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => fetchNews(false)}
+            disabled={loadingNews}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-zinc-200 text-sm font-bold cursor-pointer disabled:opacity-50 hover:bg-white/10"
+          >
+            {loadingNews ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            רענון רשימת הכתבות
+          </button>
+          <button
+            onClick={() => fetchNews(true)}
+            disabled={loadingNews}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500 text-black text-sm font-bold cursor-pointer disabled:opacity-50"
+          >
+            בחר את הכתבה האחרונה
+          </button>
+        </div>
 
         {newsError && (
           <p className="mt-3 text-xs text-amber-400 flex items-center gap-1.5">
@@ -160,14 +189,70 @@ export default function NewsContentAgent() {
           </p>
         )}
 
+        {/* Manual content picker — every candidate article; click to select, "תצוגה" to preview raw text. */}
+        {list.length > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono mb-2">
+              <span>{list.length} כתבות · {CATEGORY_LABEL[category]}</span>
+              <span>לחצו על כתבה כדי לבחור אותה למחולל</span>
+            </div>
+            <div className="max-h-[340px] overflow-y-auto rounded-lg border border-white/10 divide-y divide-white/5">
+              {list.map((n) => {
+                const selected = n.id === item?.id;
+                return (
+                  <div key={n.id} className={selected ? 'bg-brand-500/10' : 'hover:bg-white/[0.03]'}>
+                    <button
+                      onClick={() => setItem(n)}
+                      className="w-full text-right px-3 py-2.5 cursor-pointer flex flex-col gap-1"
+                    >
+                      <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono">
+                        <span className={`px-1.5 py-0.5 rounded ${selected ? 'bg-brand-500 text-black' : 'bg-white/5 text-brand-300'}`}>
+                          {TOPIC_LABEL[n.topic] ?? n.topic}
+                        </span>
+                        <span>{n.source}</span>
+                        <span>·</span>
+                        <span>{timeLabel(n.publishedAt)}</span>
+                        {n.image && <span className="text-brand-400/70">· תמונה ✓</span>}
+                      </div>
+                      <span className={`text-[13px] font-bold leading-snug ${selected ? 'text-white' : 'text-zinc-200'}`}>
+                        {n.title}
+                      </span>
+                    </button>
+                    <div className="px-3 pb-2 -mt-0.5 flex items-center gap-3">
+                      <button
+                        onClick={() => setExpandedId(expandedId === n.id ? null : n.id)}
+                        className="text-[10px] text-sky-400 hover:text-sky-300 cursor-pointer"
+                      >
+                        {expandedId === n.id ? 'הסתר תצוגה' : 'תצוגת טקסט גולמי'}
+                      </button>
+                      <a
+                        href={n.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300"
+                      >
+                        <ExternalLink className="w-3 h-3" /> מקור
+                      </a>
+                    </div>
+                    {expandedId === n.id && (
+                      <p className="px-3 pb-3 text-[11px] text-zinc-400 leading-relaxed whitespace-pre-wrap">
+                        {n.summary || n.excerpt || '(אין טקסט מלא בפיד לכתבה זו)'}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {item && (
-          <div className="mt-4 p-3 rounded-lg bg-black/30 border border-white/10">
-            <div className="flex items-center gap-2 text-[11px] text-zinc-500 font-mono mb-1">
-              <span className="text-brand-400">{CATEGORY_LABEL[category === 'all' ? 'all' : category]}</span>
-              <span>·</span>
+          <div className="mt-4 p-3 rounded-lg bg-black/30 border border-brand-500/20">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-500 font-mono mb-1">
+              <span className="text-brand-400 font-bold">נבחר למחולל:</span>
               <span>{item.source}</span>
               <span>·</span>
-              <span>{timeLabel(item.publishedAt)}</span>
+              <span>{TOPIC_LABEL[item.topic] ?? item.topic}</span>
               <span>·</span>
               {imageSource === 'original' ? (
                 <span className="text-brand-400">תמונת המקור מהכתבה ✓</span>
@@ -182,14 +267,6 @@ export default function NewsContentAgent() {
               )}
             </div>
             <p className="text-sm text-zinc-200 font-bold leading-snug">{item.title}</p>
-            <a
-              href={item.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 mt-1"
-            >
-              <ExternalLink className="w-3 h-3" /> לכתבה המקורית
-            </a>
           </div>
         )}
       </div>

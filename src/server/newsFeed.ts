@@ -46,9 +46,12 @@ const GNEWS_QUERY = '(טכנולוגיה OR סייבר OR "בינה מלאכות
 const GNEWS_URL = `https://news.google.com/rss/search?q=${encodeURIComponent(GNEWS_QUERY)}&hl=iw&gl=IL&ceid=IL:iw`;
 
 const SOURCES: FeedSource[] = [
-  { name: 'Geektime', url: 'https://www.geektime.co.il/feed/', priority: 1 },
+  // Geektime is the primary tech source — priority 0 pins it first in every cross-source dedup tie.
+  { name: 'Geektime', url: 'https://www.geektime.co.il/feed/', priority: 0 },
   { name: 'TechTime', url: 'https://techtime.co.il/feed/', priority: 1 },
   { name: 'גלובס', url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=1725', priority: 2, timeoutMs: 9000 },
+  // Ynet DIGITAL/TECH feed only (StoryRss544). Do NOT use the general-news feed (StoryRss2) —
+  // it floods the aggregate with politics/crime that isn't on-topic for this site.
   { name: 'ynet דיגיטל', url: 'https://www.ynet.co.il/Integration/StoryRss544.xml', priority: 2, timeoutMs: 9000 },
   { name: 'Israel Defense', url: 'https://www.israeldefense.co.il/rss.xml', priority: 3, onlyTopics: ['cyber'] },
   // Fallback aggregator — fills gaps from any Israeli outlet whose native feed failed above, and
@@ -57,7 +60,16 @@ const SOURCES: FeedSource[] = [
   { name: 'Google News', url: GNEWS_URL, priority: 6, stripTitleSuffix: true, timeoutMs: 9000 },
 ];
 
+// Publishers removed from the aggregate entirely. They have no native feed in SOURCES, but the
+// Google-News fallback still surfaces their stories under the extracted-publisher name — this
+// drops those. "אנשים ומחשבים" / PC (pc.co.il) is deprecated per product direction.
+const BLOCKED_PUBLISHERS = /(אנשים ומחשבים|people ?and ?computers|\bpc\.co\.il\b|\bpc\.org\.il\b)/i;
+
 const PER_FEED_ITEM_CAP = 30;
+// The `summary` field carries the article's real lede — enough for the story/post generators to
+// synthesise rich slides from, not a one-sentence teaser. `excerpt` stays short for feed cards.
+const SUMMARY_MAX = 720;
+const EXCERPT_MAX = 160;
 
 /** Rejects a source promise if it hasn't settled within `ms` — so `Promise.allSettled` in
  * `refreshAll` never waits on a hanging outlet longer than its own cap. */
@@ -454,8 +466,14 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
         title = title.slice(0, match.index).trim();
       }
     }
+    if (BLOCKED_PUBLISHERS.test(sourceName) || BLOCKED_PUBLISHERS.test(link)) continue;
 
-    const summary = cleanText(item.contentSnippet || item.content, title) || title;
+    // Prefer the full article body (`content:encoded`, present on Geektime/TechTime WordPress
+    // feeds) over the short `description`/`contentSnippet` teaser, so downstream generators get
+    // real substance. `cleanText` strips markup and WordPress trailers; keep a generous slice.
+    const rawBody = item.contentEncoded || item['content:encoded'] || item.content || item.contentSnippet;
+    const fullText = cleanText(rawBody as string | undefined, title);
+    const summary = truncate(fullText || cleanText(item.contentSnippet, title) || title, SUMMARY_MAX);
     const categories = item.categories ?? [];
     const classifierText = `${title} ${summary} ${categories.join(' ')}`;
     const topic = classifyTopic(classifierText);
@@ -471,7 +489,7 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
       topic,
       title,
       link,
-      excerpt: truncate(summary, 160),
+      excerpt: truncate(summary, EXCERPT_MAX),
       summary,
       publishedAt,
       image: extractImage(item as Record<string, any>),

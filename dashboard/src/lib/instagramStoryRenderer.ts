@@ -75,6 +75,31 @@ async function drawFooter(ctx: CanvasRenderingContext2D, withDomain: boolean) {
   }
 }
 
+/**
+ * Styled accent line drawn directly under a heading / key-metric block on every content slide —
+ * a short brand-green→cyan bar with a soft glow, RTL (starts at the right margin). Keeps the
+ * slide sequence visually consistent and gives each section a defined edge.
+ */
+function drawAccentLine(ctx: CanvasRenderingContext2D, rightX: number, y: number, width: number) {
+  const grad = ctx.createLinearGradient(rightX, 0, rightX - width, 0);
+  grad.addColorStop(0, BRAND_GREEN);
+  grad.addColorStop(0.55, '#22D3EE');
+  grad.addColorStop(1, 'rgba(34,211,238,0)');
+  ctx.save();
+  ctx.fillStyle = grad;
+  ctx.shadowColor = 'rgba(118,185,0,0.55)';
+  ctx.shadowBlur = 22;
+  const h = Math.max(4, W * 0.006);
+  if (ctx.roundRect) {
+    ctx.beginPath();
+    ctx.roundRect(rightX - width, y, width, h, h / 2);
+    ctx.fill();
+  } else {
+    ctx.fillRect(rightX - width, y, width, h);
+  }
+  ctx.restore();
+}
+
 function paintBackground(ctx: CanvasRenderingContext2D, photo: HTMLImageElement | null, kind: StorySlide['kind']) {
   ctx.fillStyle = CHARCOAL;
   ctx.fillRect(0, 0, W, H);
@@ -146,6 +171,8 @@ async function renderSlide(slide: StorySlide, photo: HTMLImageElement | null): P
     ctx.fillStyle = BRAND_GREEN;
     let y = H * 0.24;
     ctx.fillText(slide.heading ?? '', rightX, y);
+    // styled accent line directly under the heading
+    drawAccentLine(ctx, rightX, y + W * 0.03, W * 0.22);
     y += W * 0.06 * 1.4;
 
     const bodySpec = `500 ${Math.round(W * 0.042)}px Rubik, sans-serif`;
@@ -173,6 +200,7 @@ async function renderSlide(slide: StorySlide, photo: HTMLImageElement | null): P
     ctx.fillStyle = BRAND_GREEN;
     let y = H * 0.26;
     ctx.fillText(slide.heading ?? '', rightX, y);
+    drawAccentLine(ctx, rightX, y + W * 0.03, W * 0.22);
     y += W * 0.06 * 1.6;
 
     const bodySpec = `500 ${Math.round(W * 0.046)}px Rubik, sans-serif`;
@@ -193,6 +221,8 @@ async function renderSlide(slide: StorySlide, photo: HTMLImageElement | null): P
     ctx.textAlign = 'center';
     let y = H * 0.4;
     ctx.fillText(slide.heading ?? '', W / 2, y);
+    // centred accent line under the CTA heading
+    drawAccentLine(ctx, W / 2 + W * 0.11, y + W * 0.035, W * 0.22);
     y += W * 0.075 * 1.4;
 
     const bodySpec = `500 ${Math.round(W * 0.042)}px Rubik, sans-serif`;
