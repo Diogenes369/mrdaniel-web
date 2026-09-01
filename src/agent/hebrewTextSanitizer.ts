@@ -16,6 +16,14 @@ const RLM = '‏';
 // space before a following Hebrew word.
 const LATIN_RUN = /\b[A-Za-z][A-Za-z0-9]*(?:[-'’ ][A-Za-z0-9]+)*\b/g;
 
+// LTR ISOLATE / POP DIRECTIONAL ISOLATE — wrap a URL or bare domain so its internal order stays
+// left-to-right inside an RTL line (otherwise "mrdaniel.co.il" renders as "il.co.mrdaniel").
+const LTR_ISO_OPEN = '⁦';
+const LTR_ISO_CLOSE = '⁩';
+// A full URL or a bare dotted domain (optionally with a path). Requires at least one label + a
+// 2+ letter TLD, so it never fires on "e.g.", "i.e." or "ב-2026.".
+const URL_LIKE = /\b(?:https?:\/\/)?(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?:\/[^\s]*)?/gi;
+
 /** Sanitizes one piece of generated Hebrew text before it's stored/rendered:
  * 1. Collapses stray space(s) before sentence/clause punctuation ("שלום , עולם" -> "שלום, עולם") —
  *    punctuation must sit flush against the word it closes, never floating or opening a line.
@@ -31,8 +39,17 @@ export function sanitizeHebrewText(raw: string): string {
 
   text = text.replace(/[ \t]+([,.:;!?])/g, '$1');
   text = text.replace(/^[,.:;!?]+\s*/, '');
+
+  // Pull URLs/domains out first (placeholder = PUA char + index + PUA char, immune to LATIN_RUN
+  // which must start with a letter), run the Latin-run pass on the rest, then restore each one
+  // inside an LTR isolate so it keeps left-to-right order within the RTL line.
+  const held: string[] = [];
+  text = text.replace(URL_LIKE, (m) => `${held.push(m) - 1}`);
+
   text = text.replace(LATIN_RUN, (match) => `${RLM}${match}${RLM}`);
   text = text.replace(/‏{2,}/g, RLM);
+
+  text = text.replace(/(\d+)/g, (_m, i) => `${LTR_ISO_OPEN}${held[Number(i)]}${LTR_ISO_CLOSE}`);
 
   return text;
 }

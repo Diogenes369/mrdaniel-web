@@ -177,7 +177,8 @@ async function renderSlide(slide: StorySlide, photo: HTMLImageElement | null): P
     if (slide.source) {
       ctx.font = `600 ${Math.round(W * 0.03)}px Rubik, sans-serif`;
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.fillText(`מקור: ${slide.source}`, rightX, y + fontSize * 0.2);
+      // isolate the (often Latin) source name so it doesn't flip order after "מקור:"
+      ctx.fillText(sanitizeHebrewText(`מקור: ${slide.source}`), rightX, y + fontSize * 0.2);
     }
   } else if (slide.kind === 'bullets' || slide.kind === 'insight') {
     // Both content kinds render the SAME way now: heading + accent line + narrative paragraph.
@@ -209,16 +210,32 @@ async function renderSlide(slide: StorySlide, photo: HTMLImageElement | null): P
     }
   } else {
     // cta
-    const headSpec = `800 ${Math.round(W * 0.075)}px Rubik, sans-serif`;
-    await loadFont(headSpec);
-    ctx.font = headSpec;
+    await loadFont('800 80px Rubik, sans-serif');
     ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'center';
-    let y = H * 0.4;
-    ctx.fillText(slide.heading ?? '', W / 2, y);
-    // centred accent line under the CTA heading
-    drawAccentLine(ctx, W / 2 + W * 0.11, y + W * 0.035, W * 0.22);
-    y += W * 0.075 * 1.4;
+
+    // Auto-fit the CTA heading: shrink the font until every wrapped line fits inside a strict
+    // side margin (>= 44px per edge) and the block is at most 3 lines — so it can NEVER clip.
+    const ctaMaxW = W - Math.max(88, PAD * 2); // PAD*2 ≈ 194px; hard floor 88 = 44px each side
+    const headText = sanitizeHebrewText(slide.heading ?? '');
+    let headPx = W * 0.07;
+    let headLines: string[] = [];
+    for (let attempt = 0; attempt < 8; attempt++) {
+      ctx.font = `800 ${Math.round(headPx)}px Rubik, sans-serif`;
+      headLines = wrapRtl(ctx, headText, ctaMaxW);
+      const widest = headLines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
+      if (widest <= ctaMaxW && headLines.length <= 3) break;
+      headPx *= 0.85;
+    }
+    const headLh = headPx * 1.22;
+    let y = H * 0.4 - (headLines.length - 1) * headLh * 0.5;
+    for (const line of headLines) {
+      ctx.fillText(line, W / 2, y);
+      y += headLh;
+    }
+    // centred accent line under the (possibly multi-line) heading
+    drawAccentLine(ctx, W / 2 + W * 0.1, y - headLh * 0.32, W * 0.2);
+    y += W * 0.035;
 
     const bodySpec = `500 ${Math.round(W * 0.042)}px Rubik, sans-serif`;
     await loadFont(bodySpec);
