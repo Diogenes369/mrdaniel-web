@@ -218,7 +218,7 @@ export default function AIAssistantWidget() {
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: 'מצטער, חלה שגיאת תקשורת רגעית. אפשר גם למלא את טופס יצירת הקשר באתר או לפנות ישירות במייל danihell3039@gmail.com.',
+          content: 'מצטער, חלה שגיאת תקשורת רגעית. אפשר גם למלא את טופס יצירת הקשר באתר או לפנות ישירות במייל daniel@mrdaniel.co.il.',
           timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
         }
       ]);

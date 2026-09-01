@@ -79,8 +79,8 @@ export default function AccessibilityPage() {
               {
                 label: 'כתובת דוא"ל לפניות נגישות',
                 value: (
-                  <a href="mailto:danihell3039@gmail.com" className="text-brand-400 hover:underline" dir="ltr">
-                    danihell3039@gmail.com
+                  <a href="mailto:daniel@mrdaniel.co.il" className="text-brand-400 hover:underline" dir="ltr">
+                    daniel@mrdaniel.co.il
                   </a>
                 ),
               },

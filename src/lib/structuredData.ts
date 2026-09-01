@@ -22,7 +22,7 @@ export function organizationLd() {
     url: SITE_URL,
     logo: `${SITE_URL}/logo.png`,
     image: `${SITE_URL}/og-image.png`,
-    email: 'danihell3039@gmail.com',
+    email: 'daniel@mrdaniel.co.il',
     description:
       'ארכיטקטורת סוכני בינה מלאכותית מותאמים אישית, אבטחת סייבר לעסקים קטנים ובינוניים ולארגונים, ופיתוח דיגיטלי ושיווק מתקדם.',
     areaServed: { '@type': 'Country', name: 'Israel' },

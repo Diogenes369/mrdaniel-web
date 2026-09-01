@@ -24,7 +24,7 @@ const LEGAL_LINKS = [
   { name: 'הצהרת נגישות', to: '/accessibility' },
 ];
 
-const CONTACT_EMAIL = 'danihell3039@gmail.com';
+const CONTACT_EMAIL = 'daniel@mrdaniel.co.il';
 
 const COLUMN_HEADING_CLASS = 'text-xs font-medium uppercase tracking-[0.15em] text-zinc-500 mb-4';
 

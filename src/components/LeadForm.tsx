@@ -468,7 +468,7 @@ export default function LeadForm() {
 
                           {status === 'error' && (
                             <p className="text-xs text-red-400">
-                              קרתה תקלה בשליחה. נסו שוב, או צרו קשר ישירות במייל danihell3039@gmail.com.
+                              קרתה תקלה בשליחה. נסו שוב, או צרו קשר ישירות במייל daniel@mrdaniel.co.il.
                             </p>
                           )}
                         </motion.div>
@@ -538,7 +538,7 @@ export default function LeadForm() {
                           </Field>
                           {status === 'error' && (
                             <p className="text-xs text-red-400">
-                              קרתה תקלה בשליחה. נסו שוב, או צרו קשר ישירות במייל danihell3039@gmail.com.
+                              קרתה תקלה בשליחה. נסו שוב, או צרו קשר ישירות במייל daniel@mrdaniel.co.il.
                             </p>
                           )}
                         </motion.div>

@@ -3,7 +3,7 @@ import { Instagram, Linkedin, Mail } from 'lucide-react';
 export const INSTAGRAM_URL = 'https://www.instagram.com/daniel.benbaruch?igsi=MTc3ODd5aWlsbTdtaA%3D%3D&utm_source=qr';
 export const LINKEDIN_URL = 'https://www.linkedin.com/in/daniel-ben-baruch?utm_source=share_via&utm_content=profile&utm_medium=member_ios';
 export const TIKTOK_URL = 'https://www.tiktok.com/@glasswing_project?_r=1&_t=ZS-99CfiH4Iz0G';
-export const CONTACT_EMAIL = 'danihell3039@gmail.com';
+export const CONTACT_EMAIL = 'daniel@mrdaniel.co.il';
 
 // The one official WhatsApp Business number for the site — every direct-contact link (header CTA,
 // lead form, agent qualifier, this bar) points here.
