@@ -76,20 +76,20 @@ async function drawFooter(ctx: CanvasRenderingContext2D, withDomain: boolean) {
 }
 
 /**
- * Styled accent line drawn directly under a heading / key-metric block on every content slide —
- * a short brand-green→cyan bar with a soft glow, RTL (starts at the right margin). Keeps the
- * slide sequence visually consistent and gives each section a defined edge.
+ * Thin, refined accent line under a heading — the site's own brand-green accent (matches
+ * TitleUnderline.tsx: no blue, no blocky bar), a short bar fading to transparent with a soft
+ * green glow. RTL (starts at the right margin).
  */
 function drawAccentLine(ctx: CanvasRenderingContext2D, rightX: number, y: number, width: number) {
   const grad = ctx.createLinearGradient(rightX, 0, rightX - width, 0);
   grad.addColorStop(0, BRAND_GREEN);
-  grad.addColorStop(0.55, '#22D3EE');
-  grad.addColorStop(1, 'rgba(34,211,238,0)');
+  grad.addColorStop(0.6, 'rgba(118,185,0,0.85)');
+  grad.addColorStop(1, 'rgba(118,185,0,0)');
   ctx.save();
   ctx.fillStyle = grad;
-  ctx.shadowColor = 'rgba(118,185,0,0.55)';
-  ctx.shadowBlur = 22;
-  const h = Math.max(4, W * 0.006);
+  ctx.shadowColor = 'rgba(118,185,0,0.5)';
+  ctx.shadowBlur = 12;
+  const h = Math.max(2, W * 0.0028);
   if (ctx.roundRect) {
     ctx.beginPath();
     ctx.roundRect(rightX - width, y, width, h, h / 2);

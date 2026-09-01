@@ -92,6 +92,34 @@ function padPoints(base: string[], topic: NewsTopic, want: number): string[] {
   return out.slice(0, want);
 }
 
+/** Journalistic slide headline pulled from the article's own text: drop leading filler, keep it
+ * to a scannable ~46 chars on a word boundary, no trailing punctuation. Falls back to `alt` when
+ * the source sentence is too thin to carry a headline. */
+function headlineFrom(text: string | undefined, alt: string): string {
+  let s = (text || '').replace(/\s+/g, ' ').trim();
+  s = s.replace(/^(לפי|על פי|עם זאת|בנוסף|כמו כן|בין היתר|יצוין כי|למעשה)[,\s]+/u, '');
+  s = s.replace(/["'׳״.…:;\-–—]+$/u, '').trim();
+  if (s.length < 14) return alt;
+  if (s.length <= 46) return s;
+  const cut = s.slice(0, 46);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${lastSpace > 24 ? cut.slice(0, lastSpace) : cut}…`;
+}
+
+// Sharp, non-generic frames — used only when the article text can't yield a headline.
+const LEAD_HEADING: Record<NewsTopic, string> = {
+  cyber: 'מה קרה בשטח הסייבר',
+  ai: 'ההתפתחות ב-AI',
+  cloud: 'מה זז בענן ובתשתיות',
+  general: 'הידיעה בקצרה',
+};
+const TAKEAWAY_HEADING: Record<NewsTopic, string> = {
+  cyber: 'הלקח למי שמגן על עסק',
+  ai: 'מה זה אומר על AI בעסק שלכם',
+  cloud: 'המשמעות לארכיטקטורה שלכם',
+  general: 'הזווית המעשית',
+};
+
 export function buildStorySlides(item: NewsItem, imageUrl: string): StoryPayload {
   const topic = item.topic;
   const kicker = KICKER[topic];
@@ -104,17 +132,17 @@ export function buildStorySlides(item: NewsItem, imageUrl: string): StoryPayload
 
   const slides: StorySlide[] = [];
   slides.push({ kind: 'cover', index: 0, total: 0, kicker, headline: item.title.trim(), source: item.source });
-  slides.push({ kind: 'bullets', index: 0, total: 0, kicker, heading: 'מה קרה?', points: overview });
-  if (hasDeep) slides.push({ kind: 'bullets', index: 0, total: 0, kicker, heading: 'העמקה', points: deep });
-  slides.push({ kind: 'insight', index: 0, total: 0, kicker, heading: 'למה זה חשוב?', body: INSIGHT[topic] });
-  if (rich) slides.push({ kind: 'insight', index: 0, total: 0, kicker, heading: 'המשמעות לעסק שלכם', body: IMPACT[topic] });
+  slides.push({ kind: 'bullets', index: 0, total: 0, kicker, heading: headlineFrom(pts[0], LEAD_HEADING[topic]), points: overview });
+  if (hasDeep) slides.push({ kind: 'bullets', index: 0, total: 0, kicker, heading: headlineFrom(deep[0], 'הפרטים המלאים'), points: deep });
+  slides.push({ kind: 'insight', index: 0, total: 0, kicker, heading: TAKEAWAY_HEADING[topic], body: INSIGHT[topic] });
+  if (rich) slides.push({ kind: 'insight', index: 0, total: 0, kicker, heading: 'בשורה התחתונה לעסק קטן', body: IMPACT[topic] });
   slides.push({
     kind: 'cta',
     index: 0,
     total: 0,
     kicker,
-    heading: 'רוצים להעמיק?',
-    body: 'לכתבה המלאה ולעוד עדכוני AI, סייבר וטכנולוגיה — ולפתרונות סוכני AI ואוטומציה',
+    heading: 'רוצים ליישם את זה אצלכם?',
+    body: 'סוכני AI, אוטומציה והגנת סייבר לעצמאים ולעסקים קטנים — אפיון קצר וחוזרים אליכם עם תוכנית.',
     linkLabel: 'mrdaniel.co.il',
   });
 

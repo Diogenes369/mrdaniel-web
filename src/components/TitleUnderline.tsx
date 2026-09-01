@@ -24,14 +24,15 @@ export default function TitleUnderline({ className = '', base = 'w-10' }: TitleU
   const revealed = reduced || inView;
 
   return (
-    <span ref={ref} aria-hidden="true" className={`mt-4 block h-[3px] ${className}`}>
+    <span ref={ref} aria-hidden="true" className={`mt-3 block h-px ${className}`}>
       <span
         className={[
-          'block h-[3px] rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-transparent',
-          'shadow-[0_0_16px_rgba(52,211,153,0.55)]',
+          // Thin, refined — the site's own brand-green accent (no blue, no blocky bar).
+          'block h-px rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-transparent',
+          'shadow-[0_0_8px_rgba(118,185,0,0.45)]',
           reduced ? '' : 'transition-[width] duration-500 ease-out will-change-[width]',
           'group-hover:w-full group-focus-within:w-full',
-          revealed ? 'w-20 sm:w-28' : base,
+          revealed ? 'w-16 sm:w-24' : base,
         ].join(' ')}
       />
     </span>

@@ -106,6 +106,19 @@ const EXPERT_INSIGHT: Record<NewsTopic, string> = {
     'מהשטח: היתרון התחרותי לא מגיע מאימוץ מוקדם של כל טרנד, אלא מהיכולת לבחור את הקרב הנכון — תהליך אחד, מדד אחד — ולבצע אותו עד הסוף עם תשתית, אבטחה ומדידה.',
 };
 
+/** A concrete technical-context paragraph per topic — names the actual architecture / attack
+ * chain so the post reads as researched, not hand-wavy. Included on LinkedIn (long-form) only. */
+const TECH_CONTEXT: Record<NewsTopic, string> = {
+  cyber:
+    'הקשר הטכני: שרשרת התקיפה המוכרת היא גישה ראשונית (פישינג / אשראי שדלף / שירות חשוף) → הסלמת הרשאות → תנועה לרוחב ברשת שטוחה → הוצאת מידע או הצפנה. נקודות השבירה: MFA על כל גישה מרחוק וכל חשבון פריבילגי, מיקרו-סגמנטציה שמונעת תנועה לרוחב, וניטור מרוכז (SIEM/XDR) שמקצר את הזמן מחדירה לגילוי משבועות לשעות.',
+  ai:
+    'הקשר הטכני: סוכן אג׳נטי אמיתי = מודל שפה (Claude / GPT / Gemini) + שכבת תזמור שמפרקת משימה לצעדים + כלים דרך פרוטוקולים כמו MCP + RAG על בסיס הידע הפנימי + שכבת Guardian שמאשרת פעולות רגישות. הנקודה הקריטית היא צמצום היקף: תהליך אחד, מדד הצלחה מספרי אחד, והרחבה בהדרגה.',
+  cloud:
+    'הקשר הטכני: ההחלטות שמשנות הן ניהול זהויות והרשאות (IAM), הפרדת סביבות (dev / stage / prod), תשתית-כקוד (Terraform) שהופכת סביבה לנכס בר-שחזור, ו-FinOps מהיום הראשון — תיוג, תקרות תקציב והתראות. Lock-In מתכננים מראש, לא מגלים בדיעבד.',
+  general:
+    'הקשר הטכני: הערך נוצר באינטגרציה — API שמחבר בין מערכות, תהליך אוטומטי מקצה לקצה, ושכבת מדידה על התוצאה. תשתית רשת יציבה, אבטחה מודרנית ואוטומציה חכמה הן מקשה אחת, לא שלושה פרויקטים נפרדים.',
+};
+
 function seededInt(text: string): number {
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
@@ -158,9 +171,10 @@ export function composeNewsPost(item: NewsItem, platform: SocialPlatform): Compo
   const isLinkedin = platform === 'linkedin';
 
   const hook = seededPick(HOOKS[topic], seed).replace('{title}', item.title.trim());
-  const context = contextParagraph(item.summary || item.excerpt, isLinkedin ? 600 : 380);
+  const context = contextParagraph(item.summary || item.excerpt, isLinkedin ? 900 : 520);
   const whyItMatters = WHY_IT_MATTERS[topic];
-  const bullets = seededSubset(TAKEAWAYS[topic], isLinkedin ? 4 : 3, seed).map((b) => `▪️ ${b}`);
+  const techContext = TECH_CONTEXT[topic];
+  const bullets = seededSubset(TAKEAWAYS[topic], isLinkedin ? 5 : 4, seed).map((b) => `▪️ ${b}`);
   const insight = EXPERT_INSIGHT[topic];
 
   const dateLabel = formatDate(item.publishedAt);
@@ -178,10 +192,11 @@ export function composeNewsPost(item: NewsItem, platform: SocialPlatform): Compo
 
   const sections: string[] = [
     hook,
-    context ? `📌 מה קרה\n${context}` : '',
-    `🔍 למה זה חשוב\n${whyItMatters}`,
-    `📋 עיקרי הדברים\n${bullets.join('\n')}`,
-    `🎯 זווית המומחה\n${insight}`,
+    context ? `📌 העובדות מהכתבה\n${context}` : '',
+    `🔍 הניתוח\n${whyItMatters}`,
+    isLinkedin ? `🧩 הקשר טכני\n${techContext}` : '',
+    `📋 מה לקחת מזה\n${bullets.join('\n')}`,
+    `🎯 מהניסיון בשטח\n${insight}`,
     sourceLine,
     engagement,
     hashtags.join(' '),
