@@ -1,19 +1,25 @@
 import type { NewsItem, NewsTopic } from './newsFeed.js';
 
 /**
- * Turns a news item into a sequence of Instagram-Story slides (text/data only — the canvas render
- * lives in instagramStoryRenderer.ts). Two paths:
+ * Universal slide-synthesis engine (text/data only — the canvas render lives in
+ * instagramStoryRenderer.ts). Any content source — a scraped news item, a free-text prompt, or a
+ * social-post draft — is first normalised to a `SlideSource`, then turned into a 4–5 slide deck:
  *
- *   synthesizeStory()  — PRIMARY. Sends the full cleaned article text to the LLM
- *                        (/api/agent-generate · action:"story-synthesize") which returns strict
- *                        JSON: per-slide { title, narrativeText }. No bullets, no generic filler,
- *                        the body never restates its own title, every fact is grounded in the
- *                        article. Dynamic 4–6 slides.
- *   buildStorySlides() — DETERMINISTIC FALLBACK for when there's no GEMINI_API_KEY / the call
- *                        fails. Still article-grounded (narrative paragraphs pulled straight from
- *                        the item summary) — NO topic "wisdom" banks, NO bullet lists.
+ *   Cover  →  2–3 deep content / fact slides  →  final CTA slide.
  *
- * A server copy in src/server/storySlides.ts stays in sync for the autonomous cron.
+ * Two paths, both guaranteeing that shape:
+ *   synthesizeSlides()  — PRIMARY. Sends the source text to the LLM
+ *                         (/api/agent-generate · action:"story-synthesize"), strict JSON per
+ *                         slide { kind, title, narrativeText }. No bullets, no filler, every fact
+ *                         grounded in the source. If the model under-delivers content slides the
+ *                         richest narrative is split so the AI path is never a 2-slide deck.
+ *   buildSlides()       — DETERMINISTIC FALLBACK (no GEMINI_API_KEY / 429 / network). Splits the
+ *                         source body+summary text into >=2 narrative content slides — never a
+ *                         2-slide deck, no "wisdom" banks, no bullet lists.
+ *
+ * `synthesizeStory()` / `buildStorySlides()` are thin NewsItem wrappers kept for existing callers
+ * (instagramStoryRenderer, the autonomous cron). A server copy in src/server/storySlides.ts
+ * stays in sync.
  */
 
 export type StorySlideKind = 'cover' | 'bullets' | 'insight' | 'cta';
@@ -25,7 +31,7 @@ export interface StorySlide {
   kicker: string;
   /** Slide's own headline / section title. */
   heading?: string;
-  /** Cover slide only — the news headline. */
+  /** Cover slide only — the source headline. */
   headline?: string;
   /** Narrative paragraph body (2–4 sentences). Replaces the old `points[]` bullet list. */
   narrativeText?: string;
@@ -45,7 +51,25 @@ export interface StoryPayload {
   slides: StorySlide[];
   /** true when the LLM synthesised the copy; false = deterministic fallback. */
   synthesized: boolean;
+  /** When `synthesized` is false: the reason the LLM path was skipped (rate limit, auth, thin
+   * text, network) — surfaced in the dashboard so the operator sees why it fell back. */
+  fallbackReason?: string;
   createdAt: number;
+}
+
+/**
+ * Normalised input to the slide engine. `bodyText` is the raw material every slide is grounded in
+ * (article summary+body, or the operator's free text). `imageUrl` is optional (news photo);
+ * free-text decks render on the branded graphic background.
+ */
+export interface SlideSource {
+  id: string;
+  title: string;
+  bodyText: string;
+  topic: NewsTopic;
+  source: string;
+  link: string;
+  imageUrl: string;
 }
 
 const KICKER: Record<NewsTopic, string> = {
@@ -55,13 +79,59 @@ const KICKER: Record<NewsTopic, string> = {
   general: 'טכנולוגיה',
 };
 
-const CTA_HEADING = 'רוצים ליישם את זה אצלכם?';
+// STANDARD final CTA slide (slide 5) — fixed, brand-consistent, page-follow oriented. Not
+// derived from the article and NOT overridable by the LLM.
+const CTA_HEADING = 'רוצים להישאר מעודכנים?';
 const CTA_BODY =
-  'סוכני AI, אוטומציה והגנת סייבר לעצמאים ולעסקים קטנים — אפיון קצר ב-mrdaniel.co.il וחוזרים אליכם עם תוכנית.';
+  'עקבו אחר העמוד לניתוחי סייבר וטכנולוגיה בזמן אמת, וקראו את הכתבות המלאות באתר:';
+const CTA_LINK = 'mrdaniel.co.il';
+const TITLE_MAX = 90;
+
+// ─── source normalisers ─────────────────────────────────────────────────────────────────────
+
+function hashId(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return `src-${Math.abs(h).toString(36)}`;
+}
+
+/** A scraped news item → SlideSource (keeps the article photo + link + outlet). */
+export function newsItemToSlideSource(item: NewsItem, imageUrl = ''): SlideSource {
+  return {
+    id: item.id,
+    title: item.title.trim(),
+    bodyText: (item.summary || item.excerpt || '').trim(),
+    topic: item.topic,
+    source: item.source,
+    link: item.link,
+    imageUrl,
+  };
+}
+
+/** Free text / a social-post draft → SlideSource. Title is derived from the first sentence when
+ * not supplied; topic defaults to 'general'. */
+export function textToSlideSource(
+  text: string,
+  opts: { title?: string; topic?: NewsTopic; source?: string } = {}
+): SlideSource {
+  const clean = (text || '').replace(/\s+/g, ' ').trim();
+  const derivedTitle =
+    (opts.title || '').trim() ||
+    (sentences(clean)[0] || clean.split(/[.!?\n]/)[0] || 'תוכן חדש').trim().slice(0, TITLE_MAX);
+  return {
+    id: hashId(clean || derivedTitle),
+    title: derivedTitle,
+    bodyText: clean,
+    topic: opts.topic || 'general',
+    source: opts.source || 'טקסט חופשי',
+    link: '',
+    imageUrl: '',
+  };
+}
 
 // ─── shared helpers ──────────────────────────────────────────────────────────────────────────
 
-/** Cleaned sentences from the article body, de-duplicated, order preserved. Article text only. */
+/** Cleaned sentences from the source body, de-duplicated, order preserved. */
 function sentences(text: string): string[] {
   const clean = (text || '').replace(/\s+/g, ' ').trim();
   const seen = new Set<string>();
@@ -77,18 +147,217 @@ function sentences(text: string): string[] {
     });
 }
 
-/** A short section label built from the entity-rich part of a chunk (number / brand / English
- * token), 2–6 words, never equal to the chunk's own opening — so the heading and the body's first
- * sentence can't be redundant. Falls back to '' (renderer then shows the body alone). */
-function labelFor(chunk: string): string {
-  const words = chunk.replace(/["'׳״.…:;]/g, '').split(/\s+/).filter(Boolean);
-  const idx = words.findIndex((w) => /\d/.test(w) || /[A-Za-z]{3,}/.test(w) || /^[₪$%]/.test(w));
-  if (idx === -1) return '';
-  const start = Math.max(0, idx - 1);
-  const label = words.slice(start, start + 5).join(' ');
-  // reject if it's just the sentence opening again
-  if (chunk.trim().startsWith(label)) return words.slice(idx, idx + 4).join(' ');
-  return label.length >= 6 ? label : '';
+function wordCount(s: string): number {
+  return (s.trim().match(/\S+/g) ?? []).length;
+}
+
+/**
+ * ZERO-TRUNCATION close. Trims dangling connective punctuation ("(", ",", "-", ":", "…") off the
+ * END of a fragment, then adds a full stop only if the text now ends on a real word / ")" / '"'.
+ * Never appends "…" and never adds a period after a broken mid-word fragment.
+ */
+function ensureSentenceEnd(s: string): string {
+  let t = (s || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  // balance a dangling "(" — drop an unclosed trailing parenthetical rather than cut a list
+  const opens = (t.match(/\(/g) || []).length;
+  const closes = (t.match(/\)/g) || []).length;
+  if (opens > closes) t = t.replace(/\s*\([^()]*$/, '').trim();
+  t = t.replace(/[\s,;:–—\-….]+$/u, '').trim(); // strip trailing "…", commas, dashes, colons
+  if (!t) return '';
+  return /[.!?]$/.test(t) ? t : `${t}.`;
+}
+
+/** Split text into an ordered array of COMPLETE sentences (terminal punctuation kept, "…" → ".").
+ * De-duplicates near-identical sentences (OG-description + article lede repeats). A trailing
+ * fragment with no terminator is closed via `ensureSentenceEnd` (or merged back). */
+function toSentences(text: string): string[] {
+  const clean = (text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (s: string) => {
+    const v = s.trim();
+    if (wordCount(v) < 2) return;
+    const key = v.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 60).toLowerCase();
+    if (key.length > 12 && seen.has(key)) return;
+    if (key.length > 12) seen.add(key);
+    out.push(v);
+  };
+  const parts = clean.split(/(?<=[.!?…])\s+/);
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i].trim();
+    if (!p) continue;
+    if (/[.!?…]$/.test(p)) push(p.replace(/…$/, '.'));
+    else if (i === parts.length - 1) {
+      const closed = ensureSentenceEnd(p);
+      if (wordCount(closed) >= 3) push(closed);
+      else if (out.length) out[out.length - 1] = ensureSentenceEnd(`${out[out.length - 1]} ${p}`);
+    } else {
+      push(ensureSentenceEnd(p));
+    }
+  }
+  return out;
+}
+
+// ── META-PHRASE SCRUBBER ────────────────────────────────────────────────────────────────────
+// Editorial output is CLEAN narrative ONLY. No framing labels, editor's notes, section headers
+// or "context" tags may survive into a slide body / social-copy paragraph — on ANY route
+// (LLM synthesis, deterministic fallback, or the slide-editor chat).
+// "start of text / after newline / after a sentence end" — the positions a meta-label can open at.
+const AT = '(?:^|\\n|(?<=[.!?…]\\s))';
+const META_PATTERNS: RegExp[] = [
+  new RegExp(`${AT}\\s*ה?הקשר\\s*(?:ה?טכני)?\\s*:\\s*`, 'gi'),
+  new RegExp(`${AT}\\s*הקשר\\s+טכני\\s*:?\\s*`, 'gi'),
+  /\s*ה?הקשר\s*:?\s*הידיעה שפורסמה תחת הכותרת\s*"?[^"\n.]*"?\s*(?:עוסקת בכך)?\s*\.?/gi,
+  /\s*הידיעה שפורסמה תחת הכותרת\s*"?[^"\n.]*"?\s*(?:עוסקת בכך)?\s*\.?/gi,
+  new RegExp(`${AT}\\s*נא\\s+לשים\\s+לב\\s*[:,]?\\s*`, 'gi'),
+  new RegExp(`${AT}\\s*(?:כותרת(?:\\s+משנה)?|תת[- ]?כותרת|כותרת[- ]על|הערת עורך|לתשומת לב\\S*)\\s*:\\s*`, 'gi'),
+  new RegExp(`${AT}\\s*(?:כמה נקודות|הנקודות|התובנות|מה ש\\S+)\\s+(?:ש?מעבר ל(?:כתבה|כותרת)|המעשיות מכאן|חשוב לקחת מכאן|כדאי לבדוק אצלכם עכשיו|נשאר מזה[^:\\n]*)\\s*:\\s*`, 'gi'),
+  new RegExp(`${AT}\\s*מעבר לכותרת\\s*[,:]\\s*`, 'gi'),
+  new RegExp(`${AT}\\s*מהשטח\\s*:\\s*`, 'gi'),
+  /\s*זהו עיקר המידע שנמסר בשלב זה[^.\n]*\.?/gi,
+  /\s*זהו הפרט המרכזי שנמסר[^.\n]*\.?/gi,
+  /\s*(?:בשלב זה אלה הפרטים שפורסמו|ההתפתחות מובאת כאן כפי שדווחה)[^.\n]*\.?/gi,
+  /\s*הפרטים המלאים מופיעים בכתבת המקור\.?/gi,
+  new RegExp(`${AT}\\s*(?:לפי הדיווח|על פי הפרסום שהתקבל|בכתבה נמסר כי|מהפרטים שנחשפו עד כה עולה כי)\\s*,?\\s*`, 'g'),
+];
+
+/** Remove meta-framing / editor-note / section-label injections; return clean narrative only. */
+export function stripMetaPhrases(text: string): string {
+  let t = text || '';
+  for (const re of META_PATTERNS) t = t.replace(re, (m) => (m.startsWith('\n') ? '\n' : ' '));
+  return t
+    .replace(/["'׳״]\s*["'׳״]/g, ' ')
+    .replace(/\(\s*\)/g, '')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^[\s,;:.–—-]+/, '')
+    .trim();
+}
+
+/** Word threshold above which the LLM's own per-slide split is kept as-is. */
+const MIN_DENSE_WORDS = 26;
+/** Aim ~this many words per content slide; the deck grows (up to MAX) to hit it without cutting. */
+const SLIDE_TARGET_WORDS = 44;
+/** A single content slide won't be forced past this many words even if it's one long sentence. */
+const SLIDE_HARD_WORDS = 78;
+/** Deck may grow to this many content slides (total up to 8) rather than truncate a sentence. */
+const MAX_CONTENT_SLIDES = 6;
+
+/** Headline hygiene: meta-scrubbed, no trailing "…", capped on a WORD boundary (never mid-word). */
+function tidyHeadline(h: string): string {
+  let t = stripMetaPhrases((h || '').replace(/\s+/g, ' ').trim()).replace(/[…\s.]+$/u, '').trim();
+  if (t.length > 150) {
+    const cut = t.slice(0, 150);
+    const sp = cut.lastIndexOf(' ');
+    t = (sp > 60 ? cut.slice(0, sp) : cut).replace(/[\s,;:–—-]+$/u, '');
+  }
+  return t;
+}
+
+/**
+ * DYNAMIC content-slide builder. Packs WHOLE sentences into balanced ~44-word slides (hard ceiling
+ * ~78) and GROWS the slide count (2..6) as needed so no sentence is ever split, dropped or cut.
+ * Every returned body is complete sentences only, each ending with proper punctuation.
+ */
+function buildContentSlides(rawText: string, kicker: string): StorySlide[] {
+  const text = stripMetaPhrases((rawText || '').replace(/\s+/g, ' ').trim());
+  const sents = toSentences(text);
+  if (sents.length === 0) return [];
+
+  const w = sents.map(wordCount);
+
+  // 1. Greedy pack: start a new chunk BEFORE the next sentence would overshoot the target / ceiling.
+  let chunks: string[][] = [];
+  let cur: string[] = [];
+  let curW = 0;
+  for (let i = 0; i < sents.length; i++) {
+    cur.push(sents[i]);
+    curW += w[i];
+    const nextW = i + 1 < sents.length ? w[i + 1] : 0;
+    if (nextW > 0 && (curW + nextW > SLIDE_TARGET_WORDS * 1.25 || curW + nextW > SLIDE_HARD_WORDS)) {
+      chunks.push(cur);
+      cur = [];
+      curW = 0;
+    }
+  }
+  if (cur.length) chunks.push(cur);
+
+  // 2. Clamp to MAX by merging the smallest adjacent pair (whole sentences stay intact).
+  while (chunks.length > MAX_CONTENT_SLIDES) {
+    let mi = 0;
+    let mw = Infinity;
+    for (let i = 0; i < chunks.length - 1; i++) {
+      const pairW = chunks[i].reduce((n, s) => n + wordCount(s), 0) + chunks[i + 1].reduce((n, s) => n + wordCount(s), 0);
+      if (pairW < mw) {
+        mw = pairW;
+        mi = i;
+      }
+    }
+    chunks.splice(mi, 2, [...chunks[mi], ...chunks[mi + 1]]);
+  }
+
+  // 3. Ensure >= 2 content slides when there's more than one sentence — split the largest chunk.
+  if (chunks.length === 1 && chunks[0].length >= 2) {
+    const only = chunks[0];
+    const mid = Math.ceil(only.length / 2);
+    chunks = [only.slice(0, mid), only.slice(mid)];
+  }
+
+  return chunks
+    .filter((c) => c.length)
+    .map((c) => {
+      const body = ensureSentenceEnd(c.join(' '));
+      return { kind: 'insight' as const, index: 0, total: 0, kicker, heading: '', narrativeText: body, body };
+    });
+}
+
+export interface DeckValidation {
+  ok: boolean;
+  issues: string[];
+}
+
+/**
+ * PRE-RENDER GATE. Every content/cover slide must end on a COMPLETE sentence — no mid-word cut,
+ * no trailing "…" / "...", no unclosed "(", no dangling "," / "-" / ":".
+ */
+export function validateDeckSentences(payload: StoryPayload): DeckValidation {
+  const issues: string[] = [];
+  payload.slides.forEach((s, i) => {
+    if (s.kind === 'cta') return;
+    const t = (s.kind === 'cover' ? s.headline || '' : s.narrativeText || s.body || '').trim();
+    if (!t) {
+      if (s.kind !== 'cover') issues.push(`slide ${i + 1}: empty body`);
+      return;
+    }
+    if (/(?:…|\.\.\.)\s*$/.test(t)) issues.push(`slide ${i + 1}: trailing ellipsis`);
+    if ((t.match(/\(/g) || []).length > (t.match(/\)/g) || []).length) issues.push(`slide ${i + 1}: unclosed "("`);
+    if (/[,;:–—-]\s*$/.test(t)) issues.push(`slide ${i + 1}: ends on dangling punctuation`);
+    if (s.kind !== 'cover' && !/[.!?]["'׳״)\]]?\s*$/.test(t)) issues.push(`slide ${i + 1}: no terminal "."`);
+  });
+  return { ok: issues.length === 0, issues };
+}
+
+/**
+ * Repair pass — scrub meta, force content slides heading-less + sentence-complete, tidy the
+ * headline, keep the cover body empty, and always reset the CTA to the standard one. Idempotent;
+ * run before the deck reaches the preview / export canvas.
+ */
+export function finalizeDeck(payload: StoryPayload): StoryPayload {
+  const slides: StorySlide[] = payload.slides.map((s) => {
+    if (s.kind === 'cta') {
+      return { ...s, heading: CTA_HEADING, narrativeText: CTA_BODY, body: CTA_BODY, linkLabel: CTA_LINK };
+    }
+    if (s.kind === 'cover') {
+      return { ...s, headline: tidyHeadline(s.headline || ''), narrativeText: '' };
+    }
+    const body = ensureSentenceEnd(stripMetaPhrases((s.narrativeText || s.body || '').trim()));
+    return { ...s, heading: '', narrativeText: body, body };
+  });
+  stampIndexes(slides);
+  return { ...payload, slides };
 }
 
 function stampIndexes(slides: StorySlide[]): void {
@@ -107,95 +376,274 @@ interface SynthSlide {
   narrativeText: string;
 }
 
+/** POST to the story-synth endpoint, retrying once on a 429 (Gemini free-tier hourly cap) after a
+ * short, bounded wait so a brief quota blip doesn't force the deterministic fallback. */
+async function postStorySynth(url: string, headers: Record<string, string>, body: string): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    // Per-attempt hard timeout — a hung fetch never rejects on its own, which would hang the
+    // whole slide pipeline (and leave the Story Studio spinner stuck). On abort this throws,
+    // the caller's catch runs, and generation falls back to buildSlides().
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 75000);
+    let res: Response;
+    try {
+      res = await fetch(url, { method: 'POST', headers, body, signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.status !== 429 || attempt >= 1) return res;
+    let waitMs = 6000;
+    try {
+      const j = (await res.clone().json()) as { retryAfterSeconds?: number };
+      if (typeof j.retryAfterSeconds === 'number') {
+        waitMs = Math.min(12000, Math.max(3000, j.retryAfterSeconds * 1000));
+      }
+    } catch {
+      /* keep the default wait */
+    }
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
+}
+
+/** Call the synth endpoint for one source; returns the raw SynthSlide[] or throws a descriptive
+ * (Hebrew) error the caller can show and fall back on. */
+async function requestSynthesis(
+  src: SlideSource,
+  opts: { apiBase: string; adminSecret?: string }
+): Promise<SynthSlide[]> {
+  if (src.bodyText.trim().length < 60) throw new Error('הטקסט קצר מדי לסינתזת AI (פחות מ-60 תווים)');
+
+  const res = await postStorySynth(
+    `${opts.apiBase.replace(/\/$/, '')}/api/agent-generate`,
+    { 'Content-Type': 'application/json', ...(opts.adminSecret ? { 'x-admin-secret': opts.adminSecret } : {}) },
+    JSON.stringify({ action: 'story-synthesize', title: src.title, source: src.source, topic: src.topic, articleText: src.bodyText })
+  );
+
+  if (res.status === 429) throw new Error('מכסת ה-API החינמית של Gemini לשעה זו מוצתה (429) — נסו שוב מאוחר יותר או שדרגו את המפתח');
+  if (res.status === 401) throw new Error('אימות מול /api/agent-generate נכשל (401) — x-admin-secret חסר או לא תואם ל-ADMIN_API_SECRET באתר');
+  if (res.status === 503) throw new Error('GEMINI_API_KEY לא מוגדר בסביבת הריצה של האתר (503)');
+  if (!res.ok) throw new Error(`שרת ה-AI החזיר שגיאה ${res.status}`);
+
+  const data = (await res.json()) as { ok?: boolean; slides?: SynthSlide[]; blocked?: boolean };
+  if (data.blocked) throw new Error('פלט ה-AI נחסם ע"י מסנן התוכן');
+  if (!data.ok || !Array.isArray(data.slides) || data.slides.length < 3) {
+    throw new Error('מנוע ה-AI לא החזיר מספיק שקופיות תקינות');
+  }
+  return data.slides;
+}
+
 /**
- * Calls the site's story-synthesis endpoint and maps the strict-JSON result onto a StoryPayload.
- * `apiBase` is the site origin (e.g. https://mrdaniel.co.il); `adminSecret` is optional
- * (x-admin-secret). Throws on any failure so the caller can fall back to buildStorySlides().
+ * Map the LLM's SynthSlide[] onto a 5-slide StoryPayload enforcing the density + layout rules:
+ *   • Cover  = headline + tag + watermark ONLY (no body text — narrativeText forced empty).
+ *   • Slides 2–4 = 2–3 rich, dense paragraphs (30–60 words each). If any LLM content slide is a
+ *     thin single line, ALL the content is re-grouped into balanced dense paragraphs.
+ *   • CTA    = clean closing line.
  */
+function assembleSynthesized(src: SlideSource, synthSlides: SynthSlide[]): StoryPayload {
+  const kicker = KICKER[src.topic];
+
+  const coverSynth = synthSlides.find((s) => s.kind === 'cover');
+  const contentSynth = synthSlides.filter((s) => s.kind === 'body' || s.kind === 'takeaway');
+
+  const contentTexts = contentSynth.map((s) => stripMetaPhrases((s.narrativeText || '').trim())).filter(Boolean);
+  const alreadyDense =
+    contentTexts.length >= 2 &&
+    contentTexts.length <= 3 &&
+    contentTexts.every((t) => wordCount(t) >= MIN_DENSE_WORDS);
+
+  let content: StorySlide[];
+  if (alreadyDense && contentTexts.every((t) => toSentences(t).length >= 1)) {
+    // Keep the LLM's own per-slide split — but each body still runs through the sentence-complete
+    // guard, and if any slide is over the hard word ceiling it's re-chunked dynamically.
+    const overLong = contentTexts.some((t) => wordCount(t) > SLIDE_HARD_WORDS + 8);
+    content = overLong
+      ? buildContentSlides(contentTexts.join(' '), kicker)
+      : contentTexts.slice(0, MAX_CONTENT_SLIDES).map((t) => {
+          const body = ensureSentenceEnd(t);
+          return { kind: 'insight' as const, index: 0, total: 0, kicker, heading: '', narrativeText: body, body };
+        });
+  } else {
+    // Re-distribute all the LLM's sentences (+ cover's stray fact) into dynamic, sentence-safe slides.
+    const pool = [coverSynth?.narrativeText ?? '', ...contentTexts].join(' ').trim();
+    content = buildContentSlides(pool || src.bodyText, kicker);
+  }
+  if (content.length < 1) throw new Error('טקסט ה-AI היה דל מכדי לבנות שקופיות תוכן');
+
+  const cover: StorySlide = {
+    kind: 'cover',
+    index: 0,
+    total: 0,
+    kicker,
+    headline: tidyHeadline(coverSynth?.title || src.title),
+    narrativeText: '',
+    source: src.source,
+  };
+  const cta: StorySlide = {
+    kind: 'cta',
+    index: 0,
+    total: 0,
+    kicker,
+    heading: CTA_HEADING,
+    narrativeText: CTA_BODY,
+    body: CTA_BODY,
+    linkLabel: CTA_LINK,
+  };
+
+  const slides = [cover, ...content.slice(0, MAX_CONTENT_SLIDES), cta];
+  stampIndexes(slides);
+
+  return finalizeDeck({
+    newsId: src.id,
+    newsTitle: src.title,
+    newsLink: src.link,
+    topic: src.topic,
+    imageUrl: src.imageUrl,
+    slides,
+    synthesized: true,
+    createdAt: Date.now(),
+  });
+}
+
+/**
+ * PRIMARY entry point. Any SlideSource → a 4–5 slide StoryPayload via the LLM. Throws a
+ * descriptive error on any failure so the caller can fall back to buildSlides() and show why.
+ */
+export async function synthesizeSlides(
+  src: SlideSource,
+  opts: { apiBase: string; adminSecret?: string }
+): Promise<StoryPayload> {
+  const synth = await requestSynthesis(src, opts);
+  return assembleSynthesized(src, synth);
+}
+
+// ─── FALLBACK: deterministic, source-grounded, no banks, no bullets ──────────────────────────
+
+/**
+ * Deterministic fallback. Enforces the SAME layout rules as the LLM path:
+ *   • Cover (1)   = headline + tag + watermark ONLY (no body).
+ *   • Slides 2–4  = 2–3 DENSE narrative paragraphs, NO heading, each ending on a full sentence.
+ *   • CTA (5)     = the standard page-follow CTA (fixed).
+ * `reason` records why the LLM path was skipped so the dashboard can show it.
+ */
+export function buildSlides(src: SlideSource, reason?: string): StoryPayload {
+  const kicker = KICKER[src.topic];
+  const sourceText = (src.bodyText || src.title || '').replace(/\s+/g, ' ').trim();
+
+  let content = buildContentSlides(sourceText, kicker);
+  // If we got nothing at all, fall back to the headline as a single clean content slide.
+  if (content.length === 0) {
+    const body = ensureSentenceEnd(stripMetaPhrases(sourceText || src.title));
+    content = [{ kind: 'insight', index: 0, total: 0, kicker, heading: '', narrativeText: body, body }];
+  }
+
+  const slides: StorySlide[] = [
+    { kind: 'cover', index: 0, total: 0, kicker, headline: tidyHeadline(src.title), narrativeText: '', source: src.source },
+    ...content.slice(0, MAX_CONTENT_SLIDES),
+    { kind: 'cta', index: 0, total: 0, kicker, heading: CTA_HEADING, narrativeText: CTA_BODY, body: CTA_BODY, linkLabel: CTA_LINK },
+  ];
+  stampIndexes(slides);
+
+  return finalizeDeck({
+    newsId: src.id,
+    newsTitle: src.title,
+    newsLink: src.link,
+    topic: src.topic,
+    imageUrl: src.imageUrl,
+    slides,
+    synthesized: false,
+    fallbackReason: reason,
+    createdAt: Date.now(),
+  });
+}
+
+// ─── AI Slide Editor — live in-dashboard edits ──────────────────────────────────────────────
+
+export interface SlideEdit {
+  /** 1-based slide index. */
+  n: number;
+  kind: StorySlide['kind'];
+  text: string;
+}
+
+/** Flatten a payload into the editable shape the chat widget / editor endpoint work with. */
+export function slidesToEditable(payload: StoryPayload): SlideEdit[] {
+  return payload.slides.map((s, i) => ({
+    n: i + 1,
+    kind: s.kind,
+    text: s.kind === 'cover' ? s.headline || '' : s.narrativeText || s.body || '',
+  }));
+}
+
+/**
+ * Apply edited slide texts back onto a payload: cover text → headline, content → narrative
+ * paragraph (heading-less), CTA (slide 5) always reset to the STANDARD CTA. Every field is
+ * meta-scrubbed. Slide count and kinds are preserved.
+ */
+export function applySlideEdits(payload: StoryPayload, edits: SlideEdit[]): StoryPayload {
+  const byN = new Map(edits.map((e) => [e.n, e]));
+  const slides = payload.slides.map((s, i) => {
+    if (s.kind === 'cta') {
+      return { ...s, heading: CTA_HEADING, narrativeText: CTA_BODY, body: CTA_BODY, linkLabel: CTA_LINK };
+    }
+    const e = byN.get(i + 1);
+    const raw = (e?.text ?? '').trim();
+    if (!raw) return s;
+    const clean = stripMetaPhrases(raw);
+    if (s.kind === 'cover') return { ...s, headline: tidyHeadline(clean), narrativeText: '' };
+    const body = ensureSentenceEnd(clean);
+    return { ...s, kind: 'insight' as const, heading: '', narrativeText: body, body };
+  });
+  stampIndexes(slides);
+  return finalizeDeck({ ...payload, slides, createdAt: Date.now() });
+}
+
+/**
+ * Deterministic local slide edit — used when the AI edit endpoint is unavailable (429 / offline).
+ * Handles: shorten a slide, replace a slide with explicit quoted text. Rephrasing / tone changes
+ * need the AI and return `changed:false` with a note.
+ */
+export function localSlideEdit(
+  payload: StoryPayload,
+  instruction: string
+): { payload: StoryPayload; changed: boolean; note?: string } {
+  const instr = (instruction || '').trim();
+  const nMatch = instr.match(/שק(?:ופית|ף|ופיות)?\s*(?:מספר\s*)?(\d)/) || instr.match(/slide\s*(\d)/i);
+  const n = nMatch ? Number(nMatch[1]) : 0;
+  const target = n >= 1 && n <= payload.slides.length ? payload.slides[n - 1] : null;
+
+  const quoted = instr.match(/["“„”']([^"“„”']{6,})["“„”']/);
+  if (target && target.kind !== 'cta' && /החלף|החליף|שנה|תחליף|replace/i.test(instr) && quoted) {
+    return { payload: applySlideEdits(payload, [{ n, kind: target.kind, text: quoted[1] }]), changed: true };
+  }
+
+  if (target && target.kind !== 'cta' && /תקצר|קצר|תמצת|תקצץ|shorten|קיצור/i.test(instr)) {
+    const srcText = target.kind === 'cover' ? target.headline || '' : target.narrativeText || target.body || '';
+    const sents = srcText.split(/(?<=[.!?…])\s+/).filter(Boolean);
+    if (sents.length >= 2) {
+      const keep = Math.max(1, Math.round(sents.length * 0.55));
+      return { payload: applySlideEdits(payload, [{ n, kind: target.kind, text: sents.slice(0, keep).join(' ') }]), changed: true };
+    }
+  }
+
+  return {
+    payload,
+    changed: false,
+    note: 'העריכה הזו דורשת את מנוע ה-AI (כרגע לא זמין — מכסת Gemini). פעולות מקומיות נתמכות: "תקצר את שקופית 2", או החלפה מפורשת: החלף את שקף 1 ב"טקסט חדש".',
+  };
+}
+
+// ─── NewsItem back-compat wrappers ──────────────────────────────────────────────────────────
+
+/** @deprecated use `synthesizeSlides(newsItemToSlideSource(item, imageUrl), opts)`. */
 export async function synthesizeStory(
   item: NewsItem,
   imageUrl: string,
   opts: { apiBase: string; adminSecret?: string }
 ): Promise<StoryPayload> {
-  const articleText = (item.summary || item.excerpt || '').trim();
-  if (articleText.length < 60) throw new Error('article text too thin for synthesis');
-
-  const res = await fetch(`${opts.apiBase.replace(/\/$/, '')}/api/agent-generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(opts.adminSecret ? { 'x-admin-secret': opts.adminSecret } : {}),
-    },
-    body: JSON.stringify({
-      action: 'story-synthesize',
-      title: item.title,
-      source: item.source,
-      topic: item.topic,
-      articleText,
-    }),
-  });
-  if (!res.ok) throw new Error(`story-synthesize responded ${res.status}`);
-  const data = (await res.json()) as { ok?: boolean; slides?: SynthSlide[]; blocked?: boolean };
-  if (!data.ok || data.blocked || !Array.isArray(data.slides) || data.slides.length < 3) {
-    throw new Error('story-synthesize returned no usable slides');
-  }
-
-  const kicker = KICKER[item.topic];
-  const slides: StorySlide[] = data.slides.map((s) => {
-    if (s.kind === 'cover') {
-      return { kind: 'cover', index: 0, total: 0, kicker, headline: s.title || item.title.trim(), narrativeText: s.narrativeText, source: item.source };
-    }
-    if (s.kind === 'cta') {
-      return { kind: 'cta', index: 0, total: 0, kicker, heading: s.title || CTA_HEADING, narrativeText: s.narrativeText || CTA_BODY, body: s.narrativeText || CTA_BODY, linkLabel: 'mrdaniel.co.il' };
-    }
-    // body / takeaway both render as a heading + narrative paragraph
-    return { kind: 'insight', index: 0, total: 0, kicker, heading: s.title, narrativeText: s.narrativeText, body: s.narrativeText };
-  });
-
-  // guarantee a CTA is last
-  if (slides[slides.length - 1].kind !== 'cta') {
-    slides.push({ kind: 'cta', index: 0, total: 0, kicker, heading: CTA_HEADING, narrativeText: CTA_BODY, body: CTA_BODY, linkLabel: 'mrdaniel.co.il' });
-  }
-  stampIndexes(slides);
-
-  return { newsId: item.id, newsTitle: item.title, newsLink: item.link, topic: item.topic, imageUrl, slides, synthesized: true, createdAt: Date.now() };
+  return synthesizeSlides(newsItemToSlideSource(item, imageUrl), opts);
 }
 
-// ─── FALLBACK: deterministic, article-grounded, no banks, no bullets ──────────────────────────
-
-export function buildStorySlides(item: NewsItem, imageUrl: string): StoryPayload {
-  const kicker = KICKER[item.topic];
-  const S = sentences(item.summary || item.excerpt);
-
-  const slides: StorySlide[] = [];
-  slides.push({
-    kind: 'cover',
-    index: 0,
-    total: 0,
-    kicker,
-    headline: item.title.trim(),
-    narrativeText: S[0] || '',
-    source: item.source,
-  });
-
-  // Body slides: chunk the remaining sentences into 2-sentence narrative paragraphs (max 2).
-  const rest = S.slice(1);
-  let consumed = 1; // how many of `rest`'s sentences ended up in a body slide
-  for (let i = 0; i < rest.length && slides.length < 3; i += 2) {
-    const chunk = rest.slice(i, i + 2).join(' ');
-    if (chunk.length < 24) continue;
-    slides.push({ kind: 'insight', index: 0, total: 0, kicker, heading: labelFor(chunk), narrativeText: chunk, body: chunk });
-    consumed = i + 2;
-  }
-
-  // Takeaway slide — only if there's a genuinely UNUSED later sentence to carry it.
-  const leftover = rest.slice(consumed).find((s) => s.length >= 24);
-  if (leftover) {
-    slides.push({ kind: 'insight', index: 0, total: 0, kicker, heading: 'המשמעות', narrativeText: leftover, body: leftover });
-  }
-
-  slides.push({ kind: 'cta', index: 0, total: 0, kicker, heading: CTA_HEADING, narrativeText: CTA_BODY, body: CTA_BODY, linkLabel: 'mrdaniel.co.il' });
-  stampIndexes(slides);
-
-  return { newsId: item.id, newsTitle: item.title, newsLink: item.link, topic: item.topic, imageUrl, slides, synthesized: false, createdAt: Date.now() };
+/** @deprecated use `buildSlides(newsItemToSlideSource(item, imageUrl), reason)`. */
+export function buildStorySlides(item: NewsItem, imageUrl: string, reason?: string): StoryPayload {
+  return buildSlides(newsItemToSlideSource(item, imageUrl), reason);
 }

@@ -44,14 +44,18 @@ export function pexelsQueryForTopic(topic: string): string {
 }
 
 async function searchPexels(slideText: string, fallbackQuery: string, orientation: PhotoOrientation): Promise<string | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
   try {
     const params = new URLSearchParams({ slideText, query: fallbackQuery, orientation });
-    const res = await fetch(`${PEXELS_SEARCH_BASE}?${params.toString()}`, { headers: authHeaders() });
+    const res = await fetch(`${PEXELS_SEARCH_BASE}?${params.toString()}`, { headers: authHeaders(), signal: ctrl.signal });
     if (!res.ok) return null;
     const data = await res.json();
     return data.ok ? data.photoUrl : null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -76,12 +80,21 @@ export async function resolveSlidePhotoUrl(slideText: string, topic: string, ori
  * sends permissive CORS headers (confirmed live), so this succeeds and keeps the canvas untainted
  * for `toDataURL()`; if it fails for any reason (network blip, a future non-CORS host), `onerror`
  * resolves null rather than throwing, and the caller draws the gradient-only background instead. */
-export function loadPhoto(url: string): Promise<HTMLImageElement | null> {
+export function loadPhoto(url: string, timeoutMs = 8000): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
+    let settled = false;
+    const finish = (v: HTMLImageElement | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(v);
+    };
+    // A stalled connection never fires load/error — cap it so callers can't hang forever.
+    const timer = setTimeout(() => finish(null), timeoutMs);
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
+    img.onload = () => finish(img);
+    img.onerror = () => finish(null);
     img.src = url;
   });
 }

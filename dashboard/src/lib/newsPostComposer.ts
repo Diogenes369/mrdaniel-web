@@ -1,4 +1,5 @@
 import { SITE_PROMO_FOOTER, type NewsItem, type NewsTopic, type SocialPlatform } from './newsAgentTypes';
+import { stripMetaPhrases } from './storySlides';
 
 /**
  * Turns a news item into a rich, long-form, ready-to-publish social post — entirely client-side
@@ -147,14 +148,18 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-/** Keeps the item's own summary as a real paragraph — up to `maxChars`, cut on a sentence boundary. */
+/** Keeps the item's own summary as a real paragraph — up to ~`maxChars`, ALWAYS ending on a full
+ * sentence. Never appends "…" and never cuts mid-sentence: if no sentence boundary lands in range,
+ * the first complete sentence is kept at whatever length. */
 function contextParagraph(text: string, maxChars: number): string {
   const clean = (text || '').replace(/\s+/g, ' ').trim();
   if (!clean) return '';
-  if (clean.length <= maxChars) return clean;
-  const slice = clean.slice(0, maxChars);
-  const lastStop = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('! '), slice.lastIndexOf('? '), slice.lastIndexOf('… '));
-  return `${(lastStop > maxChars * 0.5 ? slice.slice(0, lastStop + 1) : slice).trimEnd()}…`;
+  if (clean.length <= Math.floor(maxChars * 1.35)) return clean;
+  const window = clean.slice(0, Math.floor(maxChars * 1.35));
+  const upToLastStop = window.match(/^[\s\S]*[.!?](?=\s|$)/);
+  if (upToLastStop && upToLastStop[0].length >= maxChars * 0.4) return upToLastStop[0].trim();
+  const first = clean.match(/^[\s\S]*?[.!?](?=\s|$)/);
+  return (first ? first[0] : clean).trim();
 }
 
 export interface ComposedPost {
@@ -163,8 +168,130 @@ export interface ComposedPost {
   hashtags: string[];
   /** Just the footer, so the UI can show it as a locked/highlighted block. */
   footer: string;
+  /** true when the body was written by the adaptive LLM synthesis step; false = deterministic. */
+  synthesized: boolean;
 }
 
+/** Close a fragment with a full stop so takeaways read as flowing sentences, not a list. */
+function asSentence(s: string): string {
+  const t = (s || '').replace(/^[▪️•\-–—*\s]+/, '').trim();
+  return !t || /[.!?…]$/.test(t) ? t : `${t}.`;
+}
+
+function topicHashtags(topic: NewsTopic, isLinkedin: boolean): string[] {
+  const topicTags = isLinkedin ? TOPIC_HASHTAGS[topic].slice(0, 6) : TOPIC_HASHTAGS[topic];
+  const globalTags = isLinkedin ? GLOBAL_HASHTAGS.slice(0, 3) : GLOBAL_HASHTAGS;
+  return [...topicTags, ...globalTags];
+}
+
+/** Publisher display-name → canonical domain for the clean text citation. Covers the outlets in
+ * src/server/newsFeed.ts's SOURCES plus the publishers the Google-News fallback attributes by the
+ * "Headline - Publisher" title suffix (whose `link` is then a news.google.com redirect). */
+const SOURCE_DOMAINS: Record<string, string> = {
+  geektime: 'geektime.co.il',
+  גיקטיים: 'geektime.co.il',
+  techtime: 'techtime.co.il',
+  'ynet דיגיטל': 'ynet.co.il',
+  ynet: 'ynet.co.il',
+  'ידיעות אחרונות': 'ynet.co.il',
+  גלובס: 'globes.co.il',
+  globes: 'globes.co.il',
+  כלכליסט: 'calcalist.co.il',
+  calcalist: 'calcalist.co.il',
+  ctech: 'calcalistech.com',
+  themarker: 'themarker.com',
+  'the marker': 'themarker.com',
+  'דה מרקר': 'themarker.com',
+  הארץ: 'haaretz.co.il',
+  haaretz: 'haaretz.co.il',
+  מעריב: 'maariv.co.il',
+  maariv: 'maariv.co.il',
+  'ישראל היום': 'israelhayom.co.il',
+  'israel hayom': 'israelhayom.co.il',
+  וואלה: 'walla.co.il',
+  walla: 'walla.co.il',
+  'israel defense': 'israeldefense.co.il',
+  'ישראל דיפנס': 'israeldefense.co.il',
+  'times of israel': 'timesofisrael.com',
+  reuters: 'reuters.com',
+  bloomberg: 'bloomberg.com',
+  techcrunch: 'techcrunch.com',
+  'the verge': 'theverge.com',
+  cnbc: 'cnbc.com',
+};
+
+/** Hosts that are feed aggregators / link shorteners / redirects — never the real publisher. */
+const AGGREGATOR_HOSTS =
+  /(^|\.)(news\.google\.com|google\.com|feedproxy\.google\.com|feedburner\.com|feeds\.feedburner\.com|feedsportal\.com|rss\.app|bing\.com|t\.co|lnkd\.in)$/i;
+
+/** Tracking/analytics query params to drop from an article URL — keeps functional ones such as
+ * Globes' `?did=` article id. */
+const TRACKING_PARAM =
+  /^(utm_[a-z]+|fbclid|gclid|dclid|mc_[a-z]+|ref|ref_src|referrer|cmpid|cmp|campaign|source|medium|at_medium|at_campaign|spm|s_cid|__twitter_impression|guccounter|igshid)$/i;
+
+/** A clean, bare domain for the source citation — never a URL. Prefers the real article host,
+ * falls back to a lookup on the source display name, then to the display name itself.
+ * Exported so the Story/Carousel generator can stamp the same clean attribution on its slides. */
+export function citationDomain(item: NewsItem): string {
+  try {
+    const host = new URL(item.link).hostname.replace(/^www\./, '').toLowerCase();
+    if (host && !AGGREGATOR_HOSTS.test(host)) return host;
+  } catch {
+    /* item.link isn't a URL — fall through to the name lookup */
+  }
+  const key = item.source.trim().toLowerCase();
+  if (SOURCE_DOMAINS[key]) return SOURCE_DOMAINS[key];
+  const hit = Object.keys(SOURCE_DOMAINS).find((name) => key.includes(name));
+  return hit ? SOURCE_DOMAINS[hit] : item.source.trim();
+}
+
+/** LinkedIn only: a clean canonical article URL — protocol normalised, `www.`, tracking params
+ * and `#fragment` stripped — or null when the link is a Google-News / aggregator redirect that
+ * can't be resolved to the real article without a network hop (the caller then shows just the
+ * bare-domain citation instead of an opaque redirect URL). */
+function canonicalArticleUrl(link: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(link);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.replace(/^www\./, '');
+  if (!/^https?:$/.test(u.protocol) || AGGREGATOR_HOSTS.test(host)) return null;
+  for (const k of [...u.searchParams.keys()]) if (TRACKING_PARAM.test(k)) u.searchParams.delete(k);
+  u.hash = '';
+  u.hostname = host;
+  u.protocol = 'https:';
+  const s = u.toString();
+  return u.search ? s : s.replace(/\/$/, '');
+}
+
+/** Source attribution, engagement prompt, hashtag line and the mandatory promo footer —
+ * appended after both the deterministic body and an LLM-synthesised one.
+ *
+ * Instagram captions can't carry clickable links, so IG gets a bare-domain text citation only
+ * ("מקור: ynet.co.il · 01.09.2026"). LinkedIn gets that same citation plus the canonical article
+ * URL — but only when it's a real publisher link, not a news.google.com redirect. */
+function postTail(item: NewsItem, platform: SocialPlatform, hashtags: string[]): string[] {
+  const isLinkedin = platform === 'linkedin';
+  const dateLabel = formatDate(item.publishedAt);
+  const citation = `מקור: ${[citationDomain(item), dateLabel].filter(Boolean).join(' · ')}`;
+
+  const articleUrl = isLinkedin ? canonicalArticleUrl(item.link) : null;
+  const sourceLine = articleUrl ? `${citation}\nלכתבה המלאה: ${articleUrl}` : citation;
+
+  const engagement = isLinkedin
+    ? 'מה דעתכם? האם הארגון שלכם ערוך לזה?'
+    : 'שתפו בתגובות מה הכי מפתיע אתכם כאן 👇';
+  return [sourceLine, engagement, hashtags.join(' '), SITE_PROMO_FOOTER];
+}
+
+/**
+ * DETERMINISTIC FALLBACK (no API key / synthesis failed). Organic flow — no fixed
+ * "📌 / 🔍 / 📋 / 🎯" header blocks: hook, then the article's own facts, then the analysis and
+ * technical context as running paragraphs, one header-free takeaway cluster with a varied
+ * lead-in, and the field note to close.
+ */
 export function composeNewsPost(item: NewsItem, platform: SocialPlatform): ComposedPost {
   const topic = item.topic;
   const seed = seededInt(item.title);
@@ -172,36 +299,100 @@ export function composeNewsPost(item: NewsItem, platform: SocialPlatform): Compo
 
   const hook = seededPick(HOOKS[topic], seed).replace('{title}', item.title.trim());
   const context = contextParagraph(item.summary || item.excerpt, isLinkedin ? 900 : 520);
-  const whyItMatters = WHY_IT_MATTERS[topic];
-  const techContext = TECH_CONTEXT[topic];
-  const bullets = seededSubset(TAKEAWAYS[topic], isLinkedin ? 5 : 4, seed).map((b) => `▪️ ${b}`);
-  const insight = EXPERT_INSIGHT[topic];
+  // Takeaways woven into ONE flowing paragraph — no bullet markers, no "📋 / כמה נקודות" label.
+  const takeaways = seededSubset(TAKEAWAYS[topic], isLinkedin ? 5 : 4, seed).map(asSentence).filter(Boolean).join(' ');
+  const hashtags = topicHashtags(topic, isLinkedin);
 
-  const dateLabel = formatDate(item.publishedAt);
-  const sourceLine = isLinkedin
-    ? [`📰 מקור: ${[item.source, dateLabel].filter(Boolean).join(' · ')}`, item.link ? `🔗 לכתבה המלאה: ${item.link}` : '']
-        .filter(Boolean)
-        .join('\n')
-    : `📰 ${[item.source, dateLabel].filter(Boolean).join(' · ')}`;
+  const body = stripMetaPhrases(
+    [
+      hook,
+      context,
+      WHY_IT_MATTERS[topic],
+      isLinkedin ? TECH_CONTEXT[topic] : '',
+      takeaways,
+      EXPERT_INSIGHT[topic],
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+  );
 
-  const engagement = isLinkedin ? 'מה דעתכם? האם הארגון שלכם ערוך לזה? 👇' : 'שתפו בתגובות מה הכי מפתיע אתכם כאן 👇';
+  const fullText = [body, ...postTail(item, platform, hashtags)].join('\n\n');
+  return { fullText, hashtags, footer: SITE_PROMO_FOOTER, synthesized: false };
+}
 
-  const topicTags = isLinkedin ? TOPIC_HASHTAGS[topic].slice(0, 6) : TOPIC_HASHTAGS[topic];
-  const globalTags = isLinkedin ? GLOBAL_HASHTAGS.slice(0, 3) : GLOBAL_HASHTAGS;
-  const hashtags = [...topicTags, ...globalTags];
+/** Wraps an LLM-synthesised post body (adaptive structure, article-typed) with the standard
+ * source line, engagement prompt, hashtags and mandatory promo footer. */
+export function assembleComposedPost(
+  item: NewsItem,
+  platform: SocialPlatform,
+  body: string,
+  aiHashtags: string[]
+): ComposedPost {
+  const hashtags = (
+    aiHashtags && aiHashtags.length >= 3 ? aiHashtags : topicHashtags(item.topic, platform === 'linkedin')
+  ).slice(0, 12);
+  const fullText = [stripMetaPhrases(body.trim()), ...postTail(item, platform, hashtags)].join('\n\n');
+  return { fullText, hashtags, footer: SITE_PROMO_FOOTER, synthesized: true };
+}
 
-  const sections: string[] = [
-    hook,
-    context ? `📌 העובדות מהכתבה\n${context}` : '',
-    `🔍 הניתוח\n${whyItMatters}`,
-    isLinkedin ? `🧩 הקשר טכני\n${techContext}` : '',
-    `📋 מה לקחת מזה\n${bullets.join('\n')}`,
-    `🎯 מהניסיון בשטח\n${insight}`,
-    sourceLine,
-    engagement,
-    hashtags.join(' '),
-    SITE_PROMO_FOOTER,
-  ].filter(Boolean);
+/**
+ * PRIMARY (dashboard, human-in-the-loop): calls the site's post-synthesis endpoint
+ * (/api/agent-generate · action:"post-synthesize") for an adaptive, article-typed Hebrew post
+ * body — dynamic structure per subject (cyber incident / AI launch / hardware / policy), every
+ * material fact from the source woven in, organic paragraphs, **bold** key terms. Throws on any
+ * failure so the caller can fall back to composeNewsPost().
+ */
+export async function synthesizeNewsPost(
+  item: NewsItem,
+  platform: SocialPlatform,
+  opts: { apiBase: string; adminSecret?: string }
+): Promise<ComposedPost> {
+  const articleText = (item.summary || item.excerpt || '').trim();
+  if (articleText.length < 60) throw new Error('article text too thin for synthesis');
 
-  return { fullText: sections.join('\n\n'), hashtags, footer: SITE_PROMO_FOOTER };
+  const url = `${opts.apiBase.replace(/\/$/, '')}/api/agent-generate`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(opts.adminSecret ? { 'x-admin-secret': opts.adminSecret } : {}),
+  };
+  const reqBody = JSON.stringify({
+    action: 'post-synthesize',
+    title: item.title,
+    source: item.source,
+    topic: item.topic,
+    platform,
+    articleText,
+  });
+
+  // Retry once on a 429 (Gemini free-tier hourly cap) after a short bounded wait.
+  let res = await fetch(url, { method: 'POST', headers, body: reqBody });
+  if (res.status === 429) {
+    let waitMs = 6000;
+    try {
+      const j = (await res.clone().json()) as { retryAfterSeconds?: number };
+      if (typeof j.retryAfterSeconds === 'number') waitMs = Math.min(12000, Math.max(3000, j.retryAfterSeconds * 1000));
+    } catch {
+      /* keep default wait */
+    }
+    await new Promise((r) => setTimeout(r, waitMs));
+    res = await fetch(url, { method: 'POST', headers, body: reqBody });
+  }
+  if (res.status === 429) throw new Error('post-synthesize rate-limited (429) — Gemini free-tier hourly quota');
+  if (res.status === 401) throw new Error('post-synthesize unauthorized (401) — x-admin-secret missing/mismatched');
+  if (!res.ok) throw new Error(`post-synthesize responded ${res.status}`);
+  const data = (await res.json()) as {
+    ok?: boolean;
+    blocked?: boolean;
+    post?: { body?: string; hashtags?: string[] };
+  };
+  if (
+    !data.ok ||
+    data.blocked ||
+    !data.post ||
+    typeof data.post.body !== 'string' ||
+    data.post.body.trim().length < 120
+  ) {
+    throw new Error('post-synthesize returned no usable body');
+  }
+  return assembleComposedPost(item, platform, data.post.body, data.post.hashtags ?? []);
 }

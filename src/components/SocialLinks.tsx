@@ -1,6 +1,6 @@
 import { Instagram, Linkedin, Mail } from 'lucide-react';
 
-export const INSTAGRAM_URL = 'https://www.instagram.com/daniel.benbaruch?igsi=MTc3ODd5aWlsbTdtaA%3D%3D&utm_source=qr';
+export const INSTAGRAM_URL = 'https://www.instagram.com/mrdaniel.ai/';
 export const LINKEDIN_URL = 'https://www.linkedin.com/in/daniel-ben-baruch?utm_source=share_via&utm_content=profile&utm_medium=member_ios';
 export const TIKTOK_URL = 'https://www.tiktok.com/@glasswing_project?_r=1&_t=ZS-99CfiH4Iz0G';
 export const CONTACT_EMAIL = 'daniel@mrdaniel.co.il';

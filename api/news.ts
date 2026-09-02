@@ -13,6 +13,12 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Short CDN cache + stale-while-revalidate: viewers get an instant response and the edge
+  // refreshes the feed in the background, so the News Content Agent streams new stories through
+  // the day without every client hammering the origin. `Vercel-CDN-Cache-Control` is the
+  // directive Vercel's edge actually honours (plain `s-maxage` gets stripped for functions).
+  res.setHeader('Cache-Control', 'public, max-age=120');
+  res.setHeader('Vercel-CDN-Cache-Control', 'max-age=600, stale-while-revalidate=1800');
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;

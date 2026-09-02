@@ -37,6 +37,9 @@ interface FeedSource {
    * (Israel Defense carries naval / air / ground stories too) so the feed contributes only the
    * slice that's on-topic for this site — its cyber coverage — instead of military noise. */
   onlyTopics?: NewsTopic[];
+  /** Per-source item cap (default `PER_FEED_ITEM_CAP`). International outlets publish constantly —
+   * a lower cap keeps them present in the mix without drowning the Israeli feeds. */
+  maxItems?: number;
 }
 
 // Aggregated Israeli tech / AI / cyber / economy coverage. Native RSS from each outlet first, with
@@ -45,25 +48,41 @@ interface FeedSource {
 const GNEWS_QUERY = '(טכנולוגיה OR סייבר OR "בינה מלאכותית" OR הייטק OR סטארטאפ) when:14d';
 const GNEWS_URL = `https://news.google.com/rss/search?q=${encodeURIComponent(GNEWS_QUERY)}&hl=iw&gl=IL&ceid=IL:iw`;
 
+const GNEWS_CYBER_QUERY = '(סייבר OR "אבטחת מידע" OR ransomware OR "מתקפת סייבר" OR פריצה OR דלף) when:10d';
+const GNEWS_CYBER_URL = `https://news.google.com/rss/search?q=${encodeURIComponent(GNEWS_CYBER_QUERY)}&hl=iw&gl=IL&ceid=IL:iw`;
+
 const SOURCES: FeedSource[] = [
-  // Geektime is the primary tech source — priority 0 pins it first in every cross-source dedup tie.
+  // ── Israeli tech / business (native RSS, highest dedup priority) ──
   { name: 'Geektime', url: 'https://www.geektime.co.il/feed/', priority: 0 },
   { name: 'TechTime', url: 'https://techtime.co.il/feed/', priority: 1 },
+  { name: 'אנשים ומחשבים', url: 'https://www.pc.co.il/feed/', priority: 2 },
   { name: 'גלובס', url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=1725', priority: 2, timeoutMs: 9000 },
   // Ynet DIGITAL/TECH feed only (StoryRss544). Do NOT use the general-news feed (StoryRss2) —
   // it floods the aggregate with politics/crime that isn't on-topic for this site.
   { name: 'ynet דיגיטל', url: 'https://www.ynet.co.il/Integration/StoryRss544.xml', priority: 2, timeoutMs: 9000 },
+  // Calcalist + TheMarker native feeds often 403 datacenter IPs (Yediot / Haaretz WAF) — kept in
+  // the list anyway: Promise.allSettled logs the failure and moves on, and when they DO answer
+  // (CDN edge, warm cache) it's real Hebrew business/tech coverage. Google News is the safety net.
+  { name: 'כלכליסט', url: 'https://www.calcalist.co.il/GeneralRSS/0,16335,L-3927,00.xml', priority: 3, timeoutMs: 7000 },
+  { name: 'TheMarker', url: 'https://www.themarker.com/cmlink/1.145', priority: 3, timeoutMs: 7000 },
   { name: 'Israel Defense', url: 'https://www.israeldefense.co.il/rss.xml', priority: 3, onlyTopics: ['cyber'] },
-  // Fallback aggregator — fills gaps from any Israeli outlet whose native feed failed above, and
-  // is the sole path for Calcalist (כלכליסט), whose own RSS endpoints all return 403 to
-  // non-browser clients (server-side bot block, not a bad URL).
-  { name: 'Google News', url: GNEWS_URL, priority: 6, stripTitleSuffix: true, timeoutMs: 9000 },
+  // ── International tech (capped so they enrich rather than dominate the Israeli mix) ──
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', priority: 5, maxItems: 8, timeoutMs: 8000 },
+  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', priority: 6, maxItems: 8, timeoutMs: 8000 },
+  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', priority: 6, maxItems: 6, timeoutMs: 8000 },
+  // ── International cyber / security (topic-filtered to keep only security stories) ──
+  { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/', priority: 4, maxItems: 8, onlyTopics: ['cyber'], timeoutMs: 8000 },
+  { name: 'The Hacker News', url: 'https://feeds.feedburner.com/TheHackersNews', priority: 4, maxItems: 8, onlyTopics: ['cyber'], timeoutMs: 8000 },
+  { name: 'CyberNews', url: 'https://cybernews.com/feed/', priority: 5, maxItems: 6, onlyTopics: ['cyber'], timeoutMs: 8000 },
+  { name: 'Krebs on Security', url: 'https://krebsonsecurity.com/feed/', priority: 5, maxItems: 5, onlyTopics: ['cyber'], timeoutMs: 8000 },
+  // ── Google News safety nets — broad tech + a dedicated cyber query ──
+  { name: 'Google News', url: GNEWS_URL, priority: 7, stripTitleSuffix: true, timeoutMs: 9000 },
+  { name: 'Google News · סייבר', url: GNEWS_CYBER_URL, priority: 7, stripTitleSuffix: true, maxItems: 12, timeoutMs: 9000 },
 ];
 
-// Publishers removed from the aggregate entirely. They have no native feed in SOURCES, but the
-// Google-News fallback still surfaces their stories under the extracted-publisher name — this
-// drops those. "אנשים ומחשבים" / PC (pc.co.il) is deprecated per product direction.
-const BLOCKED_PUBLISHERS = /(אנשים ומחשבים|people ?and ?computers|\bpc\.co\.il\b|\bpc\.org\.il\b)/i;
+// Publishers still dropped from the aggregate (name-only Google-News hits). pc.co.il was
+// re-added above as a native source per product direction — no longer blocked.
+const BLOCKED_PUBLISHERS = /\b(?:sponsored content|advertorial|תוכן שיווקי|כתבה ממומנת)\b/i;
 
 const PER_FEED_ITEM_CAP = 30;
 // The `summary` field carries the article's real lede — enough for the story/post generators to
@@ -83,7 +102,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
-const CACHE_TTL_MS = 45 * 60 * 1000;
+const CACHE_TTL_MS = 15 * 60 * 1000;
 
 // A real desktop-browser User-Agent (plus the Accept/Accept-Language headers a real browser sends
 // along with it) — the previous self-identifying "DBBNewsBot/1.0" UA is exactly what a WAF pattern
@@ -116,20 +135,36 @@ const parser = new Parser({
 const JUNK_IMAGE_RE =
   /(feedburner|feedsportal|feeds\.wordpress|doubleclick|googlesyndication|scorecardresearch|googleusercontent\.com|gstatic\.com|\/logos?\/|\/pixel|pixel\.|1x1|blank\.(gif|png)|spacer\.(gif|png)|gravatar\.com\/avatar\/0{16}|\/wp-includes\/images\/)/i;
 
-/** Rewrites a known-CDN thumbnail URL to a larger rendition so the dashboard's 1080px canvas has a
- * sharp source to cover-crop from. Currently: Globes' Cloudinary named crops (`t_800X392` etc.) →
- * a 1600px-wide limit-fit at auto quality. Any URL we don't recognise is returned unchanged. */
-function upscaleCdnImage(url: string): string {
+/**
+ * Rewrites a thumbnail/low-res image URL to its highest-resolution rendition, so the dashboard's
+ * 1080×1350 / 1080×1920 canvas always has a sharp source to cover-crop from instead of visibly
+ * upscaling a small thumbnail. Handles, in order:
+ *   1. Globes' Cloudinary named crops (`t_800X392`, `w_300` …) → an explicit 1600px limit-fit.
+ *   2. WordPress' auto-generated size suffix (`photo-300x169.jpg` → `photo.jpg`) — the un-suffixed
+ *      original is the same media-library file, almost always still hosted at that path
+ *      (Geektime / TechTime / pc.co.il and most other WP outlets in the feed list).
+ *   3. Generic CDN query-string thumbnail hints (`w=`/`width=`/`h=`/`height=` under 800px,
+ *      `quality=`/`q=` under 70) — bumped to a real-photo minimum. Any other URL shape, or a URL
+ *      with no such hints, is returned unchanged (never breaks a working image URL).
+ */
+export function upscaleImageUrl(url: string): string {
   if (/res\.cloudinary\.com\/globes\/image\/upload\//.test(url)) {
     return url.replace(/\/upload\/(t_[^/]+|c_[^/]+|w_\d+[^/]*)\//, '/upload/w_1600,c_limit,q_auto:good/');
   }
-  return url;
+  let u = url.replace(/-(\d{2,4})x(\d{2,4})(?=\.(?:jpe?g|png|webp|gif)(?:[?#]|$))/i, '');
+  u = u.replace(/([?&])(w|width)=(\d+)/i, (m, sep, key, val) => (Number(val) < 800 ? `${sep}${key}=1200` : m));
+  u = u.replace(/([?&])(h|height)=(\d+)/i, (m, sep, key, val) => (Number(val) < 800 ? `${sep}${key}=1350` : m));
+  u = u.replace(/([?&])quality=(low|\d+)/i, (m, sep, val) => (val.toLowerCase() === 'low' || Number(val) < 70 ? `${sep}quality=85` : m));
+  u = u.replace(/([?&])q=(\d+)(?![a-z])/i, (m, sep, val) => (Number(val) < 70 ? `${sep}q=85` : m));
+  return u;
 }
 
 const OG_IMAGE_RES = [
   /<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i,
   /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
   /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+  /<meta[^>]+property=["']article:image["'][^>]+content=["']([^"']+)["']/i,
+  /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']article:image["']/i,
   /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
   /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
 ];
@@ -156,7 +191,7 @@ function pickOgImage(html: string, baseUrl: string): string | undefined {
       }
     }
     if (!/^https?:\/\//i.test(candidate) || JUNK_IMAGE_RE.test(candidate)) continue;
-    return upscaleCdnImage(candidate);
+    return upscaleImageUrl(candidate);
   }
   return undefined;
 }
@@ -260,7 +295,7 @@ function extractImage(item: Record<string, any>): string | undefined {
     if (s.startsWith('//')) s = `https:${s}`;
     if (!/^https?:\/\//i.test(s)) return undefined;
     if (JUNK_IMAGE_RE.test(s)) return undefined;
-    return upscaleCdnImage(s);
+    return upscaleImageUrl(s);
   };
 
   const enc = item.enclosure;
@@ -496,7 +531,7 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
     });
   }
 
-  return items.slice(0, PER_FEED_ITEM_CAP);
+  return items.slice(0, source.maxItems ?? PER_FEED_ITEM_CAP);
 }
 
 let cache: { items: NewsItem[]; fetchedAt: number } | null = null;

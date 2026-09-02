@@ -176,7 +176,7 @@ export function wrapBrandedEmail(inner: string, opts: WrapOptions = {}): string 
     ${link(SITE, 'האתר')} &nbsp;·&nbsp; ${link(`${SITE}/ai`, 'סוכני AI')} &nbsp;·&nbsp; ${link(`${SITE}/cyber`, 'סייבר')} &nbsp;·&nbsp; ${link(`${SITE}/news`, 'חדשות')} &nbsp;·&nbsp; ${link(`${SITE}/jarvis`, 'JARVIS')}<br>
     <a href="mailto:daniel@mrdaniel.co.il" style="color:${GREEN_LIGHT};text-decoration:none;">daniel@mrdaniel.co.il</a>
     &nbsp;·&nbsp; ${link('https://www.linkedin.com/', 'LinkedIn')}
-    &nbsp;·&nbsp; ${link('https://www.instagram.com/', 'Instagram')}
+    &nbsp;·&nbsp; ${link('https://www.instagram.com/mrdaniel.ai/', 'Instagram')}
     &nbsp;·&nbsp; ${link('https://wa.me/972506473039', 'WhatsApp')}
   </td></tr>
   <tr><td style="padding:6px 30px 0;color:#54575e;font:400 11px/1.8 Arial,Helvetica,sans-serif;text-align:center;">

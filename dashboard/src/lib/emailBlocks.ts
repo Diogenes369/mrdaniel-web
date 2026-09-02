@@ -102,7 +102,7 @@ export function previewShell(inner: string, subject: string, extraSections = '')
   ${extraSections}
   <tr><td style="padding:22px 30px 6px;color:#6e727b;font:400 12px/1.9 Arial,Helvetica,sans-serif;text-align:center;">
     ${link(SITE, 'האתר')} &nbsp;·&nbsp; ${link(`${SITE}/ai`, 'סוכני AI')} &nbsp;·&nbsp; ${link(`${SITE}/cyber`, 'סייבר')} &nbsp;·&nbsp; ${link(`${SITE}/news`, 'חדשות')}<br>
-    <a href="mailto:daniel@mrdaniel.co.il" style="color:${GREEN_LIGHT};text-decoration:none;">daniel@mrdaniel.co.il</a> &nbsp;·&nbsp; ${link('https://www.linkedin.com/', 'LinkedIn')} &nbsp;·&nbsp; ${link('https://www.instagram.com/', 'Instagram')}
+    <a href="mailto:daniel@mrdaniel.co.il" style="color:${GREEN_LIGHT};text-decoration:none;">daniel@mrdaniel.co.il</a> &nbsp;·&nbsp; ${link('https://www.linkedin.com/', 'LinkedIn')} &nbsp;·&nbsp; ${link('https://www.instagram.com/mrdaniel.ai/', 'Instagram')}
   </td></tr>
   <tr><td style="padding:6px 30px 0;color:#54575e;font:400 11px/1.8 Arial,Helvetica,sans-serif;text-align:center;">
     &copy; ${year} דניאל בן ברוך · כל הזכויות שמורות.<br>קיבלת מייל זה כי נרשמת לעדכונים ב-mrdaniel.co.il. <span style="color:#7c848d;text-decoration:underline;">להסרה מרשימת התפוצה</span>.

@@ -1,4 +1,5 @@
-import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides } from '../src/agent/SocialAgentEngine.js';
+import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies } from '../src/agent/SocialAgentEngine.js';
+import { importUrlContent } from '../src/server/contentImport.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
 import { pushQueueItem, readAgentMode, readAgentWebhooks, readStrategicContext, writeAutoPilotRunTimestamp, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
@@ -304,6 +305,126 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    if (action === 'post-synthesize') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { title, source, topic, platform, articleText, variant } = req.body ?? {};
+      if (typeof articleText !== 'string' || articleText.trim().length < 40) {
+        res.status(400).json({ ok: false, error: 'articleText (>= 40 chars) required' });
+        return;
+      }
+      const post = await synthesizeNewsPost({
+        title: String(title ?? ''),
+        source: String(source ?? ''),
+        topic: String(topic ?? 'general'),
+        platform: platform === 'instagram' ? 'instagram' : 'linkedin',
+        variant: variant === 'whatsapp' ? 'whatsapp' : 'linkedin',
+        articleText,
+      });
+      const security = sanitizeOutput(`${post.body}\n\n${post.hashtags.join(' ')}`);
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, post });
+      return;
+    }
+
+    if (action === 'import-url') {
+      const { url } = req.body ?? {};
+      if (typeof url !== 'string' || !/^(https?:\/\/)?[\w.-]+\.[a-z]{2,}/i.test(url.trim())) {
+        res.status(400).json({ ok: false, error: 'valid url required' });
+        return;
+      }
+      const imported = await importUrlContent(url.trim());
+      const security = sanitizeOutput(`${imported.title}\n${imported.body}`.slice(0, 4000));
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, imported });
+      return;
+    }
+
+    if (action === 'slides-edit') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { instruction, slides } = req.body ?? {};
+      if (typeof instruction !== 'string' || instruction.trim().length < 3) {
+        res.status(400).json({ ok: false, error: 'instruction (>= 3 chars) required' });
+        return;
+      }
+      if (!Array.isArray(slides) || slides.length < 2) {
+        res.status(400).json({ ok: false, error: 'slides array (>= 2) required' });
+        return;
+      }
+      const edited = await editSlideDeck({ instruction, slides });
+      const security = sanitizeOutput(edited.map((s) => s.text).join('\n\n'));
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, slides: edited });
+      return;
+    }
+
+    if (action === 'trend-radar') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { items } = req.body ?? {};
+      if (!Array.isArray(items) || items.length < 3) {
+        res.status(400).json({ ok: false, error: 'items array (>= 3) required' });
+        return;
+      }
+      const radar = await analyzeTrendRadar({
+        // Compact + capped: title/source/category only, no summaries or URLs — a large payload
+        // was triggering transient Gemini 500s. analyzeTrendRadar caps again at its own limit.
+        items: items.slice(0, 15).map((i: any) => ({
+          title: String(i?.title ?? '').slice(0, 180),
+          source: String(i?.source ?? '').slice(0, 60),
+          category: String(i?.category ?? i?.topic ?? 'general').slice(0, 24),
+        })),
+      });
+      const flat = JSON.stringify(radar);
+      const security = sanitizeOutput(flat.slice(0, 6000));
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, radar });
+      return;
+    }
+
+    if (action === 'engagement-replies') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { postText, sourceUrl, lang } = req.body ?? {};
+      if (typeof postText !== 'string' || postText.trim().length < 20) {
+        res.status(400).json({ ok: false, error: 'postText (>= 20 chars) required' });
+        return;
+      }
+      const replies = await generateEngagementReplies({
+        postText,
+        sourceUrl: typeof sourceUrl === 'string' ? sourceUrl : undefined,
+        lang: typeof lang === 'string' ? lang : undefined,
+      });
+      const security = sanitizeOutput(replies.map((r) => r.text).join('\n\n'));
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, replies });
+      return;
+    }
+
     res.status(400).json({ ok: false, error: 'unknown action' });
   } catch (err) {
     const rateLimit = detectGeminiRateLimit(err);
@@ -312,6 +433,6 @@ export default async function handler(req: any, res: any) {
       return;
     }
     console.error('[api/agent-generate] error:', err);
-    res.status(500).json({ ok: false, error: 'generation failed' });
+    res.status(500).json({ ok: false, error: 'generation failed', detail: (err as Error)?.message?.slice(0, 400) });
   }
 }

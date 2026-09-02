@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff } from 'lucide-react';
+import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp } from 'lucide-react';
 import { useAuthUser, logout } from './lib/auth';
 import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
 import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
@@ -20,11 +20,13 @@ import AgentControlPanel from './components/AgentControlPanel';
 import NewsContentAgent from './components/NewsContentAgent';
 import AutoPublisherPanel from './components/AutoPublisherPanel';
 import InstagramStoryCanvas from './components/InstagramStoryCanvas';
+import ContentRepurposer from './components/ContentRepurposer';
+import IgGrowthAgent from './components/IgGrowthAgent';
 import EmailManagerPanel from './components/EmailManagerPanel';
 import WeeklyPlanCalendar from './components/WeeklyPlanCalendar';
 import ErrorBoundary from './components/ErrorBoundary';
 
-type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'auto-publisher' | 'email' | 'weekly-plan';
+type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'repurpose' | 'ig-growth' | 'auto-publisher' | 'email' | 'weekly-plan';
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'overview', label: 'סקירה כללית', icon: LayoutGrid },
@@ -35,6 +37,8 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'agent', label: 'סוכן AI חברתי', icon: Bot },
   { id: 'news-agent', label: 'מחולל תוכן מחדשות', icon: Newspaper },
   { id: 'story', label: 'מחולל סטורי', icon: Film },
+  { id: 'repurpose', label: 'יבוא ושכתוב תוכן', icon: Recycle },
+  { id: 'ig-growth', label: 'סוכן צמיחה באינסטגרם', icon: TrendingUp },
   { id: 'auto-publisher', label: 'אוטונומיה', icon: Rocket },
   { id: 'email', label: 'מערכת דיוור ומיילים', icon: Mail },
   { id: 'weekly-plan', label: 'לוח תוכן שבועי', icon: Calendar },
@@ -199,6 +203,18 @@ export default function App() {
         {tab === 'story' && (
           <ErrorBoundary label="מחולל סטורי">
             <InstagramStoryCanvas />
+          </ErrorBoundary>
+        )}
+
+        {tab === 'repurpose' && (
+          <ErrorBoundary label="יבוא ושכתוב תוכן">
+            <ContentRepurposer />
+          </ErrorBoundary>
+        )}
+
+        {tab === 'ig-growth' && (
+          <ErrorBoundary label="סוכן צמיחה באינסטגרם">
+            <IgGrowthAgent />
           </ErrorBoundary>
         )}
 

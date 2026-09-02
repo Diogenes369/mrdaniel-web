@@ -380,22 +380,28 @@ export interface SynthesizedSlide {
   narrativeText: string;
 }
 
-const STORY_SYNTH_SYSTEM_INSTRUCTION = `אתה עורך חדשות טכנולוגי מנוסה שכותב סטוריז לאינסטגרם. קיבלת טקסט מלא של כתבת חדשות. הפק 4–6 שקופיות בעברית שמסכמות אך ורק את מה שכתוב בכתבה עצמה.
+const STORY_SYNTH_SYSTEM_INSTRUCTION = `אתה עורך תוכן טכנולוגי מנוסה שבונה קרוסלות ושקפי סטורי ממותגים. קיבלת טקסט מקור — כתבת חדשות, תקציר, או טיוטת פוסט. הפק 5 שקופיות בעברית שמסכמות אך ורק את מה שכתוב בטקסט המקור, בסדר הזה:
+1. שער (kind:"cover") — כותרת בלבד (בשדה title). אין גוף. narrativeText חייב להיות "" (מחרוזת ריקה).
+2..N. שקופיות תוכן (kind:"body", ואפשר שהאחרונה תהיה kind:"takeaway") — הליבה של הקרוסלה. בשקופיות אלה title חייב להיות "" (מחרוזת ריקה) — אין להן כותרת משנה כלל, רק פסקת נרטיב אחת בשדה narrativeText.
+אחרונה. סיום (kind:"cta") — החזר title:"" ו-narrativeText:"" . המערכת מחליפה את שקופית הסיום בנוסח CTA קבוע ומותג, אל תכתוב לה תוכן.
+
+מספר שקופיות תוכן דינמי: הפק 2 עד 4 שקופיות תוכן לפי אורך המקור. אם התוכן ארוך — עדיף להוסיף עוד שקופית תוכן (עד 4) מאשר לדחוס משפטים או לקטוע אותם. אם המקור קצר — 2 שקופיות תוכן, לעולם לא פחות ולעולם לא שקופית דלילה.
+
+חוקי תוכן שקופיות התוכן (קריטי):
+א. כל שקופית תוכן = פסקת נרטיב רציפה אחת: 2–5 משפטים, כ-30–60 מילים. אין כותרת, אין תבליטים, אין רשימה — רק פסקה זורמת.
+ב. אסור משפט בודד קצר או שורה בודדת בשקופית תוכן.
+ג. כלל אפס-קיטוע: כל משפט חייב להיות שלם, תקין דקדוקית, ולהסתיים בסימן פיסוק סופי (. או ? או !). לעולם אל תסיים פסקה באמצע משפט, באמצע רשימה בסוגריים (למשל "(Identity Security"), או במילה קטועה. אסור להשתמש ב-"..." או ב-"…" לקיצור — אם משפט לא נכנס, פשוט אל תכלול אותו, אבל אל תקטע אותו.
+ד. קבץ עובדות קשורות יחד לפסקה מגובשת. כל שקופית מפתחת נושא אחר (למשל: מה הושק והמספרים; היכולת הטכנית והארכיטקטורה; תגובת השוק וההשלכה המעשית).
+ה. חלק את החומר באופן מאוזן — פסקאות באורך דומה, לא אחת ארוכה ושתיים קצרות.
 
 חוקים מחייבים:
-1. הסתמכות מוחלטת על הטקסט: כל עובדה בשקופית חייבת להופיע בכתבה שסופקה. אסור להמציא, אסור להוסיף ידע כללי, ואסור להשתמש במשפטי מדף גנריים (למשל "יש בינה מלאכותית", "סוכן טוב נבנה סביב תהליך אחד", "אבטחה היא חלק מהאפיון"). אם עובדה לא מופיעה בטקסט — היא לא נכנסת.
-2. חילוץ עובדות חמות: מספרים, אחוזים, סכומי כסף, שמות חברות ומוצרים, גרסאות, תאריכים, ציטוטים ישירים, והשפעה טכנולוגית מדידה — הכניסו אותם לשקופיות.
-3. אין תבליטים ואין רשימות. כל שקופית = פסקה נרטיבית אחת, קצרה וחדה (2–4 משפטים, עד 55 מילים), בטון עיתונאי מקצועי, טבעי וזורם — לא "AI פלאפי".
-4. איסור כפילות כותרת–גוף: המשפט הראשון של narrativeText לא יחזור ולא ינסח מחדש את ה-title של אותה שקופית. ה-title הוא זווית/כותרת משנה; ה-narrativeText מביא את הפרטים החדשים.
-5. כל title מובחן וספציפי למה שהשקופית מכסה. אין כותרות גנריות ("מה קרה", "למה זה חשוב", "קריאה לפעולה").
+1. הסתמכות מוחלטת על הטקסט: כל עובדה חייבת להופיע בטקסט המקור. אסור להמציא, אסור ידע כללי, ואסור משפטי מדף גנריים ("יש בינה מלאכותית", "אבטחה היא חלק מהאפיון"). עובדה שלא בטקסט — לא נכנסת.
+2. חילוץ עובדות חמות: מספרים, אחוזים, סכומים, שמות חברות ומוצרים, גרסאות, תאריכים, ציטוטים — הכניסו אותם לשקופיות התוכן.
+3. טון עיתונאי מקצועי, זורם — לא "AI פלאפי".
+4. טקסט נקי בלבד: אסור לחלוטין להוסיף תוויות מסגור, כותרות-על או הערות עורך בתוך הטקסט — למשל "ההקשר:", "הקשר טכני:", "נא לשים לב", "כותרת:", "כמה נקודות מעבר לכתבה", "הידיעה שפורסמה תחת הכותרת ...". השקופית מכילה אך ורק פסקת נרטיב ישירה על החדשות/התובנה.
+5. אכיפת מיתוג: אסור להזכיר את שם הכותב/המחבר המקורי, "מאת", "נכתב ע\"י", כינויי משתמש (@), שמות רשתות חברתיות ("פוסט ב-LinkedIn", "X תגובות על LinkedIn", "via Twitter") או כל קרדיט חיצוני. אין לצטט את הכותרת המקורית מילה במילה. המותג היחיד הוא mrdaniel.co.il.
 
-מבנה (שדה kind):
-- "cover": title = הכותרת החדשותית החדה ביותר; narrativeText = משפט פתיחה אחד עם העובדה/הנתון הכי חזק בכתבה.
-- "body" (2–3 שקופיות): כל אחת מכסה עובדה או היבט אחר — נתונים, השקה, מחיר, יכולת טכנית, תגובת שוק, מגבלה.
-- "takeaway": המשמעות המעשית לעצמאי / פרילנסר / עסק קטן — נגזרת מהכתבה, לא סיסמה.
-- "cta": title = הזמנה קצרה; narrativeText = משפט אחד על השירותים ב-mrdaniel.co.il (סוכני AI, אוטומציה, אבטחת סייבר לעסקים קטנים).
-
-פלט: JSON array בלבד, בלי טקסט מסביב. כל איבר: { "kind": "cover|body|takeaway|cta", "title": "...", "narrativeText": "..." }`;
+פלט: JSON array בלבד, בלי טקסט מסביב. כל איבר: { "kind": "cover|body|takeaway|cta", "title": "...", "narrativeText": "..." } — כאשר title בשקופיות body/takeaway/cta הוא תמיד "".`;
 
 function mapSynthKind(k: unknown): SynthesizedSlide['kind'] {
   const s = String(k || '').toLowerCase();
@@ -403,6 +409,65 @@ function mapSynthKind(k: unknown): SynthesizedSlide['kind'] {
   if (/take|לקח|תובנ|משמע/.test(s)) return 'takeaway';
   if (/cover|שער|כותרת ראשית/.test(s)) return 'cover';
   return 'body';
+}
+
+/** Branding enforcement: strip any original-author credit / social-network noise the model may
+ * have echoed from the source. The only brand on generated output is mrdaniel.co.il. */
+export function stripSourceCredits(text: string): string {
+  return (text || '')
+    .replace(/^\s*(?:מאת|נכתב(?:\s+על[- ]ידי)?|קרדיט|כתב[הת]?|by|written by|posted by|source|via)\s*[:\-–—]?\s*.{1,60}$/gim, '')
+    .replace(/\b\d[\d,]*\s*(?:comments?|תגובות|reactions?|תגובה)\s*(?:on LinkedIn|על LinkedIn)?/gi, '')
+    .replace(/\b(?:via|through|במקור מ|פורסם ב|נצפה ב)\s*[- ]?\s*(?:LinkedIn|לינקדאין|Twitter|טוויטר|X|Facebook|פייסבוק|Instagram|אינסטגרם)\b/gi, '')
+    .replace(/[ \t]*[|｜]\s*[\p{L}][\p{L}'.\-֐-׿]{1,20}(?:\s+[\p{L}][\p{L}'.\-֐-׿]{1,20}){0,3}\s*(?=\n|$)/gu, '')
+    .replace(/\(\s*\)/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/** Strip editorial meta-framing / section labels / "context" tags from generated copy. The
+ * output must read as clean narrative only — no "ההקשר:", "הקשר טכני:", "נא לשים לב",
+ * "כותרת:", "כמה נקודות מעבר לכתבה", "הידיעה שפורסמה תחת הכותרת ...", etc. */
+export function stripMetaFraming(text: string): string {
+  let t = text || '';
+  const AT = '(?:^|\\n|(?<=[.!?…]\\s))';
+  const pats: RegExp[] = [
+    new RegExp(`${AT}\\s*ה?הקשר\\s*(?:ה?טכני)?\\s*:\\s*`, 'gi'),
+    new RegExp(`${AT}\\s*הקשר\\s+טכני\\s*:?\\s*`, 'gi'),
+    /\s*ה?הקשר\s*:?\s*הידיעה שפורסמה תחת הכותרת\s*"?[^"\n.]*"?\s*(?:עוסקת בכך)?\s*\.?/gi,
+    /\s*הידיעה שפורסמה תחת הכותרת\s*"?[^"\n.]*"?\s*(?:עוסקת בכך)?\s*\.?/gi,
+    new RegExp(`${AT}\\s*נא\\s+לשים\\s+לב\\s*[:,]?\\s*`, 'gi'),
+    new RegExp(`${AT}\\s*(?:כותרת(?:\\s+משנה)?|תת[- ]?כותרת|כותרת[- ]על|הערת עורך|לתשומת לב\\S*)\\s*:\\s*`, 'gi'),
+    new RegExp(`${AT}\\s*(?:כמה נקודות|הנקודות|התובנות|מה ש\\S+)\\s+(?:ש?מעבר ל(?:כתבה|כותרת)|המעשיות מכאן|חשוב לקחת מכאן|כדאי לבדוק אצלכם עכשיו|נשאר מזה[^:\\n]*)\\s*:\\s*`, 'gi'),
+    new RegExp(`${AT}\\s*מעבר לכותרת\\s*[,:]\\s*`, 'gi'),
+    new RegExp(`${AT}\\s*מהשטח\\s*:\\s*`, 'gi'),
+  ];
+  for (const re of pats) t = t.replace(re, (m) => (m.startsWith('\n') ? '\n' : ' '));
+  return t
+    .replace(/["'׳״]\s*["'׳״]/g, ' ')
+    .replace(/\(\s*\)/g, '')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^[\s,;:.–—-]+/, '')
+    .trim();
+}
+
+/**
+ * ZERO-TRUNCATION trim. Only ever cuts at a full stop / ? / ! (followed by space or end). Within
+ * `softMax * 1.5` the whole text is kept. Past that, cut at the LAST sentence terminator inside
+ * the window; if none is far enough in, return the first COMPLETE sentence at whatever length.
+ * Never appends "…" and never cuts mid-sentence or mid-word.
+ */
+function trimToCleanSentenceEnd(text: string, softMax: number): string {
+  const t = (text || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  if (t.length <= Math.floor(softMax * 1.5)) return t;
+  const window = t.slice(0, Math.floor(softMax * 1.5));
+  const upToLastStop = window.match(/^[\s\S]*[.!?](?=\s|$)/);
+  if (upToLastStop && upToLastStop[0].length >= softMax * 0.4) return upToLastStop[0].trim();
+  const firstSentence = t.match(/^[\s\S]*?[.!?](?=\s|$)/);
+  return (firstSentence ? firstSentence[0] : t).trim();
 }
 
 /** First-sentence-of-body must not paraphrase the title — drop it if it does. */
@@ -450,13 +515,320 @@ export async function synthesizeStorySlides(input: {
   const slides = arr
     .map((s): SynthesizedSlide => {
       const rec = s as Record<string, unknown>;
-      const title = sanitizeHebrewText(String(rec.title ?? '').trim()).slice(0, 90);
-      let narrativeText = sanitizeHebrewText(String(rec.narrativeText ?? rec.body ?? rec.text ?? '').trim());
-      narrativeText = dropRedundantLead(title, narrativeText).slice(0, 420);
-      return { kind: mapSynthKind(rec.kind), title, narrativeText };
+      const kind = mapSynthKind(rec.kind);
+      // Content slides (body/takeaway) carry NO heading — force title empty. Only the cover keeps one.
+      const title = kind === 'cover' ? stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.title ?? '').trim()))).slice(0, 90) : '';
+      let narrativeText = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.narrativeText ?? rec.body ?? rec.text ?? '').trim())));
+      // Trim to the last complete sentence within the budget — never cut mid-sentence.
+      narrativeText = trimToCleanSentenceEnd(dropRedundantLead(title, narrativeText), 700);
+      return { kind, title, narrativeText };
     })
-    .filter((s) => s.narrativeText.length > 12 && s.title.length > 1);
+    .filter((s) => {
+      if (s.kind === 'cover') return s.title.length > 1;
+      if (s.kind === 'cta') return true; // replaced by the standard CTA downstream
+      return s.narrativeText.length > 20; // body / takeaway must carry real narrative
+    });
 
-  if (slides.length < 3) throw new Error('model returned too few usable slides');
+  const bodyCount = slides.filter((s) => s.kind === 'body' || s.kind === 'takeaway').length;
+  // Need at least a cover + one real content slide + a cta; the dashboard splits a single rich
+  // content slide into two so the rendered story is never fewer than 4.
+  if (slides.length < 3 || bodyCount < 1) throw new Error('model returned too few usable content slides');
   return slides;
+}
+
+// --- AI Slide Editor — apply a natural-language edit to an existing carousel deck -------------
+
+const SLIDE_EDIT_SYSTEM_INSTRUCTION = `אתה עורך תוכן מקצועי לקרוסלות עברית. קיבלת מערך שקופיות (JSON) והוראת עריכה של המשתמש. החזר את אותו מספר שקופיות, באותו סדר ובאותו kind, כאשר רק מה שההוראה מבקשת השתנה — כל שאר השקופיות זהות מילה במילה.
+
+חוקים:
+1. שקופיות תוכן (kind:"body"/"takeaway"/"insight") = פסקת נרטיב עיתונאית נקייה אחת. אסור כותרות, אסור תבליטים, ואסור תוויות מסגור / הערות עורך ("ההקשר:", "הקשר טכני:", "נא לשים לב", "כותרת:", "כמה נקודות מעבר לכתבה", "הידיעה שפורסמה תחת הכותרת ..."). טקסט זורם בלבד.
+2. שקופית kind:"cover" — רק כותרת קצרה בשדה text.
+3. שקופית kind:"cta" — אל תיגע בה. החזר אותה בדיוק כפי שקיבלת.
+4. שמור על עברית תקנית, משפטים שלמים שמסתיימים בנקודה, ואל תמציא עובדות שלא היו בטקסט המקורי של השקופית (אלא אם ההוראה מבקשת ניסוח מחדש / קיצור / הארכה סגנונית).
+5. אם ההוראה עמומה או לא מפנה לשקופית ספציפית — בצע את השינוי הסביר ביותר על השקופית הרלוונטית.
+
+פלט: JSON array בלבד, בלי טקסט מסביב: [{ "n": 1, "kind": "...", "text": "..." }, ...]`;
+
+export interface SlideEditItem {
+  n: number;
+  kind: string;
+  text: string;
+}
+
+export async function editSlideDeck(input: { instruction: string; slides: SlideEditItem[] }): Promise<SlideEditItem[]> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean: instruction } = sanitizeInput((input.instruction || '').slice(0, 600));
+  if (instruction.trim().length < 3) throw new Error('instruction too short');
+  if (!Array.isArray(input.slides) || input.slides.length < 2) throw new Error('slides payload required');
+
+  const deck = input.slides.map((s) => ({ n: Number(s.n), kind: String(s.kind || 'insight'), text: String(s.text || '') }));
+
+  const response = await genAI.models.generateContent({
+    model: 'gemini-3.6-flash',
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: `הוראת עריכה: ${instruction}\n\nמערך השקופיות הנוכחי:\n${JSON.stringify(deck, null, 1)}` }],
+      },
+    ],
+    config: { systemInstruction: SLIDE_EDIT_SYSTEM_INSTRUCTION, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
+  });
+
+  const raw = stripCodeFence(response.text?.trim() || '[]');
+  const parsed = JSON.parse(raw) as unknown;
+  const arr = Array.isArray(parsed) ? parsed : (parsed as { slides?: unknown[] })?.slides;
+  if (!Array.isArray(arr) || arr.length !== deck.length) throw new Error('editor did not return a matching slide array');
+
+  return arr.map((s, i): SlideEditItem => {
+    const rec = s as Record<string, unknown>;
+    const kind = String(rec.kind || deck[i].kind);
+    let text = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.text ?? rec.narrativeText ?? deck[i].text).trim())));
+    if (kind === 'cover') text = text.slice(0, 120);
+    else if (kind !== 'cta') text = trimToCleanSentenceEnd(text, 760);
+    return { n: Number(rec.n) || i + 1, kind, text };
+  });
+}
+
+// --- News-post synthesis (adaptive structure, strict article grounding) -------------------
+// Replaces the fixed-template newsPostComposer.ts outline when GEMINI_API_KEY is set. The model
+// picks the post structure from the article TYPE (cyber incident / AI launch / hardware / policy),
+// synthesises every material fact, writes organic paragraphs (no "📌 header" blocks), and bolds
+// key technical concepts with **double asterisks**.
+
+const NEWS_POST_SYSTEM_INSTRUCTION = `אתה כותב תוכן טכנולוגי בכיר בעברית — רקע של IT Manager עם התמחות בסוכני AI אוטונומיים ובאבטחת סייבר. אתה כותב פוסט מקורי על בסיס כתבת חדשות שסופקה לך במלואה.
+
+עקרונות מחייבים:
+1. הסתמכות מוחלטת על טקסט הכתבה. כל עובדה, מספר, אחוז, סכום, שם חברה/ספק/מוצר, גרסה, תאריך, וקטור תקיפה או טכנולוגיה — חייבים להגיע מהטקסט שסופק. אל תמציא, אל תוסיף ידע כללי, ואל תשתמש במשפטי מדף גנריים. אם פרט לא מופיע בכתבה — הוא לא נכנס לפוסט.
+2. סינתזה מקיפה, לא סיכום. שלב את כל הפרטים המהותיים מהכתבה — סטטיסטיקות, שמות, לוחות זמנים, המנגנון הטכני המדויק, וההשלכה העסקית. הפוסט צריך להיקרא כפירוק מעמיק ברמת מומחה, לא כתקציר.
+3. מבנה דינמי — קבע אותו בעצמך לפי סוג הכתבה:
+   • אירוע סייבר / פרצה: הוק חד → פירוק וקטור החדירה והטכניקה (איך זה קרה בפועל, שלב-שלב) → לקח תפעולי אמיתי לעצמאי או לעסק קטן.
+   • השקת AI / מודל / מוצר: הוק → היכולת הטכנית והארכיטקטורה שמאחוריה → השפעת שוק ומה זה אומר ליישום בפועל.
+   • חומרה / תשתית: הוק → מה השתנה טכנית ומספרי הביצועים → מי מרוויח מזה ומתי.
+   • רגולציה / מדיניות: הוק → מה הכלל אומר בפועל → למי זה נוגע ומה כדאי לעשות עכשיו.
+   אין כותרות סעיף קבועות ("מה קרה", "למה זה חשוב", "עיקרי הדברים") ואין אימוג'י ככותרת. פסקאות זורמות עם משפטי מעבר טבעיים בין רעיון לרעיון.
+4. פורמט: {PARA_SPEC}, שורה ריקה בין פסקאות. הדגש 2–4 מושגים טכניים מרכזיים ע"י עטיפה ב-**כוכביות כפולות** (למשל **Zero-Trust**, **RAG**, **lateral movement**) — טבעי, לא מאולץ, לא יותר מ-4. אימוג'י בודד ומדוד בתוך משפט מותר אם הוא משרת, לא כתחליף למבנה.
+5. סיים בפסקה קצרה של קריאה לפעולה טבעית (תגובה / שיתוף / פנייה לדיון) — לא מכירתי אגרסיבי, בלי קישור (המערכת מוסיפה חתימה בסוף).
+6. אל תכלול בגוף הפוסט אף כתובת URL, קישור, דומיין עם http/https, שם דומיין חשוף, או שורת "מקור:" / "לכתבה המלאה:" — המערכת מצרפת בנפרד ייחוס מקור נקי (שם הדומיין של המקור בלבד, למשל ynet.co.il) וחתימה. אין להזכיר news.google.com או קישורי הפניה של אגרגטורים. באינסטגרם ממילא אין קישורים לחיצים בכיתוב, אז אין טעם להזכיר "קישור בביו" או כתובת כלשהי.
+7. אכיפת מיתוג: אסור להזכיר את שם הכותב/המחבר המקורי, "מאת", "נכתב ע\"י", כינויי משתמש (@), שמות רשתות חברתיות ("פוסט ב-LinkedIn", "X תגובות על LinkedIn", "via Twitter") או כל קרדיט חיצוני. אין לצטט את הכותרת המקורית מילה במילה. המותג היחיד הוא mrdaniel.co.il.
+8. טקסט נקי בלבד: אסור להוסיף תוויות מסגור / כותרות-על / הערות עורך בגוף הפוסט — למשל "ההקשר:", "הקשר טכני:", "נא לשים לב", "כותרת:", "כמה נקודות מעבר לכתבה". פסקאות נרטיב זורמות בלבד.
+
+פלט: הטקסט המלא של הפוסט בלבד, פסקה אחרי פסקה, ללא שום כתובת אתר. בשורה נפרדת אחרונה: "האשטגים: " ואחריה 6–9 האשטגים רלוונטיים (עברית ואנגלית מעורבב), מופרדים ברווח.`;
+
+// WhatsApp Community variant — mobile-native: sharp hook line, 2–3 short paragraphs, WhatsApp
+// Markdown bold (*single asterisks*), no headers, ends with one CTA line. The link + branding are
+// appended downstream by the dashboard's whatsappPayload builder, so the body carries no URL.
+const WHATSAPP_POST_SYSTEM_INSTRUCTION = `אתה כותב עדכונים לקהילת WhatsApp טכנולוגית בעברית — רקע של IT Manager עם התמחות בסוכני AI ובאבטחת סייבר. קיבלת טקסט מקור (כתבה / טיוטת פוסט / תקציר). כתוב עדכון קהילה קצר, מותאם לקריאה בנייד.
+
+עקרונות מחייבים:
+1. הסתמכות מוחלטת על טקסט המקור — כל עובדה, מספר, שם חברה/מוצר, תאריך — מהטקסט בלבד. אין להמציא ואין ידע כללי.
+2. מבנה: שורת הוק חדה אחת שעוצרת גלילה (לא "בעולם של היום"), ואז 2–3 פסקאות קצרות (2–3 משפטים כל אחת) שמוסרות את העובדות המהותיות וההשלכה המעשית לעצמאי / עסק קטן. לסיום שורת קריאה לפעולה אחת (לשאול, להגיב, להיכנס לאתר).
+3. פורמט WhatsApp: הדגשה עם *כוכבית בודדת* (למשל *Zero-Trust*), 1–3 הדגשות בסך הכול. שורה ריקה בין פסקאות. בלי כותרות סעיף, בלי אימוג'י ככותרת, אימוג'י בודד ומדוד מותר בתוך משפט. אסור תוויות מסגור / הערות עורך ("ההקשר:", "הקשר טכני:", "נא לשים לב", "כותרת:") — טקסט זורם בלבד.
+4. אין בגוף שום כתובת URL, קישור, "מקור:" או שם דומיין — המערכת מוסיפה קישור וחתימת מותג בנפרד.
+5. אורך כולל: 60–110 מילים. קצר, צפוף, בלי מילים מיותרות.
+6. אכיפת מיתוג: אסור להזכיר את שם הכותב/המחבר המקורי, "מאת", "נכתב ע\"י", כינויי משתמש (@), שמות רשתות חברתיות ("פוסט ב-LinkedIn", "X תגובות", "via Twitter") או קרדיטים חיצוניים. המותג היחיד הוא mrdaniel.co.il.
+
+פלט: טקסט העדכון בלבד, פסקה אחרי פסקה. בשורה נפרדת אחרונה: "האשטגים: " ואחריה 3–5 האשטגים.`;
+
+export interface SynthesizedPost {
+  body: string;
+  hashtags: string[];
+}
+
+export async function synthesizeNewsPost(input: {
+  title: string;
+  source: string;
+  topic: string;
+  platform: 'linkedin' | 'instagram';
+  variant?: 'linkedin' | 'whatsapp';
+  articleText: string;
+}): Promise<SynthesizedPost> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean } = sanitizeInput(input.articleText.slice(0, 9000));
+  if (clean.trim().length < 60) throw new Error('article text too thin to synthesise');
+
+  const isWhatsapp = input.variant === 'whatsapp';
+  // Tighter word budgets keep generation comfortably under the 60s serverless ceiling on Hobby.
+  const paraSpec =
+    input.platform === 'linkedin'
+      ? '4–6 פסקאות, בסך הכול 160–250 מילים'
+      : '3–4 פסקאות, בסך הכול 90–140 מילים';
+  const systemInstruction = isWhatsapp
+    ? WHATSAPP_POST_SYSTEM_INSTRUCTION
+    : NEWS_POST_SYSTEM_INSTRUCTION.replace('{PARA_SPEC}', paraSpec);
+
+  const response = await genAI.models.generateContent({
+    model: 'gemini-3.6-flash',
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: `כותרת המקור: ${input.title}\nמקור: ${input.source}\nנושא כללי: ${input.topic}\nערוץ יעד: ${isWhatsapp ? 'WhatsApp Community' : input.platform === 'linkedin' ? 'LinkedIn' : 'Instagram'}\n\nטקסט המקור המלא (הבסיס היחיד לתוכן):\n"""\n${clean}\n"""`,
+          },
+        ],
+      },
+    ],
+    config: { systemInstruction, temperature: 0.7, topP: 0.95 },
+  });
+
+  // The source citation is appended downstream from clean feed metadata (bare domain, no URL) —
+  // strip any raw link or "מקור:" line the model may have echoed from the article text so it
+  // can't leak into the body (Instagram captions can't carry links at all).
+  const stripped = stripMetaFraming(stripSourceCredits(
+    (response.text?.trim() || '')
+      .replace(/^[ \t>*-]*(?:מקור|לכתבה המלאה|קרדיט|source)\s*:.*$/gim, '')
+      .replace(/\bhttps?:\/\/\S+/gi, '')
+      .replace(/\b(?:www\.|news\.google\.com)\S*/gi, '')
+  ));
+  const raw = sanitizeHebrewText(stripped);
+  const lines = raw.split('\n');
+  const tagIdx = lines.findIndex((l) => /^\s*(האשטגים|hashtags)\s*:/.test(l));
+  let hashtags: string[] = [];
+  let bodyLines = lines;
+  if (tagIdx !== -1) {
+    hashtags = (lines[tagIdx].replace(/^\s*(האשטגים|hashtags)\s*:/i, '').match(/#[^\s#]+/g) ?? []).slice(0, 10);
+    bodyLines = lines.slice(0, tagIdx);
+  }
+  const body = bodyLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (body.length < 120) throw new Error('model returned too little body text');
+  return { body, hashtags };
+}
+
+// --- IG Growth Intelligence — Trend Radar + Engagement replies --------------------------------
+
+const TREND_RADAR_SYSTEM_INSTRUCTION = `אתה אנליסט תוכן וטרנדים עבור הנוכחות של דניאל בן ברוך באינסטגרם (סייבר, AI, ענן וטכנולוגיה ארגונית, קהל ישראלי ובינלאומי).
+
+${BRAND_KNOWLEDGE_BASE}
+
+${HEBREW_COPY_RULES}
+
+קיבלת רשימת כותרות וכתבות עדכניות מהפיד המקצועי. נתח אותן והפק "ראדאר טרנדים ויראלי" מעשי לתוכן.
+
+חוקים:
+- הסתמך אך ורק על הכותרות/התקצירים שסופקו. אל תמציא אירועים, מספרים או שמות מוצרים שלא הופיעו בהם.
+- כל פלט טקסטואלי בעברית תקנית (מונחים טכניים באנגלית בתוך משפט עברי מותרים).
+- "trends": 4-6 טרנדים/נושאים שחוזרים על עצמם או צוברים תאוצה. לכל אחד: title קצר, momentum ("rising"/"hot"/"steady"), why (משפט אחד — למה זה זז עכשיו), audiencePainPoint (כאב קונקרטי של הקהל — מנהלי IT, בעלי עסקים, אנשי אבטחה).
+- "viralHeadlines": 4-6 ניסוחי כותרת בסגנון hook שעוצר גלילה, כל אחד מבוסס על כותרת אמיתית מהרשימה, עם angle (הזווית שהופכת אותה לעובדת).
+- "blueprints": בדיוק 3 — אחד "reel", אחד "story", אחד "carousel". לכל אחד: hook (משפט פתיחה חד), outline (מערך של 3-6 שלבים/פריימים/שקופיות מסודרים), cta (קריאה לפעולה לא מכירתית).
+
+החזר JSON תקני בלבד, בלי markdown code fence, במבנה:
+{"trends":[{"title":"...","momentum":"rising","why":"...","audiencePainPoint":"..."}],"viralHeadlines":[{"headline":"...","angle":"..."}],"blueprints":[{"format":"reel","hook":"...","outline":["...","..."],"cta":"..."}]}`;
+
+/** Max headlines forwarded to Gemini for the trend radar. A 36-item payload was triggering
+ * intermittent upstream HTTP 500s from Flash; 14 compact `title · source · category` lines keep
+ * the prompt slim and well within model bounds. The local fallback still sees the full feed. */
+const TREND_RADAR_MAX_ITEMS = 14;
+
+type GenContentReq = Parameters<GoogleGenAI['models']['generateContent']>[0];
+
+/** One-shot retry (800ms backoff) for a transient upstream 5xx from Gemini Flash — INTERNAL /
+ * UNAVAILABLE / "overloaded" / deadline / reset. A 429 is NOT retried here (surfaced so the
+ * endpoint can return its structured rate-limit response); a genuine 4xx/parse error is not
+ * retried either. */
+async function generateContentWithRetry(params: GenContentReq) {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  try {
+    return await genAI.models.generateContent(params);
+  } catch (err) {
+    if (detectGeminiRateLimit(err)) throw err;
+    const msg = err instanceof Error ? err.message : String(err);
+    const transient = /\b50[0-3]\b|INTERNAL|UNAVAILABLE|overloaded|deadline|ECONNRESET|ETIMEDOUT|fetch failed/i.test(msg);
+    if (!transient) throw err;
+    await new Promise((r) => setTimeout(r, 800));
+    return await genAI.models.generateContent(params);
+  }
+}
+
+export async function analyzeTrendRadar(input: {
+  items: Array<{ title: string; source: string; topic?: string; category?: string }>;
+}): Promise<unknown> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const items = (Array.isArray(input.items) ? input.items : []).slice(0, TREND_RADAR_MAX_ITEMS);
+  if (items.length < 3) throw new Error('need at least 3 source headlines');
+
+  // Compact payload — title + source + category only, no summaries or URLs (see MAX_ITEMS note).
+  const digest = items
+    .map((i, n) => {
+      const { clean } = sanitizeInput(String(i.title || '').replace(/\s+/g, ' ').trim().slice(0, 160));
+      const cat = String(i.category || i.topic || 'general').slice(0, 24);
+      const src = String(i.source || '—').slice(0, 40);
+      return `${n + 1}. [${cat} · ${src}] ${clean}`;
+    })
+    .join('\n');
+
+  const response = await generateContentWithRetry({
+    model: 'gemini-3.6-flash',
+    contents: [{ role: 'user', parts: [{ text: `כותרות עדכניות מהפיד:\n"""\n${digest}\n"""` }] }],
+    config: { systemInstruction: TREND_RADAR_SYSTEM_INSTRUCTION, temperature: 0.6, topP: 0.95, responseMimeType: 'application/json' },
+  });
+
+  const raw = stripCodeFence(response.text?.trim() || '{}');
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const sanitizeDeep = (v: unknown): unknown => {
+    if (typeof v === 'string') return stripMetaFraming(stripSourceCredits(sanitizeHebrewText(v)));
+    if (Array.isArray(v)) return v.map(sanitizeDeep);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, val]) => [k, sanitizeDeep(val)]));
+    return v;
+  };
+  const clean = sanitizeDeep(parsed) as { trends?: unknown[]; blueprints?: unknown[] };
+  if (!Array.isArray(clean.trends) || clean.trends.length < 2 || !Array.isArray(clean.blueprints) || clean.blueprints.length < 1) {
+    throw new Error('model did not return a usable trend radar');
+  }
+  return clean;
+}
+
+const ENGAGEMENT_REPLIES_SYSTEM_INSTRUCTION = `אתה מנסח תגובות (comments) עבור דניאל בן ברוך — מומחה מערכות IT, סייבר ו-AI — על פוסטים של מובילי דעה וחשבונות בעלי תנועה גבוהה באינסטגרם/לינקדאין. המטרה: תגובה שמוסיפה ערך אמיתי, מושכת תשומת לב לפרופיל של דניאל, ולא נשמעת כמו ספאם.
+
+${BRAND_KNOWLEDGE_BASE}
+
+${HEBREW_COPY_RULES}
+
+קיבלת את טקסט הפוסט של האדם האחר. הפק בדיוק 3 תגובות מובחנות:
+1. style "expert" — תוספת ערך מקצועית: תובנה טכנית או ניסיון מהשטח שמעמיק את הדיון (2-4 משפטים). לא מתנשא, לא "בעצם אתה טועה".
+2. style "question" — שאלה מעוררת דיון: שאלה חדה שמזמינה את המחבר ואת הקוראים להמשיך את השיחה בתגובות (1-2 משפטים).
+3. style "concise" — חד וזכיר: משפט אחד קצר, ממוקד ובלתי נשכח שמייצר נראות גבוהה.
+
+חוקים:
+- הסתמך על תוכן הפוסט שסופק. אל תמציא נתונים או ציטוטים.
+- טון המותג: ביטחון טכני, ישיר, מבוסס ניסיון — לא "גורו", לא סופרלטיבים, לא אימוג'ים בתחילת כל שורה.
+- בלי קישורים, בלי "עקבו אחריי", בלי תיוג חשבונות. הערך עצמו הוא מה שמושך.
+- אם הפוסט באנגלית — התגובות עדיין בעברית תקנית (מותר מונח טכני באנגלית), אלא אם lang="en" סופק ואז באנגלית.
+
+החזר JSON array תקני בלבד, בלי markdown code fence: [{"style":"expert","text":"..."},{"style":"question","text":"..."},{"style":"concise","text":"..."}]`;
+
+export async function generateEngagementReplies(input: {
+  postText: string;
+  sourceUrl?: string;
+  lang?: string;
+}): Promise<Array<{ style: string; text: string }>> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean } = sanitizeInput((input.postText || '').slice(0, 4000));
+  if (clean.trim().length < 20) throw new Error('post text too short');
+  const lang = input.lang === 'en' ? 'en' : 'he';
+
+  const response = await generateContentWithRetry({
+    model: 'gemini-3.6-flash',
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: `lang=${lang}\n\nטקסט הפוסט של המחבר האחר (הבסיס לתגובה):\n"""\n${clean}\n"""` }],
+      },
+    ],
+    config: { systemInstruction: ENGAGEMENT_REPLIES_SYSTEM_INSTRUCTION, temperature: 0.75, topP: 0.95, responseMimeType: 'application/json' },
+  });
+
+  const raw = stripCodeFence(response.text?.trim() || '[]');
+  const parsed = JSON.parse(raw) as unknown;
+  const arr = Array.isArray(parsed) ? parsed : (parsed as { replies?: unknown[] })?.replies;
+  if (!Array.isArray(arr) || arr.length < 3) throw new Error('model did not return 3 replies');
+
+  const out = arr.slice(0, 3).map((r) => {
+    const rec = r as Record<string, unknown>;
+    return {
+      style: String(rec.style ?? '').toLowerCase(),
+      text: stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.text ?? rec.body ?? '').trim()))).slice(0, 600),
+    };
+  }).filter((r) => r.text.length > 2);
+  if (out.length < 3) throw new Error('replies came back empty after sanitising');
+  return out;
 }

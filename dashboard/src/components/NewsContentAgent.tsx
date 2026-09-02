@@ -11,6 +11,11 @@ import {
   ExternalLink,
   ImageIcon,
   AlertTriangle,
+  Sparkles,
+  Film,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
 } from 'lucide-react';
 import {
   CATEGORY_LABEL,
@@ -21,8 +26,29 @@ import {
   type SocialPlatform,
 } from '../lib/newsAgentTypes';
 import { fetchNewsList } from '../lib/newsFeedClient';
-import { composeNewsPost, type ComposedPost } from '../lib/newsPostComposer';
+import { composeNewsPost, synthesizeNewsPost, citationDomain, type ComposedPost } from '../lib/newsPostComposer';
 import { renderNewsImage, type BgSource } from '../lib/newsImageComposer';
+import { renderStoryForItem, rerenderDeck, type SlideFormat } from '../lib/instagramStoryRenderer';
+import type { StoryPayload } from '../lib/storySlides';
+import SlideEditorChat from './SlideEditorChat';
+import PreviewErrorBoundary from './PreviewErrorBoundary';
+import QuickPublishBar from './QuickPublishBar';
+import { deckToCaption } from '../lib/socialPublish';
+import { loadDeck, saveDeckMeta, saveDeckImages, clearDeck } from '../lib/deckPersistence';
+
+const SLIDE_FORMATS: { id: SlideFormat; label: string }[] = [
+  { id: '9:16', label: '9:16 · סטורי' },
+  { id: '4:5', label: '4:5 · קרוסלה' },
+  { id: '1:1', label: '1:1 · ריבוע' },
+];
+const PREVIEW_DIMS: Record<SlideFormat, { w: number; h: number }> = {
+  '9:16': { w: 288, h: 512 },
+  '4:5': { w: 340, h: 425 },
+  '1:1': { w: 380, h: 380 },
+};
+import { SITE_ORIGIN } from '../lib/useDashboardRefresh';
+
+const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
 const CATEGORIES: NewsCategory[] = ['cyber', 'ai', 'tech', 'all'];
 const PLATFORM_ICON: Record<SocialPlatform, typeof Linkedin> = { linkedin: Linkedin, instagram: Instagram };
@@ -54,6 +80,8 @@ export default function NewsContentAgent() {
   const [newsError, setNewsError] = useState<string | null>(null);
 
   const [post, setPost] = useState<ComposedPost | null>(null);
+  const [posting, setPosting] = useState(false);
+  const postSeq = useRef(0);
   const [copied, setCopied] = useState(false);
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -62,40 +90,177 @@ export default function NewsContentAgent() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const renderSeq = useRef(0);
 
+  // Instagram Story / Carousel slides — generated on demand from the selected article,
+  // independent of the post-platform toggle above. The generated deck is PERSISTED to
+  // sessionStorage and restored here on mount: it must survive the 4-minute feed poll, an
+  // `isGenerating` toggle, an error-boundary reset or a hot reload, and is only ever wiped by
+  // the explicit "נקה / צור חדש" button (`handleClearDeck`).
+  const [restored] = useState(() => loadDeck());
+  const restoredPostText = useRef(restored?.meta.postText ?? '').current;
+  const [storyPayload, setStoryPayload] = useState<StoryPayload | null>(restored?.meta.payload ?? null);
+  const [storyImages, setStoryImages] = useState<string[]>(restored?.images ?? []);
+  const [storyRendering, setStoryRendering] = useState(false);
+  const [storyError, setStoryError] = useState<string | null>(null);
+  const [storyActive, setStoryActive] = useState(restored?.meta.activeIndex ?? 0);
+  const [slideFormat, setSlideFormat] = useState<SlideFormat>(restored?.meta.format ?? '9:16');
+  const storySeq = useRef(0);
+  // A restored deck whose images didn't fit the storage quota needs a one-time re-render.
+  const needsImageRestore = useRef(!!restored && restored.images.length === 0);
+
   const fetchNews = useCallback(
-    async (autoSelect = false) => {
-      setLoadingNews(true);
+    async (opts: { autoSelectLatest?: boolean; background?: boolean } = {}) => {
+      const { autoSelectLatest = false, background = false } = opts;
+      if (!background) setLoadingNews(true);
       setNewsError(null);
       try {
         const items = await fetchNewsList(category);
         setList(items);
         if (items.length === 0) {
-          setNewsError('לא נמצאו כתבות בקטגוריה הזו כרגע.');
-          setItem(null);
-        } else if (autoSelect || !items.some((i) => i.id === item?.id)) {
+          // A background poll that comes back empty must NOT nuke the workspace / selection.
+          if (!background) {
+            setNewsError('לא נמצאו כתבות בקטגוריה הזו כרגע.');
+            setItem(null);
+          }
+          return;
+        }
+        const stillSelected = !!item && items.some((i) => i.id === item.id);
+        if (autoSelectLatest) {
           setItem(items[0]);
+        } else if (stillSelected) {
+          /* keep the operator's current selection exactly as-is */
+        } else if (background) {
+          /* the selected article rotated off the live feed — keep showing it anyway rather
+             than yanking the workspace out from under an in-progress carousel */
+        } else {
+          // Foreground refresh / category switch with no valid selection — restore the last
+          // pinned article across reloads, else fall back to the newest.
+          let savedArticle: NewsItem | undefined;
+          try {
+            const savedId = window.sessionStorage.getItem('nca:articleId');
+            if (savedId) savedArticle = items.find((i) => i.id === savedId);
+          } catch {
+            /* sessionStorage unavailable */
+          }
+          setItem(savedArticle ?? items[0]);
         }
       } catch {
-        setNewsError('משיכת הפיד נכשלה — בדקו חיבור ל-mrdaniel.co.il/api/news.');
-        setList([]);
-        setItem(null);
+        if (!background) {
+          setNewsError('משיכת הפיד נכשלה — בדקו חיבור ל-mrdaniel.co.il/api/news.');
+          setList([]);
+          setItem(null);
+        }
       } finally {
-        setLoadingNews(false);
+        if (!background) setLoadingNews(false);
       }
     },
     [category, item?.id]
   );
 
+  // Persist the active article + slide index so a crash/remount/reload keeps the workspace.
+  useEffect(() => {
+    try {
+      if (item?.id) window.sessionStorage.setItem('nca:articleId', item.id);
+    } catch {
+      /* ignore */
+    }
+  }, [item?.id]);
+
   // Refresh the candidate list whenever the category changes (keeps the picker in sync with the chips).
   useEffect(() => {
-    void fetchNews(false);
+    void fetchNews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
-  // Recompose copy whenever the item or platform changes.
+  // Real-time news stream — re-poll the live feed every 4 minutes so new stories appear through
+  // the day without a manual refresh (the /api/news edge cache serves this cheaply). Runs in
+  // `background` mode: it refreshes the list but never moves the selection or clears the deck.
   useEffect(() => {
-    setPost(item ? composeNewsPost(item, platform) : null);
+    const id = window.setInterval(() => void fetchNews({ background: true }), 4 * 60 * 1000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
+
+  // Compose copy whenever the item or platform changes. Show the deterministic draft instantly,
+  // then swap in the adaptive LLM synthesis when it returns; keep the draft if synthesis fails.
+  useEffect(() => {
+    if (!item) {
+      setPost(null);
+      return;
+    }
+    const seq = ++postSeq.current;
+    setPost(composeNewsPost(item, platform));
+    setPosting(true);
+    void (async () => {
+      try {
+        const synth = await synthesizeNewsPost(item, platform, { apiBase: SITE_ORIGIN, adminSecret: ADMIN_SECRET });
+        if (seq === postSeq.current) setPost(synth);
+      } catch {
+        /* keep the deterministic draft already shown */
+      } finally {
+        if (seq === postSeq.current) setPosting(false);
+      }
+    })();
   }, [item, platform]);
+
+  // NOTE: a generated deck is deliberately NOT auto-cleared when the selected article changes.
+  // Wiping it on any `item` change (including the silent swaps a background feed poll can cause)
+  // is exactly the "carousel got purged" bug. The deck persists until the operator presses
+  // "רענון שקפים" (rebuilds it from the current article) or "נקה / צור חדש" (`handleClearDeck`).
+  // A small hint below flags when the visible deck belongs to a different article than the one
+  // now selected.
+
+  // One-time image restore: a deck came back from sessionStorage but its rendered PNGs were too
+  // large to persist — re-render them from the saved payload so the carousel is fully visible.
+  useEffect(() => {
+    if (!needsImageRestore.current || !storyPayload) return;
+    needsImageRestore.current = false;
+    const seq = ++storySeq.current;
+    setStoryRendering(true);
+    void (async () => {
+      try {
+        const deck = await rerenderDeck(storyPayload, slideFormat);
+        if (seq === storySeq.current) {
+          setStoryPayload(deck.payload);
+          setStoryImages(deck.images);
+        }
+      } catch {
+        if (seq === storySeq.current) setStoryError('שחזור התצוגה נכשל — לחצו "רענון שקפים".');
+      } finally {
+        if (seq === storySeq.current) setStoryRendering(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist the deck on every change so a background event / remount can restore it. Split in two:
+  // the lightweight meta writes on every nav, the heavy PNG blob only when the images actually change.
+  useEffect(() => {
+    if (!storyPayload) return;
+    saveDeckMeta({
+      payload: storyPayload,
+      postText: (post?.fullText || restoredPostText || deckToCaption(storyPayload)).trim(),
+      articleId: storyPayload.newsId || item?.id || '',
+      format: slideFormat,
+      activeIndex: storyActive,
+      savedAt: Date.now(),
+    });
+  }, [storyPayload, storyActive, slideFormat, post?.fullText, item?.id]);
+
+  useEffect(() => {
+    if (!storyPayload || storyImages.length === 0) return;
+    saveDeckImages(storyPayload.newsId || item?.id || '', slideFormat, storyImages);
+  }, [storyImages, storyPayload, slideFormat, item?.id]);
+
+  // Explicit, operator-only reset — the ONLY path that clears the generated deck.
+  const handleClearDeck = useCallback(() => {
+    storySeq.current++;
+    needsImageRestore.current = false;
+    setStoryPayload(null);
+    setStoryImages([]);
+    setStoryError(null);
+    setStoryActive(0);
+    clearDeck();
+  }, []);
 
   // Re-render the branded image whenever the item / aspect / headline toggle changes.
   useEffect(() => {
@@ -144,6 +309,74 @@ export default function NewsContentAgent() {
     a.remove();
   };
 
+  // Build + render the full branded story/carousel set for the selected article. Maps the
+  // headline, category (kicker) and synthesised narrative through the shared story engine, and
+  // stamps the same clean bare-domain source attribution the post text uses. Falls back to the
+  // deterministic article-grounded builder inside renderStoryForItem when the AI call is down.
+  const generateStorySlides = useCallback(
+    async (format: SlideFormat) => {
+      if (!item) return;
+      const seq = ++storySeq.current;
+      setStoryRendering(true);
+      setStoryError(null);
+      setStoryActive(0);
+      try {
+        const { payload, images } = await renderStoryForItem({ ...item, source: citationDomain(item) }, format);
+        if (seq === storySeq.current) {
+          setStoryPayload(payload);
+          setStoryImages(images);
+        }
+      } catch {
+        if (seq === storySeq.current) setStoryError('רינדור שקפי הסטורי נכשל — נסו שוב.');
+      } finally {
+        if (seq === storySeq.current) setStoryRendering(false);
+      }
+    },
+    [item]
+  );
+
+  // Re-render the deck when the aspect ratio changes, but only if one was already generated.
+  useEffect(() => {
+    if (storyPayload && !storyRendering) void generateStorySlides(slideFormat);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slideFormat]);
+
+  // AI Slide Editor chat → apply an edited deck and live re-render on the same background.
+  const applyStoryEdit = useCallback(
+    async (edited: StoryPayload) => {
+      const seq = ++storySeq.current;
+      setStoryRendering(true);
+      setStoryError(null);
+      try {
+        const deck = await rerenderDeck(edited, slideFormat);
+        if (seq === storySeq.current) {
+          setStoryPayload(deck.payload);
+          setStoryImages(deck.images);
+        }
+      } catch {
+        if (seq === storySeq.current) setStoryError('הרינדור מחדש נכשל — נסו שוב.');
+      } finally {
+        if (seq === storySeq.current) setStoryRendering(false);
+      }
+    },
+    [slideFormat]
+  );
+
+  const downloadAllStorySlides = async () => {
+    if (!storyImages.length) return;
+    const slug = (item?.slug || 'story').slice(0, 40);
+    for (let i = 0; i < storyImages.length; i++) {
+      const a = document.createElement('a');
+      a.href = storyImages[i];
+      a.download = `mrdaniel-story-${slug}-${i + 1}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // small stagger so the browser doesn't drop the rapid-fire downloads
+      await new Promise((r) => setTimeout(r, 350));
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Action bar — category selector + fetch */}
@@ -167,7 +400,7 @@ export default function NewsContentAgent() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => fetchNews(false)}
+            onClick={() => fetchNews()}
             disabled={loadingNews}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-zinc-200 text-sm font-bold cursor-pointer disabled:opacity-50 hover:bg-white/10"
           >
@@ -175,7 +408,7 @@ export default function NewsContentAgent() {
             רענון רשימת הכתבות
           </button>
           <button
-            onClick={() => fetchNews(true)}
+            onClick={() => fetchNews({ autoSelectLatest: true })}
             disabled={loadingNews}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500 text-black text-sm font-bold cursor-pointer disabled:opacity-50"
           >
@@ -319,6 +552,17 @@ export default function NewsContentAgent() {
               <div className="flex items-center justify-between mb-3">
                 <span className="flex items-center gap-2 text-zinc-400 text-xs font-mono uppercase tracking-wider">
                   <Newspaper className="w-3.5 h-3.5" /> טקסט מוכן לפרסום
+                  {posting ? (
+                    <span className="flex items-center gap-1 text-[10px] text-zinc-500 normal-case tracking-normal">
+                      <Loader2 className="w-3 h-3 animate-spin" /> מנסח…
+                    </span>
+                  ) : post?.synthesized ? (
+                    <span className="flex items-center gap-1 text-[10px] text-brand-400 normal-case tracking-normal">
+                      <Sparkles className="w-3 h-3" /> ניסוח AI מותאם
+                    </span>
+                  ) : post ? (
+                    <span className="text-[10px] text-zinc-500 normal-case tracking-normal">תבנית בסיס</span>
+                  ) : null}
                 </span>
                 <button
                   onClick={copyText}
@@ -348,6 +592,7 @@ export default function NewsContentAgent() {
                     <span className="text-brand-400 font-bold">קריאה לפעולה (קבועה): </span>
                     {post.footer}
                   </p>
+                  <QuickPublishBar text={post.fullText} image={imageUrl ?? undefined} className="mt-3" />
                 </div>
               )}
             </div>
@@ -388,7 +633,185 @@ export default function NewsContentAgent() {
         </>
       )}
 
-      {!item && !loadingNews && !newsError && (
+      {/* Story / Carousel slides — PERSISTED. Deliberately mounted OUTSIDE the `{item && …}`
+          gate so it stays alive through background feed polls, `storyRendering` toggles, an
+          error-boundary reset, or `item` momentarily going null. Only "נקה / צור חדש" clears it. */}
+      {(item || storyPayload) && (
+          <PreviewErrorBoundary
+            label="תצוגת הקרוסלה"
+            resetKeys={[storyPayload?.createdAt, slideFormat, storyImages.length]}
+            onReset={() => {
+              // An error-boundary reset is crash-recovery, not a user action — but a deck that
+              // crashed the renderer must not be restored on the next mount, so wipe storage too.
+              handleClearDeck();
+            }}
+          >
+          <div className="dash-card p-6">
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <span className="flex items-center gap-2 text-zinc-400 text-xs font-mono uppercase tracking-wider">
+                <Film className="w-3.5 h-3.5" /> שקפים / קרוסלה מבוססת AI
+                {storyRendering ? (
+                  <span className="flex items-center gap-1 text-[10px] text-zinc-500 normal-case tracking-normal">
+                    <Loader2 className="w-3 h-3 animate-spin" /> מרנדר…
+                  </span>
+                ) : storyPayload ? (
+                  <span className="text-[10px] normal-case tracking-normal">
+                    {storyPayload.synthesized ? (
+                      <span className="text-brand-400">טקסט AI מהכתבה · {storyImages.length} שקופיות</span>
+                    ) : (
+                      <span className="text-amber-400/80">
+                        גיבוי מקומי · {storyImages.length} שקופיות
+                        {storyPayload.fallbackReason ? ` — ${storyPayload.fallbackReason}` : ''}
+                      </span>
+                    )}
+                  </span>
+                ) : null}
+              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1">
+                  {SLIDE_FORMATS.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setSlideFormat(f.id)}
+                      disabled={storyRendering}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer font-mono disabled:opacity-50 ${
+                        slideFormat === f.id ? 'bg-brand-500 text-black' : 'bg-white/5 text-zinc-400 border border-white/10'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => generateStorySlides(slideFormat)}
+                  disabled={storyRendering || !item}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 text-black text-xs font-bold cursor-pointer disabled:opacity-50"
+                >
+                  {storyRendering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Film className="w-3.5 h-3.5" />}
+                  {storyPayload ? 'רענון שקפים' : 'צור שקפים / קרוסלה מבוססת AI'}
+                </button>
+                {storyPayload && (
+                  <button
+                    onClick={handleClearDeck}
+                    disabled={storyRendering}
+                    title="מוחק את הקרוסלה השמורה ומאפס — הפעולה היחידה שמנקה את התצוגה"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-300 text-xs font-bold cursor-pointer disabled:opacity-50 hover:bg-white/10 hover:text-white"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> נקה / צור חדש
+                  </button>
+                )}
+                {storyImages.length > 0 && (
+                  <button
+                    onClick={downloadAllStorySlides}
+                    disabled={storyRendering}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-200 text-xs font-bold cursor-pointer disabled:opacity-50 hover:bg-white/10"
+                  >
+                    <Download className="w-3.5 h-3.5" /> הורד את כל השקופיות (PNG)
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {storyError && (
+              <p className="text-xs text-amber-400 flex items-center gap-1.5 mb-3">
+                <AlertTriangle className="w-3.5 h-3.5" /> {storyError}
+              </p>
+            )}
+
+            {storyPayload && item && storyPayload.newsId && storyPayload.newsId !== item.id && (
+              <p className="text-[11px] text-amber-400/80 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2 mb-3 leading-relaxed">
+                הקרוסלה שמוצגת נוצרה מכתבה אחרת ({storyPayload.newsTitle}). היא נשמרת כמו שהיא — לחצו
+                "רענון שקפים" כדי לבנות אותה מהכתבה הנבחרת עכשיו, או "נקה / צור חדש" כדי להתחיל מאפס.
+              </p>
+            )}
+
+            {storyPayload && storyImages.length > 0 ? (
+              <>
+                <div className="flex items-center gap-1.5 flex-wrap mb-4">
+                  {(storyPayload.slides ?? []).map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setStoryActive(i)}
+                      disabled={!storyImages[i]}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 ${
+                        storyActive === i ? 'bg-brand-500 text-black' : 'bg-white/5 text-zinc-400 border border-white/10'
+                      }`}
+                    >
+                      {i + 1}. {s?.kind === 'cover' ? 'שער' : s?.kind === 'cta' ? 'סיום' : s?.heading || `שקופית ${i + 1}`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setStoryActive((a) => Math.max(0, a - 1))}
+                    disabled={storyActive === 0}
+                    className="p-2 rounded-full bg-white/5 border border-white/10 text-zinc-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                  <div
+                    className="relative rounded-2xl overflow-hidden border border-white/10 bg-black"
+                    style={{
+                      width: (PREVIEW_DIMS[slideFormat] ?? PREVIEW_DIMS['9:16']).w,
+                      height: (PREVIEW_DIMS[slideFormat] ?? PREVIEW_DIMS['9:16']).h,
+                    }}
+                  >
+                    {storyImages[Math.min(storyActive, storyImages.length - 1)] ? (
+                      <img
+                        src={storyImages[Math.min(storyActive, storyImages.length - 1)]}
+                        alt={`שקופית ${storyActive + 1}`}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-zinc-700">
+                        <Film className="w-6 h-6" />
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setStoryActive((a) => Math.min(storyImages.length - 1, a + 1))}
+                    disabled={storyActive >= storyImages.length - 1}
+                    className="p-2 rounded-full bg-white/5 border border-white/10 text-zinc-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-zinc-600 text-center mt-3">
+                  {slideFormat} · {storyImages.length} שקופיות · שקופית {Math.min(storyActive, storyImages.length - 1) + 1} · שער → פסקאות תוכן → CTA (mrdaniel.co.il)
+                </p>
+
+                <QuickPublishBar
+                  text={(post?.fullText || restoredPostText || deckToCaption(storyPayload)).trim()}
+                  image={storyImages[Math.min(storyActive, storyImages.length - 1)]}
+                  label="פרסום מהיר · קרוסלה"
+                  className="mt-3 justify-center"
+                />
+
+                <div className="mt-4">
+                  <SlideEditorChat
+                    payload={storyPayload}
+                    format={slideFormat}
+                    busy={storyRendering}
+                    onApply={applyStoryEdit}
+                  />
+                </div>
+              </>
+            ) : storyRendering ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                כפתור אחד יפרק את הכתבה הנבחרת ל-4–5 שקופיות ממותגות (שער → 2–3 שקופיות תוכן/עובדות → CTA עם הכתובת mrdaniel.co.il) — עם אותו טקסט מסונתז וייחוס מקור נקי כמו הפוסט, בלי בולטים, עם יישור כותרות אוטומטי ובידוד כיווניות לדומיין. בחרו יחס: 9:16 לסטורי/ריל, או 4:5 / 1:1 לקרוסלה בלינקדאין/אינסטגרם.
+              </p>
+            )}
+          </div>
+          </PreviewErrorBoundary>
+      )}
+
+      {!item && !storyPayload && !loadingNews && !newsError && (
         <div className="dash-card p-10 text-center text-zinc-500 text-sm">
           בחרו קטגוריה ולחצו "משוך חדשות אחרונות" — המערכת תיצור פוסט מלא (טקסט + תמונה ממותגת + חתימת אתר) מהכתבה העדכנית ביותר.
         </div>
