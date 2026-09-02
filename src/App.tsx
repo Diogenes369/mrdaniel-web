@@ -95,7 +95,7 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen overflow-x-clip bg-carbon-950 text-zinc-100 font-sans selection:bg-brand-500 selection:text-black"
+      className="relative min-h-screen w-full max-w-full overflow-x-clip bg-carbon-950 text-zinc-100 font-sans selection:bg-brand-500 selection:text-black"
       dir="rtl"
     >
       <RouteScrollManager />

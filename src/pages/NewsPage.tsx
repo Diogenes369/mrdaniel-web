@@ -246,7 +246,7 @@ export default function NewsPage() {
         </div>
 
         {isLoading && (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 9 }).map((_, idx) => (
               <div key={idx} className="h-72 animate-pulse rounded-2xl border border-white/5 bg-white/[0.03]" />
             ))}
@@ -279,7 +279,7 @@ export default function NewsPage() {
                 {heroItem && <NewsHeroCard item={heroItem} onOpen={setActive} className="mb-8" />}
 
                 {gridItems.length > 0 && (
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     {gridItems.map((item, i) => (
                       <NewsGridCard key={item.id} item={item} onOpen={setActive} wide={i === 0} />
                     ))}

@@ -86,10 +86,10 @@ export default function CyberNewsGrid() {
 
         {!isLoading && !isError && hero && (
           <>
-            <div className="mx-auto grid max-w-[1400px] gap-5">
+            <div className="mx-auto grid w-full min-w-0 max-w-[1400px] gap-5">
               <NewsHeroCard item={hero} onOpen={setActive} />
               {secondary.length > 0 && (
-                <div className="grid gap-5 sm:grid-cols-2">
+                <div className="grid min-w-0 gap-5 sm:grid-cols-2">
                   {secondary.map((item) => (
                     <NewsGridCard key={item.id} item={item} onOpen={setActive} />
                   ))}

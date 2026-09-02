@@ -337,7 +337,7 @@ export default function Header() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: DRAWER_EXIT_MS / 1000, ease: 'easeInOut' }}
-            className="fixed inset-0 h-dvh bg-black lg:hidden z-40 flex flex-col"
+            className="fixed inset-0 h-dvh w-full max-w-full overflow-x-hidden bg-black lg:hidden z-40 flex flex-col"
           >
             {/* Top: logo + close, pt-safe clears the notch/status bar */}
             <div className="shrink-0 flex items-center justify-between px-6 pt-safe pt-6 pb-4">

@@ -30,16 +30,16 @@ export function NewsHeroCard({ item, onOpen, className = '' }: { item: NewsItem;
       type="button"
       onClick={() => onOpen(item)}
       data-track-interest={`news:${item.topic}:${item.title}`}
-      className={`group relative block w-full overflow-hidden rounded-3xl border border-white/12 bg-[#06080c] text-right transition-colors hover:border-[#76B900]/40 ${className}`}
+      className={`group relative block w-full min-w-0 max-w-full overflow-hidden rounded-3xl border border-white/12 bg-[#06080c] text-right transition-colors hover:border-[#76B900]/40 ${className}`}
     >
-      <div className="grid md:grid-cols-2">
-        <div className="relative aspect-[16/9] overflow-hidden md:aspect-[16/10]">
+      <div className="grid min-w-0 md:grid-cols-2">
+        <div className="relative aspect-[16/9] w-full overflow-hidden md:aspect-[16/10]">
           <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
           <Icon className="pointer-events-none absolute -bottom-6 -left-4 h-40 w-40 text-white/[0.06]" aria-hidden="true" />
           <NewsImage src={item.image} className="transition-transform duration-700 group-hover:scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#06080c] via-transparent to-transparent md:bg-gradient-to-l" aria-hidden="true" />
         </div>
-        <div className="flex flex-col justify-center gap-3 p-6 sm:p-8">
+        <div className="flex min-w-0 flex-col justify-center gap-3 p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[#76B900]/45 bg-[#76B900]/12 px-2.5 py-1 text-[11px] font-bold text-[#9FE870]">
               <Radar className="h-3.5 w-3.5" /> כתבה נבחרת · ניתוח חמ״ל
@@ -48,10 +48,10 @@ export function NewsHeroCard({ item, onOpen, className = '' }: { item: NewsItem;
               <Icon className="h-3.5 w-3.5" /> {t.label}
             </span>
           </div>
-          <h3 dir="auto" className="font-display text-2xl font-black leading-tight text-white transition-colors group-hover:text-brand-300 sm:text-3xl">
+          <h3 dir="auto" className="break-words font-display text-2xl font-black leading-tight text-white transition-colors group-hover:text-brand-300 sm:text-3xl">
             {item.title}
           </h3>
-          <p dir="auto" className="line-clamp-3 text-sm leading-relaxed text-zinc-400">
+          <p dir="auto" className="line-clamp-3 break-words text-sm leading-relaxed text-zinc-400">
             {item.excerpt || item.summary}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500" dir="rtl">
@@ -94,11 +94,11 @@ export function NewsGridCard({
       type="button"
       onClick={() => onOpen(item)}
       data-track-interest={`news:${item.topic}:${item.title}`}
-      className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#06080c] text-right transition-colors hover:border-[#76B900]/40 ${
+      className={`group flex h-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#06080c] text-right transition-colors hover:border-[#76B900]/40 ${
         wide ? 'sm:col-span-2' : ''
       }`}
     >
-      <div className="relative aspect-[16/9] min-h-[190px] shrink-0 overflow-hidden">
+      <div className="relative aspect-[16/9] min-h-[190px] w-full shrink-0 overflow-hidden">
         <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
         <Icon className="pointer-events-none absolute -bottom-4 -left-3 h-24 w-24 text-white/[0.06]" aria-hidden="true" />
         <NewsImage src={item.image} className="transition-transform duration-700 group-hover:scale-105" />
@@ -106,20 +106,20 @@ export function NewsGridCard({
           <Icon className="h-3 w-3" /> {t.label}
         </span>
       </div>
-      <div className="flex flex-1 flex-col p-4 sm:p-5">
+      <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
         <h3
           dir="auto"
-          className={`font-display font-bold leading-snug text-[#F1F5F9] transition-colors group-hover:text-brand-300 ${
+          className={`break-words font-display font-bold leading-snug text-[#F1F5F9] transition-colors group-hover:text-brand-300 ${
             wide ? 'text-lg line-clamp-3 md:text-xl' : 'text-[15px] line-clamp-3'
           }`}
         >
           {item.title}
         </h3>
-        <p dir="auto" className="mt-2 line-clamp-2 flex-1 text-[12.5px] leading-relaxed text-zinc-400">
+        <p dir="auto" className="mt-2 line-clamp-2 flex-1 break-words text-[12.5px] leading-relaxed text-zinc-400">
           {item.excerpt || item.summary}
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-zinc-500" dir="rtl">
-          <span dir="ltr" className="font-mono text-zinc-400">{domain || item.source}</span>
+        <div className="mt-4 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-zinc-500" dir="rtl">
+          <span dir="ltr" className="max-w-full truncate font-mono text-zinc-400">{domain || item.source}</span>
           <span aria-hidden="true">·</span>
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3 w-3" />
