@@ -40,7 +40,7 @@ export default function CyberNewsGrid() {
             <TitleUnderline className="w-full" base="w-12" />
           </div>
           <p className="font-sans text-base leading-relaxed text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)] md:text-lg">
-            כל מה שזז בטכנולוגיה הישראלית, במקום אחד — מתעדכן אוטומטית מגיקטיים, גלובס, ynet, TechTime ו-Israel Defense.
+            כל מה שזז בטכנולוגיה הישראלית, במקום אחד.
           </p>
         </div>
 

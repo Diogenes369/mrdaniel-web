@@ -20,22 +20,29 @@ export function sourceDomain(url: string): string {
 const HEBREW_RE = /[֐-׿]/g;
 const LATIN_RE = /[A-Za-z]/g;
 
+// Known foreign / English tech outlets that reach the feed (directly or via Google News).
+// Matched loosely against `item.source`; anything here is excluded regardless of the title.
+const FOREIGN_SOURCE_RE =
+  /bleeping|hacker\s*news|krebs|techcrunch|the\s*verge|ars\s*technica|cybernews|wired|reuters|bloomberg|the\s*register|zdnet|engadget|gizmodo|mashable|the\s*next\s*web|venturebeat|investing\.com|forbes(?!\.co\.il)|3druck|passportnews|تسنیم|dark\s*reading|securityweek/i;
+
 /**
- * News Command Center card requirement — a Hebrew-language item that carries a usable lead image.
- * Filters out English-source headlines and text-only / no-image cards so no card renders empty or
- * with a broken container. (A genuinely broken image URL that returns 404 still degrades
- * gracefully: <NewsImage> hides itself and the topic-gradient shows through.)
+ * News Command Center card requirement — a validated **Hebrew-language article from an Israeli
+ * tech portal** that carries a usable lead image. Excludes foreign/English sources
+ * (BleepingComputer, The Hacker News, TechCrunch, The Verge, …) both by an explicit source
+ * blocklist AND by requiring the title/excerpt to be strongly Hebrew-dominant (≥ 2× the Latin
+ * letter count), and drops text-only / no-image cards.
  */
 export function isHebrewWithImage(item: NewsItem): boolean {
+  if (FOREIGN_SOURCE_RE.test(item.source || '')) return false;
   const img = (item.image || '').trim();
   if (!/^https?:\/\/[^\s]+\.[^\s]+/i.test(img)) return false;
   const text = `${item.title} ${item.excerpt || ''}`;
   const he = (text.match(HEBREW_RE) || []).length;
   const la = (text.match(LATIN_RE) || []).length;
-  return he >= 8 && he >= la;
+  return he >= 10 && he >= la * 2;
 }
 
-/** Apply the command-center filter and keep the feed's newest-first order. */
+/** Apply the strict Hebrew-Israeli command-center filter, keeping the feed's newest-first order. */
 export function filterCommandCenter(items: NewsItem[]): NewsItem[] {
   return items.filter(isHebrewWithImage);
 }
