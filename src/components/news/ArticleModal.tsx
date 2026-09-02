@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, ExternalLink, Clock, BookOpen, ListChecks, Radar, ShieldAlert, Sparkles, Cloud, Newspaper, type LucideIcon } from 'lucide-react';
 import { formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } from '../../services/newsService';
 import { executiveSummary, deepDive, technicalImpact, sourceDomain } from '../../lib/newsAnalysis';
+import NewsImage from './NewsImage';
 
 const TOPIC: Record<NewsTopic, { label: string; icon: LucideIcon; ring: string; grad: string }> = {
   cyber: { label: 'סייבר ואבטחת מידע', icon: ShieldAlert, ring: 'text-rose-300 border-rose-400/40 bg-rose-500/10', grad: 'from-rose-600/40' },
@@ -85,21 +86,10 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
       </button>
 
       {/* branded hi-res header image + overlay gradient */}
-      <header className="relative h-56 w-full overflow-hidden sm:h-72 md:h-80">
-        {item.image ? (
-          <img
-            src={item.image}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="absolute inset-0 h-full w-full object-cover"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        ) : null}
+      <header className="relative aspect-[16/9] w-full overflow-hidden sm:aspect-[2/1]">
         <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
         <Icon className="pointer-events-none absolute -bottom-6 -left-4 h-40 w-40 text-white/[0.06]" aria-hidden="true" />
+        <NewsImage src={item.image} />
         <div className="absolute inset-0 bg-gradient-to-t from-[#06080c] via-[#06080c]/55 to-transparent" aria-hidden="true" />
 
         <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
@@ -130,7 +120,7 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
         </div>
       </header>
 
-      <div className="max-h-[calc(90dvh-14rem)] space-y-8 overflow-y-auto p-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:p-7 md:max-h-[calc(90vh-18rem)]">
+      <div className="space-y-8 p-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:p-7">
         {/* Executive summary */}
         <section>
           <h3 className="mb-3 flex items-center gap-2 font-display text-sm font-black uppercase tracking-wider text-brand-400">

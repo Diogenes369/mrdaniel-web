@@ -1,12 +1,13 @@
 import { Clock, ExternalLink, BookOpen, Sparkles, ShieldAlert, Cloud, Newspaper, type LucideIcon } from 'lucide-react';
 import TiltCard from './TiltCard';
+import NewsImage from './news/NewsImage';
 import { formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } from '../services/newsService';
 
 const CARD_BASE = 'cyber-glass cyber-glass--info h-full rounded-2xl flex flex-col';
 
-// No image URLs come from the feed, so each card leads with a compact topic-tinted banner (an
-// oversized watermark icon + a colour keyed to the topic) that reads as a thumbnail and makes the
-// grid scannable at a glance on both mobile and wide desktop.
+// Each card leads with a 16:9 image header (feed lead image via <NewsImage>, `object-cover
+// object-center` so subjects stay centred; a topic-tinted gradient + oversized watermark icon
+// show through when the feed has no image or it fails to load).
 const TOPIC_META: Record<NewsTopic, { label: string; icon: LucideIcon; grad: string; glyph: string }> = {
   ai: {
     label: 'בינה מלאכותית',
@@ -48,15 +49,15 @@ export default function NewsCard({ item }: { item: NewsItem }) {
     >
       <TiltCard strength={5} className="h-full">
         <div className={CARD_BASE}>
-          {/* Topic banner — the "thumbnail": watermark glyph + a plain topic label, no chips */}
-          <div className={`relative h-16 md:h-20 shrink-0 overflow-hidden bg-gradient-to-bl ${meta.grad} to-transparent`}>
-            <TopicIcon className={`absolute -bottom-3 -left-2 w-20 h-20 md:w-24 md:h-24 ${meta.glyph}`} aria-hidden="true" />
-            <div className="absolute inset-0 flex items-center px-4 md:px-5">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white/80">
-                <TopicIcon className="w-3.5 h-3.5 text-brand-400" />
-                {meta.label}
-              </span>
-            </div>
+          {/* Image header — 16:9, ~55% of the card. Feed lead image (centred, never squashed);
+              topic gradient + watermark show through when there's no image. */}
+          <div className={`relative aspect-[16/9] min-h-[190px] shrink-0 overflow-hidden bg-gradient-to-bl ${meta.grad} to-transparent`}>
+            <TopicIcon className={`absolute -bottom-3 -left-2 w-28 h-28 md:w-32 md:h-32 ${meta.glyph}`} aria-hidden="true" />
+            <NewsImage src={item.image} className="transition-transform duration-700 group-hover:scale-105" />
+            <span className="absolute right-2.5 top-2.5 z-[1] inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-2.5 py-1 text-[11px] font-bold text-white/90 backdrop-blur-md">
+              <TopicIcon className="w-3.5 h-3.5 text-brand-400" />
+              {meta.label}
+            </span>
           </div>
 
           <div className="relative flex flex-col flex-grow p-5 md:p-6">

@@ -18,6 +18,7 @@ import {
 import { PageHero } from '../components/content/ContentPrimitives';
 import WebButton from '../components/WebButton';
 import ArticleModal from '../components/news/ArticleModal';
+import NewsImage from '../components/news/NewsImage';
 import { sourceDomain } from '../lib/newsAnalysis';
 import { prefersReducedMotion } from '../lib/gsap';
 import { useNewsFeed, formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } from '../services/newsService';
@@ -120,21 +121,10 @@ function HeroCard({ item, onOpen }: { item: NewsItem; onOpen: (i: NewsItem) => v
       className="group relative mb-8 block w-full overflow-hidden rounded-3xl border border-white/12 bg-[#06080c] text-right transition-colors hover:border-[#76B900]/40"
     >
       <div className="grid md:grid-cols-2">
-        <div className="relative h-52 overflow-hidden sm:h-64 md:h-full md:min-h-[340px]">
-          {item.image ? (
-            <img
-              src={item.image}
-              alt=""
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          ) : null}
+        <div className="relative aspect-[16/9] overflow-hidden md:aspect-[16/10]">
           <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
           <Icon className="pointer-events-none absolute -bottom-6 -left-4 h-40 w-40 text-white/[0.06]" aria-hidden="true" />
+          <NewsImage src={item.image} className="transition-transform duration-700 group-hover:scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#06080c] via-transparent to-transparent md:bg-gradient-to-l" aria-hidden="true" />
         </div>
         <div className="flex flex-col justify-center gap-3 p-6 sm:p-8">
@@ -186,22 +176,11 @@ function GridCard({ item, onOpen, wide }: { item: NewsItem; onOpen: (i: NewsItem
       data-track-interest={`news:${item.topic}:${item.title}`}
       className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#06080c] text-right transition-colors hover:border-[#76B900]/40 ${wide ? 'sm:col-span-2' : ''}`}
     >
-      <div className={`relative shrink-0 overflow-hidden ${wide ? 'h-44 sm:h-52' : 'h-36'}`}>
-        {item.image ? (
-          <img
-            src={item.image}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        ) : null}
+      <div className="relative aspect-[16/9] min-h-[190px] shrink-0 overflow-hidden">
         <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
         <Icon className="pointer-events-none absolute -bottom-4 -left-3 h-24 w-24 text-white/[0.06]" aria-hidden="true" />
-        <span className={`absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold backdrop-blur-md ${t.ring}`}>
+        <NewsImage src={item.image} className="transition-transform duration-700 group-hover:scale-105" />
+        <span className={`absolute right-2.5 top-2.5 z-[1] inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold backdrop-blur-md ${t.ring}`}>
           <Icon className="h-3 w-3" /> {t.label}
         </span>
       </div>
