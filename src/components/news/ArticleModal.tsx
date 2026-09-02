@@ -43,9 +43,13 @@ export default function ArticleModal({ item, onClose }: { item: NewsItem | null;
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto p-0 sm:p-6 md:p-10"
           style={{ background: 'rgba(3,5,8,0.78)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
-          onMouseDown={(e) => {
+          // Close only when the click lands on the backdrop itself, never on the card.
+          onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
+          // Lenis (desktop smooth-scroll) hijacks `wheel` globally and scrolls `window`; opt the
+          // whole overlay out so native overflow scroll works inside the modal.
+          data-lenis-prevent
           role="dialog"
           aria-modal="true"
           aria-label={item.title}
@@ -73,7 +77,6 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
       exit={{ y: 20, opacity: 0, scale: 0.985 }}
       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       className="relative w-full max-w-3xl overflow-hidden border border-white/12 bg-[#06080c] shadow-[0_40px_120px_rgba(0,0,0,0.7)] sm:rounded-3xl"
-      onMouseDown={(e) => e.stopPropagation()}
     >
       {/* close — pinned to the frame (outside the scroll area below), 44px touch target */}
       <button
@@ -85,10 +88,13 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
         <X className="h-5 w-5" />
       </button>
 
-      {/* THE scroll container — native wheel + touch scroll of the article, contained so it never
-          bleeds to the backdrop/page. `body { overflow:hidden }` still locks the page behind. */}
+      {/* THE scroll container — native wheel + touch scroll of the article. `data-lenis-prevent`
+          opts it out of Lenis's global wheel hijack; `overscroll-contain` + the onWheel stop keep
+          the scroll from bleeding to the backdrop/page. `body { overflow:hidden }` locks the page. */}
       <div
-        className="max-h-[90dvh] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.22)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+        data-lenis-prevent
+        onWheel={(e) => e.stopPropagation()}
+        className="pointer-events-auto max-h-[85vh] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.22)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
       >
       {/* branded hi-res header image + overlay gradient */}
       <header className="relative aspect-[16/9] w-full overflow-hidden sm:aspect-[2/1]">
