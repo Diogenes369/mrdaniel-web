@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, Shuffle, Search, Sparkles } from 'lucide-react';
+import { Menu, X, Shuffle, Search, Sparkles, SquareTerminal } from 'lucide-react';
 import WebButton from './WebButton';
 import SocialLinks from './SocialLinks';
 import Logo from './Logo';
@@ -260,6 +260,16 @@ export default function Header() {
               >
                 <Search className="w-4 h-4" />
               </motion.button>
+              <motion.button
+                onClick={() => window.dispatchEvent(new CustomEvent('open-cli'))}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.9 }}
+                className={`${DESKTOP_ICON_CLASS} !text-[#22d3ee] hover:!text-[#7dd3fc] hover:!shadow-[0_0_16px_rgba(34,211,238,0.45)]`}
+                aria-label="מצב טרמינל"
+                title="מצב טרמינל · CLI"
+              >
+                <SquareTerminal className="w-4 h-4" />
+              </motion.button>
               <SocialLinks iconClassName={DESKTOP_ICON_CLASS} channels={[...HEADER_SOCIAL_CHANNELS]} />
             </div>
 
@@ -349,10 +359,21 @@ export default function Header() {
                   setMobileOpen(false);
                   window.setTimeout(openAgent, DRAWER_EXIT_MS);
                 }}
-                className={`mb-4 flex items-center justify-center gap-2 rounded-full bg-brand-500 py-3.5 font-display text-lg font-bold text-black shadow-[0_0_24px_rgba(118,185,0,0.25)] ${FOCUS_SAFE_CLASS}`}
+                className={`mb-3 flex items-center justify-center gap-2 rounded-full bg-brand-500 py-3.5 font-display text-lg font-bold text-black shadow-[0_0_24px_rgba(118,185,0,0.25)] ${FOCUS_SAFE_CLASS}`}
               >
                 <Sparkles size={18} />
                 סוכן אישי · התאמה מיידית
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-cli')), DRAWER_EXIT_MS);
+                }}
+                className={`mb-4 flex items-center justify-center gap-2 rounded-full border border-[#22d3ee]/40 bg-[#22d3ee]/10 py-3 font-mono text-base font-semibold text-[#7dd3fc] transition-colors active:scale-[0.98] ${FOCUS_SAFE_CLASS}`}
+              >
+                <SquareTerminal size={17} />
+                {'>_ CLI · מצב טרמינל'}
               </button>
               {navLinks.map((link) =>
                 link.action === 'contact' ? (

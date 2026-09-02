@@ -10,6 +10,7 @@ import LeadForm from './components/LeadForm';
 import AgentQualificationModal from './components/AgentQualificationModal';
 import CyberCookieBanner from './components/CyberCookieBanner';
 import CommandPalette from './components/CommandPalette';
+import TerminalCLI from './components/TerminalCLI';
 import { useLenis, triggerRouteTransitionPulse } from './hooks/useLenis';
 import { useScrollRestoration } from './hooks/useScrollRestoration';
 import { useDeferredMount } from './hooks/useDeferredMount';
@@ -135,6 +136,7 @@ export default function App() {
       <AgentQualificationModal />
       <CyberCookieBanner />
       <CommandPalette />
+      <TerminalCLI />
     </div>
   );
 }
