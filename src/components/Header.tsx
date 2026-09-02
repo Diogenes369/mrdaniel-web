@@ -370,7 +370,7 @@ export default function Header() {
                   setMobileOpen(false);
                   window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-cli')), DRAWER_EXIT_MS);
                 }}
-                className={`mb-4 flex items-center justify-center gap-2 rounded-full border border-[#22d3ee]/40 bg-[#22d3ee]/10 py-3 font-mono text-base font-semibold text-[#7dd3fc] transition-colors active:scale-[0.98] ${FOCUS_SAFE_CLASS}`}
+                className={`mb-4 flex items-center justify-center gap-2 rounded-full border border-[#22d3ee]/40 bg-[#22d3ee]/10 py-3 font-mono text-base font-semibold text-[#7dd3fc] transition-all active:scale-[0.98] hover:border-[#22d3ee]/70 hover:shadow-[0_0_18px_rgba(34,211,238,0.35)] ${FOCUS_SAFE_CLASS}`}
               >
                 <SquareTerminal size={17} />
                 {'>_ CLI · מצב טרמינל'}

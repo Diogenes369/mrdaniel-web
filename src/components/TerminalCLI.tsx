@@ -8,7 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X } from 'lucide-react';
+import { X, SquareTerminal } from 'lucide-react';
 
 /**
  * Interactive Terminal / CLI mode. Opened from the header's `>_` toggle (or the mobile drawer)
@@ -293,6 +293,25 @@ export default function TerminalCLI() {
     : { transform: 'translateZ(0)' };
 
   return (
+    <>
+      {/* Floating trigger — stacked directly ABOVE the Accessibility widget's launcher button
+          (a11y sits at bottom 5.5rem, this at 9.5rem — the same +4rem rhythm as a11y-over-chat).
+          Size / shape / bg / border structure are identical to the a11y button; the cyan tint +
+          hover glow is the only accent so it sits seamlessly in the corner stack. */}
+      {!open && (
+        <motion.button
+          type="button"
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setOpen(true)}
+          aria-label="פתיחת מצב טרמינל"
+          title="מצב טרמינל · CLI"
+          className="fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-[calc(1.5rem+env(safe-area-inset-left))] z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[#22d3ee]/35 bg-[#0D0E12] transition-all duration-300 hover:border-[#22d3ee]/70 hover:shadow-[0_0_18px_rgba(34,211,238,0.4)] md:h-12 md:w-12"
+        >
+          <SquareTerminal className="h-5 w-5 text-[#22d3ee]" strokeWidth={1.75} />
+        </motion.button>
+      )}
+
     <AnimatePresence>
       {open && (
         <motion.div
@@ -402,5 +421,6 @@ export default function TerminalCLI() {
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   );
 }
