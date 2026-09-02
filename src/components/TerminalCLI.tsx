@@ -294,10 +294,10 @@ export default function TerminalCLI() {
 
   return (
     <>
-      {/* Floating trigger — stacked directly ABOVE the Accessibility widget's launcher button
-          (a11y sits at bottom 5.5rem, this at 9.5rem — the same +4rem rhythm as a11y-over-chat).
-          Size / shape / bg / border structure are identical to the a11y button; the cyan tint +
-          hover glow is the only accent so it sits seamlessly in the corner stack. */}
+      {/* Floating trigger — MOBILE ONLY (`md:hidden`). Stacked directly ABOVE the Accessibility
+          widget's launcher button (a11y at bottom 5.5rem, this at 9.5rem — the same +4rem rhythm
+          as a11y-over-chat), matching its w-11 h-11 circular glass shape; the cyan tint + hover
+          glow is the only accent. On desktop the ONLY CLI trigger is the header pill. */}
       {!open && (
         <motion.button
           type="button"
@@ -306,7 +306,7 @@ export default function TerminalCLI() {
           onClick={() => setOpen(true)}
           aria-label="פתיחת מצב טרמינל"
           title="מצב טרמינל · CLI"
-          className="fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-[calc(1.5rem+env(safe-area-inset-left))] z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[#22d3ee]/35 bg-[#0D0E12] transition-all duration-300 hover:border-[#22d3ee]/70 hover:shadow-[0_0_18px_rgba(34,211,238,0.4)] md:h-12 md:w-12"
+          className="fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-[calc(1.5rem+env(safe-area-inset-left))] z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[#22d3ee]/35 bg-[#0D0E12] transition-all duration-300 hover:border-[#22d3ee]/70 hover:shadow-[0_0_18px_rgba(34,211,238,0.4)] md:hidden"
         >
           <SquareTerminal className="h-5 w-5 text-[#22d3ee]" strokeWidth={1.75} />
         </motion.button>
