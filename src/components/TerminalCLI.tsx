@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 
@@ -99,6 +107,45 @@ export default function TerminalCLI() {
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Mobile virtual-keyboard handling. `dvh` still reports the *layout* viewport when the keyboard
+  // is up on iOS/Android, so the overlay gets stretched behind the keyboard and the top bar /
+  // input row are pushed off-screen. Bind the window instead to `window.visualViewport` — its
+  // `height` shrinks with the keyboard and `offsetTop` tracks any viewport shift.
+  const [isMobile, setIsMobile] = useState(false);
+  const [vv, setVv] = useState<{ height: number; top: number } | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    const target = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (!open || !target) {
+      setVv(null);
+      return;
+    }
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      setVv({ height: target.height, top: target.offsetTop });
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    apply();
+    target.addEventListener('resize', schedule);
+    target.addEventListener('scroll', schedule);
+    return () => {
+      target.removeEventListener('resize', schedule);
+      target.removeEventListener('scroll', schedule);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [open]);
+
   const push = useCallback((add: Line[]) => {
     setLines((prev) => {
       const next = [...prev, ...add];
@@ -184,11 +231,11 @@ export default function TerminalCLI() {
     if (open) window.setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
-  // keep the view pinned to the newest line
+  // keep the view pinned to the newest line — also re-pin when the keyboard resizes the window
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [lines, open]);
+  }, [lines, open, vv?.height]);
 
   const submit = () => {
     run(input);
@@ -230,6 +277,21 @@ export default function TerminalCLI() {
     inputRef.current?.focus();
   };
 
+  // On mobile, pin the window to the visual viewport (keyboard-aware); on desktop the `md:`
+  // classes centre a fixed-size window and this stays empty so they win.
+  const useVV = open && isMobile && !!vv;
+  const windowStyle: CSSProperties = useVV
+    ? {
+        position: 'fixed',
+        top: vv!.top,
+        left: 0,
+        right: 0,
+        height: vv!.height,
+        maxHeight: vv!.height,
+        transform: 'translateZ(0)',
+      }
+    : { transform: 'translateZ(0)' };
+
   return (
     <AnimatePresence>
       {open && (
@@ -254,7 +316,7 @@ export default function TerminalCLI() {
             exit={{ y: 24, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="relative flex h-dvh w-full flex-col overflow-hidden border border-[#22d3ee]/25 bg-[#04060a]/95 font-mono text-[13px] leading-relaxed shadow-[0_0_60px_rgba(34,211,238,0.12)] md:h-[min(78dvh,640px)] md:max-w-3xl md:rounded-xl"
-            style={{ transform: 'translateZ(0)' }}
+            style={windowStyle}
             onMouseDown={() => inputRef.current?.focus()}
           >
             {/* title bar + sticky close (>=44px touch target) */}
@@ -281,7 +343,7 @@ export default function TerminalCLI() {
             <div
               ref={scrollRef}
               className="min-h-0 flex-1 overflow-auto px-3 py-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-white/15"
-              style={{ overscrollBehavior: 'contain' }}
+              style={{ overscrollBehavior: 'none', touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
             >
               {lines.map((l, i) => (
                 <div key={i} className={`whitespace-pre ${TONE_CLASS[l.tone]}`}>
@@ -290,10 +352,10 @@ export default function TerminalCLI() {
               ))}
             </div>
 
-            {/* mobile quick-command chips — horizontal scroll, above the input / keyboard */}
+            {/* quick-command chips — horizontal scroll, glued directly above the input row */}
             <div
               className="flex shrink-0 gap-2 overflow-x-auto border-t border-white/10 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain' }}
+              style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none', touchAction: 'pan-x' }}
             >
               {QUICK_CMDS.map((c) => (
                 <button
@@ -315,6 +377,13 @@ export default function TerminalCLI() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onInputKey}
+                onFocus={() => {
+                  // let the keyboard finish opening, then re-pin the output to the newest line
+                  window.setTimeout(() => {
+                    const el = scrollRef.current;
+                    if (el) el.scrollTop = el.scrollHeight;
+                  }, 180);
+                }}
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -323,7 +392,10 @@ export default function TerminalCLI() {
                 enterKeyHint="send"
                 aria-label="שורת פקודה"
                 placeholder="help"
-                className="min-w-0 flex-1 bg-transparent text-zinc-100 caret-[#4ade80] outline-none placeholder:text-zinc-600"
+                // 16px hard-coded (not rem/text-base) so iOS Safari never auto-zooms the page on
+                // focus regardless of the root font scale set by the accessibility widget.
+                style={{ fontSize: '16px' }}
+                className="min-w-0 flex-1 bg-transparent leading-none text-zinc-100 caret-[#4ade80] outline-none placeholder:text-zinc-600"
               />
             </div>
           </motion.div>
