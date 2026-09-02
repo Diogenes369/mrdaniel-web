@@ -260,16 +260,6 @@ export default function Header() {
               >
                 <Search className="w-4 h-4" />
               </motion.button>
-              <motion.button
-                onClick={() => window.dispatchEvent(new CustomEvent('open-cli'))}
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.9 }}
-                className={`${DESKTOP_ICON_CLASS} !text-[#22d3ee] hover:!text-[#7dd3fc] hover:!shadow-[0_0_16px_rgba(34,211,238,0.45)]`}
-                aria-label="מצב טרמינל"
-                title="מצב טרמינל · CLI"
-              >
-                <SquareTerminal className="w-4 h-4" />
-              </motion.button>
               <SocialLinks iconClassName={DESKTOP_ICON_CLASS} channels={[...HEADER_SOCIAL_CHANNELS]} />
             </div>
 
@@ -299,6 +289,19 @@ export default function Header() {
                 סוכן התאמה אישי
               </WebButton>
             </div>
+
+            {/* `>_ CLI` — directly LEFT of the personal-agent CTA (RTL: next in DOM). Mirrors that
+                button's exact pill shape / height / padding / glass border via <WebButton
+                variant="ghost">, restyled with the CLI cyan/turquoise neon signature (#22d3ee). */}
+            <WebButton
+              variant="ghost"
+              onClick={() => window.dispatchEvent(new CustomEvent('open-cli'))}
+              aria-label="מצב טרמינל · CLI"
+              className="hidden lg:inline-flex font-mono !text-[#22d3ee] hover:!text-white !border-[#22d3ee]/40 hover:!border-[#22d3ee]/40 hover:bg-[#22d3ee]/10 !px-4 !py-2 !text-xs !font-semibold !transition-all !duration-300 shadow-[0_0_15px_rgba(34,211,238,0.14)] hover:shadow-[0_0_20px_rgba(34,211,238,0.4)]"
+            >
+              <SquareTerminal size={14} />
+              {'>_ CLI'}
+            </WebButton>
 
             {/* Mobile quick-action — opens the personal-agent qualifier. Compact pill that sits to
                 the side of the hamburger (which is pulled to the edge via -mr-2) so it never

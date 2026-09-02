@@ -180,27 +180,94 @@ export default function NewsContentAgent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
-  // Compose copy whenever the item or platform changes. Show the deterministic draft instantly,
-  // then swap in the adaptive LLM synthesis when it returns; keep the draft if synthesis fails.
+  // ─── On-demand generation (token-saving) ────────────────────────────────────────────────────
+  // Selecting / browsing a news item costs NOTHING — it only shows the article's own title,
+  // summary and source. Post synthesis (Gemini) and the branded-image render fire ONLY when the
+  // "צור פוסט ותמונה" button is pressed. Outputs are cached per (item + platform) for the post
+  // and per (item + aspect + headline) for the image, so returning to an already-generated
+  // combination — or pressing the button again — never re-hits the APIs.
+  const postCache = useRef<Map<string, ComposedPost>>(new Map());
+  const imageCache = useRef<Map<string, { url: string; source: BgSource }>>(new Map());
+  const postKeyFor = (it: NewsItem, p: SocialPlatform) => `${it.id}::${p}`;
+  const imgKeyFor = (it: NewsItem, a: ImageAspect, h: boolean) => `${it.id}::${a}::${h ? 'H' : 'x'}`;
+
+  // Selection / param change → restore any cached output for that exact combo, else clear. No API.
   useEffect(() => {
+    postSeq.current++;
+    renderSeq.current++;
+    setPosting(false);
+    setRendering(false);
+    setRenderError(null);
     if (!item) {
       setPost(null);
+      setImageUrl(null);
+      setImageSource(null);
       return;
     }
-    const seq = ++postSeq.current;
-    setPost(composeNewsPost(item, platform));
-    setPosting(true);
-    void (async () => {
-      try {
-        const synth = await synthesizeNewsPost(item, platform, { apiBase: SITE_ORIGIN, adminSecret: ADMIN_SECRET });
-        if (seq === postSeq.current) setPost(synth);
-      } catch {
-        /* keep the deterministic draft already shown */
-      } finally {
-        if (seq === postSeq.current) setPosting(false);
-      }
-    })();
-  }, [item, platform]);
+    const pc = postCache.current.get(postKeyFor(item, platform));
+    setPost(pc ?? null);
+    const ic = imageCache.current.get(imgKeyFor(item, aspect, headline));
+    setImageUrl(ic?.url ?? null);
+    setImageSource(ic?.source ?? null);
+  }, [item, platform, aspect, headline]);
+
+  const generateContent = useCallback(() => {
+    if (!item) return;
+    const it = item;
+
+    // post — instant deterministic draft, then swap in the LLM synthesis (cached)
+    const pKey = postKeyFor(it, platform);
+    const pSeq = ++postSeq.current;
+    const cachedPost = postCache.current.get(pKey);
+    if (cachedPost) {
+      setPost(cachedPost);
+      setPosting(false);
+    } else {
+      setPost(composeNewsPost(it, platform));
+      setPosting(true);
+      void (async () => {
+        try {
+          const synth = await synthesizeNewsPost(it, platform, { apiBase: SITE_ORIGIN, adminSecret: ADMIN_SECRET });
+          if (pSeq === postSeq.current) {
+            setPost(synth);
+            postCache.current.set(pKey, synth);
+          }
+        } catch {
+          /* keep the deterministic draft already shown */
+        } finally {
+          if (pSeq === postSeq.current) setPosting(false);
+        }
+      })();
+    }
+
+    // branded image (cached)
+    const iKey = imgKeyFor(it, aspect, headline);
+    const rSeq = ++renderSeq.current;
+    const cachedImg = imageCache.current.get(iKey);
+    if (cachedImg) {
+      setImageUrl(cachedImg.url);
+      setImageSource(cachedImg.source);
+      setRendering(false);
+      setRenderError(null);
+    } else {
+      setRendering(true);
+      setRenderError(null);
+      renderNewsImage(it, { aspect, headline })
+        .then(({ dataUrl, imageSource: src }) => {
+          if (rSeq === renderSeq.current) {
+            setImageUrl(dataUrl);
+            setImageSource(src);
+            imageCache.current.set(iKey, { url: dataUrl, source: src });
+          }
+        })
+        .catch(() => {
+          if (rSeq === renderSeq.current) setRenderError('רינדור התמונה נכשל.');
+        })
+        .finally(() => {
+          if (rSeq === renderSeq.current) setRendering(false);
+        });
+    }
+  }, [item, platform, aspect, headline]);
 
   // NOTE: a generated deck is deliberately NOT auto-cleared when the selected article changes.
   // Wiping it on any `item` change (including the silent swaps a background feed poll can cause)
@@ -262,30 +329,7 @@ export default function NewsContentAgent() {
     clearDeck();
   }, []);
 
-  // Re-render the branded image whenever the item / aspect / headline toggle changes.
-  useEffect(() => {
-    if (!item) {
-      setImageUrl(null);
-      setImageSource(null);
-      return;
-    }
-    const seq = ++renderSeq.current;
-    setRendering(true);
-    setRenderError(null);
-    renderNewsImage(item, { aspect, headline })
-      .then(({ dataUrl, imageSource: src }) => {
-        if (seq === renderSeq.current) {
-          setImageUrl(dataUrl);
-          setImageSource(src);
-        }
-      })
-      .catch(() => {
-        if (seq === renderSeq.current) setRenderError('רינדור התמונה נכשל.');
-      })
-      .finally(() => {
-        if (seq === renderSeq.current) setRendering(false);
-      });
-  }, [item, aspect, headline]);
+  // (Branded-image rendering moved into `generateContent` above — no longer auto-runs on select.)
 
   const copyText = async () => {
     if (!post) return;
@@ -543,6 +587,17 @@ export default function NewsContentAgent() {
               <input type="checkbox" checked={headline} onChange={(e) => setHeadline(e.target.checked)} className="accent-brand-500 w-4 h-4" />
               כותרת על התמונה
             </label>
+
+            {/* Explicit, on-demand generation — the ONLY thing that fires Gemini / the image API.
+                Selecting a news item above does nothing but show its title/summary/source. */}
+            <button
+              onClick={generateContent}
+              disabled={posting || rendering}
+              className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500 text-black text-sm font-bold cursor-pointer disabled:opacity-50"
+            >
+              {posting || rendering ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {post || imageUrl ? 'רענון תוכן' : 'צור פוסט ותמונה'}
+            </button>
           </div>
 
           {/* Side-by-side workspaces */}
@@ -566,19 +621,29 @@ export default function NewsContentAgent() {
                 </span>
                 <button
                   onClick={copyText}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 text-black text-xs font-bold cursor-pointer"
+                  disabled={!post}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 text-black text-xs font-bold cursor-pointer disabled:opacity-50"
                 >
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? 'הועתק ✓' : 'העתק טקסט'}
                 </button>
               </div>
-              <textarea
-                readOnly
-                value={post?.fullText ?? ''}
-                dir="rtl"
-                rows={24}
-                className="w-full flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-zinc-200 leading-relaxed resize-y min-h-[420px]"
-              />
+              {post ? (
+                <textarea
+                  readOnly
+                  value={post.fullText}
+                  dir="rtl"
+                  rows={24}
+                  className="w-full flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-zinc-200 leading-relaxed resize-y min-h-[420px]"
+                />
+              ) : (
+                <div className="w-full flex-1 grid place-items-center bg-black/40 border border-dashed border-white/10 rounded-lg px-6 text-center min-h-[420px]">
+                  <p className="text-xs text-zinc-500 leading-relaxed max-w-sm">
+                    הכתבה נבחרה. לחצו <span className="text-brand-400 font-bold">"צור פוסט ותמונה"</span> למעלה כדי לנסח פוסט
+                    ולרנדר תמונה ממותגת — גלישה בין כתבות לא מפעילה שום קריאת AI ולא מבזבזת טוקנים.
+                  </p>
+                </div>
+              )}
               {post && (
                 <div className="mt-3">
                   <div className="flex flex-wrap gap-1.5 mb-2">
@@ -625,7 +690,9 @@ export default function NewsContentAgent() {
                     className="max-h-[520px] w-auto max-w-full rounded-md shadow-lg"
                   />
                 ) : (
-                  <p className="text-xs text-zinc-600">אין תצוגה</p>
+                  <p className="text-xs text-zinc-600 text-center px-4 leading-relaxed">
+                    לחצו "צור פוסט ותמונה" כדי לרנדר את התמונה הממותגת
+                  </p>
                 )}
               </div>
             </div>
