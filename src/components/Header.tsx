@@ -290,18 +290,22 @@ export default function Header() {
               </WebButton>
             </div>
 
-            {/* `>_ CLI` — directly LEFT of the personal-agent CTA (RTL: next in DOM). Mirrors that
-                button's exact pill shape / height / padding / glass border via <WebButton
-                variant="ghost">, restyled with the CLI cyan/turquoise neon signature (#22d3ee). */}
-            <WebButton
-              variant="ghost"
-              onClick={() => window.dispatchEvent(new CustomEvent('open-cli'))}
-              aria-label="מצב טרמינל · CLI"
-              className="hidden lg:inline-flex font-mono !text-[#22d3ee] hover:!text-white !border-[#22d3ee]/40 hover:!border-[#22d3ee]/40 hover:bg-[#22d3ee]/10 !px-4 !py-2 !text-xs !font-semibold !transition-all !duration-300 shadow-[0_0_15px_rgba(34,211,238,0.14)] hover:shadow-[0_0_20px_rgba(34,211,238,0.4)]"
-            >
-              <SquareTerminal size={14} />
-              {'>_ CLI'}
-            </WebButton>
+            {/* `>_ CLI` — desktop only (>= lg). Wrapped in a `hidden lg:block` div rather than
+                putting `hidden` on the WebButton itself: WebButton hardcodes `inline-flex` in its
+                base class, which fought `hidden` and let the pill leak into the mobile header.
+                Directly LEFT of the personal-agent CTA (RTL: next in DOM); mirrors its pill shape
+                via <WebButton variant="ghost"> with the CLI cyan/turquoise signature (#22d3ee). */}
+            <div className="hidden lg:block">
+              <WebButton
+                variant="ghost"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-cli'))}
+                aria-label="מצב טרמינל · CLI"
+                className="font-mono !text-[#22d3ee] hover:!text-white !border-[#22d3ee]/40 hover:!border-[#22d3ee]/40 hover:bg-[#22d3ee]/10 !px-4 !py-2 !text-xs !font-semibold !transition-all !duration-300 shadow-[0_0_15px_rgba(34,211,238,0.14)] hover:shadow-[0_0_20px_rgba(34,211,238,0.4)]"
+              >
+                <SquareTerminal size={14} />
+                {'>_ CLI'}
+              </WebButton>
+            </div>
 
             {/* Mobile quick-action — opens the personal-agent qualifier. Compact pill that sits to
                 the side of the hamburger (which is pulled to the edge via -mr-2) so it never
