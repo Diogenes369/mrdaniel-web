@@ -72,19 +72,24 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
       animate={{ y: 0, opacity: 1, scale: 1 }}
       exit={{ y: 20, opacity: 0, scale: 0.985 }}
       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-      className="relative my-0 w-full max-w-3xl overflow-hidden border border-white/12 bg-[#06080c] shadow-[0_40px_120px_rgba(0,0,0,0.7)] sm:rounded-3xl"
+      className="relative w-full max-w-3xl overflow-hidden border border-white/12 bg-[#06080c] shadow-[0_40px_120px_rgba(0,0,0,0.7)] sm:rounded-3xl"
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {/* sticky close — 44px touch target */}
+      {/* close — pinned to the frame (outside the scroll area below), 44px touch target */}
       <button
         type="button"
         onClick={onClose}
         aria-label="סגירה"
-        className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-20 grid h-11 w-11 place-items-center rounded-full border border-white/15 bg-black/50 text-zinc-200 backdrop-blur-md transition-colors hover:bg-black/80 hover:text-white"
+        className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 grid h-11 w-11 place-items-center rounded-full border border-white/15 bg-black/50 text-zinc-200 backdrop-blur-md transition-colors hover:bg-black/80 hover:text-white"
       >
         <X className="h-5 w-5" />
       </button>
 
+      {/* THE scroll container — native wheel + touch scroll of the article, contained so it never
+          bleeds to the backdrop/page. `body { overflow:hidden }` still locks the page behind. */}
+      <div
+        className="max-h-[90dvh] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.22)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+      >
       {/* branded hi-res header image + overlay gradient */}
       <header className="relative aspect-[16/9] w-full overflow-hidden sm:aspect-[2/1]">
         <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
@@ -180,6 +185,7 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
         <p className="-mt-4 text-center text-[11px] text-zinc-600">
           התקציר והניתוח נערכים אוטומטית מתוך הסיקור המקורי · העובדות המלאות באתר המקור.
         </p>
+      </div>
       </div>
     </motion.article>
   );
