@@ -17,6 +17,29 @@ export function sourceDomain(url: string): string {
   }
 }
 
+const HEBREW_RE = /[֐-׿]/g;
+const LATIN_RE = /[A-Za-z]/g;
+
+/**
+ * News Command Center card requirement — a Hebrew-language item that carries a usable lead image.
+ * Filters out English-source headlines and text-only / no-image cards so no card renders empty or
+ * with a broken container. (A genuinely broken image URL that returns 404 still degrades
+ * gracefully: <NewsImage> hides itself and the topic-gradient shows through.)
+ */
+export function isHebrewWithImage(item: NewsItem): boolean {
+  const img = (item.image || '').trim();
+  if (!/^https?:\/\/[^\s]+\.[^\s]+/i.test(img)) return false;
+  const text = `${item.title} ${item.excerpt || ''}`;
+  const he = (text.match(HEBREW_RE) || []).length;
+  const la = (text.match(LATIN_RE) || []).length;
+  return he >= 8 && he >= la;
+}
+
+/** Apply the command-center filter and keep the feed's newest-first order. */
+export function filterCommandCenter(items: NewsItem[]): NewsItem[] {
+  return items.filter(isHebrewWithImage);
+}
+
 function toSentences(text: string): string[] {
   return (text || '')
     .replace(/\s+/g, ' ')
