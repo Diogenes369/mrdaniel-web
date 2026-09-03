@@ -25,6 +25,14 @@ export type LayoutKind =
 export type SlideRole = 'hook' | 'value' | 'cta';
 export type AccentKey = 'green' | 'cyan';
 
+/**
+ * Visual system the Compositor paints in:
+ *  · 'web3'  — deep-obsidian / neon-cyber (the default studio look)
+ *  · 'notes' — light "study-notes" carousel: white paper, dotted grid, bold black headlines,
+ *              coloured italic sub-headlines, disc bullet lists, author bar + swipe arrows.
+ */
+export type StudioTheme = 'web3' | 'notes';
+
 export interface StudioSlide {
   id: string;
   index: number; // 0-based position in the deck
@@ -62,6 +70,8 @@ export interface StudioDeck {
   /** true = AI-synthesised copy, false = deterministic local fallback */
   synthesized: boolean;
   fallbackReason?: string;
+  /** visual system the slides are rendered in */
+  theme: StudioTheme;
   createdAt: number;
 }
 

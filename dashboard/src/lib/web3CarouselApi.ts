@@ -1,7 +1,7 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import { importUrl, parseRawText, stripAuthorNoise, cleanExtractedBody } from './repurposeApi';
 import type { NewsTopic } from './newsAgentTypes';
-import type { LayoutKind, ResearchBrief, SlideRole, StudioDeck, StudioPreset, StudioSlide } from './carouselStudioTypes';
+import type { LayoutKind, ResearchBrief, SlideRole, StudioDeck, StudioPreset, StudioSlide, StudioTheme } from './carouselStudioTypes';
 
 /**
  * Agents 1 & 2 of the WEB3 Carousel Studio.
@@ -239,7 +239,7 @@ function estimateReadingTime(body: string): string {
 
 /** Deterministic fallback deck — used when the AI endpoint is unavailable / rate-limited. Builds a
  * real 10–12 slide carousel from the research brief so generation never stops. */
-export function buildDeckFallback(brief: ResearchBrief, topic: NewsTopic, reason: string): StudioDeck {
+export function buildDeckFallback(brief: ResearchBrief, topic: NewsTopic, reason: string, theme: StudioTheme = 'web3'): StudioDeck {
   const sentences = splitSentences(brief.body);
   const takeaways = brief.takeaways.length ? brief.takeaways : sentences.slice(0, 8);
   const hook = brief.hooks[0] || brief.title;
@@ -313,16 +313,18 @@ export function buildDeckFallback(brief: ResearchBrief, topic: NewsTopic, reason
     hashtags: topicHashtags(topic),
     synthesized: false,
     fallbackReason: reason,
+    theme,
     createdAt: Date.now(),
   };
 }
 
 export async function synthesizeStudioDeck(
   brief: ResearchBrief,
-  topic: NewsTopic
+  topic: NewsTopic,
+  theme: StudioTheme = 'web3'
 ): Promise<StudioDeck> {
   if (brief.body.trim().length < 40) {
-    return buildDeckFallback(brief, topic, 'טקסט המקור קצר מדי לשכתוב AI');
+    return buildDeckFallback(brief, topic, 'טקסט המקור קצר מדי לשכתוב AI', theme);
   }
   try {
     const res = await post({
@@ -332,11 +334,11 @@ export async function synthesizeStudioDeck(
       brief: brief.body,
       takeaways: brief.takeaways,
     });
-    if (!res.ok) return buildDeckFallback(brief, topic, httpReason(res.status));
+    if (!res.ok) return buildDeckFallback(brief, topic, httpReason(res.status), theme);
     const data = (await res.json()) as { ok?: boolean; blocked?: boolean; deck?: ApiSlide[] };
-    if (data.blocked) return buildDeckFallback(brief, topic, 'הפלט נחסם ע"י מסנן התוכן');
+    if (data.blocked) return buildDeckFallback(brief, topic, 'הפלט נחסם ע"י מסנן התוכן', theme);
     if (!data.ok || !Array.isArray(data.deck) || data.deck.length < 5) {
-      return buildDeckFallback(brief, topic, 'מנוע ה-AI לא החזיר קרוסלה שמישה');
+      return buildDeckFallback(brief, topic, 'מנוע ה-AI לא החזיר קרוסלה שמישה', theme);
     }
     let slides = data.deck.map(toStudioSlide).map((s, i) => ({ ...s, index: i }));
     // hero needs a reading-time; the engine may omit it
@@ -357,10 +359,11 @@ export async function synthesizeStudioDeck(
       caption: deckCaption(brief.title, slides),
       hashtags: topicHashtags(topic),
       synthesized: true,
+      theme,
       createdAt: Date.now(),
     };
   } catch (e) {
-    return buildDeckFallback(brief, topic, (e as Error).message || 'שגיאת רשת מול מנוע ה-AI');
+    return buildDeckFallback(brief, topic, (e as Error).message || 'שגיאת רשת מול מנוע ה-AI', theme);
   }
 }
 

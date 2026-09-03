@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AgentId, AgentState, StudioDeck, StudioLogLine, StudioSlide } from './carouselStudioTypes';
+import type { AgentId, AgentState, StudioDeck, StudioLogLine, StudioSlide, StudioTheme } from './carouselStudioTypes';
 import { freshAgents } from './carouselStudioTypes';
 import { researchSource, synthesizeStudioDeck, deckCaption, type ResearchInput } from './web3CarouselApi';
 import { directDeck, renderStudioDeck } from './web3CarouselRenderer';
+import { renderNotesDeck } from './notesCarouselRenderer';
+
+/** Dispatch to the renderer for a deck's theme. Both take the same (deck, onProgress) shape. */
+function renderByTheme(deck: StudioDeck, onProgress?: (done: number, total: number) => void): Promise<string[]> {
+  return deck.theme === 'notes' ? renderNotesDeck(deck, onProgress) : renderStudioDeck(deck, onProgress);
+}
 
 /**
  * Orchestrator for the 4-agent Carousel Studio pipeline. Runs the agents sequentially, streaming a
@@ -38,13 +44,14 @@ function loadDeck(): StudioDeck | null {
     const raw = ss()?.getItem(DECK_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw) as Persisted;
-    return p?.deck?.slides?.length ? p.deck : null;
+    if (!p?.deck?.slides?.length) return null;
+    return { ...p.deck, theme: p.deck.theme ?? 'web3' };
   } catch {
     return null;
   }
 }
 
-export type StudioRunInput = ResearchInput;
+export type StudioRunInput = ResearchInput & { theme?: StudioTheme };
 
 export function useCarouselStudio() {
   const [agents, setAgents] = useState<AgentState[]>(freshAgents);
@@ -63,7 +70,7 @@ export function useCarouselStudio() {
     if (!restored) return;
     setDeck(restored);
     setAgents((prev) => prev.map((a) => ({ ...a, phase: 'done', detail: 'שוחזר מהפעלה קודמת' })));
-    renderStudioDeck(restored)
+    renderByTheme(restored)
       .then(setImages)
       .catch(() => setImages([]));
   }, []);
@@ -106,7 +113,7 @@ export function useCarouselStudio() {
         // ── Agent 2 · Copywriter & Hook Architect ────────────────────────────────────────
         patchAgent('copywriter', { phase: 'running', detail: 'כותב תסריט קרוסלה בעברית…', startedAt: Date.now() });
         pushLog('copywriter', 'מנסח Hook, שקפי ערך ו-CTA — 10 עד 14 שקופיות');
-        let built = await synthesizeStudioDeck(brief, input.topic);
+        let built = await synthesizeStudioDeck(brief, input.topic, input.theme ?? 'web3');
         if (stale()) return;
         if (!built.synthesized) {
           const msg = `מנוע ה-AI לא זמין (${built.fallbackReason}) — נבנתה קרוסלה דטרמיניסטית מקומית.`;
@@ -120,16 +127,21 @@ export function useCarouselStudio() {
           endedAt: Date.now(),
         });
 
-        // ── Agent 3 · WEB3 Creative Director ─────────────────────────────────────────────
-        patchAgent('director', { phase: 'running', detail: 'מקצה layout, גוונים והילות ניאון…', startedAt: Date.now() });
+        // ── Agent 3 · Creative Director ──────────────────────────────────────────────────
+        patchAgent('director', { phase: 'running', detail: 'מקצה layout, גוונים והדגשות…', startedAt: Date.now() });
         built = directDeck(built);
         const layoutCounts = built.slides.reduce<Record<string, number>>((acc, s) => {
           acc[s.layout] = (acc[s.layout] ?? 0) + 1;
           return acc;
         }, {});
         pushLog('director', `פריסות: ${Object.entries(layoutCounts).map(([k, v]) => `${k}×${v}`).join(' · ')}`);
-        pushLog('director', 'פלטת WEB3: אובסידיאן #06080D · ירוק חשמלי #00FF66 · ציאן #00F0FF · כסף מתכתי');
-        patchAgent('director', { phase: 'done', detail: `${Object.keys(layoutCounts).length} סוגי פריסה`, endedAt: Date.now() });
+        pushLog(
+          'director',
+          built.theme === 'notes'
+            ? 'סגנון: פנקס לימוד — נייר לבן, גריד נקודות, כותרות שחורות מודגשות, תת-כותרת נטויה צבעונית'
+            : 'סגנון: WEB3 — אובסידיאן #06080D · ירוק חשמלי #00FF66 · ציאן #00F0FF · כסף מתכתי'
+        );
+        patchAgent('director', { phase: 'done', detail: `${Object.keys(layoutCounts).length} סוגי פריסה · ${built.theme === 'notes' ? 'פנקס' : 'WEB3'}`, endedAt: Date.now() });
         if (stale()) return;
         setDeck(built);
         saveDeck(built);
@@ -137,7 +149,7 @@ export function useCarouselStudio() {
         // ── Agent 4 · Compositor & Export Engine ─────────────────────────────────────────
         patchAgent('compositor', { phase: 'running', detail: 'מרנדר PNG 1080×1350…', startedAt: Date.now() });
         setRenderProgress({ done: 0, total: built.slides.length });
-        const imgs = await renderStudioDeck(built, (done, total) => {
+        const imgs = await renderByTheme(built, (done, total) => {
           if (!stale()) setRenderProgress({ done, total });
         });
         if (stale()) return;
@@ -167,7 +179,26 @@ export function useCarouselStudio() {
       saveDeck(next);
       setRenderProgress({ done: 0, total: slides.length });
       try {
-        const imgs = await renderStudioDeck(next, (done, total) => setRenderProgress({ done, total }));
+        const imgs = await renderByTheme(next, (done, total) => setRenderProgress({ done, total }));
+        setImages(imgs);
+      } finally {
+        setRenderProgress(null);
+      }
+    },
+    [deck]
+  );
+
+  /** Switch the visual system of an already-generated deck and re-render its slides — no
+   * re-run of the pipeline / no new AI call. */
+  const setTheme = useCallback(
+    async (theme: StudioTheme) => {
+      if (!deck || deck.theme === theme) return;
+      const next: StudioDeck = { ...deck, theme };
+      setDeck(next);
+      saveDeck(next);
+      setRenderProgress({ done: 0, total: next.slides.length });
+      try {
+        const imgs = await renderByTheme(next, (done, total) => setRenderProgress({ done, total }));
         setImages(imgs);
       } finally {
         setRenderProgress(null);
@@ -193,5 +224,5 @@ export function useCarouselStudio() {
     }
   }, []);
 
-  return { agents, log, deck, images, busy, renderProgress, error, notice, run, updateSlide, reset };
+  return { agents, log, deck, images, busy, renderProgress, error, notice, run, updateSlide, setTheme, reset };
 }

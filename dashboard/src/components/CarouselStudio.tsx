@@ -19,7 +19,7 @@ import {
   Radio,
 } from 'lucide-react';
 import type { NewsTopic } from '../lib/newsAgentTypes';
-import type { AgentId, AccentKey, StudioSlide } from '../lib/carouselStudioTypes';
+import type { AgentId, AccentKey, StudioSlide, StudioTheme } from '../lib/carouselStudioTypes';
 import { STUDIO_PRESETS } from '../lib/carouselStudioTypes';
 import { useCarouselStudio } from '../lib/useCarouselStudio';
 import { exportStudioZip } from '../lib/web3CarouselRenderer';
@@ -108,13 +108,15 @@ function draftFromSlide(s: StudioSlide): SlideDraft {
 }
 
 export default function CarouselStudio() {
-  const { agents, log, deck, images, busy, renderProgress, error, notice, run, updateSlide, reset } = useCarouselStudio();
+  const { agents, log, deck, images, busy, renderProgress, error, notice, run, updateSlide, setTheme, reset } =
+    useCarouselStudio();
 
   const [mode, setMode] = useState<'url' | 'text' | 'preset'>('preset');
   const [url, setUrl] = useState('');
   const [rawText, setRawText] = useState('');
   const [presetId, setPresetId] = useState(STUDIO_PRESETS[0].id);
   const [topic, setTopic] = useState<NewsTopic>('ai');
+  const [theme, setThemeChoice] = useState<StudioTheme>('notes');
 
   const [active, setActive] = useState(0);
   const [draft, setDraft] = useState<SlideDraft | null>(null);
@@ -139,14 +141,23 @@ export default function CarouselStudio() {
   const start = useCallback(() => {
     setActive(0);
     if (mode === 'preset') {
-      run({ mode: 'preset', preset, topic: preset.topic });
+      run({ mode: 'preset', preset, topic: preset.topic, theme });
       setTopic(preset.topic);
     } else if (mode === 'url') {
-      run({ mode: 'url', url: url.trim(), topic });
+      run({ mode: 'url', url: url.trim(), topic, theme });
     } else {
-      run({ mode: 'text', rawText, topic });
+      run({ mode: 'text', rawText, topic, theme });
     }
-  }, [mode, preset, url, rawText, topic, run]);
+  }, [mode, preset, url, rawText, topic, theme, run]);
+
+  // toggling the theme chip after a deck exists re-renders it in place (no new AI call)
+  const pickTheme = useCallback(
+    (t: StudioTheme) => {
+      setThemeChoice(t);
+      if (deck && !busy) setTheme(t);
+    },
+    [deck, busy, setTheme]
+  );
 
   const applyEdit = useCallback(() => {
     if (!draft || !deck) return;
@@ -187,7 +198,7 @@ export default function CarouselStudio() {
           <span className="text-[11px] text-zinc-600 font-mono">1080×1350 · 4:5 · עברית</span>
         </div>
 
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
           {([
             ['preset', 'תדריך מוכן', LayoutTemplate],
             ['url', 'קישור / כתבה', Link2],
@@ -201,6 +212,27 @@ export default function CarouselStudio() {
               }`}
             >
               <Icon className="w-3.5 h-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+
+        {/* visual style — switches an existing deck in place, or sets it for the next run */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <span className="text-[11px] text-zinc-500 font-mono">סגנון:</span>
+          {([
+            ['notes', '☀️ פנקס לימוד', 'רקע לבן · כותרות מודגשות · תת-כותרת נטויה'],
+            ['web3', '🌌 WEB3 סייבר', 'אובסידיאן · ניאון · זכוכית'],
+          ] as const).map(([id, label, hint]) => (
+            <button
+              key={id}
+              onClick={() => pickTheme(id)}
+              disabled={busy || !!renderProgress}
+              title={hint}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 ${
+                theme === id ? 'bg-brand-500 text-black' : 'bg-white/5 text-zinc-400 border border-white/10'
+              }`}
+            >
+              {label}
             </button>
           ))}
         </div>
@@ -572,8 +604,8 @@ export default function CarouselStudio() {
 
       {!deck && !busy && (
         <div className="dash-card p-10 text-center text-zinc-500 text-sm leading-relaxed">
-          בחרו תדריך מוכן, הדביקו קישור, או הזינו טקסט — וצוות ארבעת הסוכנים (סורק → קופירייטר → קריאייטיב WEB3 → קומפוזיטור)
-          יפיק קרוסלת אינסטגרם של 10–14 שקופיות בעברית, בסגנון סייבר/WEB3 יוקרתי, מוכנה לייצוא כ-ZIP.
+          בחרו תדריך מוכן, הדביקו קישור, או הזינו טקסט — וצוות ארבעת הסוכנים (סורק → קופירייטר → קריאייטיב → קומפוזיטור)
+          יפיק קרוסלת אינסטגרם של 10–14 שקופיות בעברית, בסגנון "פנקס לימוד" בהיר או "WEB3 סייבר" — ניתן להחליף סגנון גם אחרי היצירה — מוכנה לייצוא כ-ZIP.
         </div>
       )}
     </div>
