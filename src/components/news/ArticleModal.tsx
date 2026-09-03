@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ExternalLink, Clock, BookOpen, ListChecks, Radar, ShieldAlert, Sparkles, Cloud, Newspaper, type LucideIcon } from 'lucide-react';
 import { formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } from '../../services/newsService';
@@ -14,9 +15,17 @@ const TOPIC: Record<NewsTopic, { label: string; icon: LucideIcon; ring: string; 
 
 /**
  * Expanded article overlay — an Apple/cyber-styled modal opened from a news card (homepage section
- * or /news). Fixed full-viewport backdrop, the card is viewport-CENTERED and capped at 85dvh so
- * the image + title are visible immediately; the body scrolls inside (Lenis-exempt). Close via the
- * top-right X, Escape, or a backdrop click. `body` scroll is locked while open.
+ * or /news).
+ *
+ * ROOT-CAUSE POSITIONING FIX: rendered through a React portal into `document.body`. The news
+ * sections live inside ancestors that carry `transform` / `will-change` (Framer Motion, the
+ * DepthSection 3D plane, GSAP), and any transformed ancestor turns `position: fixed` into
+ * `position: absolute` relative to itself — which is why the modal used to open offset down the
+ * page. Portaling to `<body>` (no transform) makes `fixed` strictly viewport-relative again.
+ *
+ * Fixed full-viewport backdrop, the card is viewport-CENTERED and capped so the image + title are
+ * visible immediately; the body scrolls inside (Lenis-exempt). Close via the top-right X, Escape,
+ * or a backdrop click. `body` scroll is locked while open.
  */
 export default function ArticleModal({ item, onClose }: { item: NewsItem | null; onClose: () => void }) {
   useEffect(() => {
@@ -33,7 +42,9 @@ export default function ArticleModal({ item, onClose }: { item: NewsItem | null;
     };
   }, [item, onClose]);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {item && (
         <motion.div
@@ -41,8 +52,7 @@ export default function ArticleModal({ item, onClose }: { item: NewsItem | null;
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6"
-          style={{ background: 'rgba(3,5,8,0.78)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-3 backdrop-blur-md sm:p-4 md:p-6"
           // Close only when the click lands on the backdrop itself, never on the card.
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
@@ -57,7 +67,8 @@ export default function ArticleModal({ item, onClose }: { item: NewsItem | null;
           <ModalBody item={item} onClose={onClose} />
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 
@@ -76,14 +87,14 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
       animate={{ y: 0, opacity: 1, scale: 1 }}
       exit={{ y: 16, opacity: 0, scale: 0.985 }}
       transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-      className="relative flex max-h-[85dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#06080c] shadow-[0_40px_120px_rgba(0,0,0,0.7)] sm:rounded-3xl"
+      className="pointer-events-auto relative flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0B0F17] shadow-2xl sm:max-h-[88dvh] md:rounded-3xl"
     >
       {/* Prominent sticky close — pinned to the card frame, above the scrolling body. */}
       <button
         type="button"
         onClick={onClose}
         aria-label="סגירה"
-        className="absolute right-4 top-4 z-[110] flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/20 bg-black/60 text-white transition-all hover:bg-black/90"
+        className="absolute right-4 top-4 z-[10000] flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/20 bg-black/60 text-white transition-all hover:bg-black/90"
       >
         <X className="h-5 w-5" />
       </button>
@@ -100,7 +111,7 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
           <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
           <Icon className="pointer-events-none absolute -bottom-6 -left-4 h-40 w-40 text-white/[0.06]" aria-hidden="true" />
           <NewsImage src={item.image} />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#06080c] via-[#06080c]/55 to-transparent" aria-hidden="true" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/55 to-transparent" aria-hidden="true" />
 
           <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
             <div className="mb-3 flex flex-wrap items-center gap-2">
