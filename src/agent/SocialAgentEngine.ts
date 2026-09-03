@@ -536,6 +536,189 @@ export async function synthesizeStorySlides(input: {
   return slides;
 }
 
+// --- WEB3 Carousel Studio — long-form (10–14 slide) structured Hebrew deck synthesis ----------
+// Powers dashboard/src/components/CarouselStudio.tsx (the "Copywriter & Hook Architect" agent).
+// Unlike synthesizeStorySlides (a tight 5-slide narrative deck), this returns a full IG carousel
+// script: a hook cover, 8–12 value slides each tagged with a LAYOUT the renderer knows how to draw
+// (value paragraph / checklist / stat callout / myth-vs-reality comparison / prompt box / pull
+// quote), and a branded CTA. Every fact must come from the supplied brief — same strict grounding
+// and branding rules as the rest of the engine.
+
+export type CarouselLayout =
+  | 'hero'
+  | 'value'
+  | 'checklist'
+  | 'stat'
+  | 'comparison'
+  | 'prompt'
+  | 'quote'
+  | 'cta';
+
+export interface CarouselStudioSlide {
+  role: 'hook' | 'value' | 'cta';
+  layout: CarouselLayout;
+  kicker: string;
+  headline: string;
+  subhead: string;
+  body: string;
+  bullets: string[];
+  bulletsLeft: string[];
+  columnLabels: [string, string] | null;
+  stat: string;
+  code: string;
+  quote: string;
+  readingTime: string;
+}
+
+const CAROUSEL_STUDIO_SYSTEM_INSTRUCTION = `אתה "אדריכל ה-Hook והקופירייטינג" של סטודיו קרוסלות פרימיום עבור דניאל בן ברוך. קיבלת תקציר מחקר (כותרת, טקסט מקור, ותובנות שחולצו). הפק תסריט קרוסלת אינסטגרם שלם בעברית — 10 עד 14 שקופיות — במבנה ויראלי הדוק.
+
+${BRAND_KNOWLEDGE_BASE}
+
+${HEBREW_COPY_RULES}
+
+מבנה הקרוסלה:
+1. שקופית פתיחה (role:"hook", layout:"hero") — כותרת שעוצרת גלילה ב-1-2 שניות + subhead שמייצר פער סקרנות + readingTime (למשל "3 דק׳ קריאה"). body ="" , bullets=[].
+2..N. שקופיות ערך (role:"value") — 8 עד 12 שקופיות. לכל שקופית בחר את ה-layout שמתאים לתוכן:
+   • "value" — פסקת נרטיב אחת, 25–55 מילים, זורמת, בשדה body. headline קצר (עד 6 מילים).
+   • "checklist" — headline + bullets: 3–5 פריטים קצרים ופעילים (לא משפטים ארוכים).
+   • "stat" — headline + stat (מספר/אחוז בודד בולט, למשל "83%" או "פי 4") + body קצר שמסביר את המספר (משפט-שניים). ה-stat חייב להופיע בטקסט המקור.
+   • "comparison" — headline + columnLabels (זוג תוויות, למשל ["מיתוס","מציאות"] או ["לפני","אחרי"]) + bulletsLeft (עמודה ימנית) + bullets (עמודה שמאלית), 2–4 פריטים בכל עמודה.
+   • "prompt" — headline + code: פרומפט מוכן-להעתקה או קטע קוד קצר (עד 6 שורות) שהקורא יכול להשתמש בו מיד. אם אין בתקציר חומר מתאים לפרומפט — אל תשתמש ב-layout הזה.
+   • "quote" — quote: משפט מפתח חד וזכיר מהתוכן (עד 20 מילים) + body: שורת חיזוק קצרה.
+   גיוון: אל תשתמש באותו layout יותר מ-3 פעמים. שלב לפחות 3 סוגים שונים. הראשונה אחרי ה-hero תהיה "value" או "checklist".
+אחרונה. שקופית סיום (role:"cta", layout:"cta") — headline: קריאה לפעולה אסטרטגית (לא מכירתית אגרסיבית) שמפנה ל-mrdaniel.co.il ולעקוב אחרי הפרופיל. body: משפט תמיכה קצר.
+
+חוקים מחייבים:
+1. הסתמכות מוחלטת על התקציר: כל עובדה, מספר, שם מוצר או ציטוט חייב להופיע בטקסט המקור. אסור להמציא, אסור ידע כללי, אסור משפטי מדף גנריים.
+2. אכיפת מיתוג: אסור להזכיר את שם הכותב המקורי, "מאת", כינויי משתמש (@), שמות רשתות חברתיות כמקור, או כל קרדיט חיצוני. אין לצטט את כותרת המקור מילה במילה. המותג היחיד — mrdaniel.co.il.
+3. כלל אפס-קיטוע: כל משפט שלם ומסתיים בפיסוק סופי. אסור "..." או "…" לקיצור.
+4. טקסט נקי: אסור תוויות מסגור, "כותרת:", "הקשר:", הערות עורך.
+5. kicker: תגית קצרה (1–3 מילים) לפס העליון של השקופית — נושא-המשנה של אותה שקופית.
+
+פלט: JSON array בלבד, בלי markdown code fence. כל איבר:
+{"role":"hook|value|cta","layout":"hero|value|checklist|stat|comparison|prompt|quote|cta","kicker":"...","headline":"...","subhead":"...","body":"...","bullets":["..."],"bulletsLeft":["..."],"columnLabels":["...","..."],"stat":"...","code":"...","quote":"...","readingTime":"..."}
+שדות שאינם רלוונטיים ל-layout: החזר "" (מחרוזת ריקה) או [] (מערך ריק).`;
+
+function mapCarouselLayout(v: unknown, role: string): CarouselLayout {
+  const s = String(v || '').toLowerCase();
+  if (role === 'hook') return 'hero';
+  if (role === 'cta') return 'cta';
+  if (/check|list|תבליט|רשימ/.test(s)) return 'checklist';
+  if (/stat|number|מספר|אחוז|נתון/.test(s)) return 'stat';
+  if (/compar|versus|vs|מול|מיתוס|לפני/.test(s)) return 'comparison';
+  if (/prompt|code|קוד|פרומפט/.test(s)) return 'prompt';
+  if (/quote|ציטוט|משפט/.test(s)) return 'quote';
+  if (/hero|cover|שער/.test(s)) return 'hero';
+  return 'value';
+}
+
+function cleanCarouselText(v: unknown, max: number): string {
+  const t = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(v ?? '').trim())));
+  return t.length > max ? trimToCleanSentenceEnd(t, max) : t;
+}
+
+function cleanCarouselList(v: unknown, maxItems: number, maxLen: number): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((x) => stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(x ?? '').trim()))).slice(0, maxLen))
+    .filter((x) => x.length > 1)
+    .slice(0, maxItems);
+}
+
+export async function synthesizeCarouselDeck(input: {
+  title: string;
+  source: string;
+  topic: string;
+  brief: string;
+  takeaways?: string[];
+}): Promise<CarouselStudioSlide[]> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean } = sanitizeInput(input.brief.slice(0, 9000));
+  if (clean.trim().length < 40) throw new Error('brief too thin to build a carousel');
+  const takeaways = (input.takeaways ?? []).map((t) => String(t).slice(0, 200)).filter(Boolean).slice(0, 8);
+
+  const response = await generateContentWithRetry({
+    model: 'gemini-3.6-flash',
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: `כותרת המקור: ${input.title}\nמקור: ${input.source}\nנושא: ${input.topic}\n\n${
+              takeaways.length ? `תובנות מפתח שחולצו:\n- ${takeaways.join('\n- ')}\n\n` : ''
+            }טקסט המקור המלא (הבסיס היחיד לתוכן):\n"""\n${clean}\n"""`,
+          },
+        ],
+      },
+    ],
+    config: { systemInstruction: CAROUSEL_STUDIO_SYSTEM_INSTRUCTION, temperature: 0.55, topP: 0.9, responseMimeType: 'application/json' },
+  });
+
+  const raw = stripCodeFence(response.text?.trim() || '[]');
+  const parsed = JSON.parse(raw) as unknown;
+  const arr = Array.isArray(parsed) ? parsed : (parsed as { slides?: unknown[] })?.slides;
+  if (!Array.isArray(arr)) throw new Error('model did not return a slide array');
+
+  const slides = arr
+    .map((s): CarouselStudioSlide => {
+      const rec = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+      const role: CarouselStudioSlide['role'] =
+        /cta|סיום|קריא/.test(String(rec.role || '')) ? 'cta' : /hook|שער|פתיח/.test(String(rec.role || '')) ? 'hook' : 'value';
+      const layout = mapCarouselLayout(rec.layout, role);
+      const cols = Array.isArray(rec.columnLabels) ? rec.columnLabels.map((c) => sanitizeHebrewText(String(c ?? '').trim()).slice(0, 24)) : [];
+      return {
+        role,
+        layout,
+        kicker: cleanCarouselText(rec.kicker, 40) || 'תובנה',
+        headline: cleanCarouselText(rec.headline, 120),
+        subhead: cleanCarouselText(rec.subhead, 160),
+        body: cleanCarouselText(rec.body ?? rec.text, 480),
+        bullets: cleanCarouselList(rec.bullets, 5, 120),
+        bulletsLeft: cleanCarouselList(rec.bulletsLeft, 4, 120),
+        columnLabels: cols.length === 2 ? [cols[0], cols[1]] : null,
+        stat: sanitizeHebrewText(String(rec.stat ?? '').trim()).slice(0, 24),
+        code: String(rec.code ?? '').trim().slice(0, 600),
+        quote: cleanCarouselText(rec.quote, 220),
+        readingTime: sanitizeHebrewText(String(rec.readingTime ?? '').trim()).slice(0, 24),
+      };
+    })
+    .filter((s) => {
+      if (s.role === 'hook') return s.headline.length > 3;
+      if (s.role === 'cta') return true;
+      // a value slide must carry SOMETHING renderable for its layout
+      return (
+        s.body.length > 15 ||
+        s.bullets.length > 0 ||
+        s.quote.length > 5 ||
+        s.code.length > 5 ||
+        (s.stat.length > 0 && s.headline.length > 2) ||
+        (s.bulletsLeft.length > 0 && s.bullets.length > 0)
+      );
+    });
+
+  const hook = slides.find((s) => s.role === 'hook');
+  const valueSlides = slides.filter((s) => s.role === 'value');
+  if (!hook || valueSlides.length < 4) throw new Error('model returned too few usable carousel slides');
+
+  // Guarantee ordering: exactly one hero first, value slides in the middle, one cta last.
+  const cta = slides.find((s) => s.role === 'cta') ?? {
+    role: 'cta' as const,
+    layout: 'cta' as const,
+    kicker: 'צעד הבא',
+    headline: '',
+    subhead: '',
+    body: '',
+    bullets: [],
+    bulletsLeft: [],
+    columnLabels: null,
+    stat: '',
+    code: '',
+    quote: '',
+    readingTime: '',
+  };
+  return [hook, ...valueSlides.slice(0, 12), cta];
+}
+
 // --- AI Slide Editor — apply a natural-language edit to an existing carousel deck -------------
 
 const SLIDE_EDIT_SYSTEM_INSTRUCTION = `אתה עורך תוכן מקצועי לקרוסלות עברית. קיבלת מערך שקופיות (JSON) והוראת עריכה של המשתמש. החזר את אותו מספר שקופיות, באותו סדר ובאותו kind, כאשר רק מה שההוראה מבקשת השתנה — כל שאר השקופיות זהות מילה במילה.

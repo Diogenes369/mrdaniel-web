@@ -1,4 +1,4 @@
-import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies } from '../src/agent/SocialAgentEngine.js';
+import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck } from '../src/agent/SocialAgentEngine.js';
 import { importUrlContent } from '../src/server/contentImport.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
@@ -345,6 +345,34 @@ export default async function handler(req: any, res: any) {
         return;
       }
       res.status(200).json({ ok: true, imported });
+      return;
+    }
+
+    if (action === 'carousel-studio') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { title, source, topic, brief, takeaways } = req.body ?? {};
+      if (typeof brief !== 'string' || brief.trim().length < 40) {
+        res.status(400).json({ ok: false, error: 'brief (>= 40 chars) required' });
+        return;
+      }
+      const deck = await synthesizeCarouselDeck({
+        title: String(title ?? ''),
+        source: String(source ?? ''),
+        topic: String(topic ?? 'general'),
+        brief,
+        takeaways: Array.isArray(takeaways) ? takeaways.map((t: unknown) => String(t)) : [],
+      });
+      const security = sanitizeOutput(
+        deck.map((s) => `${s.headline}\n${s.subhead}\n${s.body}\n${s.quote}\n${s.bullets.join('\n')}\n${s.bulletsLeft.join('\n')}`).join('\n\n')
+      );
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, deck });
       return;
     }
 
