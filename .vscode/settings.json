@@ -1,0 +1,13 @@
+{
+  // Hermes Agent over ACP (Agent Client Protocol), alongside Claude Code.
+  // VS Code: install the "ACP Client" extension (formulahendry). Cursor: built-in ACP support.
+  // `hermes` is on PATH after the Windows installer; if the extension can't spawn it as a bare
+  // command, replace "command" with the full path, e.g.
+  //   "command": "C:\\Users\\kj\\.local\\bin\\hermes"   (or "hermes.cmd")
+  "acp.agents": {
+    "Hermes Agent": {
+      "command": "hermes",
+      "args": ["acp"]
+    }
+  }
+}
