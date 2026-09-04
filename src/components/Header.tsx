@@ -6,6 +6,7 @@ import WebButton from './WebButton';
 import SocialLinks from './SocialLinks';
 import Logo from './Logo';
 import { smoothScrollTo, scrollToTopSmooth } from '../hooks/useLenis';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 // TikTok and WhatsApp stay exclusive to the footer and the bottom-of-page social bar — the header
 // toolbar and mobile drawer keep just these three.
@@ -164,14 +165,10 @@ export default function Header() {
 
   // Lock background scroll while the drawer is open — it's now a fully opaque h-dvh overlay, so a
   // stray touch on it shouldn't be able to scroll the page behind it.
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [mobileOpen]);
+  // Shared, reference-counted — see useBodyScrollLock for why a local
+  // save/restore of body.style.overflow permanently locked the page when overlays
+  // overlapped.
+  useBodyScrollLock(mobileOpen);
 
   return (
     <motion.header

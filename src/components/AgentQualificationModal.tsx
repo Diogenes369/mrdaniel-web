@@ -26,6 +26,7 @@ import WebButton from './WebButton';
 import ModalHeaderBanner from './ModalHeaderBanner';
 import { buildWhatsAppUrl } from './SocialLinks';
 import { AI_AGENTS, GOAL_LABEL, type AiAgent, type AgentGoal, type AgentAudience } from '../data/aiAgents';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 type BusinessType = 'solo' | 'smb' | 'startup' | 'enterprise';
 const BUSINESS_TYPE_OPTIONS: { id: BusinessType; label: string; icon: LucideIcon; audience: AgentAudience }[] = [
@@ -194,14 +195,10 @@ export default function AgentQualificationModal() {
     return () => window.removeEventListener('open-agent-qualifier', handleOpen);
   }, []);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
+  // Shared, reference-counted — see useBodyScrollLock for why a local
+  // save/restore of body.style.overflow permanently locked the page when overlays
+  // overlapped.
+  useBodyScrollLock(isOpen);
 
   const result = useMemo(() => {
     if (!businessType || !techStack || !budget || !goal) return null;

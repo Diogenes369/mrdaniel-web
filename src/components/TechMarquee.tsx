@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { prefersReducedMotion } from '../lib/gsap';
 import PopHeadline from './home/PopHeadline';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 /**
  * "Arsenal" — infinite tech-stack marquee with detail popovers.
@@ -130,6 +131,10 @@ export default function TechMarquee() {
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
   );
+  // Page scroll lock is shared and reference-counted (see useBodyScrollLock) so an
+  // overlay opened on top of another one cannot strand the page in a locked state.
+  useBodyScrollLock(Boolean(active) && isMobile);
+
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
     const update = () => setIsMobile(mq.matches);
@@ -188,12 +193,9 @@ export default function TechMarquee() {
   // Mobile modal: lock body scroll + Escape to close.
   useEffect(() => {
     if (!active || !isMobile) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
     window.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = prev;
       window.removeEventListener('keydown', onKey);
     };
   }, [active, isMobile, close]);

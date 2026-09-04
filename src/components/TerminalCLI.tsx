@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, SquareTerminal } from 'lucide-react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 /**
  * Interactive Terminal / CLI mode. Opened from the header's `>_` toggle (or the mobile drawer)
@@ -217,14 +218,10 @@ export default function TerminalCLI() {
   }, [open]);
 
   // lock background scroll while open
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  // Shared, reference-counted — see useBodyScrollLock for why a local
+  // save/restore of body.style.overflow permanently locked the page when overlays
+  // overlapped.
+  useBodyScrollLock(open);
 
   // focus the input on open
   useEffect(() => {
@@ -374,7 +371,7 @@ export default function TerminalCLI() {
             {/* quick-command chips — horizontal scroll, glued directly above the input row */}
             <div
               className="flex shrink-0 gap-2 overflow-x-auto border-t border-white/10 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none', touchAction: 'pan-x' }}
+              style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none', touchAction: 'pan-x pan-y' }}
             >
               {QUICK_CMDS.map((c) => (
                 <button

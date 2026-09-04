@@ -9,6 +9,7 @@ import {
 import { createPortal } from 'react-dom';
 import { Info, X } from 'lucide-react';
 import { lookupTerm } from '../data/glossary';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 /**
  * Wraps a technical term with a subtle dotted underline + an "מה זה אומר?" info affordance.
@@ -54,6 +55,10 @@ export default function TermTooltip({
   const isOpen = current === id;
 
   const [isMobile, setIsMobile] = useState(false);
+  // Page scroll lock is shared and reference-counted (see useBodyScrollLock) so an
+  // overlay opened on top of another one cannot strand the page in a locked state.
+  useBodyScrollLock(isOpen && isMobile);
+
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
     const update = () => setIsMobile(mq.matches);
@@ -88,12 +93,9 @@ export default function TermTooltip({
   // Mobile modal: lock body scroll + Escape to close.
   useEffect(() => {
     if (!isOpen || !isMobile) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpenId(null);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = prev;
       document.removeEventListener('keydown', onKey);
     };
   }, [isOpen, isMobile]);

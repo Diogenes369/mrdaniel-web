@@ -7,6 +7,7 @@ import { executiveSummary, deepDive, sourceDomain } from '../../lib/newsAnalysis
 import { useArticleInsights } from '../../services/newsInsightsService';
 import NewsImage from './NewsImage';
 import RtlText from './RtlText';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const TOPIC: Record<NewsTopic, { label: string; icon: LucideIcon; ring: string; grad: string }> = {
   cyber: { label: 'סייבר ואבטחת מידע', icon: ShieldAlert, ring: 'text-rose-300 border-rose-400/40 bg-rose-500/10', grad: 'from-rose-600/40' },
@@ -30,16 +31,17 @@ const TOPIC: Record<NewsTopic, { label: string; icon: LucideIcon; ring: string; 
  * or a backdrop click. `body` scroll is locked while open.
  */
 export default function ArticleModal({ item, onClose }: { item: NewsItem | null; onClose: () => void }) {
+  // Page scroll lock is shared and reference-counted (see useBodyScrollLock) so an
+  // overlay opened on top of another one cannot strand the page in a locked state.
+  useBodyScrollLock(Boolean(item));
+
   useEffect(() => {
     if (!item) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = prev;
       window.removeEventListener('keydown', onKey);
     };
   }, [item, onClose]);

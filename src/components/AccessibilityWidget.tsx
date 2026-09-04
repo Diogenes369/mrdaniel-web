@@ -25,6 +25,7 @@ import {
   type A11yLang,
   type A11yContrast,
 } from '../lib/a11yStore';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 const STRINGS: Record<A11yLang, {
   title: string;
@@ -159,14 +160,10 @@ export default function AccessibilityWidget() {
   const isRtl = prefs.lang === 'he';
 
   // Lock background scroll while the panel is open, matching the AI chat widget's drawer.
-  useEffect(() => {
-    if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
+  // Shared, reference-counted — see useBodyScrollLock for why a local
+  // save/restore of body.style.overflow permanently locked the page when overlays
+  // overlapped.
+  useBodyScrollLock(isOpen);
 
   // Escape closes the panel and returns focus to the trigger; Tab is trapped inside the panel
   // while it's open, matching the "Full ARIA compliance with keyboard navigation" requirement.

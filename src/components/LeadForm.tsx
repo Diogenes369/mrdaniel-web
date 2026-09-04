@@ -21,6 +21,7 @@ import WebButton from './WebButton';
 import ModalHeaderBanner from './ModalHeaderBanner';
 import { sendLeadWebhook } from '../lib/leadWebhook';
 import { isValidPhone } from '../lib/phone';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 // Firebase (~200KB gzipped) is dynamically imported, not statically — same reasoning as App.tsx's
 // own `loadTracker`, kept out of this modal's bundle until a visitor actually interacts with it.
@@ -134,14 +135,10 @@ export default function LeadForm() {
   // Lock background scroll while the modal is open — on mobile, a touch that starts on the
   // backdrop (or a fast swipe past the scrollable body's bounds) can otherwise scroll the page
   // behind the fixed overlay, which reads as the whole layout jumping while typing.
-  useEffect(() => {
-    if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
+  // Shared, reference-counted — see useBodyScrollLock for why a local
+  // save/restore of body.style.overflow permanently locked the page when overlays
+  // overlapped.
+  useBodyScrollLock(isOpen);
 
   const reset = () => {
     setStep(0);

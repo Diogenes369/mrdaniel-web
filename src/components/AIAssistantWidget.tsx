@@ -12,6 +12,7 @@ import {
 import TypingIndicator from './TypingIndicator';
 import { sendLeadWebhook } from '../lib/leadWebhook';
 import { isValidPhone } from '../lib/phone';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 // Firebase (~200KB gzipped) is dynamically imported, not statically — same reasoning as App.tsx's
 // own `loadTracker`, kept out of this widget's bundle until a visitor actually opens the chat.
@@ -131,14 +132,10 @@ export default function AIAssistantWidget() {
   // Lock background scroll while the drawer is open — same reasoning as LeadForm's modal: a touch
   // starting on the backdrop, or a fast swipe past the message list's scroll bounds, could
   // otherwise scroll the page behind this fixed drawer.
-  useEffect(() => {
-    if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
+  // Shared, reference-counted — see useBodyScrollLock for why a local
+  // save/restore of body.style.overflow permanently locked the page when overlays
+  // overlapped.
+  useBodyScrollLock(isOpen);
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputMessage).trim();

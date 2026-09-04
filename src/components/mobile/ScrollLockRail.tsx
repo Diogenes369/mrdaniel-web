@@ -8,11 +8,16 @@ import { Children, isValidElement, type ReactNode } from 'react';
  * Android low-power devices the pin could mis-measure / stick, blocking vertical page scroll and
  * leaving the sections below it blank. All of that is removed: the rail is now nothing but a
  * `-webkit-overflow-scrolling: touch` scroll-snap track. Vertical swipes always scroll the page;
- * horizontal drags scroll the cards. `touch-action: pan-x` enforces that split so a mostly-vertical
- * gesture that starts on a card is handed straight back to the page.
+ * horizontal drags scroll the cards.
  *
- * `.momentum-scroll` is deliberately NOT used here — it sets `touch-action: pan-y` for vertical
- * panels and would cancel the `pan-x` this row needs. The momentum bits are inlined instead.
+ * FIX (2026-09): that split used to be written as `touch-action: pan-x`, on the belief it handed a
+ * mostly-vertical gesture back to the page. It does the opposite — per spec `pan-x` permits
+ * horizontal panning ONLY, so a vertical drag starting on a card was dropped and the page would
+ * not scroll at all from anywhere on the rail. Naming both axes lets the browser resolve the
+ * direction from the gesture itself, which is the behaviour the comment always described.
+ *
+ * `.momentum-scroll` is deliberately NOT used here — it sets `touch-action: pan-y` alone, which
+ * would cancel the horizontal drag this row needs. The momentum bits are inlined instead.
  *
  * Desktop layout is the caller's job: render your `md:grid` separately and mount this with
  * `className="md:hidden"`.
@@ -37,7 +42,7 @@ export default function ScrollLockRail({ children, itemClassName = DEFAULT_ITEM,
         aria-label={ariaLabel}
         className="flex flex-nowrap gap-4 list-none p-0 m-0 -mx-4 px-4 overflow-x-auto snap-x snap-mandatory [scrollbar-width:none]"
         style={{
-          touchAction: 'pan-x',
+          touchAction: 'pan-x pan-y',
           overscrollBehaviorX: 'contain',
           WebkitOverflowScrolling: 'touch',
         }}

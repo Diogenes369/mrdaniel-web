@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Film, X } from 'lucide-react';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 /**
  * JARVIS video gallery — local files only (NO YouTube / Vimeo / embeds), served from
@@ -30,14 +31,15 @@ export default function JarvisShowcaseVideo({ clips = DEFAULT_CLIPS }: { clips?:
   const [errored, setErrored] = useState<Record<number, boolean>>({});
   const markErrored = (i: number) => setErrored((e) => ({ ...e, [i]: true }));
 
+  // Page scroll lock is shared and reference-counted (see useBodyScrollLock) so an
+  // overlay opened on top of another one cannot strand the page in a locked state.
+  useBodyScrollLock(openIndex !== null);
+
   useEffect(() => {
     if (openIndex === null) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpenIndex(null);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', onKey);
     };
   }, [openIndex]);

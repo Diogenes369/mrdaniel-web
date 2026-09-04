@@ -210,7 +210,7 @@ export default function ServicesSection() {
             ref={trackRef}
             onScroll={onScroll}
             className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain', touchAction: 'pan-x' }}
+            style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain', touchAction: 'pan-x pan-y' }}
             role="group"
             aria-label="גללו לצדדים לעוד שירותים"
           >

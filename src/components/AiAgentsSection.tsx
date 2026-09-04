@@ -179,7 +179,7 @@ function AgentCarousel({ agents }: { agents: AiAgent[] }) {
     <div className="md:hidden">
       <div
         ref={trackRef}
-        className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none -mx-4 px-4 pb-2 [touch-action:pan-x] [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]"
+        className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none -mx-4 px-4 pb-2 [touch-action:pan-x_pan-y] [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]"
       >
         {agents.map((agent, idx) => (
           <div

@@ -235,6 +235,9 @@ body::before {
 .cyber-glass {
   position: relative;
   isolation: isolate;
+  /* Every glass card is a passive surface: a touch-drag anywhere on it scrolls the document.
+     Stated explicitly so no future ancestor rule can silently narrow the gesture on phones. */
+  touch-action: pan-y;
   background-color: rgba(9, 9, 11, 0.42);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -404,7 +407,13 @@ body::before {
   display: block;
   width: 100% !important;
   height: 100% !important;
-  touch-action: none;
+  /* The canvas is purely decorative background — it must never capture a touch meant for page
+     scroll. `pointer-events: none` is restated here (rather than only inherited from
+     `.scene3d-layer`) because a WebGL canvas is a replaced element and some engines hit-test it
+     independently, and `touch-action` was previously `none`, which is the hardest possible
+     scroll block if the canvas ever does get hit-tested. */
+  pointer-events: none;
+  touch-action: pan-x pan-y;
 }
 
 /* GPU-accelerated transform hint for frequently-animated interactive elements */
@@ -458,10 +467,12 @@ body::before {
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
-    /* Claim ONLY the horizontal axis: a vertical swipe that lands on this row is handed straight
-       back to the page so it scrolls down normally — the row never traps or hijacks vertical
-       scroll on Android. Horizontal drags still scroll the cards. */
-    touch-action: pan-x;
+    /* BOTH axes, deliberately. `pan-x` alone was a scroll LOCK, not a hand-off: per spec it
+       permits horizontal panning ONLY, so a vertical drag that started on a card was dropped
+       rather than passed to the page — the reported "cards eat the scroll" bug on phones.
+       Listing both axes lets the browser pick from the gesture direction: horizontal drags still
+       scroll the rail, vertical drags scroll the document. */
+    touch-action: pan-x pan-y;
     transform: translate3d(0, 0, 0);
     will-change: transform;
   }
