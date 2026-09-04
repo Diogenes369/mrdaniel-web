@@ -1,11 +1,10 @@
 import { getNewsItemBySlug } from '../src/server/newsFeed.js';
 
-// Vercel Serverless Function equivalent of netlify/functions/news-item.ts. `.ts` entry — see the
-// comment in api/news.ts for why (a `.js` entry deployed here with the same import failed at
-// runtime with ERR_MODULE_NOT_FOUND, since Vercel only bundles a `.ts` entry's dependency graph).
-// The slug arrives as a query param (see the `/api/news/item/:slug` -> `/api/news-item.ts?slug=:slug`
-// rewrite in vercel.json) rather than being parsed off the URL path — Vercel's `req.query` is
-// already URL-decoded, unlike the Netlify version's manual `decodeURIComponent` on a raw path segment.
+// Vercel Serverless Function. `.ts` entry — see the comment in api/news.ts for why (a `.js` entry
+// deployed here with the same import failed at runtime with ERR_MODULE_NOT_FOUND, since Vercel only
+// bundles a `.ts` entry's dependency graph). The slug arrives as a query param (see the
+// `/api/news/item/:slug` -> `/api/news-item.ts?slug=:slug` rewrite in vercel.json) rather than
+// being parsed off the URL path — Vercel's `req.query` is already URL-decoded.
 export default async function handler(req: any, res: any) {
   try {
     const raw = req.query.slug;

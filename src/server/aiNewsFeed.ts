@@ -88,8 +88,9 @@ async function getVideos(): Promise<AIVideo[]> {
 
 /** Combines live YouTube RSS (AI lab channels) with the site's existing news pipeline
  * (newsFeed.ts), filtered to items already classified topic === 'ai' — reused rather than
- * re-implementing article classification here. Shared by both server.ts (local dev/Express) and
- * netlify/functions/ai-news.ts (production), same pattern as getNewsItems() itself. */
+ * re-implementing article classification here. `getNewsItems()` is called with no args, so the
+ * articles are the sanitized Hebrew AI stream by default. Shared by server.ts (local dev/Express)
+ * and api/ai-news.ts (production). */
 export async function getAINews(): Promise<AINewsData> {
   const [videos, news] = await Promise.all([getVideos(), getNewsItems()]);
   const articles = news.items.filter((item) => item.topic === 'ai');

@@ -1,10 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
+import type { NewsItem } from './newsService';
 
 /**
- * Real-time "AI Pulse" — live external AI-tech news, aggregated client-side from a few reliable
- * RSS sources via the CORS-friendly rss2json bridge. Every source is best-effort
- * (Promise.allSettled) and if the whole thing fails we return a curated, evergreen fallback so
- * the section is NEVER empty or broken. Cached ~30 min via react-query.
+ * "AI Pulse" — the live AI/cyber news strip on the AI page. It reads the SAME sanitized Hebrew
+ * stream as the rest of the site (`/api/news`, strict-by-default: Hebrew-only titles, no scrape
+ * artefacts, AI/cyber/cloud only), keeps just the `ai` + `cyber` items, and maps them to the
+ * widget's shape. If the fetch fails or comes back empty it returns a curated, evergreen Hebrew
+ * fallback so the section is NEVER empty or broken. Cached ~30 min via react-query.
+ *
+ * (Previously aggregated English RSS — TechCrunch / VentureBeat / Hacker News — via rss2json;
+ * dropped so the widget is 100% Hebrew and on-topic, consistent with the feed policy.)
  */
 export interface PulseItem {
   id: string;
@@ -14,14 +19,6 @@ export interface PulseItem {
   publishedAt: string;
   excerpt: string;
 }
-
-const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
-
-const FEEDS: { url: string; source: string }[] = [
-  { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'TechCrunch' },
-  { url: 'https://venturebeat.com/category/ai/feed/', source: 'VentureBeat' },
-  { url: 'https://hnrss.org/newest?q=%22AI%22+OR+%22LLM%22+OR+%22agent%22&count=20', source: 'Hacker News' },
-];
 
 /** Automated fallback — high-value, current AI tooling. Kept intentionally evergreen. */
 export const AI_PULSE_FALLBACK: PulseItem[] = [
@@ -75,62 +72,41 @@ export const AI_PULSE_FALLBACK: PulseItem[] = [
   },
 ];
 
-function stripHtml(html: string): string {
-  if (typeof window === 'undefined') return html.replace(/<[^>]*>/g, ' ');
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
-}
-
-async function fetchFeed(feed: { url: string; source: string }): Promise<PulseItem[]> {
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 8000);
-  try {
-    const res = await fetch(RSS2JSON + encodeURIComponent(feed.url), { signal: ac.signal });
-    if (!res.ok) throw new Error(`${feed.source}: ${res.status}`);
-    const json = (await res.json()) as {
-      status?: string;
-      items?: { title?: string; link?: string; guid?: string; pubDate?: string; description?: string; content?: string }[];
-    };
-    if (json.status !== 'ok' || !Array.isArray(json.items)) throw new Error(`${feed.source}: bad payload`);
-    const isHN = feed.source === 'Hacker News';
-    return json.items.slice(0, isHN ? 6 : 10).map((it, i) => ({
-      id: `${feed.source}-${it.guid || it.link || i}`,
-      title: (it.title || '').trim(),
-      link: it.link || '#',
-      source: feed.source,
-      publishedAt: it.pubDate ? new Date(it.pubDate).toISOString() : new Date().toISOString(),
-      // HN RSS descriptions are just "Article URL / Comments URL / Points" metadata — skip them.
-      excerpt: isHN ? '' : stripHtml(it.description || it.content || '').slice(0, 200),
-    }));
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
+/** The site's sanitized Hebrew feed. The server already: aggregates, de-duplicates cross-source,
+ * sorts newest-first, and applies the Hebrew + on-topic gate — so all this needs to do is keep the
+ * ai/cyber slice and reshape. */
 export async function fetchAIPulse(): Promise<PulseItem[]> {
-  const settled = await Promise.allSettled(FEEDS.map(fetchFeed));
-  const items = settled.flatMap((s) => (s.status === 'fulfilled' ? s.value : []));
-  if (items.length === 0) return AI_PULSE_FALLBACK;
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 9000);
+    let json: { items?: NewsItem[] };
+    try {
+      const res = await fetch('/api/news', { signal: ac.signal, headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error(`/api/news responded ${res.status}`);
+      json = (await res.json()) as { items?: NewsItem[] };
+    } finally {
+      clearTimeout(timer);
+    }
 
-  const seen = new Set<string>();
-  const deduped = items.filter((i) => {
-    const key = i.title.toLowerCase().slice(0, 80);
-    if (!i.title || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+    const items = Array.isArray(json.items) ? json.items : [];
+    const pulse: PulseItem[] = items
+      .filter((i) => i.topic === 'ai' || i.topic === 'cyber')
+      .slice(0, 14)
+      .map((i) => ({
+        id: `news-${i.id}`,
+        title: (i.title || '').trim(),
+        link: i.link || '#',
+        source: i.source || 'חדשות',
+        publishedAt: i.publishedAt || new Date().toISOString(),
+        excerpt: (i.excerpt || i.summary || '').replace(/\s+/g, ' ').trim().slice(0, 200),
+      }))
+      .filter((p) => p.title.length > 8);
 
-  // Recent-first, but give named publications a small edge for the top slot when items are within
-  // ~48h of each other, so the lead isn't a noisy HN version bump.
-  const prio = (s: string) => (s === 'Hacker News' ? 1 : 0);
-  deduped.sort((a, b) => {
-    const dateDiff = +new Date(b.publishedAt) - +new Date(a.publishedAt);
-    const pa = prio(a.source);
-    const pb = prio(b.source);
-    if (pa !== pb && Math.abs(dateDiff) < 48 * 3600 * 1000) return pa - pb;
-    return dateDiff;
-  });
-  return deduped.slice(0, 12);
+    return pulse.length >= 3 ? pulse.slice(0, 12) : AI_PULSE_FALLBACK;
+  } catch (err) {
+    console.error('[ai-pulse] failed to read /api/news:', err);
+    return AI_PULSE_FALLBACK;
+  }
 }
 
 export function useAIPulse() {

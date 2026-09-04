@@ -22,6 +22,6 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "server.ts", "netlify", "api"],
+  "include": ["src", "server.ts", "api"],
   "exclude": ["src/archive"]
 }

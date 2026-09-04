@@ -74,6 +74,28 @@ Scraper/Researcher → Copywriter (`carousel-studio` action → `synthesizeCarou
 
 ---
 
+## Feed content policy — HARD RULE
+
+Every news surface — the site's Live Feed **ticker**, the `/news` page, the **AI Pulse** strip on
+`/ai`, `/api/ai-news`, and the dashboard's News Content Agent picker — serves **one stream**:
+
+> **Hebrew only. AI / cybersecurity / cloud-infra only. No scrape or parse artefacts.**
+
+- `src/server/newsFeed.ts` → **`sanitizeAndKeep(item)`** is the single gate. It requires: a
+  Hebrew-lettered title (≥6 Hebrew chars), a real headline (not a bare URL / `...` / leftover
+  `<tag>` / `&#8217;` / CDATA tail, length ≥ 12), and an AI/cyber/cloud signal (reusing the feed's
+  own `CYBER_/AI_/CLOUD_PATTERNS`), with generic consumer-tech/gadget/gaming dropped unless it also
+  carries one of those signals.
+- **`getNewsItems()` applies it BY DEFAULT.** `/api/news` is the sanitized stream; `?strict=0` is
+  a debug-only escape hatch for the raw aggregate. Do not wire `?strict=0` into any UI.
+- `SOURCES` contains **Hebrew feeds only** (Israeli outlets + Hebrew Google-News queries + the
+  Israeli AI/cyber blogs). Do not add English-language RSS sources. `aiPulseService.ts` reads
+  `/api/news`, not external English RSS.
+- Any new feature that reads/renders news MUST go through `/api/news` (default) — never a raw RSS
+  fetch, never `?strict=0`.
+
+---
+
 ## Dual-agent workflow (official)
 
 This project is worked by **two agents in parallel**, sharing this repo and this file:

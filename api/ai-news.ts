@@ -1,7 +1,6 @@
 import { getAINews } from '../src/server/aiNewsFeed.js';
 
-// Vercel Serverless Function equivalent of netlify/functions/ai-news.ts. `.ts` entry — see the
-// comment in api/news.ts for why.
+// Vercel Serverless Function. `.ts` entry — see the comment in api/news.ts for why.
 export default async function handler(req: any, res: any) {
   try {
     const data = await getAINews();

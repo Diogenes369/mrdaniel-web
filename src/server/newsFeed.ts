@@ -72,16 +72,11 @@ const SOURCES: FeedSource[] = [
   { name: 'Machine Learning Israel', url: 'https://machinelearning.co.il/feed/', priority: 2, maxItems: 10, timeoutMs: 8000 },
   { name: 'SPD Blog', url: 'https://blog.spd.co.il/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
   { name: 'Kodkod Cyber', url: 'https://kodkodcyber.com/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
-  // ── International tech (capped so they enrich rather than dominate the Israeli mix) ──
-  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', priority: 5, maxItems: 8, timeoutMs: 8000 },
-  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', priority: 6, maxItems: 8, timeoutMs: 8000 },
-  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', priority: 6, maxItems: 6, timeoutMs: 8000 },
-  // ── International cyber / security (topic-filtered to keep only security stories) ──
-  { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/', priority: 4, maxItems: 8, onlyTopics: ['cyber'], timeoutMs: 8000 },
-  { name: 'The Hacker News', url: 'https://feeds.feedburner.com/TheHackersNews', priority: 4, maxItems: 8, onlyTopics: ['cyber'], timeoutMs: 8000 },
-  { name: 'CyberNews', url: 'https://cybernews.com/feed/', priority: 5, maxItems: 6, onlyTopics: ['cyber'], timeoutMs: 8000 },
-  { name: 'Krebs on Security', url: 'https://krebsonsecurity.com/feed/', priority: 5, maxItems: 5, onlyTopics: ['cyber'], timeoutMs: 8000 },
-  // ── Google News safety nets — broad tech + a dedicated cyber query ──
+  // NOTE: the English-only international outlets (TechCrunch, The Verge, Ars Technica,
+  // BleepingComputer, The Hacker News, CyberNews, Krebs on Security) were removed — the feed is a
+  // Hebrew-only AI/cyber stream now (see `sanitizeAndKeep`), so those sources contributed nothing
+  // but fetch latency. Reinstate them only if the Hebrew-only policy is lifted.
+  // ── Google News safety nets — Hebrew tech query + a dedicated Hebrew cyber query ──
   { name: 'Google News', url: GNEWS_URL, priority: 7, stripTitleSuffix: true, timeoutMs: 9000 },
   { name: 'Google News · סייבר', url: GNEWS_CYBER_URL, priority: 7, stripTitleSuffix: true, maxItems: 12, timeoutMs: 9000 },
 ];
@@ -385,25 +380,48 @@ const GENERIC_CONSUMER_PATTERNS = [
   /\bheadphones?\b/i, /\bearbuds?\b/i, /\bdrone\b/i, /\bTV\b/, /\bGPU\b.*\bgaming\b/i,
 ];
 
+const HEBREW_CHAR = /[֐-׿]/;
+// A "title" that is actually a scrape/parse artefact rather than a headline: a bare URL, an
+// ellipsis-only / punctuation-only string, leftover markup or entities, or a CDATA tail. These
+// showed up in the Live Feed ticker as `...` / `[…]` / raw `&#8217;` fragments.
+const GARBAGE_TITLE =
+  /^(?:\s*(?:https?:\/\/\S+|[.…\-–—_·•*#>«»"'׳״|/\\]+|\[[^\]]*\]|&#?\w+;?)\s*)+$/i;
+const MARKUP_LEFTOVER = /<\/?[a-z][^>]*>|&#\d{2,};|\]\]>|\{\{|https?:\/\/\S+\s*$/i;
+
 /**
- * Opt-in strict topic gate — see `/api/news?strict=1`. Keeps an item only when it's clearly
- * about AI, cyber, or cloud/infra (reusing the SAME classifier patterns the feed already runs on),
- * and drops anything that reads as generic consumer-tech / gadget / gaming coverage without one
- * of those signals. Applied as a per-request VIEW over the shared cache in `getNewsItems` — it
- * never mutates the cache, so a `?strict=1` call can't poison the response for a normal call.
+ * The feed's content gate — ON BY DEFAULT for `/api/news` (opt out with `?strict=0`). An item is
+ * kept only when ALL hold:
+ *   1. Hebrew — the title carries Hebrew letters (drops the residual English items Google News
+ *      still slips in).
+ *   2. Clean — the title isn't a scrape/parse artefact (`...`, bare URL, leftover `<tag>` /
+ *      `&#8217;`, CDATA tail) and is a real headline length.
+ *   3. On-topic — AI / cyber / cloud signal in the title+summary (reuses the SAME classifier
+ *      patterns the feed already runs on), and NOT generic consumer-tech/gadget/gaming without
+ *      one of those signals.
+ * Applied as a per-request VIEW over the shared cache in `getNewsItems` — never mutates the cache,
+ * so an unfiltered (`?strict=0`) call and a filtered one can't poison each other.
  */
-export function strictTopicKeep(item: NewsItem): boolean {
-  const text = `${item.title} ${item.excerpt} ${item.summary} ${item.category}`;
+export function sanitizeAndKeep(item: NewsItem): boolean {
+  const title = (item.title || '').trim();
+  // 1 · Hebrew
+  if (!HEBREW_CHAR.test(title)) return false;
+  // 2 · clean, real headline
+  if (title.length < 12 || GARBAGE_TITLE.test(title) || MARKUP_LEFTOVER.test(title)) return false;
+  const hebLen = (title.match(/[֐-׿]/g) || []).length;
+  if (hebLen < 6) return false; // mostly-Latin string with one stray Hebrew glyph
+  // 3 · on-topic
+  const text = `${title} ${item.excerpt} ${item.summary} ${item.category}`;
   const onTopic =
     CYBER_PATTERNS.some((re) => re.test(text)) ||
     AI_PATTERNS.some((re) => re.test(text)) ||
     CLOUD_PATTERNS.some((re) => re.test(text));
+  if (GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text)) && !onTopic) return false;
   if (onTopic) return true;
-  if (GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text))) return false;
-  // No consumer-junk markers, but also no AI/cyber/cloud signal → keep it only if the feed's own
-  // classifier can still place it in a target topic.
   return classifyTopic(text) !== 'general';
 }
+
+/** @deprecated kept as an alias so any external caller of the old name still resolves. */
+export const strictTopicKeep = sanitizeAndKeep;
 
 // Business/finance signals — used only to refine the DISPLAY `category` label (kept as a free
 // string), NOT the `topic` enum that the site's category filters run on.
@@ -609,8 +627,12 @@ async function refreshAll(): Promise<NewsItem[]> {
 }
 
 export async function getNewsItems(
+  // `strict` is ON by default — the site news page, the Live Feed ticker and the dashboard all get
+  // the sanitized Hebrew AI/cyber stream. Pass `{ strict: false }` (via `/api/news?strict=0`) only
+  // for debugging the raw aggregate.
   opts: { strict?: boolean } = {}
 ): Promise<{ items: NewsItem[]; updatedAt: string }> {
+  const strict = opts.strict ?? true;
   const isStale = !cache || Date.now() - cache.fetchedAt > CACHE_TTL_MS;
   if (isStale) {
     inFlight = inFlight ?? refreshAll().finally(() => { inFlight = null; });
@@ -618,8 +640,8 @@ export async function getNewsItems(
   }
   const all = cache?.items ?? [];
   return {
-    // `strict` is applied here, on the way out — the cache always holds the full unfiltered set.
-    items: opts.strict ? all.filter(strictTopicKeep) : all,
+    // Applied here, on the way out — the cache always holds the full unfiltered set.
+    items: strict ? all.filter(sanitizeAndKeep) : all,
     updatedAt: cache ? new Date(cache.fetchedAt).toISOString() : new Date().toISOString(),
   };
 }
