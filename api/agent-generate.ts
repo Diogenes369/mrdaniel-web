@@ -1,4 +1,4 @@
-import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech } from '../src/agent/SocialAgentEngine.js';
+import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck } from '../src/agent/SocialAgentEngine.js';
 import { importUrlContent } from '../src/server/contentImport.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
@@ -364,6 +364,29 @@ export default async function handler(req: any, res: any) {
       }
       const speech = await synthesizeSpeech(text, typeof voiceName === 'string' && voiceName.trim() ? voiceName : undefined);
       res.status(200).json({ ok: true, audioBase64: speech.audioBase64, mimeType: speech.mimeType });
+      return;
+    }
+
+    if (action === 'tech-tip-deck') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { topic, notes } = req.body ?? {};
+      if (typeof topic !== 'string' || topic.trim().length < 8) {
+        res.status(400).json({ ok: false, error: 'topic (>= 8 chars) required' });
+        return;
+      }
+      const deck = await synthesizeTechTipDeck({ topic, notes: typeof notes === 'string' ? notes : undefined });
+      // Code is excluded from the output guard on purpose: sanitizeOutput's heuristics flag ordinary
+      // source (URLs, key-like identifiers) as leaks. The Hebrew prose is what gets checked.
+      const prose = deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
+      const security = sanitizeOutput(prose);
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, deck });
       return;
     }
 

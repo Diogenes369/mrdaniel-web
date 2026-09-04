@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp, LayoutTemplate } from 'lucide-react';
+import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp, LayoutTemplate, GraduationCap } from 'lucide-react';
 import { useAuthUser, logout } from './lib/auth';
 import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
 import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
@@ -23,11 +23,12 @@ import InstagramStoryCanvas from './components/InstagramStoryCanvas';
 import ContentRepurposer from './components/ContentRepurposer';
 import CarouselStudio from './components/CarouselStudio';
 import IgGrowthAgent from './components/IgGrowthAgent';
+import TechTipsStudio from './components/TechTipsStudio';
 import EmailManagerPanel from './components/EmailManagerPanel';
 import WeeklyPlanCalendar from './components/WeeklyPlanCalendar';
 import ErrorBoundary from './components/ErrorBoundary';
 
-type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'repurpose' | 'carousel-studio' | 'ig-growth' | 'auto-publisher' | 'email' | 'weekly-plan';
+type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'repurpose' | 'carousel-studio' | 'tech-tips' | 'ig-growth' | 'auto-publisher' | 'email' | 'weekly-plan';
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'overview', label: 'סקירה כללית', icon: LayoutGrid },
@@ -40,6 +41,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'story', label: 'מחולל סטורי', icon: Film },
   { id: 'repurpose', label: 'יבוא ושכתוב תוכן', icon: Recycle },
   { id: 'carousel-studio', label: 'סטודיו קרוסלות WEB3', icon: LayoutTemplate },
+  { id: 'tech-tips', label: 'טיפים ומדריכים', icon: GraduationCap },
   { id: 'ig-growth', label: 'סוכן צמיחה באינסטגרם', icon: TrendingUp },
   { id: 'auto-publisher', label: 'אוטונומיה', icon: Rocket },
   { id: 'email', label: 'מערכת דיוור ומיילים', icon: Mail },
@@ -217,6 +219,12 @@ export default function App() {
         {tab === 'carousel-studio' && (
           <ErrorBoundary label="סטודיו קרוסלות WEB3">
             <CarouselStudio />
+          </ErrorBoundary>
+        )}
+
+        {tab === 'tech-tips' && (
+          <ErrorBoundary label="טיפים ומדריכים">
+            <TechTipsStudio />
           </ErrorBoundary>
         )}
 

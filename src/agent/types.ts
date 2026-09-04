@@ -199,3 +199,34 @@ export interface VideoJob {
   mimeType?: string;
   error?: string;
 }
+
+// --- Tech Tips & Motion Studio ------------------------------------------------------------
+/** One slide of an educational dev-tip deck (dashboard "טיפים ומדריכים"). Distinct from the
+ * marketing-oriented CarouselStudio deck: these are teaching slides — concepts, real code
+ * snippets, numbered steps, tool round-ups — aimed at developers/practitioners. */
+export type TipSlideKind = 'cover' | 'concept' | 'code' | 'step' | 'tool' | 'takeaway' | 'cta';
+
+export interface TechTipSlide {
+  kind: TipSlideKind;
+  /** short section tag for the slide's top bar */
+  kicker: string;
+  title: string;
+  /** explanation paragraph (concept / step / takeaway) */
+  body: string;
+  /** list items for `tool` / `takeaway` slides */
+  bullets: string[];
+  /** real, runnable snippet for `code` slides — plain source, no markdown fence */
+  code: string;
+  /** language hint driving syntax highlighting: python | ts | js | bash | json | '' */
+  codeLang: string;
+  /** 1-based ordinal for `step` slides, 0 when not a step */
+  stepNumber: number;
+  /** English visual brief for the free image generator that paints this slide's backdrop */
+  visualPrompt: string;
+}
+
+export interface TechTipDeck {
+  title: string;
+  slides: TechTipSlide[];
+  hashtags: string[];
+}

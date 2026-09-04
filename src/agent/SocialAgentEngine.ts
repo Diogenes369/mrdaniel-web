@@ -1,7 +1,7 @@
 import { GoogleGenAI, Modality } from '@google/genai';
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
-import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene } from './types.js';
+import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck } from './types.js';
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
@@ -1138,4 +1138,107 @@ export async function synthesizeSpeech(text: string, voiceName: string = DEFAULT
   const inline = parts.find((p) => p.inlineData?.data)?.inlineData;
   if (!inline?.data) throw new Error('TTS model returned no audio');
   return { audioBase64: inline.data, mimeType: inline.mimeType || 'audio/L16;codec=pcm;rate=24000' };
+}
+
+// --- Tech Tips & Motion Studio — educational dev-tip decks ------------------------------------
+// Powers the dashboard's "טיפים ומדריכים" tab. Unlike synthesizeCarouselDeck (marketing/insight
+// carousels grounded in a scraped article), this produces TEACHING decks: a concept, real runnable
+// code, numbered steps, a tool round-up, a takeaway. Source is a topic brief, not an article, so
+// the grounding rule shifts from "only what's in the text" to "only what's actually true and
+// standard" — the anti-fabrication rules below are the substitute for article grounding.
+
+const TECH_TIP_SYSTEM_INSTRUCTION = `אתה כותב תוכן לימודי טכני עבור דניאל בן ברוך — מדריכים קצרים למפתחים, בפורמט קרוסלת אינסטגרם.
+
+${BRAND_KNOWLEDGE_BASE}
+
+${HEBREW_COPY_RULES}
+
+המשימה: מהנושא שסופק, הפק דק לימודי של 10–12 שקופיות שמלמד משהו אחד קונקרטי ושמיש — טיפ AI, טריק קוד, אינטגרציה של מודל, או כלי פיתוח.
+
+מבנה הדק:
+1. שקופית פתיחה (kind:"cover") — כותרת שמבטיחה ערך קונקרטי ("איך לחבר מודל ל-CRM ב-20 שורות") + body של משפט אחד שמסביר למי זה ומה יוצא מזה.
+2..N. גוף הדק — 8 עד 10 שקופיות, שילוב של:
+   • kind:"concept" — הסבר רעיון/מונח בפסקה אחת (25–45 מילים). title קצר.
+   • kind:"code" — שקופית קוד: title קצר שמסביר מה הקוד עושה, body של משפט אחד, ו-code עם קטע קוד **אמיתי ורץ** (עד 12 שורות, בלי markdown fence). codeLang אחד מתוך: python | ts | js | bash | json.
+   • kind:"step" — שלב בתהליך: stepNumber (1,2,3...), title קצר, body עם ההוראה המדויקת.
+   • kind:"tool" — סקירת כלים: title + bullets של 3–5 כלים, כל אחד "שם — מה הוא עושה בפועל".
+   • kind:"takeaway" — סיכום פעולה: title + bullets של 2–4 נקודות ליישום מיידי.
+   דרישות תמהיל: לפחות 2 שקופיות code ולפחות 2 שקופיות step או concept. אל תשתמש באותו kind יותר מ-4 פעמים ברצף.
+אחרונה. kind:"cta" — title קצר + body שמפנה ל-mrdaniel.co.il ולעקוב, לא מכירתי אגרסיבי.
+
+חוקי אמת מחייבים (קריטי — אין כאן טקסט מקור לעגן בו):
+1. קוד חייב להיות תקין, מודרני, ורץ באמת. אסור להמציא שמות פונקציות/פרמטרים/חבילות שלא קיימים. אם אתה לא בטוח ב-API מסוים — כתוב קוד גנרי ונכון במקום לנחש חתימה ספציפית.
+2. אסור להמציא מספרי ביצועים, בנצ'מרקים או סטטיסטיקות. "מהיר יותר" מותר; "פי 3.7 מהיר יותר" אסור אלא אם זה מספר ידוע ומקובל.
+3. שמות כלים/מודלים/חבילות — רק כאלה שקיימים באמת.
+4. כל טקסט ההסבר בעברית תקנית. הקוד עצמו באנגלית (זה קוד). מונחים טכניים באנגלית בתוך משפט עברי — תקין ורצוי.
+5. אסור תוויות מסגור ("הקשר:", "כותרת:", "הערה:") בתוך body/title.
+
+לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית** לרקע השקופית: אבסטרקטי-טכני, כהה, מתאים למותג (dark cyber, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent, no text, no people, no logos). ספציפי לתוכן השקופית.
+
+פלט: JSON תקין בלבד, בלי markdown code fence:
+{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"visualPrompt":"..."}]}
+שדות שאינם רלוונטיים ל-kind: "" או [] או 0.`;
+
+function mapTipKind(v: unknown): TipSlideKind {
+  const s = String(v || '').toLowerCase();
+  if (/cover|שער|פתיח/.test(s)) return 'cover';
+  if (/code|קוד/.test(s)) return 'code';
+  if (/step|שלב/.test(s)) return 'step';
+  if (/tool|כלי/.test(s)) return 'tool';
+  if (/takeaway|סיכום|לקח/.test(s)) return 'takeaway';
+  if (/cta|קריא/.test(s)) return 'cta';
+  return 'concept';
+}
+
+const VALID_CODE_LANGS = new Set(['python', 'ts', 'js', 'bash', 'json']);
+
+export async function synthesizeTechTipDeck(input: { topic: string; notes?: string }): Promise<TechTipDeck> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean } = sanitizeInput(`${input.topic}\n${input.notes ?? ''}`.slice(0, 3000));
+  if (clean.trim().length < 8) throw new Error('topic too short for a tech-tip deck');
+
+  const response = await generateContentWithRetry({
+    model: 'gemini-3.6-flash',
+    contents: [{ role: 'user', parts: [{ text: `נושא המדריך:\n"""\n${clean}\n"""` }] }],
+    config: { systemInstruction: TECH_TIP_SYSTEM_INSTRUCTION, temperature: 0.6, topP: 0.9, responseMimeType: 'application/json' },
+  });
+
+  const raw = stripCodeFence(response.text?.trim() || '{}');
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const slidesRaw = Array.isArray(parsed.slides) ? parsed.slides : [];
+
+  const slides: TechTipSlide[] = slidesRaw
+    .map((s): TechTipSlide => {
+      const rec = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+      const kind = mapTipKind(rec.kind);
+      const lang = String(rec.codeLang ?? '').toLowerCase().trim();
+      return {
+        kind,
+        kicker: stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.kicker ?? '').trim()))).slice(0, 40) || 'טיפ',
+        title: stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.title ?? '').trim()))).slice(0, 120),
+        body: stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.body ?? '').trim()))).slice(0, 420),
+        bullets: Array.isArray(rec.bullets)
+          ? rec.bullets.map((b) => stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(b ?? '').trim()))).slice(0, 140)).filter((b) => b.length > 1).slice(0, 5)
+          : [],
+        // Code is NOT run through the Hebrew sanitiser — it would mangle operators/quotes/RLM-wrap
+        // Latin runs. It's already-generated source, kept verbatim minus any stray markdown fence.
+        code: stripCodeFence(String(rec.code ?? '').trim()).slice(0, 900),
+        codeLang: VALID_CODE_LANGS.has(lang) ? lang : kind === 'code' ? 'python' : '',
+        stepNumber: Number.isFinite(Number(rec.stepNumber)) ? Math.max(0, Math.min(20, Number(rec.stepNumber))) : 0,
+        visualPrompt: String(rec.visualPrompt ?? '').trim().slice(0, 400),
+      };
+    })
+    .filter((s) => s.title.length > 1 || s.body.length > 10 || s.code.length > 5 || s.bullets.length > 0);
+
+  if (slides.length < 5) throw new Error('model returned too few usable tip slides');
+
+  const hashtags = Array.isArray(parsed.hashtags)
+    ? parsed.hashtags.map((h) => String(h).trim()).filter((h) => h.startsWith('#')).slice(0, 8)
+    : [];
+
+  return {
+    title: stripMetaFraming(sanitizeHebrewText(String(parsed.title ?? input.topic).trim())).slice(0, 140),
+    slides: slides.slice(0, 12),
+    hashtags: hashtags.length ? hashtags : ['#פיתוח', '#AI', '#קוד', '#כלים_למפתחים'],
+  };
 }

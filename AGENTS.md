@@ -66,11 +66,35 @@ Single POST endpoint, **action-dispatched** (`{ action, ...params }`). Auth: `x-
 
 Client libs in `dashboard/src/lib/*Api.ts` follow one rule: **never throw** — on 429/503/network/thin output they fall back to a deterministic local builder so content generation never fully stops.
 
-Actions incl.: `generate-content`, `draft-engagement`, `story-synthesize`, `post-synthesize`, `import-url`, `slides-edit`, `trend-radar`, `engagement-replies`, `carousel-studio`, `email-generate`, `auto-publish-run`.
+Actions incl.: `generate-content`, `draft-engagement`, `story-synthesize`, `post-synthesize`, `import-url`, `slides-edit`, `trend-radar`, `engagement-replies`, `carousel-studio`, `reel-script-synthesize`, `reel-tts`, `tech-tip-deck`, `email-generate`, `auto-publish-run`.
 
 ### Carousel Studio (dashboard tab "סטודיו קרוסלות WEB3")
 4-agent pipeline (`dashboard/src/components/CarouselStudio.tsx` + `lib/useCarouselStudio.ts`):
 Scraper/Researcher → Copywriter (`carousel-studio` action → `synthesizeCarouselDeck`) → Creative Director (`directDeck`) → Compositor (canvas render 1080×1350 + JSZip). Two render themes sharing one `StudioSlide` model: `web3CarouselRenderer.ts` (obsidian/neon) and `notesCarouselRenderer.ts` (light "study-notes"). `exportStudioZip` → `01_Hook.png … NN_CTA.png`.
+
+### Tech Tips & Motion Studio (dashboard tab "טיפים ומדריכים")
+The brand's flagship educational format — a **10–12 slide Hebrew teaching deck** on practical AI
+tips, code tricks, model integration and dev tools. One `TechTipDeck` feeds **two outputs**:
+
+- `dashboard/src/lib/techTipsApi.ts` — `TIP_PRESETS` (curated shelf) + `fetchTipFeed()` (live
+  AI/cloud headlines off `/api/news`) + `synthesizeTechTipDeck()` (action `tech-tip-deck` →
+  `synthesizeTechTipDeck` in the engine; falls back to a deterministic local deck, never throws).
+- `syntaxHighlight.ts` — a canvas-targeted lexer. Prism/Shiki emit DOM; the slide target is
+  `ctx.fillText`, so this returns `{ text, color }` runs instead. Cosmetic-only by design.
+- `techTipRenderer.ts` — `drawTipSlide()` paints one slide at **any** size, so the same painter
+  serves the 1080×1350 carousel and the 1080×1920 video frames. `resolveTipBackgrounds()` pulls
+  optional free backdrops from **Pollinations** (keyless, `Access-Control-Allow-Origin: *`, so the
+  canvas stays untainted). `exportTipDeckZip()` → PNGs + `caption.txt` + `code-snippets.txt`.
+- `motionStudioService.ts` — animated 9:16 MP4 (Canvas → WebCodecs → `mp4-muxer`, same pipeline as
+  `reelVideoEncoder.ts`). **No Pexels, no stock footage** — the motion is pure vector/canvas: each
+  slide's body rises and fades in, holds, crossfades out. Audio is a *procedurally synthesised*
+  ambient bed, not a licensed track; swapping in real music is a rights decision, not a code one.
+
+Slide-copy rules (length caps, ≥2 real `code` slides, English `visualPrompt`, no fabricated
+numbers) live in `SYSTEM_PROMPT.md` and `TECH_TIP_SYSTEM_INSTRUCTION` — keep the two in sync.
+**`code` deliberately bypasses the Hebrew sanitizer** (it mangles operators and quotes) and is
+excluded from `sanitizeOutput`, whose leak heuristics flag ordinary source; only the Hebrew prose
+is guarded.
 
 ---
 
