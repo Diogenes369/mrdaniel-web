@@ -74,6 +74,23 @@ Scraper/Researcher → Copywriter (`carousel-studio` action → `synthesizeCarou
 
 ---
 
+## Dual-agent workflow (official)
+
+This project is worked by **two agents in parallel**, sharing this repo and this file:
+
+| Agent | Owns | Typical work |
+|---|---|---|
+| **Hermes Agent** | research, audits, long/background tasks, reusable skills, cross-session memory | source/competitor research, feed & dependency scans, prompt tuning for `SocialAgentEngine.ts`, scheduled (cron) checks, building skills for repeat chores |
+| **Claude Code** | direct code changes + **all builds and deployments** | React / Tailwind v4 / R3F edits, bug fixes, `npx tsc --noEmit`, `npm run build`, and **exclusively** `npm run deploy` / `npm run deploy:dashboard` / `npm run deploy:all` (Vercel/Netlify) |
+
+- **Deployment is Claude Code's alone.** Hermes may prepare a change, open a branch, or draft a
+  build fix — it must not run `vercel` / `npm run deploy*` / Netlify deploys. Claude Code runs the
+  typecheck + build + deploy, and only when the user explicitly asks.
+- The two agents do not call each other. Hand-offs are manual, via the user, through this repo.
+- Launch Hermes in project context with `./start-hermes.ps1` (session-only PATH, cwd = repo root).
+
+---
+
 ## Guardrails for agents
 
 - Work on a feature branch, never commit straight to `main`.
