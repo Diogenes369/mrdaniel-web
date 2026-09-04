@@ -30,6 +30,22 @@ export interface VideoScript {
   estimatedSeconds: number;
 }
 
+/** Article-grounded Reel/Reels script (NewsContentAgent's "תסריט לרילס" mode) — mirrors
+ * src/agent/types.ts's ReelScript. Distinct from VideoScript above: synthesized on demand from a
+ * selected news item's real text, and each scene carries a `mediaPrompt` for a future
+ * image/video-generation call. */
+export interface ReelScriptScene {
+  onScreenText: string;
+  voiceover: string;
+  mediaPrompt: string;
+}
+
+export interface ReelScript {
+  hook: string;
+  scenes: ReelScriptScene[];
+  cta: string;
+}
+
 export interface MediaFrameSpec {
   headline: string;
   subtext?: string;

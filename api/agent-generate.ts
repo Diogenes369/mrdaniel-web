@@ -1,4 +1,4 @@
-import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck } from '../src/agent/SocialAgentEngine.js';
+import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript } from '../src/agent/SocialAgentEngine.js';
 import { importUrlContent } from '../src/server/contentImport.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
@@ -323,6 +323,32 @@ export default async function handler(req: any, res: any) {
         return;
       }
       res.status(200).json({ ok: true, slides });
+      return;
+    }
+
+    if (action === 'reel-script-synthesize') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { title, source, topic, articleText } = req.body ?? {};
+      if (typeof articleText !== 'string' || articleText.trim().length < 40) {
+        res.status(400).json({ ok: false, error: 'articleText (>= 40 chars) required' });
+        return;
+      }
+      const reel = await synthesizeReelScript({
+        title: String(title ?? ''),
+        source: String(source ?? ''),
+        topic: String(topic ?? 'general'),
+        articleText,
+      });
+      const flat = `${reel.hook}\n${reel.scenes.map((s) => `${s.onScreenText}\n${s.voiceover}`).join('\n')}\n${reel.cta}`;
+      const security = sanitizeOutput(flat);
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, reel });
       return;
     }
 

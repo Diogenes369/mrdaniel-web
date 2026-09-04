@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
-import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript } from './types.js';
+import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene } from './types.js';
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
@@ -1014,4 +1014,86 @@ export async function generateEngagementReplies(input: {
   }).filter((r) => r.text.length > 2);
   if (out.length < 3) throw new Error('replies came back empty after sanitising');
   return out;
+}
+
+// --- Reel script synthesis (article-grounded — dashboard "תסריט לרילס") -----------------------
+// Distinct from generateVideoScript() above: that one is topic-driven (auto-pilot queue,
+// 25-45s, no per-scene media prompt). This one is synthesized on demand from a SELECTED news
+// item's real text (same strict-grounding contract as synthesizeNewsPost / synthesizeCarouselDeck)
+// and additionally returns a `mediaPrompt` per scene for a future image/video-generation call.
+
+const REEL_SCRIPT_SYSTEM_INSTRUCTION = `אתה כותב תסריטים לרילס אינסטגרם/טיקטוק בעברית עבור דניאל בן ברוך, מבוססים על כתבה/מאמר מקור אמיתי.
+
+${BRAND_KNOWLEDGE_BASE}
+
+${HEBREW_COPY_RULES}
+
+קיבלת טקסט מקור מלא. הפק תסריט רילס קצר (25–40 שניות, 4–6 סצנות) שמתמצת את הכתבה לפורמט וידאו קצר וקולט.
+
+מבנה מחייב:
+1. "hook" — משפט פתיחה של 1–2 שניות שעוצר גלילה מיידית: שאלה חדה, סטטמנט שנוגד אינטואיציה, או מספר/עובדה מפתיעה מהכתבה. לעולם לא "בעולם של היום" או פתיח קלישאתי.
+2. "scenes" — מערך של 4–6 סצנות, כל אחת עם:
+   - "onScreenText": שורת טקסט קצרה שתופיע על המסך (עד 8–10 מילים, לא משפט מלא ארוך).
+   - "voiceover": מה שנקרא בקול באותה סצנה — משפט או שניים, טבעי לדיבור (לא כתיבה פורמלית).
+   - "mediaPrompt": פרומפט ויזואלי לג'נרטור תמונה/וידאו — **באנגלית**, ספציפי ופוטוריאליסטי (לא אבסטרקטי/קריקטורי/"AI art" גנרי): צילום אנטרפרייז IT/סייבר/AI אמיתי (server racks, SOC/NOC room, engineer at a workstation, data center, dashboard screens), עם ספק'ים טכניים (35mm, natural lighting, shallow depth of field, 8k) שמתאימים לתוכן הספציפי של הסצנה.
+3. "cta" — קריאה לפעולה קצרה לאינסטגרם: מפנה לעקוב / לפרופיל / ל-mrdaniel.co.il, לא מכירתית אגרסיבית.
+
+חוקים מחייבים:
+- הסתמכות מוחלטת על הטקסט: כל עובדה/מספר/שם חייבים להופיע בטקסט המקור. אסור להמציא.
+- אכיפת מיתוג: אסור להזכיר את שם הכותב המקורי, "מאת", כינויי משתמש, שמות רשתות חברתיות כמקור. המותג היחיד — mrdaniel.co.il.
+- "onScreenText" ו-"voiceover" בעברית תקנית בלבד. "mediaPrompt" באנגלית בלבד (זה הפרומפט הטכני לכלי הגנרציה).
+- אין תוויות מסגור ("הקשר:", "כותרת:") בתוך onScreenText/voiceover.
+
+פלט: JSON תקין בלבד, בלי markdown code fence:
+{"hook":"...","scenes":[{"onScreenText":"...","voiceover":"...","mediaPrompt":"..."}],"cta":"..."}`;
+
+export async function synthesizeReelScript(input: {
+  title: string;
+  source: string;
+  topic: string;
+  articleText: string;
+}): Promise<ReelScript> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean } = sanitizeInput(input.articleText.slice(0, 8000));
+  if (clean.trim().length < 40) throw new Error('article text too thin for a reel script');
+
+  const response = await generateContentWithRetry({
+    model: 'gemini-3.6-flash',
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: `כותרת המקור: ${input.title}\nמקור: ${input.source}\nנושא: ${input.topic}\n\nטקסט המקור המלא (הבסיס היחיד לתוכן):\n"""\n${clean}\n"""`,
+          },
+        ],
+      },
+    ],
+    config: { systemInstruction: REEL_SCRIPT_SYSTEM_INSTRUCTION, temperature: 0.8, topP: 0.95, responseMimeType: 'application/json' },
+  });
+
+  const raw = stripCodeFence(response.text?.trim() || '{}');
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+  const hook = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(parsed.hook ?? '').trim()))).slice(0, 180);
+  const cta = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(parsed.cta ?? '').trim()))).slice(0, 220);
+  const scenesRaw = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+  const scenes: ReelScriptScene[] = scenesRaw
+    .map((s): ReelScriptScene => {
+      const rec = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+      return {
+        onScreenText: stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.onScreenText ?? '').trim()))).slice(0, 140),
+        voiceover: stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.voiceover ?? '').trim()))).slice(0, 400),
+        mediaPrompt: String(rec.mediaPrompt ?? '').trim().slice(0, 500),
+      };
+    })
+    .filter((s) => s.onScreenText.length > 1 || s.voiceover.length > 1);
+
+  if (!hook || scenes.length < 3) throw new Error('model did not return a usable reel script');
+
+  return {
+    hook,
+    scenes: scenes.slice(0, 7),
+    cta: cta || 'עקבו לעוד תוכן על AI, סייבר ופיתוח — mrdaniel.co.il',
+  };
 }

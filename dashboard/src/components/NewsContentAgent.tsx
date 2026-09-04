@@ -17,6 +17,9 @@ import {
   ChevronRight,
   Trash2,
   Send,
+  Clapperboard,
+  Mic2,
+  Camera,
 } from 'lucide-react';
 import {
   CATEGORY_LABEL,
@@ -36,6 +39,8 @@ import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
 import { deckToCaption } from '../lib/socialPublish';
 import { loadDeck, saveDeckMeta, saveDeckImages, clearDeck } from '../lib/deckPersistence';
+import { synthesizeReel, reelToText } from '../lib/reelScriptApi';
+import type { ReelScript } from '../lib/agentTypes';
 
 const SLIDE_FORMATS: { id: SlideFormat; label: string }[] = [
   { id: '9:16', label: '9:16 · סטורי' },
@@ -93,6 +98,17 @@ export default function NewsContentAgent() {
 
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<{ ok: boolean; message?: string; status?: string; provider?: string } | null>(null);
+
+  // Reel Generator — article-grounded reel script (hook + scenes + CTA), independent of the
+  // post/story workspaces above. Not persisted (cheap to regenerate; the Story deck is the one
+  // that needs persistence since it also renders images).
+  const [showReelPanel, setShowReelPanel] = useState(false);
+  const [reelScript, setReelScript] = useState<ReelScript | null>(null);
+  const [reelItemId, setReelItemId] = useState<string | null>(null);
+  const [reelLoading, setReelLoading] = useState(false);
+  const [reelSynthesized, setReelSynthesized] = useState(false);
+  const [reelFallbackReason, setReelFallbackReason] = useState<string | null>(null);
+  const [reelCopied, setReelCopied] = useState(false);
 
   // Instagram Story / Carousel slides — generated on demand from the selected article,
   // independent of the post-platform toggle above. The generated deck is PERSISTED to
@@ -304,6 +320,45 @@ export default function NewsContentAgent() {
       setPublishing(false);
     }
   }, [post, item, platform, imageUrl]);
+
+  const generateReel = useCallback(async () => {
+    if (!item) return;
+    setReelLoading(true);
+    try {
+      const { reel, synthesized, fallbackReason } = await synthesizeReel(item);
+      setReelScript(reel);
+      setReelItemId(item.id);
+      setReelSynthesized(synthesized);
+      setReelFallbackReason(fallbackReason ?? null);
+    } finally {
+      setReelLoading(false);
+    }
+  }, [item]);
+
+  const copyReel = useCallback(async () => {
+    if (!reelScript) return;
+    try {
+      await navigator.clipboard.writeText(reelToText(reelScript, item?.title));
+      setReelCopied(true);
+      window.setTimeout(() => setReelCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — text is still visible for manual copy */
+    }
+  }, [reelScript, item?.title]);
+
+  const downloadReel = useCallback(() => {
+    if (!reelScript) return;
+    const slug = (item?.title || 'reel').replace(/[^\w֐-׿]+/g, '-').slice(0, 40) || 'reel';
+    const blob = new Blob([reelToText(reelScript, item?.title)], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mrdaniel-reel-${slug}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [reelScript, item?.title]);
 
   // NOTE: a generated deck is deliberately NOT auto-cleared when the selected article changes.
   // Wiping it on any `item` change (including the silent swaps a background feed poll can cause)
@@ -642,6 +697,17 @@ export default function NewsContentAgent() {
               {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               פרסם / שלח לפרסום
             </button>
+            <button
+              onClick={() => setShowReelPanel((v) => !v)}
+              disabled={!item}
+              title="מציג/מסתיר את מחולל תסריטי הרילס"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer disabled:opacity-50 ${
+                showReelPanel ? 'bg-brand-500 text-black' : 'bg-white/5 border border-white/10 text-zinc-200 hover:bg-white/10'
+              }`}
+            >
+              <Clapperboard className="w-4 h-4" />
+              תסריט לרילס
+            </button>
           </div>
 
           {/* Side-by-side workspaces */}
@@ -925,6 +991,118 @@ export default function NewsContentAgent() {
             )}
           </div>
           </PreviewErrorBoundary>
+      )}
+
+      {/* Reel Generator — article-grounded hook/scenes/CTA script, toggled independently of the
+          post + story workspaces above. Not persisted: cheap to regenerate on demand. */}
+      {showReelPanel && item && (
+        <PreviewErrorBoundary label="תסריט הרילס" resetKeys={[reelItemId, reelScript?.hook]}>
+          <div className="dash-card p-6">
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <span className="flex items-center gap-2 text-zinc-400 text-xs font-mono uppercase tracking-wider">
+                <Clapperboard className="w-3.5 h-3.5" /> תסריט לרילס
+                {reelLoading ? (
+                  <span className="flex items-center gap-1 text-[10px] text-zinc-500 normal-case tracking-normal">
+                    <Loader2 className="w-3 h-3 animate-spin" /> כותב תסריט…
+                  </span>
+                ) : reelScript ? (
+                  <span className="text-[10px] normal-case tracking-normal">
+                    {reelSynthesized ? (
+                      <span className="text-brand-400">טקסט AI מהכתבה · {reelScript.scenes.length} סצנות</span>
+                    ) : (
+                      <span className="text-amber-400/80">
+                        גיבוי מקומי · {reelScript.scenes.length} סצנות{reelFallbackReason ? ` — ${reelFallbackReason}` : ''}
+                      </span>
+                    )}
+                  </span>
+                ) : null}
+              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={generateReel}
+                  disabled={reelLoading || !item}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 text-black text-xs font-bold cursor-pointer disabled:opacity-50"
+                >
+                  {reelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clapperboard className="w-3.5 h-3.5" />}
+                  {reelScript ? 'רענון תסריט' : 'צור תסריט לרילס'}
+                </button>
+                {reelScript && (
+                  <>
+                    <button
+                      onClick={copyReel}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-200 text-xs font-bold cursor-pointer hover:bg-white/10"
+                    >
+                      {reelCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      {reelCopied ? 'הועתק ✓' : 'העתק תסריט'}
+                    </button>
+                    <button
+                      onClick={downloadReel}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-200 text-xs font-bold cursor-pointer hover:bg-white/10"
+                    >
+                      <Download className="w-3.5 h-3.5" /> הורדה (TXT)
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {reelScript && item && reelItemId && reelItemId !== item.id && (
+              <p className="text-[11px] text-amber-400/80 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2 mb-3 leading-relaxed">
+                התסריט שמוצג נוצר מכתבה אחרת. לחצו "רענון תסריט" כדי לבנות אותו מהכתבה הנבחרת עכשיו.
+              </p>
+            )}
+
+            {reelScript ? (
+              <div className="space-y-4">
+                {/* Hook */}
+                <div className="rounded-xl border border-brand-500/25 bg-brand-500/[0.06] px-4 py-3">
+                  <span className="block text-[10px] font-mono uppercase tracking-wider text-brand-400 mb-1">
+                    HOOK · 1–2 שניות ראשונות
+                  </span>
+                  <p className="text-sm md:text-base font-bold text-white leading-relaxed">{reelScript.hook}</p>
+                </div>
+
+                {/* Scenes */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {reelScript.scenes.map((scene, i) => (
+                    <div key={i} className="rounded-xl border border-white/10 bg-black/30 p-4 flex flex-col gap-2.5">
+                      <span className="inline-flex items-center gap-1.5 w-fit rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-mono font-bold text-zinc-400">
+                        סצנה {i + 1} / {reelScript.scenes.length}
+                      </span>
+                      <p className="text-sm font-bold text-zinc-100 leading-snug">{scene.onScreenText}</p>
+                      <p className="flex items-start gap-1.5 text-xs text-zinc-300 leading-relaxed">
+                        <Mic2 className="w-3.5 h-3.5 shrink-0 text-brand-400 mt-0.5" />
+                        <span>{scene.voiceover}</span>
+                      </p>
+                      {scene.mediaPrompt && (
+                        <p className="flex items-start gap-1.5 text-[11px] text-zinc-500 leading-relaxed font-mono" dir="ltr">
+                          <Camera className="w-3.5 h-3.5 shrink-0 text-zinc-500 mt-0.5" />
+                          <span className="text-right" dir="ltr">
+                            {scene.mediaPrompt}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* CTA */}
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                  <span className="block text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">CTA</span>
+                  <p className="text-sm text-zinc-200 leading-relaxed">{reelScript.cta}</p>
+                </div>
+              </div>
+            ) : reelLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                כפתור אחד יפרק את הכתבה הנבחרת לתסריט רילס קצר: hook פותח-גלילה, 3–6 סצנות (טקסט על המסך + קריינות + פרומפט ויזואלי לג'נרטור תמונה/וידאו), ו-CTA לאינסטגרם. ניתן להעתיק או להוריד את התסריט המלא כטקסט.
+              </p>
+            )}
+          </div>
+        </PreviewErrorBoundary>
       )}
 
       {!item && !storyPayload && !loadingNews && !newsError && (

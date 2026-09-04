@@ -42,6 +42,26 @@ export interface VideoScript {
   estimatedSeconds: number;
 }
 
+/** One beat of an article-grounded Reel/Reels script (dashboard "תסריט לרילס" — NewsContentAgent),
+ * distinct from the topic-driven `VideoScript`/auto-pilot queue pipeline above: this one is
+ * synthesized on demand from a selected news item's real text, and additionally carries a
+ * `mediaPrompt` per scene for a future image/video-generation call. */
+export interface ReelScriptScene {
+  onScreenText: string;
+  voiceover: string;
+  /** Visual-generation prompt for this scene (English, photography-spec'd) — not yet consumed by
+   * any image/video-generation API call, same "prompt only, no generation" boundary as
+   * `GeneratedContentItem.imageGenerationPrompt`. */
+  mediaPrompt: string;
+}
+
+export interface ReelScript {
+  /** 1–2 second opening line — must stop the scroll on its own. */
+  hook: string;
+  scenes: ReelScriptScene[];
+  cta: string;
+}
+
 /** Structural spec for one visual preview frame — NOT a rendered image/video file. The dashboard's
  * MediaPreviewCard turns this into an actual HTML/CSS card (real Heebo/Rubik Google Fonts, brand
  * colors, correct aspect ratio). There is no video/image file generation anywhere in this module —
