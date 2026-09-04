@@ -97,9 +97,10 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
   // predictable), so every row re-establishes its own context:
   //   • button  dir="rtl" + isolate — orders bullet → headline → stamp right-to-left and walls
   //     the row off from its neighbours in the LTR track (no cross-item scrambling).
-  //   • title   dir="auto" + plaintext — base direction follows the content, so Hebrew headlines
-  //     read RTL with English brand names / acronyms / numbers sitting correctly inline, and a
-  //     rare English-first headline reads LTR.
+  //   • title   dir="rtl" + isolate — the feed is Hebrew-only, but many headlines OPEN with an
+  //     English product name ("OpenAI …", "GPT-6 …"). A per-content `dir="auto"` there would
+  //     resolve those rows to LTR and flip the whole line to the left. Forcing RTL keeps every
+  //     row aligned; embedded English / acronyms / numbers still sit correctly inline (isolated).
   //   • stamp   dir="ltr" — "27.08 · 19:24" never flips; rendered as a subtle pill badge.
   const Item = ({ row }: { row: TickerRow }) => (
     <button
@@ -109,9 +110,9 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
       className="group inline-flex items-center gap-2.5 leading-none text-[13px] md:text-sm text-zinc-300 hover:text-brand-300 transition-colors [unicode-bidi:isolate]"
     >
       <span className="text-brand-500 select-none" aria-hidden="true">•</span>
-      <span dir="auto" className="whitespace-nowrap [unicode-bidi:plaintext]">
+      <bdi dir="rtl" className="whitespace-nowrap [unicode-bidi:isolate]">
         {row.title}
-      </span>
+      </bdi>
       {row.stamp && (
         <span
           dir="ltr"
@@ -158,7 +159,7 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
               className="inline-flex items-center gap-2.5 text-[13px] md:text-sm text-zinc-300 [unicode-bidi:isolate]"
             >
               <span className="text-brand-500 select-none" aria-hidden="true">•</span>
-              <span dir="auto" className="truncate [unicode-bidi:plaintext]">{row.title}</span>
+              <bdi dir="rtl" className="truncate [unicode-bidi:isolate]">{row.title}</bdi>
               {row.stamp && (
                 <span
                   dir="ltr"

@@ -36,21 +36,14 @@ function TelemetryTicker({ items, updatedAt }: { items: NewsItem[]; updatedAt: n
   const reduce = prefersReducedMotion();
   const nodes = useMemo(() => new Set(items.map((i) => i.source)).size, [items]);
 
+  // The rotating line cycles ONLY real headlines. The "system is live / N sources synced"
+  // telemetry lives in the static left rail (LIVE FEED · NODES ACTIVE · SYNC) — it must never
+  // cycle through here as if it were a headline (and the old Latin-first "FEED · …" / "SCAN · …"
+  // strings also flipped the whole line LTR under `dir="auto"`).
   const lines = useMemo(() => {
-    const status = [
-      'SCAN · וקטורי תקיפה מנוטרים — אין אנומליה חריגה',
-      `FEED · ${nodes || '—'} מקורות RSS מחוברים ומסונכרנים`,
-      'AI-WATCH · תנועת מודלים, רגולציה והשקות במעקב',
-      'CLOUD · ניטור עלות · ביצועים · אבטחת שכבת רשת תקין',
-    ];
-    const heads = items.slice(0, 6).map((i) => `דחוף · ${i.title}`);
-    const out: string[] = [];
-    for (let i = 0; i < Math.max(status.length, heads.length); i++) {
-      if (status[i]) out.push(status[i]);
-      if (heads[i]) out.push(heads[i]);
-    }
-    return out.length ? out : status;
-  }, [items, nodes]);
+    const heads = items.slice(0, 8).map((i) => `דחוף · ${i.title}`);
+    return heads.length ? heads : ['הפיד מתעדכן — אין כותרות חדשות ברגע זה'];
+  }, [items]);
 
   const [idx, setIdx] = useState(0);
   useEffect(() => {
@@ -63,7 +56,7 @@ function TelemetryTicker({ items, updatedAt }: { items: NewsItem[]; updatedAt: n
   const synced = updatedAt > 0 ? new Date(updatedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '—';
 
   return (
-    <div className="mb-6 overflow-hidden rounded-2xl border border-[#22d3ee]/20 bg-[#04070b]/85 font-mono">
+    <div dir="rtl" className="mb-6 overflow-hidden rounded-2xl border border-[#22d3ee]/20 bg-[#04070b]/85 font-mono">
       <div className="flex items-stretch">
         <div className="flex shrink-0 items-center gap-2 border-l border-white/10 bg-[#22d3ee]/[0.06] px-3 py-2.5 text-[11px] font-bold text-[#67e8f9] sm:px-4">
           <span className="relative flex h-2 w-2">
@@ -87,11 +80,11 @@ function TelemetryTicker({ items, updatedAt }: { items: NewsItem[]; updatedAt: n
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: reduce ? 0 : -8 }}
               transition={{ duration: 0.3 }}
-              dir="auto"
-              className="truncate text-[11px] text-zinc-300 sm:text-xs"
+              dir="rtl"
+              className="truncate text-right text-[11px] text-zinc-300 sm:text-xs [unicode-bidi:isolate]"
             >
               <span className="text-[#9FE870]">▸ </span>
-              {lines[idx]}
+              <bdi>{lines[idx]}</bdi>
             </motion.p>
           </AnimatePresence>
         </div>
