@@ -22,9 +22,11 @@ interface NewsResponse {
   updatedAt: string;
 }
 
-// v3: added the `topic` classification field (AI / cyber / cloud) — bump to invalidate any
-// pre-existing browser cache written by an older shape.
-const CACHE_KEY = 'dbb-cyber-news-cache-v3';
+// v4: `/api/news` is now the sanitized Hebrew AI/cyber stream by default (see server/newsFeed.ts
+// `sanitizeAndKeep`). Bumped so every browser drops its pre-filter cache — which still holds
+// English / off-topic items for up to 24h — and re-fetches the clean feed on the next load.
+// (v3 added the `topic` field.)
+const CACHE_KEY = 'dbb-cyber-news-cache-v4';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // refresh at most once a day per browser
 
 interface NewsCacheShape {
