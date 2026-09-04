@@ -197,7 +197,7 @@ export default function NewsPage() {
           badgeIcon={Rss}
           badgeLabel="Cyber & AI News Command Center"
           title={'חמ״ל חדשות סייבר, AI וטכנולוגיה'}
-          subtitle="ריכוז חי מגיקטיים, אנשים ומחשבים, Techtime ו-Israel Defense — עם תקציר מנהלים, ניתוח טכנולוגי ומשמעויות לכל כתבה."
+          subtitle="ריכוז עדכונים בזמן אמת עם תקציר מנהלים מבוסס AI, ניתוח טכנולוגי ומשמעויות מעשיות לכל כתבה."
         />
 
         <TelemetryTicker items={items ?? []} updatedAt={dataUpdatedAt} />
