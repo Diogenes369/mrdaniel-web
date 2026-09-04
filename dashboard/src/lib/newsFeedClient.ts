@@ -16,9 +16,14 @@ export async function fetchLatestNewsItem(category: NewsCategory): Promise<NewsI
  * The full candidate list for the manual content picker — every feed item in the chosen category
  * (or all of them for `'all'`), newest-first. The dashboard renders these as a selectable list so
  * the operator can preview the raw text and pick a specific article before generating.
+ *
+ * Uses the site feed's `?strict=1` view by default: generic consumer-tech / gadget / gaming
+ * stories are dropped server-side unless they carry an AI / cyber / cloud signal, so the content
+ * agent only ever sees on-brand source material. Pass `strict = false` to see the raw aggregate.
  */
-export async function fetchNewsList(category: NewsCategory, limit = 40): Promise<NewsItem[]> {
-  const res = await fetch(`${SITE_ORIGIN}/api/news`, { headers: { Accept: 'application/json' } });
+export async function fetchNewsList(category: NewsCategory, limit = 40, strict = true): Promise<NewsItem[]> {
+  const url = `${SITE_ORIGIN}/api/news${strict ? '?strict=1' : ''}`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`news feed responded ${res.status}`);
   const data = (await res.json()) as { items?: NewsItem[] };
   const items = Array.isArray(data.items) ? data.items : [];

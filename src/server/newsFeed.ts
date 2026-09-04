@@ -66,6 +66,12 @@ const SOURCES: FeedSource[] = [
   { name: 'כלכליסט', url: 'https://www.calcalist.co.il/GeneralRSS/0,16335,L-3927,00.xml', priority: 3, timeoutMs: 7000 },
   { name: 'TheMarker', url: 'https://www.themarker.com/cmlink/1.145', priority: 3, timeoutMs: 7000 },
   { name: 'Israel Defense', url: 'https://www.israeldefense.co.il/rss.xml', priority: 3, onlyTopics: ['cyber'] },
+  // ── Israeli AI / cyber specialist blogs (small WordPress feeds — lower per-feed cap + tighter
+  //    timeout; the two security blogs are pinned cyber-only via onlyTopics so an off-topic post
+  //    never leaks into the general mix). ──
+  { name: 'Machine Learning Israel', url: 'https://machinelearning.co.il/feed/', priority: 2, maxItems: 10, timeoutMs: 8000 },
+  { name: 'SPD Blog', url: 'https://blog.spd.co.il/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
+  { name: 'Kodkod Cyber', url: 'https://kodkodcyber.com/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
   // ── International tech (capped so they enrich rather than dominate the Israeli mix) ──
   { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', priority: 5, maxItems: 8, timeoutMs: 8000 },
   { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', priority: 6, maxItems: 8, timeoutMs: 8000 },
@@ -369,6 +375,36 @@ function classifyTopic(text: string): NewsTopic {
   return 'general';
 }
 
+// Generic consumer-tech / gadget / gaming markers. The opt-in strict filter drops an item that
+// matches one of these UNLESS it also carries an AI / cyber / cloud signal (so "AI comes to your
+// smart TV" stays, "best gaming monitors of 2026" goes).
+const GENERIC_CONSUMER_PATTERNS = [
+  /גיימינג/, /קונסול/, /טלוויזי/, /סמארטפון/, /מכשיר סלולרי/, /מחשב נייד/, /לפטופ/, /אוזניות/,
+  /שעון חכם/, /רחפן/, /מצלמ(ה|ת)/, /כונן קשיח/, /כרטיס מסך/, /ספק כוח/, /שואב אבק/,
+  /\bgaming\b/i, /\bconsole\b/i, /\bsmartphone\b/i, /\blaptop\b/i, /\bwearable\b/i,
+  /\bheadphones?\b/i, /\bearbuds?\b/i, /\bdrone\b/i, /\bTV\b/, /\bGPU\b.*\bgaming\b/i,
+];
+
+/**
+ * Opt-in strict topic gate — see `/api/news?strict=1`. Keeps an item only when it's clearly
+ * about AI, cyber, or cloud/infra (reusing the SAME classifier patterns the feed already runs on),
+ * and drops anything that reads as generic consumer-tech / gadget / gaming coverage without one
+ * of those signals. Applied as a per-request VIEW over the shared cache in `getNewsItems` — it
+ * never mutates the cache, so a `?strict=1` call can't poison the response for a normal call.
+ */
+export function strictTopicKeep(item: NewsItem): boolean {
+  const text = `${item.title} ${item.excerpt} ${item.summary} ${item.category}`;
+  const onTopic =
+    CYBER_PATTERNS.some((re) => re.test(text)) ||
+    AI_PATTERNS.some((re) => re.test(text)) ||
+    CLOUD_PATTERNS.some((re) => re.test(text));
+  if (onTopic) return true;
+  if (GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text))) return false;
+  // No consumer-junk markers, but also no AI/cyber/cloud signal → keep it only if the feed's own
+  // classifier can still place it in a target topic.
+  return classifyTopic(text) !== 'general';
+}
+
 // Business/finance signals — used only to refine the DISPLAY `category` label (kept as a free
 // string), NOT the `topic` enum that the site's category filters run on.
 const ECONOMY_PATTERNS = [
@@ -572,14 +608,18 @@ async function refreshAll(): Promise<NewsItem[]> {
   return items;
 }
 
-export async function getNewsItems(): Promise<{ items: NewsItem[]; updatedAt: string }> {
+export async function getNewsItems(
+  opts: { strict?: boolean } = {}
+): Promise<{ items: NewsItem[]; updatedAt: string }> {
   const isStale = !cache || Date.now() - cache.fetchedAt > CACHE_TTL_MS;
   if (isStale) {
     inFlight = inFlight ?? refreshAll().finally(() => { inFlight = null; });
     await inFlight;
   }
+  const all = cache?.items ?? [];
   return {
-    items: cache?.items ?? [],
+    // `strict` is applied here, on the way out — the cache always holds the full unfiltered set.
+    items: opts.strict ? all.filter(strictTopicKeep) : all,
     updatedAt: cache ? new Date(cache.fetchedAt).toISOString() : new Date().toISOString(),
   };
 }

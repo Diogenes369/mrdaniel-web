@@ -9,6 +9,11 @@ import { getNewsItems } from '../src/server/newsFeed.js';
 //
 // CORS is open (`*`) so the analytics dashboard — served from its own origin — can read the feed
 // directly for the news-driven content generator. The payload is public, read-only news metadata.
+//
+// `?strict=1` opts into a tighter AI/cyber/cloud-only view of the same aggregate (see
+// `strictTopicKeep` in newsFeed.ts) — generic consumer-tech/gaming/hardware is dropped unless it
+// carries an AI/cyber/cloud signal. It's a per-request filter over the shared cache, and Vercel's
+// edge caches `?strict=1` under its own key, so the two variants never mix.
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -25,7 +30,9 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const data = await getNewsItems();
+    const strictRaw = String((req.query?.strict ?? '')).toLowerCase();
+    const strict = strictRaw === '1' || strictRaw === 'true';
+    const data = await getNewsItems({ strict });
     res.status(200).json(data);
   } catch (err) {
     console.error('[api/news] failed to fetch news items:', err);
