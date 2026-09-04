@@ -3,16 +3,24 @@
 #   PS> .\start-hermes.ps1              # interactive session, cwd = project root
 #   PS> .\start-hermes.ps1 acp --check  # any args are passed straight through to `hermes`
 #
-# Adds the Hermes install dir (~/.local/bin) to PATH for THIS session only — nothing global,
-# nothing persistent. Run from anywhere; it always drops you into the project root so Hermes
-# picks up AGENTS.md.
+# Adds the Hermes install dirs (~/.local/bin and %LOCALAPPDATA%\hermes\bin) to PATH for THIS
+# session only — nothing global, nothing persistent. Run from anywhere; it always drops you into
+# the project root so Hermes picks up AGENTS.md.
 
 $ErrorActionPreference = 'Stop'
 
-# 1. Session-only PATH: prepend the standard Hermes per-user bin dir if it isn't already there.
-$hermesBin = Join-Path $env:USERPROFILE '.local\bin'
-if ((Test-Path $hermesBin) -and ($env:PATH -notlike "*$hermesBin*")) {
-  $env:PATH = "$hermesBin;$env:PATH"
+# 1. Session-only PATH: prepend every known Hermes bin dir that exists on this machine.
+#    The Windows installer has used both layouts across versions:
+#      ~/.local/bin              (per-user, unix-style)
+#      %LOCALAPPDATA%\hermes\bin (per-user, Windows-style)
+$hermesBins = @(
+  (Join-Path $env:USERPROFILE '.local\bin'),
+  (Join-Path $env:LOCALAPPDATA 'hermes\bin')
+)
+foreach ($bin in $hermesBins) {
+  if ((Test-Path $bin) -and ($env:PATH -notlike "*$bin*")) {
+    $env:PATH = "$bin;$env:PATH"
+  }
 }
 
 # 2. Always operate from the project root (this script's own folder).
@@ -22,7 +30,8 @@ Set-Location -LiteralPath $PSScriptRoot
 $hermes = Get-Command hermes -ErrorAction SilentlyContinue
 if (-not $hermes) {
   Write-Host ''
-  Write-Host 'Hermes is not installed (no `hermes` on PATH, no ~/.local/bin/hermes).' -ForegroundColor Yellow
+  Write-Host 'Hermes is not installed — not found on PATH, nor in:' -ForegroundColor Yellow
+  foreach ($bin in $hermesBins) { Write-Host "    $bin" -ForegroundColor Yellow }
   Write-Host 'Install it, then re-run this script:' -ForegroundColor Yellow
   Write-Host '  iex (irm https://hermes-agent.nousresearch.com/install.ps1)'
   Write-Host '  hermes model      # pick a provider / model (BYO key)'
