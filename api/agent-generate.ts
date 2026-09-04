@@ -1,4 +1,4 @@
-import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript } from '../src/agent/SocialAgentEngine.js';
+import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech } from '../src/agent/SocialAgentEngine.js';
 import { importUrlContent } from '../src/server/contentImport.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
@@ -349,6 +349,21 @@ export default async function handler(req: any, res: any) {
         return;
       }
       res.status(200).json({ ok: true, reel });
+      return;
+    }
+
+    if (action === 'reel-tts') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { text, voiceName } = req.body ?? {};
+      if (typeof text !== 'string' || !text.trim()) {
+        res.status(400).json({ ok: false, error: 'text required' });
+        return;
+      }
+      const speech = await synthesizeSpeech(text, typeof voiceName === 'string' && voiceName.trim() ? voiceName : undefined);
+      res.status(200).json({ ok: true, audioBase64: speech.audioBase64, mimeType: speech.mimeType });
       return;
     }
 

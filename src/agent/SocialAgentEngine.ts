@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Modality } from '@google/genai';
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
 import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene } from './types.js';
@@ -1096,4 +1096,46 @@ export async function synthesizeReelScript(input: {
     scenes: scenes.slice(0, 7),
     cta: cta || 'עקבו לעוד תוכן על AI, סייבר ופיתוח — mrdaniel.co.il',
   };
+}
+
+// --- Reel voiceover — Gemini native text-to-speech ---------------------------------------------
+// Powers the Reel video compositor (dashboard NewsContentAgent "תסריט לרילס" → "הפק סרטון"). Uses
+// GEMINI_API_KEY (already configured for every other call in this file) via Gemini's native audio
+// output — no new provider/key needed. Best-effort by design: the caller (api/agent-generate.ts's
+// `reel-tts` action) always degrades to a silent video on any failure, exactly like every other
+// "prompt only, best-effort" boundary in this module (see VideoGenerationEngine.ts's provider
+// pattern) — a missing voice track must never block the render.
+
+const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+/** A Gemini prebuilt voice (multilingual — reads Hebrew text natively). Firm/clear register fits
+ * the brand's "confident, direct, not salesy" tone (see HEBREW_COPY_RULES above). */
+const DEFAULT_TTS_VOICE = 'Kore';
+
+export interface SpeechResult {
+  /** Base64 PCM audio bytes, as returned by the model. */
+  audioBase64: string;
+  /** The model's own MIME type for the PCM stream, e.g. "audio/L16;codec=pcm;rate=24000" — the
+   * caller parses the sample rate out of this rather than assuming one, since it's the model's
+   * stated ground truth. */
+  mimeType: string;
+}
+
+export async function synthesizeSpeech(text: string, voiceName: string = DEFAULT_TTS_VOICE): Promise<SpeechResult> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean } = sanitizeInput(text.slice(0, 800));
+  if (!clean.trim()) throw new Error('empty text for TTS');
+
+  const response = await generateContentWithRetry({
+    model: TTS_MODEL,
+    contents: [{ role: 'user', parts: [{ text: clean }] }],
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+    },
+  });
+
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  const inline = parts.find((p) => p.inlineData?.data)?.inlineData;
+  if (!inline?.data) throw new Error('TTS model returned no audio');
+  return { audioBase64: inline.data, mimeType: inline.mimeType || 'audio/L16;codec=pcm;rate=24000' };
 }

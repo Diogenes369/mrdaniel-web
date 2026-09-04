@@ -20,6 +20,8 @@ import {
   Clapperboard,
   Mic2,
   Camera,
+  Video,
+  Play,
 } from 'lucide-react';
 import {
   CATEGORY_LABEL,
@@ -41,6 +43,8 @@ import { deckToCaption } from '../lib/socialPublish';
 import { loadDeck, saveDeckMeta, saveDeckImages, clearDeck } from '../lib/deckPersistence';
 import { synthesizeReel, reelToText } from '../lib/reelScriptApi';
 import type { ReelScript } from '../lib/agentTypes';
+import { resolveReelBeats } from '../lib/reelRenderService';
+import { renderReelVideo, isReelVideoSupported } from '../lib/reelVideoEncoder';
 
 const SLIDE_FORMATS: { id: SlideFormat; label: string }[] = [
   { id: '9:16', label: '9:16 · סטורי' },
@@ -109,6 +113,19 @@ export default function NewsContentAgent() {
   const [reelSynthesized, setReelSynthesized] = useState(false);
   const [reelFallbackReason, setReelFallbackReason] = useState<string | null>(null);
   const [reelCopied, setReelCopied] = useState(false);
+
+  // Reel VIDEO render (Step B/C) — assembles the current reelScript into a real 9:16 MP4 in the
+  // browser (Pexels stills + Ken-Burns + burned-in Hebrew captions + Gemini TTS voiceover, muxed
+  // via WebCodecs). Independent of the script state above so re-generating the script doesn't
+  // silently invalidate an already-rendered video the operator is looking at.
+  const [videoRendering, setVideoRendering] = useState(false);
+  const [videoStage, setVideoStage] = useState<'assets' | 'video' | 'audio' | 'mux' | null>(null);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoHasAudio, setVideoHasAudio] = useState(false);
+  const videoSupported = useRef(isReelVideoSupported()).current;
 
   // Instagram Story / Carousel slides — generated on demand from the selected article,
   // independent of the post-platform toggle above. The generated deck is PERSISTED to
@@ -359,6 +376,66 @@ export default function NewsContentAgent() {
     a.remove();
     URL.revokeObjectURL(url);
   }, [reelScript, item?.title]);
+
+  const generateReelVideo = useCallback(async () => {
+    if (!reelScript || !videoSupported) return;
+    setVideoRendering(true);
+    setVideoError(null);
+    setVideoProgress(0);
+    setVideoStage('assets');
+    try {
+      const beats = await resolveReelBeats(reelScript, (fraction) => setVideoProgress(Math.round(fraction * 35)));
+      const { blob, hasAudio } = await renderReelVideo(beats, (pct, stage) => {
+        setVideoStage(stage);
+        setVideoProgress(35 + Math.round(pct * 0.65));
+      });
+      setVideoUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(blob);
+      });
+      setVideoBlob(blob);
+      setVideoHasAudio(hasAudio);
+      setVideoProgress(100);
+    } catch (err) {
+      setVideoError((err as Error).message || 'רינדור הסרטון נכשל');
+    } finally {
+      setVideoRendering(false);
+      setVideoStage(null);
+    }
+  }, [reelScript, videoSupported]);
+
+  const downloadReelVideo = useCallback(() => {
+    if (!videoBlob) return;
+    const slug = (item?.title || 'reel').replace(/[^\w֐-׿]+/g, '-').slice(0, 40) || 'reel';
+    const url = URL.createObjectURL(videoBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mrdaniel-reel-${slug}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [videoBlob, item?.title]);
+
+  // Release the video object URL on unmount / when a fresh render replaces it — object URLs
+  // otherwise leak for the life of the tab.
+  useEffect(() => {
+    return () => {
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+    };
+  }, [videoUrl]);
+
+  // A fresh script invalidates any video rendered from the PREVIOUS script — clear the stale
+  // preview rather than let it silently keep showing next to a different script/scenes.
+  useEffect(() => {
+    setVideoUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setVideoBlob(null);
+    setVideoError(null);
+    setVideoProgress(0);
+  }, [reelScript]);
 
   // NOTE: a generated deck is deliberately NOT auto-cleared when the selected article changes.
   // Wiping it on any `item` change (including the silent swaps a background feed poll can cause)
@@ -1041,6 +1118,30 @@ export default function NewsContentAgent() {
                     >
                       <Download className="w-3.5 h-3.5" /> הורדה (TXT)
                     </button>
+                    {videoSupported ? (
+                      <button
+                        onClick={generateReelVideo}
+                        disabled={videoRendering}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-200 text-xs font-bold cursor-pointer disabled:opacity-50 hover:bg-white/10"
+                        title="בונה סרטון MP4 אמיתי מהתסריט: תמונות Pexels + קריינות AI + כתוביות עבריות צרובות"
+                      >
+                        {videoRendering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
+                        {videoBlob ? 'רענון סרטון' : 'הפק סרטון'}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-zinc-600" title="דורש WebCodecs — Chrome/Edge עדכני">
+                        הפקת וידאו אינה נתמכת בדפדפן זה
+                      </span>
+                    )}
+                    {videoBlob && (
+                      <button
+                        onClick={downloadReelVideo}
+                        disabled={videoRendering}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 text-black text-xs font-bold cursor-pointer disabled:opacity-50"
+                      >
+                        <Download className="w-3.5 h-3.5" /> הורד סרטון מוכן (MP4)
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -1091,6 +1192,56 @@ export default function NewsContentAgent() {
                   <span className="block text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">CTA</span>
                   <p className="text-sm text-zinc-200 leading-relaxed">{reelScript.cta}</p>
                 </div>
+
+                {/* Video render — Step B/C: real MP4, encoded client-side (Pexels stills +
+                    Ken-Burns + burned-in Hebrew captions + Gemini TTS, WebCodecs -> mp4-muxer). */}
+                {(videoRendering || videoUrl || videoError) && (
+                  <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+                    <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-3">
+                      <Clapperboard className="w-3.5 h-3.5" /> סרטון רילס (MP4)
+                    </div>
+
+                    {videoRendering && (
+                      <div>
+                        <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full bg-brand-500 transition-all duration-200"
+                            style={{ width: `${videoProgress}%` }}
+                          />
+                        </div>
+                        <p className="mt-2 text-[11px] text-zinc-500">
+                          {videoStage === 'assets' && 'שולף תמונות מ-Pexels ומקליט קריינות…'}
+                          {videoStage === 'video' && 'מרנדר פריימים…'}
+                          {videoStage === 'audio' && 'ממזג פס קול…'}
+                          {videoStage === 'mux' && 'סוגר קובץ MP4…'}
+                          {!videoStage && 'מכין…'}
+                          {' '}· {videoProgress}%
+                        </p>
+                      </div>
+                    )}
+
+                    {videoError && (
+                      <p className="text-xs text-amber-400 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5" /> {videoError}
+                      </p>
+                    )}
+
+                    {videoUrl && !videoRendering && (
+                      <div className="flex flex-col items-center gap-3">
+                        <video
+                          src={videoUrl}
+                          controls
+                          playsInline
+                          className="rounded-lg border border-white/10 bg-black max-h-[480px]"
+                          style={{ aspectRatio: '9 / 16' }}
+                        />
+                        <p className="text-[11px] text-zinc-500 flex items-center gap-1.5">
+                          <Play className="w-3.5 h-3.5" /> תצוגה מקדימה · {videoHasAudio ? 'עם קריינות AI' : 'ללא קריינות (לא זמינה כרגע) — כתוביות בלבד'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : reelLoading ? (
               <div className="flex items-center justify-center py-10">
