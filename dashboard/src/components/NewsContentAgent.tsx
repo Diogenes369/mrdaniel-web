@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Send,
 } from 'lucide-react';
 import {
   CATEGORY_LABEL,
@@ -89,6 +90,9 @@ export default function NewsContentAgent() {
   const [rendering, setRendering] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const renderSeq = useRef(0);
+
+  const [publishing, setPublishing] = useState(false);
+  const [publishResult, setPublishResult] = useState<{ ok: boolean; message?: string; status?: string; provider?: string } | null>(null);
 
   // Instagram Story / Carousel slides — generated on demand from the selected article,
   // independent of the post-platform toggle above. The generated deck is PERSISTED to
@@ -268,6 +272,38 @@ export default function NewsContentAgent() {
         });
     }
   }, [item, platform, aspect, headline]);
+
+  const publishToSocial = useCallback(async () => {
+    if (!post || !item) return;
+    setPublishing(true);
+    setPublishResult(null);
+    try {
+      const res = await fetch(`${SITE_ORIGIN}/api/agent-generate`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+        },
+        body: JSON.stringify({
+          action: 'publish-social',
+          platform,
+          caption: post.fullText,
+          hashtags: post.hashtags ?? [],
+          mediaUrls: imageUrl ? [imageUrl] : [],
+          publishId: `${item.id}::${platform}::${Date.now()}`,
+          sourceTitle: item.title,
+          sourceLink: item.link,
+          category: item.category,
+        }),
+      });
+      const json = (await res.json()) as { ok?: boolean; message?: string; status?: string; provider?: string };
+      setPublishResult({ ok: Boolean(json?.ok), message: json?.message ?? (json?.ok ? 'נשלח לפרסום / תזמון' : 'השליחה נכשלה'), status: json?.status, provider: json?.provider });
+    } catch {
+      setPublishResult({ ok: false, message: 'שגיאת רשת בפרסום' });
+    } finally {
+      setPublishing(false);
+    }
+  }, [post, item, platform, imageUrl]);
 
   // NOTE: a generated deck is deliberately NOT auto-cleared when the selected article changes.
   // Wiping it on any `item` change (including the silent swaps a background feed poll can cause)
@@ -598,6 +634,14 @@ export default function NewsContentAgent() {
               {posting || rendering ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               {post || imageUrl ? 'רענון תוכן' : 'צור פוסט ותמונה'}
             </button>
+            <button
+              onClick={publishToSocial}
+              disabled={publishing || !post || !item}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-zinc-200 text-sm font-bold cursor-pointer disabled:opacity-50 hover:bg-white/10"
+            >
+              {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              פרסם / שלח לפרסום
+            </button>
           </div>
 
           {/* Side-by-side workspaces */}
@@ -658,6 +702,11 @@ export default function NewsContentAgent() {
                     {post.footer}
                   </p>
                   <QuickPublishBar text={post.fullText} image={imageUrl ?? undefined} className="mt-3" />
+                  {publishResult && (
+                    <p className={`mt-2 text-[11px] ${publishResult.ok ? 'text-brand-400' : 'text-amber-400'}`}>
+                      {publishResult.message} {publishResult.status ? `· ${publishResult.status}` : ''} {publishResult.provider ? `· ${publishResult.provider}` : ''}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

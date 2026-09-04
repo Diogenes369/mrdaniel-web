@@ -7,6 +7,7 @@ import { runAutoPublishCycle, dispatchPublish } from '../src/server/autoPublish.
 import { generateEmailCampaign, isCopywriterConfigured } from '../src/server/emailCopywriter.js';
 import { dispatchAgentNotifications } from '../src/agent/NotificationDispatcher.js';
 import { notifyNewContent, isWhatsAppBridgeConfigured } from '../src/agent/WhatsAppDispatcher.js';
+import { publishSocialPost } from '../src/services/socialPublisherService.js';
 import type { Platform, ContentFormat, QueueItem } from '../src/agent/types.js';
 
 const DASHBOARD_QUEUE_URL = 'https://mrdaniel.co.il/#agent-queue'; // placeholder anchor; real link is wherever the dashboard is hosted for this admin
@@ -227,6 +228,26 @@ export default async function handler(req: any, res: any) {
         preset: typeof preset === 'string' ? (preset as never) : undefined,
       });
       res.status(200).json({ ok: true, ...result });
+      return;
+    }
+
+    if (action === 'publish-social') {
+      const { platform, caption, hashtags, mediaUrls, publishId, scheduledAt, sourceTitle, sourceLink, category } = req.body ?? {};
+      const allowed = ['tiktok', 'instagram', 'linkedin'] as const;
+      const rawPlatform = typeof platform === 'string' ? platform.toLowerCase() : 'instagram';
+      const resolvedPlatform = allowed.includes(rawPlatform as (typeof allowed)[number]) ? (rawPlatform as Platform) : 'instagram';
+      const result = await publishSocialPost({
+        platform: resolvedPlatform,
+        caption: String(caption ?? ''),
+        hashtags: Array.isArray(hashtags) ? hashtags : [],
+        mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : [],
+        publishId: typeof publishId === 'string' ? publishId : undefined,
+        scheduledAt: typeof scheduledAt === 'string' ? scheduledAt : undefined,
+        sourceTitle: typeof sourceTitle === 'string' ? sourceTitle : undefined,
+        sourceLink: typeof sourceLink === 'string' ? sourceLink : undefined,
+        category: typeof category === 'string' ? category : undefined,
+      });
+      res.status(result.ok ? 200 : 502).json(result);
       return;
     }
 
