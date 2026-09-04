@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ExternalLink, Clock, BookOpen, ListChecks, Radar, ShieldAlert, Sparkles, Cloud, Newspaper, type LucideIcon } from 'lucide-react';
+import { X, ExternalLink, Clock, BookOpen, ListChecks, Radar, ShieldAlert, Sparkles, Cloud, Newspaper, Loader2, type LucideIcon } from 'lucide-react';
 import { formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } from '../../services/newsService';
-import { executiveSummary, deepDive, technicalImpact, sourceDomain } from '../../lib/newsAnalysis';
+import { executiveSummary, deepDive, sourceDomain } from '../../lib/newsAnalysis';
+import { useArticleInsights } from '../../services/newsInsightsService';
 import NewsImage from './NewsImage';
+import RtlText from './RtlText';
 
 const TOPIC: Record<NewsTopic, { label: string; icon: LucideIcon; ring: string; grad: string }> = {
   cyber: { label: 'סייבר ואבטחת מידע', icon: ShieldAlert, ring: 'text-rose-300 border-rose-400/40 bg-rose-500/10', grad: 'from-rose-600/40' },
@@ -78,8 +80,10 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
   const domain = sourceDomain(item.link);
   const bullets = executiveSummary(item);
   const paras = deepDive(item);
-  const impact = technicalImpact(item);
   const mins = readingTimeMin(item.summary || item.excerpt);
+  // Per-article Gemini analysis (POST /api/news/analyze). Deliberately has no boilerplate
+  // fallback — while it loads the section shows a skeleton, and if it fails it is not rendered.
+  const insights = useArticleInsights(item);
 
   return (
     <motion.article
@@ -87,7 +91,8 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
       animate={{ y: 0, opacity: 1, scale: 1 }}
       exit={{ y: 16, opacity: 0, scale: 0.985 }}
       transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-      className="pointer-events-auto relative flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0B0F17] shadow-2xl sm:max-h-[88dvh] md:rounded-3xl"
+      dir="rtl"
+      className="pointer-events-auto relative flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0B0F17] text-right shadow-2xl sm:max-h-[88dvh] md:rounded-3xl"
     >
       {/* Prominent sticky close — pinned to the card frame, above the scrolling body. */}
       <button
@@ -122,8 +127,11 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
                 <Radar className="h-3.5 w-3.5" /> ניתוח חמ״ל · MR. DANIEL Analysis
               </span>
             </div>
-            <h2 dir="auto" className="break-words font-display text-xl font-black leading-tight text-white sm:text-2xl md:text-[26px] [text-shadow:0_2px_18px_rgba(0,0,0,0.85)]">
-              {item.title}
+            <h2
+              dir="rtl"
+              className="break-words text-right font-display text-xl font-black leading-tight text-white sm:text-2xl md:text-[26px] [text-shadow:0_2px_18px_rgba(0,0,0,0.85)]"
+            >
+              <RtlText>{item.title}</RtlText>
             </h2>
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-400" dir="rtl">
               <span dir="ltr" className="font-bold text-zinc-300">{item.source}</span>
@@ -141,51 +149,82 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
           </div>
         </header>
 
-        <div className="space-y-8 p-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:p-7">
+        <div dir="rtl" className="space-y-8 p-5 text-right pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:p-7">
           {/* Executive summary */}
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 font-display text-sm font-black uppercase tracking-wider text-brand-400">
+          <section dir="rtl" className="text-right">
+            <h3 className="mb-3 flex items-center gap-2 text-right font-display text-sm font-black uppercase tracking-wider text-brand-400">
               <ListChecks className="h-4 w-4" /> תקציר מנהלים
             </h3>
-            <ul className="space-y-2.5">
+            {/* Explicit RTL bullets: the marker is a flex sibling, so in a dir="rtl" row it sits on
+                the RIGHT of the text and wrapped lines keep a clean hanging indent. The bullet is
+                never part of the string itself (see `stripLeadingBullet`). */}
+            <ul dir="rtl" className="space-y-2.5 text-right">
               {bullets.map((b, i) => (
-                <li key={i} dir="auto" className="flex gap-2.5 text-[14px] leading-relaxed text-zinc-200">
+                <li key={i} dir="rtl" className="flex gap-2.5 text-right text-[14px] leading-relaxed text-zinc-200">
                   <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" aria-hidden="true" />
-                  <span>{b}</span>
+                  <span className="min-w-0 flex-1"><RtlText>{b}</RtlText></span>
                 </li>
               ))}
             </ul>
           </section>
 
           {/* Deep dive */}
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 font-display text-sm font-black uppercase tracking-wider text-brand-400">
+          <section dir="rtl" className="text-right">
+            <h3 className="mb-3 flex items-center gap-2 text-right font-display text-sm font-black uppercase tracking-wider text-brand-400">
               <Newspaper className="h-4 w-4" /> הכתבה המורחבת
             </h3>
             <div className="space-y-3.5">
               {paras.map((p, i) => (
-                <p key={i} dir="auto" className="text-[14px] leading-relaxed text-zinc-300">
-                  {p}
+                <p key={i} dir="rtl" className="text-right text-[14px] leading-relaxed text-zinc-300">
+                  <RtlText>{p}</RtlText>
                 </p>
               ))}
             </div>
           </section>
 
-          {/* Technical impact */}
-          <section className="rounded-2xl border border-[#22d3ee]/20 bg-[#22d3ee]/[0.04] p-4 sm:p-5">
-            <h3 className="mb-1 flex items-center gap-2 font-display text-sm font-black uppercase tracking-wider text-[#67e8f9]">
-              <Radar className="h-4 w-4" /> ניתוח טכנולוגי ומשמעויות
-            </h3>
-            <p className="mb-3 text-[13px] font-semibold text-zinc-300">{impact.headline}</p>
-            <ul className="space-y-2.5">
-              {impact.points.map((p, i) => (
-                <li key={i} dir="auto" className="flex gap-2.5 text-[13.5px] leading-relaxed text-zinc-300">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#22d3ee]" aria-hidden="true" />
-                  <span>{p}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {/* Technical impact — generated per article by Gemini, never boilerplate. Rendered only
+              once real insights arrive; a failure hides the section entirely. */}
+          {(insights.isPending || insights.data) && (
+            <section dir="rtl" className="rounded-2xl border border-[#22d3ee]/20 bg-[#22d3ee]/[0.04] p-4 text-right sm:p-5">
+              <h3 className="mb-1 flex items-center gap-2 text-right font-display text-sm font-black uppercase tracking-wider text-[#67e8f9]">
+                <Radar className="h-4 w-4" /> ניתוח טכנולוגי ומשמעויות
+              </h3>
+
+              {insights.isPending ? (
+                <div dir="rtl" className="text-right">
+                  <p className="mb-3 flex items-center justify-start gap-2 text-right text-[13px] font-semibold text-zinc-400">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    מנתח את הכתבה הזו׳׳׳
+                  </p>
+                  <ul className="space-y-2.5" aria-hidden="true">
+                    {[0, 1, 2].map((i) => (
+                      <li key={i} className="flex gap-2.5">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#22d3ee]/40" />
+                        <span className="h-3 flex-1 animate-pulse rounded bg-white/[0.07]" style={{ width: `${92 - i * 12}%` }} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <>
+                  {insights.data?.headline && (
+                    <p dir="rtl" className="mb-3 text-right text-[13px] font-semibold text-zinc-300">
+                      <RtlText>{insights.data.headline}</RtlText>
+                    </p>
+                  )}
+                  {/* Same explicit RTL bullet pattern as the executive summary. */}
+                  <ul dir="rtl" className="space-y-2.5 text-right">
+                    {insights.data?.points.map((p, i) => (
+                      <li key={i} dir="rtl" className="flex gap-2.5 text-right text-[13.5px] leading-relaxed text-zinc-300">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#22d3ee]" aria-hidden="true" />
+                        <span className="min-w-0 flex-1"><RtlText>{p}</RtlText></span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
+          )}
 
           {/* Source CTA */}
           <a
@@ -193,12 +232,13 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
             target="_blank"
             rel="noopener noreferrer"
             data-track-interest={`news-modal:${item.topic}:${item.title}`}
+            dir="rtl"
             className="flex items-center justify-center gap-2 rounded-full border border-[#76B900]/50 bg-[#76B900]/12 px-5 py-3.5 text-center text-sm font-bold text-[#9FE870] transition-colors hover:border-[#76B900]/80 hover:bg-[#76B900]/20 hover:text-white"
           >
             לקריאת הכתבה המקורית באתר המקור
             <ExternalLink className="h-4 w-4" />
           </a>
-          <p className="-mt-4 text-center text-[11px] text-zinc-600">
+          <p dir="rtl" className="-mt-4 text-center text-[11px] text-zinc-600">
             התקציר והניתוח נערכים אוטומטית מתוך הסיקור המקורי · העובדות המלאות באתר המקור.
           </p>
         </div>

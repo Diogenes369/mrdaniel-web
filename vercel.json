@@ -3,6 +3,7 @@
     { "source": "/api/health", "destination": "/api/health.ts" },
     { "source": "/api/news", "destination": "/api/news.ts" },
     { "source": "/api/news/item/:slug", "destination": "/api/news-item.ts?slug=:slug" },
+    { "source": "/api/news/analyze", "destination": "/api/news.ts?action=analyze" },
     { "source": "/api/ai-news", "destination": "/api/ai-news.ts" },
     { "source": "/api/leads", "destination": "/api/leads.ts" },
     { "source": "/api/chat", "destination": "/api/chat.ts" },
@@ -19,6 +20,7 @@
   ],
   "functions": {
     "api/generate-video.ts": { "maxDuration": 60 },
+    "api/news.ts": { "maxDuration": 30 },
     "api/agent-generate.ts": { "maxDuration": 60 }
   }
 }

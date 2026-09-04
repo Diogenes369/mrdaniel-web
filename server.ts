@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 import nodemailer from 'nodemailer';
 import { GoogleGenAI } from '@google/genai';
 import { getNewsItemBySlug, getNewsItems } from './src/server/newsFeed';
+import { generateArticleInsights, isInsightsConfigured } from './src/server/newsInsights';
 import { getAINews } from './src/server/aiNewsFeed';
 import { AI_ASSISTANT_SYSTEM_INSTRUCTION } from './src/server/aiSystemPrompt';
 import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, transcribeAudio, detectGeminiRateLimit, generateVisualSearchQuery, generateImageGenerationPrompt } from './src/agent/SocialAgentEngine';
@@ -204,6 +205,33 @@ app.get('/api/news/item/:slug', async (req: Request, res: Response) => {
     return;
   }
   res.json({ item });
+});
+
+// Local-dev mirror of api/news-analyze.ts — the Gemini-generated "ניתוח טכנולוגי ומשמעויות"
+// block of the article modal. No boilerplate fallback: an unconfigured key or a model failure
+// answers `available: false` and the modal hides the section.
+app.post('/api/news/analyze', async (req: Request, res: Response) => {
+  if (!isInsightsConfigured()) {
+    res.status(503).json({ error: 'analysis unavailable', available: false });
+    return;
+  }
+  const b = req.body ?? {};
+  try {
+    const insights = await generateArticleInsights({
+      title: String(b.title || ''),
+      summary: String(b.summary || ''),
+      excerpt: String(b.excerpt || ''),
+      source: String(b.source || ''),
+      topic: String(b.topic || 'general'),
+      link: String(b.link || ''),
+    });
+    res.json({ available: true, insights });
+  } catch (err) {
+    console.error('[api/news/analyze] failed to generate article insights:', err);
+    const message = err instanceof Error ? err.message : 'unknown error';
+    const rateLimited = /429|quota|rate.?limit|RESOURCE_EXHAUSTED/i.test(message);
+    res.status(rateLimited ? 429 : 502).json({ error: message, available: false, rateLimited });
+  }
 });
 
 app.get('/api/ai-news', async (_req: Request, res: Response) => {
