@@ -14,13 +14,99 @@ function openLead(subject: string) {
   );
 }
 
+/** Feature chips — small brand-tinted pills that gently light up with the card's hover state. */
+function FeatureChips({ chips }: { chips: string[] }) {
+  return (
+    <div className="mt-4 flex flex-wrap gap-2 lg:mt-5">
+      {chips.map((c) => (
+        <span
+          key={c}
+          className="inline-flex items-center rounded-full border border-brand-500/25 bg-brand-500/[0.07] px-3 py-1 text-[11px] font-medium text-brand-200 transition-all duration-300 group-hover:border-brand-500/45 group-hover:bg-brand-500/[0.12] group-hover:shadow-[0_0_14px_-4px_rgba(118,185,0,0.5)] lg:text-xs"
+        >
+          {c}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Key-takeaway metric — a headline figure (always an estimate/range or a qualitative shift) +
+ * what it means, in a small glowing callout. */
+function MetricBadge({ metric }: { metric: NonNullable<ServiceEntry['metric']> }) {
+  return (
+    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-brand-500/20 bg-black/30 px-4 py-3 transition-colors duration-300 group-hover:border-brand-500/40 lg:mt-5">
+      <span className="font-display text-2xl font-black leading-none text-brand-400 [text-shadow:0_0_18px_rgba(0,255,102,0.35)] lg:text-3xl">
+        {metric.value}
+      </span>
+      <span className="text-xs leading-snug text-zinc-400 lg:text-[13px]">{metric.label}</span>
+    </div>
+  );
+}
+
+/** A proof-point list (mini feature list). Two columns on the full-row `wide` tile, one otherwise. */
+function ProofPoints({ points, wide }: { points: string[]; wide?: boolean }) {
+  return (
+    <ul
+      className={`mt-4 space-y-2 border-t border-white/10 pt-4 lg:mt-5 lg:space-y-2.5 lg:pt-5 ${
+        wide ? 'lg:grid lg:grid-cols-2 lg:gap-x-10 lg:gap-y-2.5 lg:space-y-0' : ''
+      }`}
+    >
+      {points.map((p) => (
+        <li key={p} className="flex items-start gap-2.5 text-sm leading-relaxed text-zinc-200 lg:text-base">
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-400 lg:h-[18px] lg:w-[18px]" />
+          <span>{p}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
  * One bento tile — the unified `.cyber-glass` surface (`--marketing`, `--flagship` for the large
- * tiles). No badges; just the icon, the giant title, the blurb, and (on flagship tiles) a short
- * proof list. The whole tile is a <Link> to the matching service page.
+ * tiles). Icon + giant title + blurb, then (when the data carries them) feature chips, a proof-point
+ * list and a metric badge — sized so the copy fills the tile instead of leaving dead space. The
+ * whole tile is a <Link> to the matching service page. `wide` splits the inner content into two
+ * columns on desktop so the full-row tile reads as one balanced block.
  */
 function ServiceTile({ s }: { s: ServiceEntry }) {
   const Icon = s.icon;
+
+  const head = (
+    <>
+      <div className="mb-4 flex items-center gap-3">
+        <span
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors lg:h-12 lg:w-12 ${
+            s.flagship
+              ? 'border-brand-500/45 bg-brand-500/20 text-brand-300'
+              : 'border-white/12 bg-black/30 text-brand-300 group-hover:border-brand-500/45'
+          }`}
+        >
+          <Icon className="h-5 w-5 lg:h-6 lg:w-6" />
+        </span>
+        <ArrowUpLeft className="ml-auto h-4 w-4 text-zinc-500 transition-colors group-hover:text-brand-400 lg:h-5 lg:w-5" aria-hidden="true" />
+      </div>
+
+      <h3
+        className={`font-display font-extrabold text-white ${
+          s.flagship ? 'text-2xl lg:text-4xl lg:leading-tight' : 'text-xl lg:text-2xl'
+        }`}
+      >
+        {s.title}
+      </h3>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-300 md:text-base lg:mt-2.5 lg:text-lg lg:leading-relaxed">
+        {s.blurb}
+      </p>
+      {s.chips && s.chips.length > 0 && <FeatureChips chips={s.chips} />}
+    </>
+  );
+
+  const detail = (
+    <>
+      {s.points && s.points.length > 0 && <ProofPoints points={s.points} wide={s.wide} />}
+      {s.metric && <MetricBadge metric={s.metric} />}
+    </>
+  );
+
   return (
     <Link
       to={s.to}
@@ -29,39 +115,16 @@ function ServiceTile({ s }: { s: ServiceEntry }) {
       }`}
     >
       <div className="flex h-full flex-col">
-        <div className="mb-4 flex items-center gap-3">
-          <span
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors lg:h-12 lg:w-12 ${
-              s.flagship
-                ? 'border-brand-500/45 bg-brand-500/20 text-brand-300'
-                : 'border-white/12 bg-black/30 text-brand-300 group-hover:border-brand-500/45'
-            }`}
-          >
-            <Icon className="h-5 w-5 lg:h-6 lg:w-6" />
-          </span>
-          <ArrowUpLeft className="ml-auto h-4 w-4 text-zinc-500 transition-colors group-hover:text-brand-400 lg:h-5 lg:w-5" aria-hidden="true" />
-        </div>
-
-        <h3
-          className={`font-display font-extrabold text-white ${
-            s.flagship ? 'text-2xl lg:text-4xl lg:leading-tight' : 'text-xl lg:text-2xl'
-          }`}
-        >
-          {s.title}
-        </h3>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-300 md:text-base lg:mt-2.5 lg:text-lg lg:leading-relaxed">
-          {s.blurb}
-        </p>
-
-        {s.flagship && s.points && (
-          <ul className="mt-4 space-y-2 border-t border-white/10 pt-4 lg:mt-5 lg:space-y-2.5 lg:pt-5">
-            {s.points.map((p) => (
-              <li key={p} className="flex items-start gap-2.5 text-sm leading-relaxed text-zinc-200 lg:text-base">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-400 lg:h-[18px] lg:w-[18px]" />
-                <span>{p}</span>
-              </li>
-            ))}
-          </ul>
+        {s.wide ? (
+          <div className="flex flex-col gap-2 lg:flex-row lg:gap-14">
+            <div className="lg:w-[42%] lg:shrink-0">{head}</div>
+            <div className="flex flex-1 flex-col">{detail}</div>
+          </div>
+        ) : (
+          <>
+            {head}
+            {detail}
+          </>
         )}
 
         <span className="mt-auto pt-5 text-sm font-bold text-brand-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100 lg:pt-6 lg:text-[15px]">
