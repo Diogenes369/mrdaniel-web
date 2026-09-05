@@ -15,13 +15,15 @@ function openLead(subject: string) {
 }
 
 /** Feature chips — small brand-tinted pills that gently light up with the card's hover state. */
-function FeatureChips({ chips }: { chips: string[] }) {
+function FeatureChips({ chips, compact }: { chips: string[]; compact?: boolean }) {
   return (
-    <div className="mt-4 flex flex-wrap gap-2 lg:mt-5">
+    <div className={`flex flex-wrap ${compact ? 'mt-2.5 gap-1.5' : 'mt-4 gap-2 lg:mt-5'}`}>
       {chips.map((c) => (
         <span
           key={c}
-          className="inline-flex items-center rounded-full border border-brand-500/25 bg-brand-500/[0.07] px-3 py-1 text-[11px] font-medium text-brand-200 transition-all duration-300 group-hover:border-brand-500/45 group-hover:bg-brand-500/[0.12] group-hover:shadow-[0_0_14px_-4px_rgba(118,185,0,0.5)] lg:text-xs"
+          className={`inline-flex items-center rounded-full border border-brand-500/25 bg-brand-500/[0.07] font-medium text-brand-200 transition-all duration-300 group-hover:border-brand-500/45 group-hover:bg-brand-500/[0.12] group-hover:shadow-[0_0_14px_-4px_rgba(118,185,0,0.5)] ${
+            compact ? 'px-2.5 py-1 text-[11px] leading-none' : 'px-3 py-1 text-[11px] lg:text-xs'
+          }`}
         >
           {c}
         </span>
@@ -32,28 +34,49 @@ function FeatureChips({ chips }: { chips: string[] }) {
 
 /** Key-takeaway metric — a headline figure (always an estimate/range or a qualitative shift) +
  * what it means, in a small glowing callout. */
-function MetricBadge({ metric }: { metric: NonNullable<ServiceEntry['metric']> }) {
+function MetricBadge({ metric, compact }: { metric: NonNullable<ServiceEntry['metric']>; compact?: boolean }) {
   return (
-    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-brand-500/20 bg-black/30 px-4 py-3 transition-colors duration-300 group-hover:border-brand-500/40 lg:mt-5">
-      <span className="font-display text-2xl font-black leading-none text-brand-400 [text-shadow:0_0_18px_rgba(0,255,102,0.35)] lg:text-3xl">
+    <div
+      className={`flex items-center rounded-2xl border border-brand-500/20 bg-black/30 transition-colors duration-300 group-hover:border-brand-500/40 ${
+        compact ? 'mt-2.5 gap-2 rounded-xl px-3 py-2' : 'mt-4 gap-3 px-4 py-3 lg:mt-5'
+      }`}
+    >
+      <span
+        className={`font-display font-black leading-none text-brand-400 [text-shadow:0_0_18px_rgba(0,255,102,0.35)] ${
+          compact ? 'shrink-0 text-base' : 'text-2xl lg:text-3xl'
+        }`}
+      >
         {metric.value}
       </span>
-      <span className="text-xs leading-snug text-zinc-400 lg:text-[13px]">{metric.label}</span>
+      <span className={`text-zinc-400 ${compact ? 'text-[11px] leading-snug' : 'text-xs leading-snug lg:text-[13px]'}`}>
+        {metric.label}
+      </span>
     </div>
   );
 }
 
 /** A proof-point list (mini feature list). Two columns on the full-row `wide` tile, one otherwise. */
-function ProofPoints({ points, wide }: { points: string[]; wide?: boolean }) {
+function ProofPoints({ points, wide, compact }: { points: string[]; wide?: boolean; compact?: boolean }) {
   return (
     <ul
-      className={`mt-4 space-y-2 border-t border-white/10 pt-4 lg:mt-5 lg:space-y-2.5 lg:pt-5 ${
-        wide ? 'lg:grid lg:grid-cols-2 lg:gap-x-10 lg:gap-y-2.5 lg:space-y-0' : ''
+      className={`border-t border-white/10 ${
+        compact
+          ? 'mt-2.5 space-y-1.5 pt-2.5'
+          : `mt-4 space-y-2 pt-4 lg:mt-5 lg:space-y-2.5 lg:pt-5 ${
+              wide ? 'lg:grid lg:grid-cols-2 lg:gap-x-10 lg:gap-y-2.5 lg:space-y-0' : ''
+            }`
       }`}
     >
       {points.map((p) => (
-        <li key={p} className="flex items-start gap-2.5 text-sm leading-relaxed text-zinc-200 lg:text-base">
-          <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-400 lg:h-[18px] lg:w-[18px]" />
+        <li
+          key={p}
+          className={`flex items-start text-zinc-200 ${
+            compact ? 'gap-2 text-xs leading-normal' : 'gap-2.5 text-sm leading-relaxed lg:text-base'
+          }`}
+        >
+          <Check
+            className={`shrink-0 text-brand-400 ${compact ? 'mt-px h-3.5 w-3.5' : 'mt-0.5 h-4 w-4 lg:h-[18px] lg:w-[18px]'}`}
+          />
           <span>{p}</span>
         </li>
       ))}
@@ -68,54 +91,87 @@ function ProofPoints({ points, wide }: { points: string[]; wide?: boolean }) {
  * whole tile is a <Link> to the matching service page. `wide` splits the inner content into two
  * columns on desktop so the full-row tile reads as one balanced block.
  */
-function ServiceTile({ s }: { s: ServiceEntry }) {
+function ServiceTile({ s, compact }: { s: ServiceEntry; compact?: boolean }) {
   const Icon = s.icon;
 
   const head = (
     <>
-      <div className="mb-4 flex items-center gap-3">
+      <div className={`flex items-center gap-3 ${compact ? 'mb-2.5' : 'mb-4'}`}>
         <span
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors lg:h-12 lg:w-12 ${
+          className={`flex shrink-0 items-center justify-center rounded-xl border transition-colors ${
+            compact ? 'h-9 w-9' : 'h-11 w-11 lg:h-12 lg:w-12'
+          } ${
             s.flagship
               ? 'border-brand-500/45 bg-brand-500/20 text-brand-300'
               : 'border-white/12 bg-black/30 text-brand-300 group-hover:border-brand-500/45'
           }`}
         >
-          <Icon className="h-5 w-5 lg:h-6 lg:w-6" />
+          <Icon className={compact ? 'h-4 w-4' : 'h-5 w-5 lg:h-6 lg:w-6'} />
         </span>
-        <ArrowUpLeft className="ml-auto h-4 w-4 text-zinc-500 transition-colors group-hover:text-brand-400 lg:h-5 lg:w-5" aria-hidden="true" />
+        <ArrowUpLeft
+          className={`ml-auto text-zinc-500 transition-colors group-hover:text-brand-400 ${
+            compact ? 'h-3.5 w-3.5' : 'h-4 w-4 lg:h-5 lg:w-5'
+          }`}
+          aria-hidden="true"
+        />
       </div>
 
       <h3
         className={`font-display font-extrabold text-white ${
-          s.flagship ? 'text-2xl lg:text-4xl lg:leading-tight' : 'text-xl lg:text-2xl'
+          compact
+            ? 'text-lg leading-tight'
+            : s.flagship
+              ? 'text-2xl lg:text-4xl lg:leading-tight'
+              : 'text-xl lg:text-2xl'
         }`}
       >
         {s.title}
       </h3>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-300 md:text-base lg:mt-2.5 lg:text-lg lg:leading-relaxed">
+      <p
+        className={`text-zinc-300 ${
+          compact
+            ? // Clamped: this is a teaser that links to the full service page, and an unclamped
+              // blurb ran 7 lines / 133px on a 390px phone — the single biggest contributor to the
+              // card overflowing a short viewport.
+              'mt-1.5 line-clamp-3 text-xs leading-normal'
+            : 'mt-2 text-sm leading-relaxed md:text-base lg:mt-2.5 lg:text-lg lg:leading-relaxed'
+        }`}
+      >
         {s.blurb}
       </p>
-      {s.chips && s.chips.length > 0 && <FeatureChips chips={s.chips} />}
+      {s.chips && s.chips.length > 0 && (
+        // Compact caps at 3 chips: a 4th wrapped the row and cost 34px on exactly the two cards
+        // that were already the tallest.
+        <FeatureChips chips={compact ? s.chips.slice(0, 3) : s.chips} compact={compact} />
+      )}
     </>
   );
 
   const detail = (
     <>
-      {s.points && s.points.length > 0 && <ProofPoints points={s.points} wide={s.wide} />}
-      {s.metric && <MetricBadge metric={s.metric} />}
+      {s.points && s.points.length > 0 && (
+        // Compact shows at most 3 proof points — the two 4-point cards were the height drivers,
+        // and the full list is one tap away on the service page.
+        <ProofPoints points={compact ? s.points.slice(0, 3) : s.points} wide={s.wide} compact={compact} />
+      )}
+      {s.metric && <MetricBadge metric={s.metric} compact={compact} />}
     </>
   );
 
   return (
     <Link
       to={s.to}
-      className={`cyber-glass cyber-glass--marketing group flex h-full flex-col rounded-3xl p-7 md:p-8 lg:p-12 ${
-        s.flagship ? 'cyber-glass--flagship' : ''
-      }`}
+      className={`cyber-glass cyber-glass--marketing group flex h-full flex-col ${
+        compact
+          ? // Safety ceiling only — the compact scale above is tuned so a card's natural height
+            // lands well under this, so it never actually engages (`.cyber-glass` is
+            // `overflow: hidden`, so a max-height that DID bite would clip rather than scroll).
+            'max-h-[calc(100dvh-11rem)] rounded-2xl p-4'
+          : 'rounded-3xl p-7 md:p-8 lg:p-12'
+      } ${s.flagship ? 'cyber-glass--flagship' : ''}`}
     >
       <div className="flex h-full flex-col">
-        {s.wide ? (
+        {s.wide && !compact ? (
           <div className="flex flex-col gap-2 lg:flex-row lg:gap-14">
             <div className="lg:w-[42%] lg:shrink-0">{head}</div>
             <div className="flex flex-1 flex-col">{detail}</div>
@@ -127,9 +183,14 @@ function ServiceTile({ s }: { s: ServiceEntry }) {
           </>
         )}
 
-        <span className="mt-auto pt-5 text-sm font-bold text-brand-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100 lg:pt-6 lg:text-[15px]">
-          לפרטים על השירות ←
-        </span>
+        {/* Hover-reveal affordance. Dropped entirely in compact mode: touch has no hover, so on
+            phones this was permanently `opacity-0` and contributed nothing but ~32px of the dead
+            bottom gap that made these cards feel cut off. */}
+        {!compact && (
+          <span className="mt-auto pt-5 text-sm font-bold text-brand-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100 lg:pt-6 lg:text-[15px]">
+            לפרטים על השירות ←
+          </span>
+        )}
       </div>
     </Link>
   );
@@ -215,8 +276,8 @@ export default function ServicesSection() {
             aria-label="גללו לצדדים לעוד שירותים"
           >
             {SERVICES.map((s) => (
-              <div key={s.id} className="w-[84%] max-w-xs shrink-0 snap-center">
-                <ServiceTile s={s} />
+              <div key={s.id} className="w-[86%] max-w-[20rem] shrink-0 snap-center">
+                <ServiceTile s={s} compact />
               </div>
             ))}
           </div>
