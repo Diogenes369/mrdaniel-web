@@ -22,6 +22,7 @@ import {
   Camera,
   Video,
   Play,
+  Layers,
 } from 'lucide-react';
 import {
   CATEGORY_LABEL,
@@ -57,6 +58,8 @@ const PREVIEW_DIMS: Record<SlideFormat, { w: number; h: number }> = {
   '1:1': { w: 380, h: 380 },
 };
 import { SITE_ORIGIN } from '../lib/useDashboardRefresh';
+import CarouselStudioModal from './CarouselStudioModal';
+import type { ArticleInput } from '../lib/carouselBridge';
 
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
@@ -94,6 +97,8 @@ export default function NewsContentAgent() {
   const postSeq = useRef(0);
   const [copied, setCopied] = useState(false);
   const [altCopied, setAltCopied] = useState(false);
+  // Hermes carousel studio — opened with the selected article; null = closed.
+  const [carouselArticle, setCarouselArticle] = useState<ArticleInput | null>(null);
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageSource, setImageSource] = useState<BgSource | null>(null);
@@ -778,6 +783,26 @@ export default function NewsContentAgent() {
               {posting || rendering ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               {post || imageUrl ? 'רענון תוכן' : 'צור פוסט ותמונה'}
             </button>
+            {/* Hermes decides concept + palette + composition on its own from the article; the
+                whole run happens on the local carousel-bridge (Hermes and Pillow are local-only). */}
+            <button
+              onClick={() =>
+                item &&
+                setCarouselArticle({
+                  title: item.title,
+                  source: item.source,
+                  topic: item.topic,
+                  link: item.link,
+                  articleText: (item.summary || item.excerpt || '').trim(),
+                })
+              }
+              disabled={!item}
+              title="Hermes בוחר קונספט ויזואלי ומייצר שקופיות נקיות, ואז מרונדרת עליהן עברית"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-brand-500/40 text-brand-300 text-sm font-bold cursor-pointer disabled:opacity-50 hover:bg-brand-500/10"
+            >
+              <Layers className="w-4 h-4" />
+              צור קרוסלה ויזואלית
+            </button>
             <button
               onClick={publishToSocial}
               disabled={publishing || !post || !item}
@@ -1292,6 +1317,8 @@ export default function NewsContentAgent() {
           בחרו קטגוריה ולחצו "משוך חדשות אחרונות" — המערכת תיצור פוסט מלא (טקסט + תמונה ממותגת + חתימת אתר) מהכתבה העדכנית ביותר.
         </div>
       )}
+
+      <CarouselStudioModal article={carouselArticle} onClose={() => setCarouselArticle(null)} />
     </div>
   );
 }

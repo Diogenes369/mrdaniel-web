@@ -1,0 +1,363 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import JSZip from 'jszip';
+import {
+  X, ChevronLeft, ChevronRight, Download, Copy, Check, Sparkles,
+  AlertTriangle, Loader2, Send, Image as ImageIcon,
+} from 'lucide-react';
+import {
+  startCarousel, fetchJob, adjustCarousel, checkBridge, slideUrl, bridgeBase, STATUS_LABEL,
+  type ArticleInput, type CarouselJob, type BridgeHealth,
+} from '../lib/carouselBridge';
+
+/**
+ * "Generate Designed Carousel with Hermes" — the visual slider modal.
+ *
+ * Hermes picks the concept, palette and per-slide composition on its own from the article; Daniel
+ * only types an instruction if he wants to steer it. Slides come back already rendered with the
+ * Hebrew handwriting overlay (Gveret Levin via scripts/render_hebrew_banner.py).
+ *
+ * The whole pipeline runs on the local carousel-bridge because Hermes and Pillow only exist on
+ * this machine, so the modal opens with an explicit bridge-status gate rather than failing
+ * mid-generation.
+ */
+export default function CarouselStudioModal({
+  article,
+  onClose,
+}: {
+  article: ArticleInput | null;
+  onClose: () => void;
+}) {
+  const [health, setHealth] = useState<BridgeHealth | null>(null);
+  const [job, setJob] = useState<CarouselJob | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [active, setActive] = useState(0);
+  const [slideCount, setSlideCount] = useState(4);
+  const [instruction, setInstruction] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [zipping, setZipping] = useState(false);
+  const pollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!article) return;
+    void checkBridge().then(setHealth);
+  }, [article]);
+
+  // Poll while a job is in flight. Image generation is ~90s per slide, so this is a long poll.
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const next = await fetchJob(jobId);
+        if (cancelled) return;
+        setJob(next);
+        if (next.status === 'done' || next.status === 'error') {
+          if (pollRef.current) window.clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'polling failed');
+      }
+    };
+    void tick();
+    pollRef.current = window.setInterval(tick, 3000);
+    return () => {
+      cancelled = true;
+      if (pollRef.current) window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    };
+  }, [jobId]);
+
+  useEffect(() => {
+    if (!article) {
+      setJob(null);
+      setJobId(null);
+      setError(null);
+      setActive(0);
+      setInstruction('');
+    }
+  }, [article]);
+
+  const begin = useCallback(async (override = '') => {
+    if (!article) return;
+    setStarting(true);
+    setError(null);
+    setJob(null);
+    try {
+      setJobId(await startCarousel(article, slideCount, override));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'failed to start');
+    } finally {
+      setStarting(false);
+    }
+  }, [article, slideCount]);
+
+  const sendAdjustment = useCallback(async () => {
+    if (!jobId || instruction.trim().length < 3) return;
+    setStarting(true);
+    setError(null);
+    try {
+      const next = await adjustCarousel(jobId, instruction.trim());
+      setInstruction('');
+      setJob(null);
+      setActive(0);
+      setJobId(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'adjustment failed');
+    } finally {
+      setStarting(false);
+    }
+  }, [jobId, instruction]);
+
+  const postText = job?.post
+    ? [job.post.body, (job.post.hashtags || []).join(' ')].filter(Boolean).join('\n\n')
+    : '';
+
+  const copyPost = async () => {
+    if (!postText) return;
+    try {
+      await navigator.clipboard.writeText(postText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — the text is visible for manual copy */
+    }
+  };
+
+  const downloadZip = async () => {
+    if (!job?.slides?.length) return;
+    setZipping(true);
+    try {
+      const zip = new JSZip();
+      await Promise.all(
+        job.slides.map(async (s) => {
+          const blob = await fetch(slideUrl(s.url)).then((r) => r.blob());
+          zip.file(`slide_${String(s.index + 1).padStart(2, '0')}.png`, blob);
+        })
+      );
+      if (postText) zip.file('post.txt', postText);
+      if (job.post?.altText) zip.file('alt.txt', job.post.altText);
+      const out = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(out);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `carousel-${job.id}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'zip failed');
+    } finally {
+      setZipping(false);
+    }
+  };
+
+  if (!article) return null;
+
+  const busy = Boolean(job && job.status !== 'done' && job.status !== 'error') || starting;
+  const slides = job?.slides ?? [];
+  const current = slides[active];
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm sm:p-6"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      dir="rtl"
+    >
+      <div className="relative flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0B0F17] text-right shadow-2xl">
+        <header className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-brand-400" />
+            <h2 className="font-bold text-white">קרוסלה מעוצבת עם Hermes</h2>
+          </div>
+          <button onClick={onClose} aria-label="סגירה" className="cursor-pointer rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white">
+            <X className="h-5 w-5" />
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <p className="mb-4 line-clamp-2 text-sm text-zinc-400">{article.title}</p>
+
+          {health && !health.ok && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[13px] text-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-bold">הגשר המקומי לא רץ</p>
+                <p className="mt-1 leading-relaxed text-amber-200/80">
+                  Hermes ו-Pillow קיימים רק במחשב הזה. הריצו מתיקיית הפרויקט:
+                  <code className="mx-1 rounded bg-black/40 px-1.5 py-0.5 font-mono text-[11px]">node carousel-bridge/index.js</code>
+                  ואז רעננו. כתובת: <span className="font-mono">{bridgeBase()}</span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {health?.ok && health.adminSecret === false && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[13px] text-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                הגשר רץ אך <span className="font-mono">ADMIN_API_SECRET</span> לא מוגדר — שלב הקופי יחזיר 401.
+                הפעילו מחדש עם המשתנה מוגדר.
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-[13px] text-rose-200">{error}</div>
+          )}
+
+          {!job && !starting && (
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-[13px] text-zinc-400">
+                מספר שקופיות
+                <select
+                  value={slideCount}
+                  onChange={(e) => setSlideCount(Number(e.target.value))}
+                  className="mr-2 cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1 text-white"
+                >
+                  {[3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
+              <button
+                onClick={() => void begin()}
+                disabled={!health?.ok}
+                className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-black disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ImageIcon className="h-4 w-4" /> צור קרוסלה ויזואלית
+              </button>
+              <span className="text-[11px] text-zinc-500">Hermes בוחר את הקונספט, הפלטה וההרכב לבד</span>
+            </div>
+          )}
+
+          {busy && (
+            <div className="flex flex-col items-center gap-3 py-12">
+              <Loader2 className="h-7 w-7 animate-spin text-brand-400" />
+              <p className="text-sm font-bold text-zinc-200">{job ? STATUS_LABEL[job.status] : 'מתחיל'}…</p>
+              {job?.progress?.total ? (
+                <>
+                  <div className="h-1.5 w-56 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-brand-500 transition-all duration-500"
+                      style={{ width: `${Math.round((job.progress.done / job.progress.total) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-zinc-500">
+                    {job.progress.done}/{job.progress.total} שקופיות · כ-90 שניות לשקופית
+                  </p>
+                </>
+              ) : null}
+              {job?.concept && <p className="max-w-md text-center text-[12px] text-zinc-400">{job.concept}</p>}
+            </div>
+          )}
+
+          {job?.status === 'done' && current && (
+            <>
+              <div className="relative mb-3 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                <img src={slideUrl(current.url)} alt={current.headline || `שקופית ${active + 1}`} className="mx-auto max-h-[46dvh] w-auto" />
+                {slides.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setActive((i) => (i - 1 + slides.length) % slides.length)}
+                      aria-label="הקודם"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded-full bg-black/70 p-2 text-white hover:bg-black"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => setActive((i) => (i + 1) % slides.length)}
+                      aria-label="הבא"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 cursor-pointer rounded-full bg-black/70 p-2 text-white hover:bg-black"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
+                {slides.map((s, i) => (
+                  <button
+                    key={s.index}
+                    onClick={() => setActive(i)}
+                    aria-label={`שקופית ${i + 1}`}
+                    className={`h-14 w-9 cursor-pointer overflow-hidden rounded border transition-all ${
+                      i === active ? 'border-brand-500 ring-1 ring-brand-500/50' : 'border-white/15 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={slideUrl(s.url)} alt="" className="h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+
+              <div className="mb-4 flex flex-wrap gap-2">
+                <button
+                  onClick={() => void downloadZip()}
+                  disabled={zipping}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-black disabled:opacity-50"
+                >
+                  {zipping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  הורדת כל השקופיות (ZIP)
+                </button>
+                <button
+                  onClick={() => void copyPost()}
+                  disabled={!postText}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-bold text-zinc-200 hover:bg-white/5 disabled:opacity-40"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? 'הועתק ✓' : 'העתק טקסט לפוסט'}
+                </button>
+              </div>
+
+              {postText && (
+                <textarea
+                  readOnly
+                  dir="rtl"
+                  rows={7}
+                  value={postText}
+                  className="mb-3 w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[13px] leading-relaxed text-zinc-200"
+                />
+              )}
+              {job.post?.altText && (
+                <p className="mb-4 rounded-lg border border-sky-400/25 bg-sky-500/[0.06] p-2 text-[11px] leading-relaxed text-zinc-300">
+                  <span className="font-bold text-sky-300">ALT: </span>{job.post.altText}
+                </p>
+              )}
+
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <p className="mb-2 text-[12px] font-bold text-zinc-300">רוצים לכוון את Hermes אחרת?</p>
+                <div className="flex gap-2">
+                  <input
+                    value={instruction}
+                    onChange={(e) => setInstruction(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void sendAdjustment()}
+                    placeholder="למשל: פלטה כחולה קרירה, פחות דמויות, יותר מרחב ריק למעלה"
+                    dir="rtl"
+                    className="flex-1 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[13px] text-white placeholder:text-zinc-600"
+                  />
+                  <button
+                    onClick={() => void sendAdjustment()}
+                    disabled={instruction.trim().length < 3}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-500/50 px-3 py-2 text-[13px] font-bold text-brand-400 hover:bg-brand-500/10 disabled:opacity-40"
+                  >
+                    <Send className="h-3.5 w-3.5" /> עדכן
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {job?.status === 'error' && (
+            <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-[13px] text-rose-200">
+              <p className="font-bold">הייצור נכשל</p>
+              <p className="mt-1 font-mono text-[11px] leading-relaxed">{job.error}</p>
+              <button onClick={() => void begin()} className="mt-2 cursor-pointer rounded-lg border border-white/20 px-3 py-1.5 text-[12px] font-bold text-white hover:bg-white/10">
+                נסו שוב
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
