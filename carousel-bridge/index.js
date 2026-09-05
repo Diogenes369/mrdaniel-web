@@ -55,7 +55,10 @@ const SITE_ORIGIN = process.env.SITE_ORIGIN || 'https://mrdaniel.co.il';
 const ADMIN_SECRET = process.env.ADMIN_API_SECRET || '';
 const PYTHON = process.env.PYTHON_BIN || 'python';
 const HERMES = process.env.HERMES_BIN || 'hermes';
-const HERMES_TIMEOUT_MS = Number(process.env.HERMES_TIMEOUT_MS) || 300_000;
+// 10 minutes. A complex claymorphism render can exceed the old 5-minute ceiling, which
+// surfaced in the modal as "hermes timed out after 300000ms" — the bridge's own error text
+// relayed through job.error, not a client-side timeout (the dashboard sets none).
+const HERMES_TIMEOUT_MS = Number(process.env.HERMES_TIMEOUT_MS) || 600_000;
 const DEFAULT_SLIDES = 4;
 const MAX_SLIDES = 8;
 
@@ -327,6 +330,7 @@ app.get('/health', (_req, res) => {
     siteOrigin: SITE_ORIGIN,
     adminSecret: Boolean(ADMIN_SECRET),
     renderScript: fs.existsSync(RENDER_SCRIPT),
+    hermesTimeoutMs: HERMES_TIMEOUT_MS,
     activeJobs: [...jobs.values()].filter((j) => !['done', 'error'].includes(j.status)).length,
   });
 });
