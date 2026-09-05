@@ -891,6 +891,19 @@ export function stripMarkdownEmphasis(text: string, keepSingleAsterisk = false):
   return out.replace(/__([^_\n]+)__/g, '$1').replace(/_([^_\n]+)_/g, '$1');
 }
 
+/**
+ * Drops bidi control marks (RLM/LRM/isolates) from a line.
+ *
+ * `sanitizeHebrewText` deliberately wraps every embedded Latin run in RLM so mixed Hebrew/English
+ * reads correctly. That is right for the post BODY but corrupts the two machine-parsed trailing
+ * lines: "ALT: ..." became "‏ALT‏: ..." so the label regex stopped matching (altText came
+ * back empty), and "#AI" became "#‏AI‏", which is not a usable hashtag on any platform.
+ * The body keeps its marks; only these fields are stripped.
+ */
+function stripBidiMarks(text: string): string {
+  return (text || '').replace(/[‎‏؜‪-‮⁦-⁩]/g, '');
+}
+
 export interface SynthesizedPost {
   body: string;
   /** Exactly 3-5, enforced here as well as in the prompt. */
@@ -950,22 +963,22 @@ export async function synthesizeNewsPost(input: {
 
   // ALT line first: it is the last line, and pulling it out before the hashtag split keeps it out
   // of the body regardless of the order the model emitted the two trailing lines in.
-  const altIdx = lines.findIndex((l) => /^\s*(ALT|alt text|טקסט חלופי)\s*:/i.test(l));
+  const altIdx = lines.findIndex((l) => /^\s*(ALT|alt text|טקסט חלופי)\s*:/i.test(stripBidiMarks(l)));
   let altText = '';
   if (altIdx !== -1) {
     altText = stripMarkdownEmphasis(
-      lines[altIdx].replace(/^\s*(ALT|alt text|טקסט חלופי)\s*:/i, '').trim()
+      stripBidiMarks(lines[altIdx]).replace(/^\s*(ALT|alt text|טקסט חלופי)\s*:/i, '').trim()
     ).trim();
     lines.splice(altIdx, 1);
   }
 
-  const tagIdx = lines.findIndex((l) => /^\s*(האשטגים|hashtags)\s*:/.test(l));
+  const tagIdx = lines.findIndex((l) => /^\s*(האשטגים|hashtags)\s*:/.test(stripBidiMarks(l)));
   let hashtags: string[] = [];
   let bodyLines = lines;
   if (tagIdx !== -1) {
     // Hard cap at 5 — the brief calls for exactly 3-5 and a long tag block reads as spam. The
     // prompt asks for it; this is what actually guarantees it.
-    hashtags = (lines[tagIdx].replace(/^\s*(האשטגים|hashtags)\s*:/i, '').match(/#[^\s#]+/g) ?? []).slice(0, 5);
+    hashtags = (stripBidiMarks(lines[tagIdx]).replace(/^\s*(האשטגים|hashtags)\s*:/i, '').match(/#[^\s#]+/g) ?? []).slice(0, 5);
     bodyLines = lines.slice(0, tagIdx);
   }
 
