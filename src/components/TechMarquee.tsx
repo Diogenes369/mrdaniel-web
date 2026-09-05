@@ -112,12 +112,20 @@ interface Anchor {
 
 const POP_HALF_WIDTH = 150;
 
+/**
+ * Glass pill, ultra-minimal. The previous chip was a heavy card — 1.3rem extra-bold text, a solid
+ * `bg-white/[0.05]` block, a brand-tinted border and a permanent double drop-shadow — which read as
+ * eleven competing buttons rather than one calm band. This is a hairline-bordered, blurred pill
+ * that is nearly invisible at rest and lights cyber-green only on hover/focus. No resting glow, no
+ * scale bounce: the only motion in the band is the scroll itself.
+ */
 const CHIP_CLASS =
-  'inline-flex items-center gap-3 rounded-xl border border-brand-500/25 bg-white/[0.05] backdrop-blur-md ' +
-  'px-5 py-3 md:px-6 md:py-3.5 text-[1.1rem] md:text-[1.3rem] font-extrabold tracking-tight text-white ' +
-  'shadow-[0_0_22px_-4px_rgba(118,185,0,0.28),0_2px_14px_rgba(0,0,0,0.4)] transition-all duration-200 ' +
-  'hover:scale-[1.06] hover:border-brand-400/60 hover:bg-white/[0.09] hover:shadow-[0_0_30px_-2px_rgba(118,185,0,0.5),0_2px_14px_rgba(0,0,0,0.4)] ' +
-  'focus-visible:scale-[1.06] focus-visible:outline-none focus-visible:border-brand-400/70 focus-visible:ring-2 focus-visible:ring-brand-400/40';
+  'tech-pill group inline-flex items-center gap-2.5 rounded-full border border-white/10 backdrop-blur-md ' +
+  'px-5 py-2.5 md:px-6 md:py-3 font-mono text-[0.8rem] md:text-[0.9rem] font-medium tracking-wide ' +
+  'whitespace-nowrap text-zinc-300 transition-all duration-300 ' +
+  'hover:border-[#00FF66]/50 hover:text-[#00FF66] hover:shadow-[0_0_15px_rgba(0,255,102,0.2)] ' +
+  'focus-visible:outline-none focus-visible:border-[#00FF66]/50 ' +
+  'focus-visible:text-[#00FF66] focus-visible:shadow-[0_0_15px_rgba(0,255,102,0.2)]';
 
 export default function TechMarquee() {
   const reduced = prefersReducedMotion();
@@ -217,7 +225,11 @@ export default function TechMarquee() {
         }}
         className={CHIP_CLASS}
       >
-        <Icon className="w-6 h-6 text-brand-400 shrink-0" aria-hidden="true" strokeWidth={2.4} />
+        <Icon
+          className="h-4 w-4 shrink-0 text-zinc-500 transition-colors duration-300 group-hover:text-[#00FF66] group-focus-visible:text-[#00FF66]"
+          aria-hidden="true"
+          strokeWidth={1.75}
+        />
         {tech.name}
         {dup === 1 && <span className="sr-only"> (עותק)</span>}
       </button>

@@ -235,9 +235,15 @@ body::before {
 .cyber-glass {
   position: relative;
   isolation: isolate;
-  /* Every glass card is a passive surface: a touch-drag anywhere on it scrolls the document.
-     Stated explicitly so no future ancestor rule can silently narrow the gesture on phones. */
-  touch-action: pan-y;
+  /* MUST stay `auto`. A previous pass set this to `pan-y` to guarantee that dragging a card
+     scrolls the page — but `touch-action` resolves from the element the touch STARTS on and is
+     intersected up the ancestor chain, so `pan-y` on the card forbade horizontal panning and broke
+     the mobile service/JARVIS carousels: a sideways swipe that began on a card (i.e. essentially
+     every swipe) was dropped and the rail never moved, hiding every card after the first.
+     `auto` is strictly more permissive than `pan-y` and already does the intended job: the browser
+     resolves the gesture direction itself, sending vertical drags to the page and horizontal ones
+     to the enclosing rail when there is one. Do not narrow this. */
+  touch-action: auto;
   background-color: rgba(9, 9, 11, 0.42);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -772,23 +778,51 @@ html.a11y-large-cursor * {
    vertical swipe over the band going straight to the page on Android. Pauses
    on hover; collapses to a static centered wrap under reduced-motion.
    --------------------------------------------------------------------------- */
+/* Glass-pill surface for the Arsenal marquee chips.
+   The pills carry `backdrop-blur-md`, but inside this marquee that filter is INERT: the
+   `mask-image` on `.tech-marquee__viewport` establishes a backdrop root, so a descendant's
+   `backdrop-filter` samples the (empty) masked subtree instead of the page behind it. Without a
+   real surface the pills sat directly on the 3D wireframe layer and the labels became unreadable
+   wherever a bright green edge passed behind them.
+   So the translucency is painted here instead: a dark base plus the white/3% glass film as a
+   second layer. Still see-through — the scene reads faintly through the pill — but the text
+   always has contrast. The blur utility is kept on the element because the reduced-motion
+   fallback renders the same chips OUTSIDE the masked viewport, where it does apply. */
+.tech-pill {
+  background-color: rgba(10, 12, 16, 0.55);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03));
+  transition: background-color 0.3s ease;
+}
+.tech-pill:hover,
+.tech-pill:focus-visible {
+  background-color: rgba(10, 12, 16, 0.72);
+}
+
 .tech-marquee__viewport {
   /* `clip` on X + `visible` on Y: X is fully clipped (no horizontal scrollbox), Y stays visible
      so chip shadows bleed and this is NOT a scroll container at all. `touch-action: pan-y`
      forwards every vertical swipe straight to the page. */
   overflow-x: clip;
   overflow-y: visible;
-  overflow-clip-margin: 12px;
+  overflow-clip-margin: 24px;
   touch-action: pan-y;
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
-  mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  /* Wide gradient fade on both edges — pills dissolve into the page background instead of being
+     cut off at a hard clip line. 15%/85% is a deliberately generous ramp: at 7% the old mask read
+     as a crop, not a fade. `overflow-clip-margin` is widened to let the hover glow bleed past the
+     clip box without reintroducing a horizontal scrollbox. */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent);
 }
 .tech-marquee__track {
   display: flex;
   width: max-content;
   /* Static fallback; the component overrides `animation-duration` to scale with item count. */
   animation: tech-marquee-scroll 50s linear infinite;
+  /* Own GPU layer for the whole loop: `will-change` + a 3D transform keep the linear translate on
+     the compositor thread, so the band doesn't hitch on low-power Android during page scroll. */
   will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
   /* Vertical swipe over the track goes straight to page scroll on touch devices. */
   touch-action: pan-y;
 }
@@ -800,16 +834,18 @@ html.a11y-large-cursor * {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 1.5rem;
-  padding-inline: 0.75rem;
+  /* Wider than the old 1.5rem: the pills are lighter now, so the band needs air between them to
+     read as a calm stream rather than a packed row of buttons. */
+  gap: 2.25rem;
+  padding-inline: 1.125rem;
 }
 .tech-marquee__group > * {
   flex-shrink: 0;
 }
 @media (max-width: 640px) {
   .tech-marquee__group {
-    gap: 1rem;
-    padding-inline: 0.5rem;
+    gap: 1.5rem;
+    padding-inline: 0.75rem;
   }
 }
 @keyframes tech-marquee-scroll {
