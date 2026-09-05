@@ -93,6 +93,7 @@ export default function NewsContentAgent() {
   const [posting, setPosting] = useState(false);
   const postSeq = useRef(0);
   const [copied, setCopied] = useState(false);
+  const [altCopied, setAltCopied] = useState(false);
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageSource, setImageSource] = useState<BgSource | null>(null);
@@ -499,6 +500,17 @@ export default function NewsContentAgent() {
 
   // (Branded-image rendering moved into `generateContent` above — no longer auto-runs on select.)
 
+  const copyAlt = async () => {
+    if (!post?.altText) return;
+    try {
+      await navigator.clipboard.writeText(post.altText);
+      setAltCopied(true);
+      window.setTimeout(() => setAltCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — the text is visible for manual copy */
+    }
+  };
+
   const copyText = async () => {
     if (!post) return;
     try {
@@ -840,6 +852,25 @@ export default function NewsContentAgent() {
                       </span>
                     ))}
                   </div>
+                  {post.altText && (
+                    <div className="mb-2 rounded-lg border border-sky-400/25 bg-sky-500/[0.06] p-2">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-sky-300">
+                          ALT · תיאור תמונה לנגישות ו-SEO
+                        </span>
+                        <button
+                          onClick={copyAlt}
+                          className="flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold text-sky-300 hover:bg-sky-500/15"
+                        >
+                          {altCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                          {altCopied ? 'הועתק ✓' : 'העתק'}
+                        </button>
+                      </div>
+                      <p dir="rtl" className="text-[11px] leading-relaxed text-zinc-300">
+                        {post.altText}
+                      </p>
+                    </div>
+                  )}
                   <p className="text-[11px] text-zinc-500 bg-black/30 border border-brand-500/20 rounded-lg p-2 leading-relaxed">
                     <span className="text-brand-400 font-bold">קריאה לפעולה (קבועה): </span>
                     {post.footer}

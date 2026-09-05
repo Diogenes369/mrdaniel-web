@@ -170,6 +170,9 @@ export interface ComposedPost {
   footer: string;
   /** true when the body was written by the adaptive LLM synthesis step; false = deterministic. */
   synthesized: boolean;
+  /** One-sentence Hebrew image description for screen readers + image SEO. Only the LLM path
+   *  produces one; the deterministic template fallback leaves it empty. */
+  altText?: string;
 }
 
 /** Close a fragment with a full stop so takeaways read as flowing sentences, not a list. */
@@ -326,21 +329,25 @@ export function assembleComposedPost(
   item: NewsItem,
   platform: SocialPlatform,
   body: string,
-  aiHashtags: string[]
+  aiHashtags: string[],
+  altText?: string
 ): ComposedPost {
+  // Capped at 5: the brief calls for exactly 3-5 relevant Israeli-market tags, and a long tag
+  // block reads as spam on both Instagram and LinkedIn.
   const hashtags = (
     aiHashtags && aiHashtags.length >= 3 ? aiHashtags : topicHashtags(item.topic, platform === 'linkedin')
-  ).slice(0, 12);
+  ).slice(0, 5);
   const fullText = [stripMetaPhrases(body.trim()), ...postTail(item, platform, hashtags)].join('\n\n');
-  return { fullText, hashtags, footer: SITE_PROMO_FOOTER, synthesized: true };
+  return { fullText, hashtags, footer: SITE_PROMO_FOOTER, synthesized: true, altText };
 }
 
 /**
  * PRIMARY (dashboard, human-in-the-loop): calls the site's post-synthesis endpoint
  * (/api/agent-generate · action:"post-synthesize") for an adaptive, article-typed Hebrew post
- * body — dynamic structure per subject (cyber incident / AI launch / hardware / policy), every
- * material fact from the source woven in, organic paragraphs, **bold** key terms. Throws on any
- * failure so the caller can fall back to composeNewsPost().
+ * body — a four-part conversion structure (hook / value + insight / brand tie-in / CTA) written
+ * for Israeli business owners and SMBs, every material fact from the source woven in, plain text
+ * with no markdown emphasis, 3-5 hashtags, plus an ALT-text line for accessibility and image SEO.
+ * Throws on any failure so the caller can fall back to composeNewsPost().
  */
 export async function synthesizeNewsPost(
   item: NewsItem,
@@ -383,7 +390,7 @@ export async function synthesizeNewsPost(
   const data = (await res.json()) as {
     ok?: boolean;
     blocked?: boolean;
-    post?: { body?: string; hashtags?: string[] };
+    post?: { body?: string; hashtags?: string[]; altText?: string };
   };
   if (
     !data.ok ||
@@ -394,5 +401,5 @@ export async function synthesizeNewsPost(
   ) {
     throw new Error('post-synthesize returned no usable body');
   }
-  return assembleComposedPost(item, platform, data.post.body, data.post.hashtags ?? []);
+  return assembleComposedPost(item, platform, data.post.body, data.post.hashtags ?? [], data.post.altText);
 }
