@@ -34,6 +34,19 @@ import express from 'express';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
+
+// Load carousel-bridge/.env (then the repo-root .env) before reading any config below.
+// Uses Node's built-in loader — no dotenv dependency. Existing process env always wins, so
+// `ADMIN_API_SECRET=... node carousel-bridge/index.js` still overrides the file.
+for (const envFile of [path.join(__dirname, '.env'), path.join(REPO_ROOT, '.env')]) {
+  if (!fs.existsSync(envFile)) continue;
+  try {
+    process.loadEnvFile(envFile);
+    console.log(`[carousel-bridge] loaded env from ${envFile}`);
+  } catch (err) {
+    console.warn(`[carousel-bridge] could not read ${envFile}: ${err.message}`);
+  }
+}
 const OUTPUT_ROOT = path.join(__dirname, 'output');
 const RENDER_SCRIPT = path.join(REPO_ROOT, 'scripts', 'render_hebrew_banner.py');
 
