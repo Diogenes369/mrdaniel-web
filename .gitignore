@@ -9,3 +9,8 @@ dist/
 .netlify
 
 .vercel
+
+# Python bytecode from the local Hebrew render scripts
+scripts/__pycache__/
+__pycache__/
+*.pyc
