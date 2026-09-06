@@ -3,11 +3,12 @@ import JSZip from 'jszip';
 import {
   X, ChevronLeft, ChevronRight, Download, Copy, Check, Sparkles,
   AlertTriangle, Loader2, Send, Image as ImageIcon, Upload, Link2, Trash2,
-  Palette, Type, LayoutGrid, ShieldCheck, Instagram, Newspaper,
+  Palette, Type, LayoutGrid, ShieldCheck, Instagram, Newspaper, KeyRound,
 } from 'lucide-react';
 import {
   startCarousel, fetchJob, adjustCarousel, checkBridge, slideUrl, bridgeBase, STATUS_LABEL,
   fileToDataUrl, MAX_REFERENCE_BYTES, REFERENCE_ACCEPT, PALETTES, FONTS, TEMPLATES,
+  bridgeToken, setBridgeToken,
   type ArticleInput, type CarouselJob, type BridgeHealth, type SlideCopy,
 } from '../lib/carouselBridge';
 
@@ -50,6 +51,11 @@ export default function CarouselStudioModal({
   const [skipQa, setSkipQa] = useState(false);
   // 'rebrand' translates a source post 1:1 into unbranded Hebrew; 'article' synthesises new copy.
   const [mode, setMode] = useState<'article' | 'rebrand'>('article');
+  // Bridge token lives in localStorage, never in the bundle. Editable here so the operator
+  // never has to open a browser console to authenticate.
+  const [tokenDraft, setTokenDraft] = useState('');
+  const [tokenSaved, setTokenSaved] = useState(false);
+  const [hasToken, setHasToken] = useState(() => Boolean(bridgeToken()));
   const [copied, setCopied] = useState(false);
   const [zipping, setZipping] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -112,7 +118,13 @@ export default function CarouselStudioModal({
         mode,
       }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'failed to start');
+      const msg = e instanceof Error ? e.message : 'failed to start';
+      setError(
+        /x-bridge-token/i.test(msg)
+          ? 'הגשר דחה את הבקשה: טוקן חסר או שגוי. הדביקו את BRIDGE_TOKEN מתוך carousel-bridge/.env בשדה שלמעלה.'
+          : msg
+      );
+      if (/x-bridge-token/i.test(msg)) setHasToken(false);
     } finally {
       setStarting(false);
     }
@@ -134,6 +146,18 @@ export default function CarouselStudioModal({
   const patchSlide = useCallback((i: number, patch: Partial<SlideCopy>) => {
     setSlideCopy((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   }, []);
+
+  const saveToken = useCallback(() => {
+    const value = tokenDraft.trim();
+    if (!value) return;
+    setBridgeToken(value);
+    setHasToken(true);
+    setTokenSaved(true);
+    setError(null);
+    setTokenDraft('');
+    window.setTimeout(() => setTokenSaved(false), 2000);
+    void checkBridge().then(setHealth);
+  }, [tokenDraft]);
 
   const pickReference = useCallback(async (file: File | null) => {
     if (!file) return;
@@ -263,6 +287,37 @@ export default function CarouselStudioModal({
                 הגשר רץ אך <span className="font-mono">ADMIN_API_SECRET</span> לא מוגדר — שלב הקופי יחזיר 401.
                 הפעילו מחדש עם המשתנה מוגדר.
               </p>
+            </div>
+          )}
+
+          {health?.ok && health.tokenRequired && !hasToken && (
+            <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+              <p className="mb-1 flex items-center gap-1.5 text-[12px] font-bold text-amber-200">
+                <KeyRound className="h-3.5 w-3.5" /> נדרש טוקן גישה לגשר
+              </p>
+              <p className="mb-2 text-[11px] leading-relaxed text-amber-200/80">
+                הגשר דורש אימות (הוא מריץ Hermes על המחשב שלכם והמנהרה פתוחה לאינטרנט).
+                הדביקו את הערך של <span className="font-mono">BRIDGE_TOKEN</span> מתוך
+                <span className="font-mono"> carousel-bridge/.env</span>. הוא נשמר בדפדפן הזה בלבד ולא נכלל בקוד האתר.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={tokenDraft}
+                  onChange={(e) => setTokenDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && saveToken()}
+                  placeholder="BRIDGE_TOKEN"
+                  dir="ltr"
+                  className="flex-1 rounded-lg border border-white/15 bg-black/40 px-3 py-2 font-mono text-[12px] text-white placeholder:text-zinc-600"
+                />
+                <button
+                  onClick={saveToken}
+                  disabled={tokenDraft.trim().length < 8}
+                  className="cursor-pointer rounded-lg bg-brand-500 px-3 py-2 text-[12px] font-bold text-black disabled:opacity-40"
+                >
+                  {tokenSaved ? 'נשמר ✓' : 'שמירה'}
+                </button>
+              </div>
             </div>
           )}
 
