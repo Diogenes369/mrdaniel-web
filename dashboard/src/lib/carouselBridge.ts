@@ -6,7 +6,40 @@
  * "start the bridge" state rather than throwing.
  */
 
-const DEFAULT_BASE = 'http://127.0.0.1:8787';
+/**
+ * Bridge URL resolution, most specific first:
+ *   1. localStorage override (per-browser, set via setBridgeBase)
+ *   2. VITE_CAROUSEL_BRIDGE_URL baked in at BUILD time
+ *   3. localhost default
+ *
+ * Note (2) must be VITE_-prefixed: the dashboard is a static Vite SPA, so a plain server-side env
+ * var on Vercel is never visible to it. It is also inlined at build time, so changing it requires
+ * a redeploy, not just an env update.
+ */
+const BUILD_BASE = (import.meta.env.VITE_CAROUSEL_BRIDGE_URL || '').replace(/\/$/, '');
+const DEFAULT_BASE = BUILD_BASE || 'http://127.0.0.1:8787';
+
+/** Token for the bridge's x-bridge-token gate. Per-browser; never baked into the bundle. */
+export function bridgeToken(): string {
+  try {
+    return localStorage.getItem('carousel-bridge-token') || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setBridgeToken(token: string) {
+  try {
+    localStorage.setItem('carousel-bridge-token', token.trim());
+  } catch {
+    /* private mode — the call will 401 until the token can be stored */
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const token = bridgeToken();
+  return token ? { 'x-bridge-token': token } : {};
+}
 
 export function bridgeBase(): string {
   try {
@@ -32,6 +65,9 @@ export interface BridgeHealth {
   adminSecret?: boolean;
   renderScript?: boolean;
   activeJobs?: number;
+  hermesTimeoutMs?: number;
+  /** true when the bridge requires x-bridge-token (always true behind a tunnel). */
+  tokenRequired?: boolean;
 }
 
 export interface CarouselSlide {
@@ -86,7 +122,7 @@ export async function startCarousel(
 ): Promise<string> {
   const res = await fetch(`${bridgeBase()}/carousel/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ article, slideCount, override }),
   });
   const data = await res.json().catch(() => ({}));
@@ -95,7 +131,7 @@ export async function startCarousel(
 }
 
 export async function fetchJob(jobId: string): Promise<CarouselJob> {
-  const res = await fetch(`${bridgeBase()}/carousel/job/${jobId}`);
+  const res = await fetch(`${bridgeBase()}/carousel/job/${jobId}`, { headers: authHeaders() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) throw new Error(data.error || `bridge responded ${res.status}`);
   return data as CarouselJob;
@@ -105,7 +141,7 @@ export async function fetchJob(jobId: string): Promise<CarouselJob> {
 export async function adjustCarousel(jobId: string, instruction: string): Promise<string> {
   const res = await fetch(`${bridgeBase()}/carousel/adjust`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ jobId, instruction }),
   });
   const data = await res.json().catch(() => ({}));

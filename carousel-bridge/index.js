@@ -59,6 +59,21 @@ const HERMES = process.env.HERMES_BIN || 'hermes';
 // surfaced in the modal as "hermes timed out after 300000ms" — the bridge's own error text
 // relayed through job.error, not a client-side timeout (the dashboard sets none).
 const HERMES_TIMEOUT_MS = Number(process.env.HERMES_TIMEOUT_MS) || 600_000;
+
+/**
+ * Shared token required on every /carousel route.
+ *
+ * This service spawns `hermes -z` with caller-supplied text (`override`, /carousel/adjust
+ * instructions) — that is a prompt fed to an agent with tool-calling and code execution on this
+ * machine. On loopback that is fine; reachable from the internet through a tunnel it is a remote
+ * code execution path. So: no token, no tunnel. The server refuses to serve non-loopback traffic
+ * unless BRIDGE_TOKEN is set.
+ */
+const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN || '';
+/** Comma-separated origins allowed to call the bridge. Defaults to localhost dev + the dashboard. */
+const ALLOWED_ORIGINS = (process.env.BRIDGE_ALLOWED_ORIGINS ||
+  'http://localhost:5174,http://127.0.0.1:5174')
+  .split(',').map((o) => o.trim()).filter(Boolean);
 const DEFAULT_SLIDES = 4;
 const MAX_SLIDES = 8;
 
@@ -313,12 +328,35 @@ function startJob(input) {
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use((req, res, next) => {
-  // Local single-user tool. Open CORS so the dashboard works from localhost:5174 and from the
-  // deployed Vercel dashboard alike; the service only ever binds 127.0.0.1.
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // Reflect only allow-listed origins. `*` is deliberately NOT used: with a tunnel in front, any
+  // web page could otherwise drive Hermes on this machine from a visitor's browser.
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  } else if (!origin) {
+    res.setHeader('Access-Control-Allow-Origin', '*'); // curl / server-to-server
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-bridge-token');
   if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
+});
+
+/** Token gate on everything that can reach Hermes. /health stays open so the UI can probe it. */
+app.use('/carousel', (req, res, next) => {
+  if (!BRIDGE_TOKEN) {
+    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    if (!local) {
+      return res.status(503).json({
+        ok: false,
+        error: 'BRIDGE_TOKEN is not set — refusing non-loopback requests. Set it before tunneling.',
+      });
+    }
+    return next();
+  }
+  const supplied = req.get('x-bridge-token') || '';
+  if (supplied !== BRIDGE_TOKEN) return res.status(401).json({ ok: false, error: 'bad or missing x-bridge-token' });
   next();
 });
 
@@ -331,6 +369,7 @@ app.get('/health', (_req, res) => {
     adminSecret: Boolean(ADMIN_SECRET),
     renderScript: fs.existsSync(RENDER_SCRIPT),
     hermesTimeoutMs: HERMES_TIMEOUT_MS,
+    tokenRequired: Boolean(BRIDGE_TOKEN),
     activeJobs: [...jobs.values()].filter((j) => !['done', 'error'].includes(j.status)).length,
   });
 });
