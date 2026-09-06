@@ -265,6 +265,123 @@ const IG_PASTE_HINT =
   + '\u05d0\u05d9\u05e0\u05e1\u05d8\u05d2\u05e8\u05dd \u05d7\u05d5\u05e1\u05de\u05ea \u05e9\u05dc\u05d9\u05e4\u05ea \u05ea\u05d5\u05db\u05df \u05de\u05e7\u05d9\u05e9\u05d5\u05e8. '
   + '\u05d4\u05e2\u05ea\u05d9\u05e7\u05d5 \u05d5\u05d4\u05d3\u05d1\u05d9\u05e7\u05d5 \u05d0\u05ea \u05db\u05d9\u05ea\u05d5\u05d1 \u05d4\u05e4\u05d5\u05e1\u05d8 \u05d9\u05e9\u05d9\u05e8\u05d5\u05ea \u05dc\u05ea\u05d9\u05d1\u05ea \u05d4\u05d8\u05e7\u05e1\u05d8.';
 
+/**
+ * Threads (threads.net / threads.com) source extraction.
+ *
+ * WHAT THE OFFICIAL API CAN AND CANNOT DO — verified against graph.threads.net:
+ * - oEmbed (`/v1.0/oembed`) exists and returns a single post, but it rejects an
+ *   `app-id|app-secret` app token outright ("Cannot parse access token"). Threads requires a USER
+ *   access token obtained through OAuth; app credentials alone authenticate nothing.
+ * - The reply-chain edges (`/{id}/replies`, `/{id}/conversation`) are scoped to the AUTHENTICATED
+ *   user's own threads. There is no supported way to read another account's post plus its reply
+ *   chain. So the full-thread fetch works for Daniel's own posts once a user token is present, and
+ *   is simply unavailable for anyone else's — no scraping fallback is attempted, since that would
+ *   mean circumventing Meta's access controls.
+ *
+ * Configure by putting a user token in THREADS_USER_TOKEN (carousel-bridge/.env). THREADS_APP_ID /
+ * THREADS_APP_SECRET are read and used to build the OAuth URL and to exchange a short-lived token,
+ * but are not themselves sufficient to read anything.
+ */
+const THREADS_URL_RE = /(?:threads\.net|threads\.com)\/@([\w.]+)\/post\/([A-Za-z0-9_-]+)/i;
+const THREADS_API = 'https://graph.threads.net/v1.0';
+
+function isThreadsUrl(url) {
+  return THREADS_URL_RE.test(String(url || ''));
+}
+
+function threadsConfig() {
+  return {
+    appId: process.env.THREADS_APP_ID || '',
+    appSecret: process.env.THREADS_APP_SECRET || '',
+    userToken: process.env.THREADS_USER_TOKEN || '',
+  };
+}
+
+async function threadsGet(pathname, params) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${THREADS_API}${pathname}?${qs}`, { signal: AbortSignal.timeout(20_000) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    throw new Error(data.error?.message || `threads api ${res.status}`);
+  }
+  return data;
+}
+
+/**
+ * Primary post plus its ordered reply chain, flattened into one source payload.
+ *
+ * Replies are numbered so the rebrander can turn each into its own slide, which is what makes a
+ * "thread of steps" convert cleanly into a numbered carousel.
+ */
+async function fetchThreadsChain(url) {
+  const { userToken } = threadsConfig();
+  if (!userToken) return null;
+
+  const m = THREADS_URL_RE.exec(url);
+  if (!m) return null;
+  const [, handle, shortcode] = m;
+
+  try {
+    // Resolve the permalink to a media id, then read the post and its replies.
+    const lookup = await threadsGet('/me/threads', {
+      fields: 'id,permalink,text,timestamp',
+      limit: '50',
+      access_token: userToken,
+    });
+    const post = (lookup.data || []).find((t) => String(t.permalink || '').includes(shortcode));
+    if (!post) {
+      // Not one of Daniel's own posts — the API cannot reach another account's thread.
+      return { unavailable: `@${handle}'s thread is not readable via the Threads API (it only exposes your own posts).` };
+    }
+
+    const replies = await threadsGet(`/${post.id}/replies`, {
+      fields: 'id,text,timestamp,is_reply_owned_by_me',
+      limit: '50',
+      access_token: userToken,
+    });
+
+    // Keep only the author's own replies, in chronological order: that is the actual thread,
+    // as opposed to other people's comments on it.
+    const chain = (replies.data || [])
+      .filter((r) => r.is_reply_owned_by_me !== false && String(r.text || '').trim())
+      .sort((a, b) => String(a.timestamp || '').localeCompare(String(b.timestamp || '')))
+      .map((r) => String(r.text).trim());
+
+    const numbered = chain.map((t, i) => `${i + 1}. ${t}`).join('\n\n');
+    const body = [String(post.text || '').trim(), numbered].filter(Boolean).join('\n\n');
+
+    return {
+      title: String(post.text || '').split('\n')[0].slice(0, 120),
+      body,
+      source: 'threads.net',
+      steps: chain.length,
+    };
+  } catch (err) {
+    console.warn(`[carousel-bridge] threads api failed: ${err.message}`);
+    return null;
+  }
+}
+
+/** Single post via oEmbed. Needs a user token; app credentials alone are rejected. */
+async function fetchThreadsOEmbed(url) {
+  const { userToken } = threadsConfig();
+  if (!userToken) return null;
+  try {
+    const data = await threadsGet('/oembed', { url, access_token: userToken, omitscript: 'true' });
+    const text = String(data.title || data.html || '').replace(/<[^>]+>/g, ' ').trim();
+    if (text.length < 20) return null;
+    return { title: text.split('\n')[0].slice(0, 120), body: text, source: 'threads.net' };
+  } catch (err) {
+    console.warn(`[carousel-bridge] threads oembed failed: ${err.message}`);
+    return null;
+  }
+}
+
+const THREADS_PASTE_HINT =
+  'Threads could not be read automatically. The Threads API only exposes your OWN posts and needs '
+  + 'THREADS_USER_TOKEN (an OAuth user token, not the app secret). Copy & paste the thread text '
+  + 'directly into the text box instead.';
+
 async function importSource(url) {
   // Instagram first: the generic og:/readability extractor cannot see past the login wall, so the
   // official oEmbed endpoint is the only route that returns a caption.
@@ -273,10 +390,26 @@ async function importSource(url) {
     if (viaOEmbed) return viaOEmbed;
   }
 
+  // Threads: prefer the full post + ordered reply chain, then the single-post oEmbed. Both return
+  // null when unconfigured or when the post belongs to someone else, and fall through below.
+  if (isThreadsUrl(url)) {
+    const chain = await fetchThreadsChain(url);
+    if (chain && chain.body) {
+      console.log(`[carousel-bridge] threads: post + ${chain.steps} reply step(s), ${chain.body.length} chars`);
+      return chain;
+    }
+    if (chain && chain.unavailable) console.warn(`[carousel-bridge] ${chain.unavailable}`);
+    const single = await fetchThreadsOEmbed(url);
+    if (single) return single;
+  }
+
   const { imported } = await callSite('import-url', { url });
   const title = String(imported?.title || '').trim();
   const body = String(imported?.body || '').trim();
   if (body.length < 60 && title.length < 10) {
+    if (isThreadsUrl(url)) {
+      throw new Error(THREADS_PASTE_HINT);
+    }
     if (isInstagramUrl(url)) {
       throw new Error(
         IG_PASTE_HINT
@@ -690,6 +823,11 @@ ABSOLUTE RULES:
 3. NATURAL HEBREW. Idiomatic and readable, not a literal word-for-word calque. Technical terms may
    stay in Latin script inside a Hebrew sentence. No markdown, no asterisks.
 4. Each slide is one discrete step or idea from the source, in the source's original order.
+5. THREADED SOURCES. If the text arrives as a numbered chain ("1. ... 2. ... 3. ..."), that
+   numbering is the thread's own reply order and is authoritative: emit exactly one slide per
+   numbered entry, in that order, never merging two entries into one slide or splitting one across
+   two. Any text before "1." is the opening post and becomes the set's title and first slide's
+   framing, not a step of its own.
 
 Return ONLY valid JSON, no prose:
 {"title":"Hebrew headline for the whole set",
@@ -930,6 +1068,9 @@ app.get('/health', (_req, res) => {
     hermesTimeoutMs: HERMES_TIMEOUT_MS,
     tokenRequired: Boolean(BRIDGE_TOKEN),
     instagramOEmbed: Boolean(process.env.INSTAGRAM_OEMBED_TOKEN),
+    threadsApp: Boolean(process.env.THREADS_APP_ID && process.env.THREADS_APP_SECRET),
+    // App credentials alone read nothing; a user OAuth token is what makes Threads work.
+    threadsUserToken: Boolean(process.env.THREADS_USER_TOKEN),
     activeJobs: [...jobs.values()].filter((j) => !['done', 'error'].includes(j.status)).length,
   });
 });
