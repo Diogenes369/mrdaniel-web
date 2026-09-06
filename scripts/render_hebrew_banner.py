@@ -55,15 +55,20 @@ REPO_FONTS = Path(__file__).resolve().parent / "fonts"
 # 22/22 Hebrew glyph coverage by bitmap-vs-.notdef comparison (NOT by the old ink-density scan,
 # which wrongly reported Consolas and Palatino as "heavy Hebrew").
 FONTS: dict[str, Path] = {
-    "gveret": REPO_FONTS / "GveretLevin-Regular.ttf",   # Hebrew handwriting / marker feel
-    "assistant": REPO_FONTS / "Assistant.ttf",          # clean modern sans, neutral
-    "varela": REPO_FONTS / "VarelaRound-Regular.ttf",   # rounded, friendly — suits claymorphism
+    # Clean modern Hebrew sans first — these are the only faces approved for the sketchnote /
+    # infographic system. Cursive and handwriting faces are illegible at slide sizes and are
+    # deliberately NOT the default.
+    "heebo": REPO_FONTS / "Heebo.ttf",                  # neutral geometric sans — default
+    "assistant": REPO_FONTS / "Assistant.ttf",          # clean modern sans
+    "rubik": REPO_FONTS / "Rubik.ttf",                  # slightly rounded, strong headlines
+    "varela": REPO_FONTS / "VarelaRound-Regular.ttf",   # rounded, friendly
+    "gveret": REPO_FONTS / "GveretLevin-Regular.ttf",   # handwriting — decorative only, avoid
     # System fallbacks, also verified 22/22:
     "guttman": Path("C:/Windows/Fonts/GHAIM.TTF"),      # Guttman-Haim
     "david": Path("C:/Windows/Fonts/david.ttf"),
     "gisha": Path("C:/Windows/Fonts/gisha.ttf"),
 }
-DEFAULT_FONT = "varela"
+DEFAULT_FONT = "heebo"
 
 
 def resolve_font(name: str, size: int) -> ImageFont.FreeTypeFont:
@@ -75,6 +80,32 @@ def resolve_font(name: str, size: int) -> ImageFont.FreeTypeFont:
         known = ", ".join(k for k, p in FONTS.items() if p.exists())
         raise FileNotFoundError(f"Font not found: {candidate}\nAvailable: {known}")
     return ImageFont.truetype(str(candidate), size)
+
+
+def assert_glyph_coverage(font: ImageFont.FreeTypeFont, text: str, font_name: str) -> None:
+    """
+    Abort if the font lacks a glyph for any character we are about to draw.
+
+    A missing glyph renders as .notdef — the empty box / question mark that used to appear for
+    final letters, geresh/gershayim or punctuation depending on the face. Pillow does not warn, so
+    without this check a broken slide looks like a successful render.
+    """
+    probe = Image.new("L", (96, 128), 0)
+    notdef = _mask(probe, font, "￿")
+    blank = _mask(probe, font, " ")
+    missing = sorted({c for c in text if not c.isspace() and _mask(probe, font, c) in (notdef, blank)})
+    if missing:
+        raise SystemExit(
+            "FATAL: font " + repr(font_name) + " has no glyph for: "
+            + " ".join(repr(c) for c in missing)
+            + ". Pick another --font (heebo, assistant, rubik) rather than shipping empty boxes."
+        )
+
+
+def _mask(img: Image.Image, font: ImageFont.FreeTypeFont, ch: str) -> bytes:
+    img.paste(0, (0, 0) + img.size)
+    ImageDraw.Draw(img).text((6, 6), ch, font=font, fill=255)
+    return img.tobytes()
 
 
 def to_visual(text: str) -> str:
@@ -119,6 +150,7 @@ def render_banner(
     outline_color: str | None = "#000000",
     outline_width: int = 3,
     max_width_pct: float = 0.82,
+    max_lines: int = 0,
 ) -> Path:
     img = Image.open(image_path).convert("RGB")
     draw = ImageDraw.Draw(img)
@@ -135,9 +167,27 @@ def render_banner(
     else:
         x, anchor = margin, "lt"
 
-    wrapped: list[str] = []
-    for line in text_lines:
-        wrapped.extend(wrap_line(line, font, max_width, draw) or [""])
+    assert_glyph_coverage(font, "".join(text_lines), font_name)
+
+    # Auto-fit: the layout schema reserves a fixed band (header ~22%, footer banner ~18%), so the
+    # text must shrink to fit rather than overflow across the artwork. Steps down 2px at a time to
+    # a floor, then accepts whatever fits best.
+    def wrap_all(f: ImageFont.FreeTypeFont) -> list[str]:
+        out: list[str] = []
+        for line in text_lines:
+            out.extend(wrap_line(line, f, max_width, draw) or [""])
+        return out
+
+    wrapped = wrap_all(font)
+    if max_lines > 0:
+        size = font_size
+        while len(wrapped) > max_lines and size > 18:
+            size -= 2
+            font = resolve_font(font_name, size)
+            wrapped = wrap_all(font)
+        if len(wrapped) > max_lines:
+            wrapped = wrapped[:max_lines]
+        font_size = size
 
     y = start_y
     for line in wrapped:
@@ -265,6 +315,7 @@ def main() -> int:
     ap.add_argument("--margin", type=int, default=56)
     ap.add_argument("--align", choices=["right", "center", "left"], default="right")
     ap.add_argument("--max-width-pct", type=float, default=0.82, help="Wrap width as a fraction of canvas width")
+    ap.add_argument("--max-lines", type=int, default=0, help="Shrink the font until the block fits N lines (0 = off)")
     ap.add_argument("--color", default="#FFFFFF")
     ap.add_argument("--outline", default="#000000", help='Outline colour, or "none" to disable')
     ap.add_argument("--outline-width", type=int, default=3)
@@ -298,6 +349,7 @@ def main() -> int:
         outline_color=None if args.outline.lower() == "none" else args.outline,
         outline_width=args.outline_width,
         max_width_pct=args.max_width_pct,
+        max_lines=args.max_lines,
     )
 
     if args.send_telegram and not send_to_telegram(out, args.caption):

@@ -74,6 +74,8 @@ const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN || '';
 const ALLOWED_ORIGINS = (process.env.BRIDGE_ALLOWED_ORIGINS ||
   'http://localhost:5174,http://127.0.0.1:5174')
   .split(',').map((o) => o.trim()).filter(Boolean);
+/** Clean Hebrew sans for the overlay. Override with RENDER_FONT=assistant|rubik. */
+const RENDER_FONT = process.env.RENDER_FONT || 'heebo';
 const DEFAULT_SLIDES = 4;
 const MAX_SLIDES = 8;
 
@@ -213,37 +215,139 @@ async function importSource(url) {
 
 // --- pipeline stages --------------------------------------------------------------------------
 
+/**
+ * The one design system every generated carousel must follow.
+ *
+ * Replaces the previous claymorphism direction outright. Two things were wrong with it: the output
+ * was decorative rather than explanatory (soft abstract blobs that could accompany any story), and
+ * it fought the Hebrew overlay for space. This system is a 2D sketchnote/infographic language whose
+ * imagery must literally depict the specific story, with reserved empty zones for the Hebrew that
+ * Pillow composites afterwards.
+ */
+const DESIGN_SYSTEM = `MANDATORY DESIGN SYSTEM — these rules override any style you would otherwise choose.
+
+BANNED, without exception. If any of these appear the slide is rejected:
+clay, claymorphism, plasticine, "3D render", 3D, octane, blender, abstract shapes, soft organic
+forms, blobs, orbs, glossy spheres, floating pebbles, generic gradient backgrounds, decorative
+swirls. Do not produce a pretty abstract image. Produce an explanatory diagram.
+
+VISUAL STYLE:
+Clean 2D hand-drawn technical illustration — sketchnote / visual-notes style, as if a skilled
+designer drew the concept with fine ink pens on paper. Confident charcoal ink linework of even
+weight, flat fills, no photorealism, no 3D shading, no bevels, no drop shadows beyond a light
+1-2px offset. Background is a textured light cream paper (#F8F6EF) with subtle fibre grain.
+
+COLOUR PALETTE — use these and nothing else:
+- Background: #F8F6EF cream paper
+- Ink / text / linework: #1A1A1A charcoal
+- Primary accent (headers, numbered badges, footer banner): #E85A2A vibrant orange
+- Secondary accent (checks, positive metrics, supporting fills): teal/green #2E9E8F
+- Highlight: subtle yellow #F5C542, used sparingly as a marker-pen emphasis
+
+CONTAINERS:
+Hand-drawn charcoal ink boxes with rounded corners frame every step, metric and section. Lines look
+drawn, not vector-perfect — slight wobble is correct. Boxes sit on the cream background with clear
+breathing room between them.
+
+ICONS AND CHARACTERS:
+Friendly, cute 2D AI robot characters drawn in the same ink style — simple rounded bodies, small
+expressive faces, no 3D. Alongside them use screens/monitors, hourglasses, checklists, progress
+bars, gauges, padlocks, shields, magnifying glasses, documents, receipts, and directional arrows.
+Characters must be DOING the thing the slide is about.
+
+LAYOUT SCHEMA — every slide follows this vertical structure:
+1. TOP HEADER ZONE: leave the top ~22% visually clean and uncluttered. A bold Hebrew headline is
+   composited there afterwards, so put NO text and no busy detail in that band — at most a thin
+   orange rule or a small badge at its edge.
+2. CONTENT AREA (middle ~55%): 1 to 4 hand-drawn cards/boxes carrying the illustration. For
+   sequential steps, mark each card with a filled circular ORANGE badge holding a numeral (1, 2, 3).
+   For comparisons, use side-by-side boxes so two figures can be set against each other.
+   Numerals and symbols may be drawn; Hebrew words must not.
+3. FOOTER BANNER (bottom ~18%): a filled horizontal banner in orange (#E85A2A) or teal (#2E9E8F),
+   with rounded ink corners, left visually clean inside — a Hebrew takeaway line is composited into
+   it afterwards.
+
+TEXT RULE — absolute:
+Draw NO Hebrew letters and NO words in any language. All wording is composited afterwards by a
+separate Hebrew typesetting step, and any lettering you draw will collide with it and read as
+gibberish. Numerals (1, 2, 3, 62.7%, 99.9%) and symbols (arrows, ticks, %) ARE allowed and
+encouraged — they carry the data. Everything else is drawn imagery only.`;
+
+/**
+ * Forces literal, story-specific imagery. The failure mode this exists to prevent is a beautiful
+ * generic illustration that would suit any article equally well.
+ */
+const METAPHOR_RULES = `VISUAL METAPHOR MAPPING — do this before you design anything:
+Read the story and name its core subject, technology or tension. Then map that subject to concrete
+drawable objects. Every element on the slide must illustrate THIS story; if an element would fit an
+unrelated article just as well, replace it.
+
+Worked examples of the required literalness:
+- Database speed / query optimisation -> a cute robot sprinting with a stopwatch in hand beside a
+  speedometer gauge whose needle swings from red into green.
+- Cybersecurity / data privacy / a breach -> a robot holding a shield, a closed padlock over a
+  document stack, a safe with its dial drawn.
+- Cost savings / cloud efficiency -> a robot studying a long receipt through a magnifying glass,
+  next to a spreadsheet grid with a descending arrow.
+- Model launch / new AI capability -> a robot at a monitor showing a rising progress bar, with a
+  checklist of ticked capabilities beside it.
+- Acquisition / two companies merging -> two robots shaking hands over a document, with two boxes
+  joining into one.
+
+Apply the same literal treatment to whatever this story actually is. State your mapping in the
+"concept" field so it is auditable.`;
+
+/**
+ * Compact style directive for the per-slide image call.
+ *
+ * The frame prompt must NOT carry the full DESIGN_SYSTEM: inlining all ~3k characters of it made a
+ * single frame exceed the 600s Hermes timeout. The art-direction step has already baked the system
+ * into each `scene`, so this only restates the non-negotiables the image model must not drift on.
+ */
+const FRAME_STYLE = [
+  'Style: clean 2D hand-drawn technical illustration, sketchnote / visual-notes look.',
+  'Confident charcoal ink linework, flat fills, textured cream paper background #F8F6EF.',
+  'Palette: #F8F6EF cream, #1A1A1A charcoal ink, #E85A2A orange accents, #2E9E8F teal, #F5C542 highlight.',
+  'Hand-drawn rounded ink boxes frame each card. Cute 2D robot characters, gauges, checklists, arrows.',
+  'NOT clay, NOT claymorphism, NOT 3D, NOT abstract blobs or organic shapes, no gradients, no photorealism.',
+].join(' ');
+
 const ART_DIRECTION_PROMPT = (article, slideCount, override, referencePath) => `
-You are the art director for an Instagram carousel about this news story.
+You are the art director for a Hebrew Instagram infographic carousel about this news story.
 
 TITLE: ${article.title}
 SOURCE: ${article.source}
 TOPIC: ${article.topic}
 ARTICLE: ${String(article.articleText || '').slice(0, 2500)}
 
-Decide the visual concept yourself — do not ask questions.
-${override ? `\nThe user has requested this art direction: "${override}". Honour it.\n` : ''}
+${METAPHOR_RULES}
+
+${DESIGN_SYSTEM}
+
+Plan ${slideCount} slide(s), 9:16 vertical, as one coherent series that walks the reader through the
+story: open with the situation, develop the mechanism or the numbers, close on the implication.
+Decide everything yourself — do not ask questions.
+${override ? `\nThe user has additionally requested: "${override}". Honour it, but never at the cost of the banned-terms rule or the layout schema.\n` : ''}
 ${
   referencePath
     ? `\nDESIGN REFERENCE: first open and study the image at ${referencePath.replace(/\\/g, "/")}.
-Extract its design language: colour palette, typographic feel and weight, how text blocks are
-positioned and framed, spacing rhythm, and the overall structural composition. Every slide you plan
-must follow that same design language. Base "palette" and "textColor" on the colours you actually
-see in the reference, and describe the matching type/layout treatment in "typography" and "layout".
-Do NOT copy its subject matter, only its style, structure and framing.\n`
+Adopt its structural framing, spacing rhythm and type feel where they do not conflict with the
+mandatory system above. The palette and the 2D sketchnote style are NOT negotiable — if the
+reference is 3D, photographic or claymorphic, take only its layout and ignore its rendering style.
+Do NOT copy its subject matter.\n`
     : ''
 }
-Constraints:
-- 3D claymorphism / soft-clay render style, premium and warm, consistent across all slides.
-- Every slide is 9:16 vertical and must contain NO TEXT, NO LETTERS, NO NUMBERS whatsoever.
-- Every slide must leave generous empty negative space in the upper third for Hebrew copy.
-- One coherent palette across the whole set; slides should read as one series.
+For each slide, "scene" must be a complete, self-contained image prompt that names the concrete
+drawn objects (which robot, doing what, holding what, next to which gauge/box/arrow), the card
+count and their arrangement, where the numerals sit, and the footer banner colour. Restate the
+"no lettering, numerals only" rule inside every scene.
 
 Return ONLY valid JSON, no prose:
-{"concept":"one sentence","palette":["#hex","#hex","#hex"],
- "typography":"one phrase describing the type treatment","layout":"one phrase describing the composition",
- "textColor":"#hex readable on these slides",
- "slides":[${Array.from({ length: slideCount }, (_, i) => `{"index":${i},"scene":"detailed text-free image prompt for slide ${i + 1}"}`).join(',')}]}
+{"concept":"one sentence naming the story's core subject and the visual metaphor you mapped it to",
+ "palette":["#F8F6EF","#1A1A1A","#E85A2A","#2E9E8F"],
+ "typography":"one phrase","layout":"one phrase",
+ "textColor":"#1A1A1A",
+ "slides":[${Array.from({ length: slideCount }, (_, i) => `{"index":${i},"scene":"detailed drawn-imagery prompt for slide ${i + 1}, no lettering"}`).join(',')}]}
 `.trim();
 
 async function generateArtDirection(article, slideCount, override, referencePath) {
@@ -259,37 +363,98 @@ async function generateFrame(jobDir, index, scene, palette, referencePath) {
   const outPath = path.join(jobDir, `frame_${String(index).padStart(2, '0')}.png`);
   const prompt = [
     `Generate ONE image and save it to ${outPath.replace(/\\/g, '/')}.`,
-    `Style: 3D claymorphism, soft clay materials, premium studio lighting, 9:16 vertical.`,
-    `Palette: ${(palette || []).join(', ')}.`,
+    `Format: 9:16 vertical.`,
+    FRAME_STYLE,
+    `Palette for this set: ${(palette || []).join(', ')}.`,
     ...(referencePath
       ? [`Match the design language of the reference image at ${referencePath.replace(/\\/g, '/')} — its palette, spacing rhythm and structural framing. Do not copy its subject matter.`]
       : []),
     `Scene: ${scene}`,
-    `ABSOLUTE REQUIREMENT: the image must contain NO text, NO letters, NO numbers, NO logos, NO watermarks.`,
-    `Leave the upper third visually calm and mostly empty — Hebrew copy will be composited there afterwards.`,
-    `Reply with only the absolute file path.`,
+    `ABSOLUTE REQUIREMENT: draw NO letters and NO words in any language, and no logos or watermarks. Numerals and symbols (1, 2, 3, 62.7%, arrows, ticks) ARE allowed and carry the data.`,
+    `Leave the top ~22% band and the inside of the footer banner visually clean — Hebrew copy is composited into both afterwards.`,
+    `Generate the image EXACTLY ONCE. Save it, then reply with only the absolute file path and stop.`,
+    `Do not review, critique, regenerate or iterate on the image — one generation only.`,
   ].join('\n');
-  await run(HERMES, ['-z', prompt]);
+  // Hermes sometimes writes the image and then keeps deliberating until the timeout. The artwork
+  // on disk is still good, so a timeout is only fatal when nothing was produced — otherwise we
+  // keep the file and move on rather than discarding minutes of work.
+  try {
+    await run(HERMES, ['-z', prompt]);
+  } catch (err) {
+    if (!fs.existsSync(outPath)) throw err;
+    console.warn(`[carousel-bridge] slide ${index}: ${err.message} — but the image exists, using it.`);
+  }
   if (!fs.existsSync(outPath)) throw new Error(`Hermes did not write slide ${index} to ${outPath}`);
   return outPath;
 }
 
-async function overlayHebrew(framePath, jobDir, index, lines, textColor) {
+/**
+ * Composites the Hebrew into the two zones the design system reserves: a headline in the clean top
+ * band, and a takeaway inside the footer banner. Two passes because they differ in position, colour
+ * and line budget.
+ *
+ * Both use --max-lines so the type shrinks to fit its band. Previously the whole deck entry
+ * (headline + subhead) was dumped at the top at a fixed 52px, which wrapped to ~10 lines and ran
+ * straight across the illustration and into the banner.
+ */
+async function overlayHebrew(framePath, jobDir, index, copy, textColor) {
   const outPath = path.join(jobDir, `slide_${String(index).padStart(2, '0')}.png`);
-  const args = [
+  const headline = String(copy.headline || '').trim();
+  const takeaway = String(copy.footer || copy.subhead || '').trim();
+
+  const header = [
     RENDER_SCRIPT,
     '-i', framePath,
     '-o', outPath,
-    '-l', ...lines.filter(Boolean),
-    '--font', 'gveret',
-    '--font-size', '46',
-    '--start-y', '70',
-    '--color', textColor || '#B4531E',
+    '-l', headline,
+    '--font', RENDER_FONT,
+    '--font-size', '54',
+    '--start-y', '52',
+    '--margin', '64',
+    '--max-width-pct', '0.80',
+    '--max-lines', '3',
+    '--color', textColor || '#1A1A1A',
     '--outline', 'none',
   ];
-  await run(PYTHON, args, { timeoutMs: 60_000 });
+  await run(PYTHON, header, { timeoutMs: 60_000 });
   if (!fs.existsSync(outPath)) throw new Error(`render script produced no output for slide ${index}`);
+
+  // Footer banner: drawn by the image model at roughly the bottom 18%, so the takeaway is placed
+  // inside it in white. Skipped when there is no takeaway rather than printing an empty band.
+  if (takeaway) {
+    const { height } = await imageSize(outPath);
+    const footer = [
+      RENDER_SCRIPT,
+      '-i', outPath,
+      '-o', outPath,
+      '-l', takeaway,
+      '--font', RENDER_FONT,
+      '--font-size', '32',
+      // The banner occupies roughly the bottom 18% (~0.77-0.89 of the canvas). Start at 0.80 so a
+      // two-line takeaway sits inside it; 0.845 pushed the second line past the banner's edge.
+      '--start-y', String(Math.round(height * 0.80)),
+      '--margin', '96',
+      '--max-width-pct', '0.68',
+      '--max-lines', '2',
+      '--align', 'center',
+      '--color', '#FFFFFF',
+      '--outline', 'none',
+    ];
+    await run(PYTHON, footer, { timeoutMs: 60_000 });
+  }
   return outPath;
+}
+
+/** Pixel height of a PNG, read from the IHDR header — avoids pulling in an image library. */
+async function imageSize(file) {
+  const fd = await fs.promises.open(file, 'r');
+  try {
+    const buf = Buffer.alloc(24);
+    await fd.read(buf, 0, 24, 0);
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  } finally {
+    await fd.close();
+  }
 }
 
 async function runJob(job) {
@@ -360,9 +525,12 @@ async function runJob(job) {
   for (let i = 0; i < slideCount; i++) {
     const plan = job.plan.slides[i] || job.plan.slides[job.plan.slides.length - 1];
     const copy = job.deck[i] || {};
-    const lines = [copy.headline, copy.subhead].filter(Boolean);
     const frame = await generateFrame(jobDir, i, plan.scene, job.plan.palette, referencePath);
-    const slide = await overlayHebrew(frame, jobDir, i, lines.length ? lines : [article.title], job.plan.textColor);
+    const slide = await overlayHebrew(
+      frame, jobDir, i,
+      { headline: copy.headline || article.title, footer: copy.subhead || '' },
+      job.plan.textColor
+    );
     job.slides.push({
       index: i,
       url: `/carousel/file/${job.id}/${path.basename(slide)}`,
