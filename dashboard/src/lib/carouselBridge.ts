@@ -109,8 +109,19 @@ export interface ArticleInput {
   articleText: string;
 }
 
+/**
+ * Absolute URL for a rendered slide, with the bridge token as `?t=`.
+ *
+ * The token has to ride in the query string here: these URLs are consumed by `<img src>` and by
+ * the ZIP bundler's plain fetch(), neither of which can set an `x-bridge-token` header. Without it
+ * the bridge's auth gate 401s every image — the slider renders broken thumbnails and the ZIP
+ * bundles the JSON error body under each .png name.
+ */
 export function slideUrl(path: string): string {
-  return path.startsWith('http') ? path : `${bridgeBase()}${path}`;
+  const base = path.startsWith('http') ? path : `${bridgeBase()}${path}`;
+  const token = bridgeToken();
+  if (!token) return base;
+  return `${base}${base.includes('?') ? '&' : '?'}t=${encodeURIComponent(token)}`;
 }
 
 export async function checkBridge(): Promise<BridgeHealth> {

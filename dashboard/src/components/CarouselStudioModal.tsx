@@ -156,7 +156,15 @@ export default function CarouselStudioModal({
       const zip = new JSZip();
       await Promise.all(
         job.slides.map(async (s) => {
-          const blob = await fetch(slideUrl(s.url)).then((r) => r.blob());
+          // Verify each response is really an image before zipping it. This previously bundled
+          // whatever came back — when the bridge's auth gate 401'd the file route, the ZIP
+          // silently contained four 52-byte JSON error bodies named slide_NN.png.
+          const res = await fetch(slideUrl(s.url));
+          if (!res.ok) throw new Error(`שקופית ${s.index + 1}: השרת החזיר ${res.status}`);
+          const blob = await res.blob();
+          if (!blob.type.startsWith('image/')) {
+            throw new Error(`שקופית ${s.index + 1}: התקבל ${blob.type || 'תוכן לא מזוהה'} במקום תמונה`);
+          }
           zip.file(`slide_${String(s.index + 1).padStart(2, '0')}.png`, blob);
         })
       );

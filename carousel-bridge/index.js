@@ -427,7 +427,12 @@ app.use('/carousel', (req, res, next) => {
     }
     return next();
   }
-  const supplied = req.get('x-bridge-token') || '';
+  // Rendered slides are fetched by <img src> and by the ZIP bundler's plain fetch(), neither of
+  // which can attach a header — so the file route (and only the file route) also accepts the token
+  // as `?t=`. Without this the gate 401s every image: the slider shows broken thumbnails and the
+  // ZIP silently bundles the 52-byte JSON error body under each .png name.
+  const fromQuery = req.path.startsWith('/file/') ? String(req.query.t || '') : '';
+  const supplied = req.get('x-bridge-token') || fromQuery;
   if (supplied !== BRIDGE_TOKEN) return res.status(401).json({ ok: false, error: 'bad or missing x-bridge-token' });
   next();
 });
