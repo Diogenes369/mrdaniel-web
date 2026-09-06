@@ -83,7 +83,8 @@ export interface CarouselSlide {
 }
 
 export type CarouselStatus =
-  | 'queued' | 'importing' | 'art-direction' | 'copywriting' | 'rendering' | 'done' | 'error';
+  | 'queued' | 'importing' | 'rebranding' | 'art-direction' | 'copywriting' | 'rendering'
+  | 'done' | 'error';
 
 export interface CarouselJob {
   ok: boolean;
@@ -102,6 +103,8 @@ export interface CarouselJob {
   /** Copy the engine produced, so the editor can seed itself from a first pass. */
   deck?: Array<{ headline?: string; subhead?: string; body?: string; bullets?: string[] }>;
   qaRetries?: number;
+  /** Rebrander audit: what branding was stripped and how much source text was available. */
+  rebrand?: { removed: string[]; sourceChars: number; title: string } | null;
   slides: CarouselSlide[];
   post: { body: string; hashtags: string[]; altText?: string } | null;
   error: string | null;
@@ -183,6 +186,8 @@ export interface CarouselOptions {
   palette?: string;
   /** Skips the vision QA pass — faster, but no overlap/overflow check. */
   skipQa?: boolean;
+  /** 'rebrand' = 1:1 unbranded Hebrew translation of a source post; 'article' = synthesis. */
+  mode?: 'article' | 'rebrand';
 }
 
 export async function startCarousel(
@@ -203,6 +208,7 @@ export async function startCarousel(
       font: opts.font || 'opensans',
       palette: opts.palette || 'brand',
       skipQa: Boolean(opts.skipQa),
+      mode: opts.mode || 'article',
     }),
   });
   const data = await res.json().catch(() => ({}));
@@ -232,6 +238,7 @@ export async function adjustCarousel(jobId: string, instruction: string): Promis
 export const STATUS_LABEL: Record<CarouselStatus, string> = {
   queued: 'ממתין בתור',
   importing: 'מייבא תוכן מהקישור',
+  rebranding: 'מתרגם ומסיר מיתוג זר',
   'art-direction': 'Hermes בוחר קונספט ויזואלי',
   copywriting: 'מנסח קופי בעברית',
   rendering: 'מייצר שקופיות ומרנדר עברית',

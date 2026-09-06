@@ -56,10 +56,10 @@ const SITE_ORIGIN = process.env.SITE_ORIGIN || 'https://mrdaniel.co.il';
 const ADMIN_SECRET = process.env.ADMIN_API_SECRET || '';
 const PYTHON = process.env.PYTHON_BIN || 'python';
 const HERMES = process.env.HERMES_BIN || 'hermes';
-// 10 minutes. A complex claymorphism render can exceed the old 5-minute ceiling, which
-// surfaced in the modal as "hermes timed out after 300000ms" — the bridge's own error text
-// relayed through job.error, not a client-side timeout (the dashboard sets none).
-const HERMES_TIMEOUT_MS = Number(process.env.HERMES_TIMEOUT_MS) || 600_000;
+// 15 minutes. Image generation under the sketchnote system with reserved zones routinely runs
+// past 10 minutes; the ceiling surfaced in the modal as "hermes timed out after 600000ms" — the
+// bridge's own error relayed through job.error, not a client-side timeout (the dashboard sets none).
+const HERMES_TIMEOUT_MS = Number(process.env.HERMES_TIMEOUT_MS) || 900_000;
 
 /**
  * Shared token required on every /carousel route.
@@ -134,7 +134,17 @@ function run(cmd, args, { timeoutMs = HERMES_TIMEOUT_MS, cwd = REPO_ROOT } = {})
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {
-      child.kill();
+      // child.kill() only signals the direct child; hermes spawns helpers that survive it and
+      // accumulate. taskkill /T /F takes the whole tree down on Windows.
+      if (process.platform === 'win32' && child.pid) {
+        try {
+          spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+        } catch {
+          child.kill();
+        }
+      } else {
+        child.kill();
+      }
       reject(new Error(`${cmd} timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
@@ -390,10 +400,14 @@ async function generateFrame(jobDir, index, scene, palette, referencePath) {
   try {
     await run(HERMES, ['-z', prompt]);
   } catch (err) {
-    if (!fs.existsSync(outPath)) throw err;
-    console.warn(`[carousel-bridge] slide ${index}: ${err.message} — but the image exists, using it.`);
+    // Only salvage a COMPLETE file. A timeout can land mid-write, and a truncated PNG would fail
+    // downstream in Pillow with a far more confusing error than the timeout itself.
+    if (!isCompletePng(outPath)) throw err;
+    console.warn(`[carousel-bridge] slide ${index}: ${err.message} — frame is complete on disk, using it.`);
   }
-  if (!fs.existsSync(outPath)) throw new Error(`Hermes did not write slide ${index} to ${outPath}`);
+  if (!isCompletePng(outPath)) {
+    throw new Error(`Hermes produced no usable frame for slide ${index} at ${outPath}`);
+  }
   return outPath;
 }
 
@@ -482,6 +496,31 @@ async function visionQa(slidePath) {
   }
 }
 
+/**
+ * True when `file` is a complete PNG: signature intact and terminated by an IEND chunk. Guards the
+ * timeout-salvage path against half-written files.
+ */
+function isCompletePng(file) {
+  try {
+    if (!fs.existsSync(file)) return false;
+    const { size } = fs.statSync(file);
+    if (size < 1024) return false;
+    const fd = fs.openSync(file, 'r');
+    try {
+      const head = Buffer.alloc(8);
+      fs.readSync(fd, head, 0, 8, 0);
+      if (head.toString('hex') !== '89504e470d0a1a0a') return false;
+      const tail = Buffer.alloc(12);
+      fs.readSync(fd, tail, 0, 12, size - 12);
+      return tail.includes('IEND');
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return false;
+  }
+}
+
 /** Pixel height of a PNG, read from the IHDR header — avoids pulling in an image library. */
 async function imageSize(file) {
   const fd = await fs.promises.open(file, 'r');
@@ -492,6 +531,71 @@ async function imageSize(file) {
   } finally {
     await fd.close();
   }
+}
+
+/**
+ * Instagram Post Rebrander — 1:1 Hebrew translation with all third-party branding removed.
+ *
+ * Distinct from the normal carousel path, which SYNTHESISES new copy from an article. Here the
+ * source post is authoritative: every step, number and claim survives, only the language and the
+ * branding change. So this deliberately does not call carousel-studio.
+ *
+ * Instagram serves a login wall to unauthenticated fetches, so import-url usually yields og:
+ * metadata (a caption excerpt) rather than the full post body. Whatever it returns is passed
+ * through verbatim to the translator; `sourceChars` is reported so a thin extraction is visible
+ * rather than silently producing a thin carousel.
+ */
+const REBRAND_SYSTEM = `You are translating a social post into Hebrew for a different brand.
+
+ABSOLUTE RULES:
+1. ONE-TO-ONE TRANSLATION. Every step, number, statistic, tool name, claim and ordering in the
+   source must survive into the Hebrew. Do not summarise, merge, drop or reorder steps. Do not add
+   steps, opinions or claims that are not in the source. If the source lists 7 items, output 7.
+2. COMPLETE UNBRANDING. Remove every trace of the original author and publisher: account handles
+   (@names), personal and company names, product names used as self-promotion, watermarks,
+   logos described in text, "follow me", "link in bio", "save this post", "credit to", hashtags
+   belonging to the original brand, and any call to action pointing anywhere other than the new
+   brand. Keep third-party TECHNICAL product names when they are part of the information itself
+   (e.g. "Postgres", "Figma") — those are facts, not branding.
+3. NATURAL HEBREW. Idiomatic and readable, not a literal word-for-word calque. Technical terms may
+   stay in Latin script inside a Hebrew sentence. No markdown, no asterisks.
+4. Each slide is one discrete step or idea from the source, in the source's original order.
+
+Return ONLY valid JSON, no prose:
+{"title":"Hebrew headline for the whole set",
+ "slides":[{"headline":"short Hebrew headline","cards":["one or two short Hebrew lines"],"footer":"short Hebrew takeaway"}],
+ "caption":"full Hebrew caption, unbranded, ready to post",
+ "hashtags":["#tag","#tag","#tag"],
+ "removed":["what branding you stripped, for audit"]}`;
+
+async function rebrandSource(sourceText, sourceTitle, slideCount) {
+  const prompt = [
+    `SOURCE POST TITLE: ${sourceTitle || '(none)'}`,
+    '',
+    'SOURCE POST TEXT:',
+    '"""',
+    String(sourceText || '').slice(0, 6000),
+    '"""',
+    '',
+    `Produce exactly ${slideCount} slides, preserving the source's own order and every step it contains.`,
+  ].join('\n');
+
+  const raw = await run(HERMES, ['-z', `${REBRAND_SYSTEM}\n\n${prompt}`], { timeoutMs: 300_000 });
+  const out = extractJson(raw);
+  if (!Array.isArray(out.slides) || out.slides.length === 0) {
+    throw new Error('rebrand returned no slides');
+  }
+  return {
+    title: String(out.title || sourceTitle || ''),
+    slides: out.slides.map((sl) => ({
+      headline: String(sl.headline || ''),
+      cards: (Array.isArray(sl.cards) ? sl.cards : [sl.body || '']).map(String).filter(Boolean).slice(0, 4),
+      footer: String(sl.footer || ''),
+    })),
+    caption: String(out.caption || ''),
+    hashtags: (Array.isArray(out.hashtags) ? out.hashtags : []).map(String).slice(0, 5),
+    removed: (Array.isArray(out.removed) ? out.removed : []).map(String),
+  };
 }
 
 async function runJob(job) {
@@ -526,6 +630,25 @@ async function runJob(job) {
   job.plan = await generateArtDirection(article, slideCount, override, referencePath);
   job.progress = { done: 0, total: slideCount };
 
+  // --- Instagram Rebrander: 1:1 translation replaces synthesis entirely -------------------
+  if (job.input.mode === 'rebrand') {
+    job.status = 'rebranding';
+    if (String(article.articleText || '').trim().length < 40) {
+      throw new Error(
+        'nothing to rebrand - the source yielded no readable text. Instagram serves a login wall '
+        + 'to unauthenticated fetches, so paste the caption into the text field instead.'
+      );
+    }
+    const rebrand = await rebrandSource(article.articleText, article.title, slideCount);
+    job.deck = rebrand.slides.map((sl) => ({ headline: sl.headline, subhead: sl.footer, bullets: sl.cards }));
+    job.input.slideCopy = rebrand.slides.map((sl) => ({
+      headline: sl.headline, cards: sl.cards, footer: sl.footer,
+    }));
+    job.post = { body: rebrand.caption, hashtags: rebrand.hashtags, altText: '' };
+    job.rebrand = { removed: rebrand.removed, sourceChars: article.articleText.length, title: rebrand.title };
+    job.copyWarning = null;
+  } else {
+
   job.status = 'copywriting';
   const brief = [article.title, article.articleText].join('\n\n').slice(0, 4000);
 
@@ -556,6 +679,7 @@ async function runJob(job) {
     warnings.push(`post copy: ${postRes.reason?.message || 'unavailable'}`);
   }
   job.copyWarning = warnings.length ? warnings.join(' · ') : null;
+  }
 
   job.status = 'rendering';
   job.slides = [];
@@ -705,6 +829,8 @@ app.post('/carousel/generate', (req, res) => {
     font: typeof req.body?.font === 'string' ? req.body.font : '',
     palette: typeof req.body?.palette === 'string' ? req.body.palette : 'brand',
     skipQa: Boolean(req.body?.skipQa),
+    // 'rebrand' = 1:1 unbranded Hebrew translation of a source post; otherwise synthesis.
+    mode: req.body?.mode === 'rebrand' ? 'rebrand' : 'article',
   });
   res.json({ ok: true, jobId: job.id, slideCount: count });
 });
@@ -724,6 +850,7 @@ app.get('/carousel/job/:id', (req, res) => {
     imported: job.imported || null,
     usedReference: Boolean(job.reference),
     deck: job.deck || [],
+    rebrand: job.rebrand || null,
     qaRetries: job.qaRetries || 0,
     slides: job.slides || [],
     post: job.post || null,

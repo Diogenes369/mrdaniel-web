@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import {
   X, ChevronLeft, ChevronRight, Download, Copy, Check, Sparkles,
   AlertTriangle, Loader2, Send, Image as ImageIcon, Upload, Link2, Trash2,
-  Palette, Type, LayoutGrid, ShieldCheck,
+  Palette, Type, LayoutGrid, ShieldCheck, Instagram, Newspaper,
 } from 'lucide-react';
 import {
   startCarousel, fetchJob, adjustCarousel, checkBridge, slideUrl, bridgeBase, STATUS_LABEL,
@@ -48,6 +48,8 @@ export default function CarouselStudioModal({
   const [palette, setPalette] = useState<string>('brand');
   const [template, setTemplate] = useState<number>(2);
   const [skipQa, setSkipQa] = useState(false);
+  // 'rebrand' translates a source post 1:1 into unbranded Hebrew; 'article' synthesises new copy.
+  const [mode, setMode] = useState<'article' | 'rebrand'>('article');
   const [copied, setCopied] = useState(false);
   const [zipping, setZipping] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -107,13 +109,14 @@ export default function CarouselStudioModal({
         font,
         palette,
         skipQa,
+        mode,
       }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'failed to start');
     } finally {
       setStarting(false);
     }
-  }, [article, slideCount, reference, sourceUrl, slideCopy, font, palette, skipQa]);
+  }, [article, slideCount, reference, sourceUrl, slideCopy, font, palette, skipQa, mode]);
 
   /** Seeds one editable entry per slide so copy can be reviewed before any image is generated. */
   const openEditor = useCallback(() => {
@@ -320,6 +323,40 @@ export default function CarouselStudioModal({
             </div>
           )}
 
+          {/* Mode: synthesise from an article, or translate an existing post 1:1. */}
+          {!job && !starting && (
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              {([
+                { id: 'article', label: 'כתבה → קרוסלה', hint: 'ניסוח חדש מתוך כתבה', Icon: Newspaper },
+                { id: 'rebrand', label: 'מיתוג מחדש לפוסט', hint: 'תרגום 1:1 והסרת מיתוג זר', Icon: Instagram },
+              ] as const).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  className={`cursor-pointer rounded-lg border p-2.5 text-right ${
+                    mode === m.id
+                      ? 'border-brand-500/60 bg-brand-500/10 text-white'
+                      : 'border-white/10 text-zinc-400 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="mb-0.5 flex items-center gap-1.5 text-[12px] font-bold">
+                    <m.Icon className="h-3.5 w-3.5" /> {m.label}
+                  </span>
+                  <span className="text-[10px] opacity-80">{m.hint}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!job && !starting && mode === 'rebrand' && (
+            <div className="mb-4 rounded-lg border border-sky-400/25 bg-sky-500/[0.06] p-3 text-[11px] leading-relaxed text-zinc-300">
+              <p className="mb-1 font-bold text-sky-300">מצב מיתוג מחדש</p>
+              הטקסט מתורגם 1:1 לעברית — כל שלב, מספר וסדר נשמרים — וכל המיתוג הזר (שמות משתמש, לוגואים,
+              "לינק בביו", קרדיטים, האשטגים של המקור) מוסר. הוסיפו קישור למעלה, או הדביקו את הכיתוב עצמו
+              בשדה הטקסט: אינסטגרם חוסמת שליפה אנונימית ולרוב מחזירה רק תקציר.
+            </div>
+          )}
+
           {/* Brand, typography and layout controls. */}
           {!job && !starting && (
             <div className="mb-4 grid gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 sm:grid-cols-3">
@@ -456,7 +493,8 @@ export default function CarouselStudioModal({
                 disabled={!health?.ok}
                 className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-black disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ImageIcon className="h-4 w-4" /> צור קרוסלה ויזואלית
+                <ImageIcon className="h-4 w-4" />
+                {mode === 'rebrand' ? 'תרגם ומתג מחדש' : 'צור קרוסלה ויזואלית'}
               </button>
               <button
                 onClick={editing ? () => setEditing(false) : openEditor}
@@ -524,6 +562,14 @@ export default function CarouselStudioModal({
                   <ShieldCheck className="h-3 w-3" />
                   {current.qa.pass ? 'QA ויזואלי: עבר' : `QA ויזואלי: ${current.qa.note || 'נמצאו חריגות'}`}
                   {job.qaRetries ? ` · ${job.qaRetries} תיקון` : ''}
+                </div>
+              )}
+
+              {job.rebrand && (
+                <div className="mb-2 rounded border border-sky-400/25 bg-sky-500/[0.06] p-2 text-[10px] text-zinc-300">
+                  <span className="font-bold text-sky-300">מיתוג שהוסר: </span>
+                  {job.rebrand.removed.length ? job.rebrand.removed.join(' · ') : 'לא נמצא מיתוג זר'}
+                  <span className="opacity-70"> · {job.rebrand.sourceChars} תווי מקור</span>
                 </div>
               )}
 
