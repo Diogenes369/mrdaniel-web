@@ -68,6 +68,8 @@ export interface BridgeHealth {
   hermesTimeoutMs?: number;
   /** true when the bridge requires x-bridge-token (always true behind a tunnel). */
   tokenRequired?: boolean;
+  /** True when INSTAGRAM_OEMBED_TOKEN is configured, so public IG captions can be read. */
+  instagramOEmbed?: boolean;
 }
 
 export interface CarouselSlide {

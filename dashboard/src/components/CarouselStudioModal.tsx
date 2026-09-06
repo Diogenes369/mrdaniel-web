@@ -352,8 +352,17 @@ export default function CarouselStudioModal({
             <div className="mb-4 rounded-lg border border-sky-400/25 bg-sky-500/[0.06] p-3 text-[11px] leading-relaxed text-zinc-300">
               <p className="mb-1 font-bold text-sky-300">מצב מיתוג מחדש</p>
               הטקסט מתורגם 1:1 לעברית — כל שלב, מספר וסדר נשמרים — וכל המיתוג הזר (שמות משתמש, לוגואים,
-              "לינק בביו", קרדיטים, האשטגים של המקור) מוסר. הוסיפו קישור למעלה, או הדביקו את הכיתוב עצמו
-              בשדה הטקסט: אינסטגרם חוסמת שליפה אנונימית ולרוב מחזירה רק תקציר.
+              "לינק בביו", קרדיטים, האשטגים של המקור) מוסר.
+              {health?.instagramOEmbed ? (
+                <span className="mt-1 block text-brand-300">
+                  oEmbed מוגדר — קישורי אינסטגרם ציבוריים נקראים אוטומטית.
+                </span>
+              ) : (
+                <span className="mt-1 block text-amber-200">
+                  אינסטגרם חוסמת שליפת תוכן מקישור. העתיקו והדביקו את כיתוב הפוסט ישירות לתיבת הטקסט,
+                  או הגדירו INSTAGRAM_OEMBED_TOKEN בגשר לקריאה אוטומטית של פוסטים ציבוריים.
+                </span>
+              )}
             </div>
           )}
 

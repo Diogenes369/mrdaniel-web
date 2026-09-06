@@ -214,11 +214,77 @@ function saveReferenceImage(dataUrl, jobDir) {
  * readability pass — see src/server/contentImport.ts). Reused rather than scraping here so both
  * paths share one extractor.
  */
+/**
+ * Instagram content extraction — official oEmbed only.
+ *
+ * Anonymous scraping of instagram.com does not work and is not attempted. Verified against a
+ * public post: the deprecated api.instagram.com/oembed endpoint 302s, /embed/captioned returns a
+ * JavaScript shell with no caption or og: tags, and the plain permalink carries no og:description.
+ * The remaining ways through — spoofing the internal X-IG-App-ID API, or driving a headless
+ * browser past the login modal — circumvent Meta's access controls and breach their platform
+ * terms, so they are deliberately not implemented.
+ *
+ * The supported path is Meta's own oEmbed Read endpoint, which returns the caption for public
+ * posts and requires an app access token:
+ *   1. Create an app at developers.facebook.com and add the "oEmbed Read" product.
+ *   2. Put `INSTAGRAM_OEMBED_TOKEN=<app-id>|<client-token>` in carousel-bridge/.env.
+ * Without a token this returns null and the caller falls back to asking for a manual paste.
+ */
+const IG_URL_RE = /(?:instagram\.com|instagr\.am)\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/i;
+
+function isInstagramUrl(url) {
+  return IG_URL_RE.test(String(url || ''));
+}
+
+async function fetchInstagramOEmbed(url) {
+  const token = process.env.INSTAGRAM_OEMBED_TOKEN || '';
+  if (!token) return null;
+  const endpoint =
+    'https://graph.facebook.com/v21.0/instagram_oembed'
+    + `?url=${encodeURIComponent(url)}&omitscript=true&access_token=${encodeURIComponent(token)}`;
+  try {
+    const res = await fetch(endpoint, { signal: AbortSignal.timeout(15_000) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      console.warn(`[carousel-bridge] oEmbed rejected: ${data.error?.message || res.status}`);
+      return null;
+    }
+    // `title` carries the caption for public posts; author_name is stripped later by the rebrander.
+    const caption = String(data.title || '').trim();
+    if (caption.length < 20) return null;
+    return { title: caption.split('\n')[0].slice(0, 120), body: caption, source: 'instagram.com' };
+  } catch (err) {
+    console.warn(`[carousel-bridge] oEmbed failed: ${err.message}`);
+    return null;
+  }
+}
+
+/** Guidance shown verbatim in the modal when an Instagram link cannot be read. */
+const IG_PASTE_HINT =
+  'Instagram blocks link scraping. Please copy & paste the post caption directly into the text box. '
+  + '\u05d0\u05d9\u05e0\u05e1\u05d8\u05d2\u05e8\u05dd \u05d7\u05d5\u05e1\u05de\u05ea \u05e9\u05dc\u05d9\u05e4\u05ea \u05ea\u05d5\u05db\u05df \u05de\u05e7\u05d9\u05e9\u05d5\u05e8. '
+  + '\u05d4\u05e2\u05ea\u05d9\u05e7\u05d5 \u05d5\u05d4\u05d3\u05d1\u05d9\u05e7\u05d5 \u05d0\u05ea \u05db\u05d9\u05ea\u05d5\u05d1 \u05d4\u05e4\u05d5\u05e1\u05d8 \u05d9\u05e9\u05d9\u05e8\u05d5\u05ea \u05dc\u05ea\u05d9\u05d1\u05ea \u05d4\u05d8\u05e7\u05e1\u05d8.';
+
 async function importSource(url) {
+  // Instagram first: the generic og:/readability extractor cannot see past the login wall, so the
+  // official oEmbed endpoint is the only route that returns a caption.
+  if (isInstagramUrl(url)) {
+    const viaOEmbed = await fetchInstagramOEmbed(url);
+    if (viaOEmbed) return viaOEmbed;
+  }
+
   const { imported } = await callSite('import-url', { url });
   const title = String(imported?.title || '').trim();
   const body = String(imported?.body || '').trim();
   if (body.length < 60 && title.length < 10) {
+    if (isInstagramUrl(url)) {
+      throw new Error(
+        IG_PASTE_HINT
+        + (process.env.INSTAGRAM_OEMBED_TOKEN
+          ? ' (oEmbed is configured but returned nothing — the post may be private or deleted.)'
+          : ' (Set INSTAGRAM_OEMBED_TOKEN in carousel-bridge/.env to read public captions automatically.)')
+      );
+    }
     throw new Error(`could not extract readable content from ${url}`);
   }
   return { title, body, source: String(imported?.source || '') };
@@ -799,6 +865,7 @@ app.get('/health', (_req, res) => {
     renderScript: fs.existsSync(RENDER_SCRIPT),
     hermesTimeoutMs: HERMES_TIMEOUT_MS,
     tokenRequired: Boolean(BRIDGE_TOKEN),
+    instagramOEmbed: Boolean(process.env.INSTAGRAM_OEMBED_TOKEN),
     activeJobs: [...jobs.values()].filter((j) => !['done', 'error'].includes(j.status)).length,
   });
 });
