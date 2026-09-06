@@ -177,9 +177,43 @@ async function callSite(action, body) {
   return data;
 }
 
+/** Max decoded size of an uploaded design reference. Base64 inflates ~33%, hence the 12mb body cap. */
+const MAX_REFERENCE_BYTES = 8 * 1024 * 1024;
+const REFERENCE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+
+/** Writes a `data:image/...;base64,...` payload to the job dir so Hermes can read it from disk. */
+function saveReferenceImage(dataUrl, jobDir) {
+  const m = /^data:([\w/+.-]+);base64,(.+)$/s.exec(String(dataUrl || '').trim());
+  if (!m) throw new Error('referenceImage must be a base64 data URL');
+  const ext = REFERENCE_TYPES[m[1].toLowerCase()];
+  if (!ext) throw new Error(`unsupported reference image type: ${m[1]} (png/jpeg/webp only)`);
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length > MAX_REFERENCE_BYTES) {
+    throw new Error(`reference image is ${(buf.length / 1e6).toFixed(1)}MB; max is 8MB`);
+  }
+  const out = path.join(jobDir, `reference.${ext}`);
+  fs.writeFileSync(out, buf);
+  return out;
+}
+
+/**
+ * Pulls readable content out of a URL via the site's existing import-url action (og: tags plus a
+ * readability pass — see src/server/contentImport.ts). Reused rather than scraping here so both
+ * paths share one extractor.
+ */
+async function importSource(url) {
+  const { imported } = await callSite('import-url', { url });
+  const title = String(imported?.title || '').trim();
+  const body = String(imported?.body || '').trim();
+  if (body.length < 60 && title.length < 10) {
+    throw new Error(`could not extract readable content from ${url}`);
+  }
+  return { title, body, source: String(imported?.source || '') };
+}
+
 // --- pipeline stages --------------------------------------------------------------------------
 
-const ART_DIRECTION_PROMPT = (article, slideCount, override) => `
+const ART_DIRECTION_PROMPT = (article, slideCount, override, referencePath) => `
 You are the art director for an Instagram carousel about this news story.
 
 TITLE: ${article.title}
@@ -189,6 +223,16 @@ ARTICLE: ${String(article.articleText || '').slice(0, 2500)}
 
 Decide the visual concept yourself — do not ask questions.
 ${override ? `\nThe user has requested this art direction: "${override}". Honour it.\n` : ''}
+${
+  referencePath
+    ? `\nDESIGN REFERENCE: first open and study the image at ${referencePath.replace(/\\/g, "/")}.
+Extract its design language: colour palette, typographic feel and weight, how text blocks are
+positioned and framed, spacing rhythm, and the overall structural composition. Every slide you plan
+must follow that same design language. Base "palette" and "textColor" on the colours you actually
+see in the reference, and describe the matching type/layout treatment in "typography" and "layout".
+Do NOT copy its subject matter, only its style, structure and framing.\n`
+    : ''
+}
 Constraints:
 - 3D claymorphism / soft-clay render style, premium and warm, consistent across all slides.
 - Every slide is 9:16 vertical and must contain NO TEXT, NO LETTERS, NO NUMBERS whatsoever.
@@ -197,12 +241,13 @@ Constraints:
 
 Return ONLY valid JSON, no prose:
 {"concept":"one sentence","palette":["#hex","#hex","#hex"],
+ "typography":"one phrase describing the type treatment","layout":"one phrase describing the composition",
  "textColor":"#hex readable on these slides",
  "slides":[${Array.from({ length: slideCount }, (_, i) => `{"index":${i},"scene":"detailed text-free image prompt for slide ${i + 1}"}`).join(',')}]}
 `.trim();
 
-async function generateArtDirection(article, slideCount, override) {
-  const raw = await run(HERMES, ['-z', ART_DIRECTION_PROMPT(article, slideCount, override)]);
+async function generateArtDirection(article, slideCount, override, referencePath) {
+  const raw = await run(HERMES, ['-z', ART_DIRECTION_PROMPT(article, slideCount, override, referencePath)]);
   const plan = extractJson(raw);
   if (!Array.isArray(plan.slides) || plan.slides.length === 0) {
     throw new Error('Hermes returned no slide plan');
@@ -210,12 +255,15 @@ async function generateArtDirection(article, slideCount, override) {
   return plan;
 }
 
-async function generateFrame(jobDir, index, scene, palette) {
+async function generateFrame(jobDir, index, scene, palette, referencePath) {
   const outPath = path.join(jobDir, `frame_${String(index).padStart(2, '0')}.png`);
   const prompt = [
     `Generate ONE image and save it to ${outPath.replace(/\\/g, '/')}.`,
     `Style: 3D claymorphism, soft clay materials, premium studio lighting, 9:16 vertical.`,
     `Palette: ${(palette || []).join(', ')}.`,
+    ...(referencePath
+      ? [`Match the design language of the reference image at ${referencePath.replace(/\\/g, '/')} — its palette, spacing rhythm and structural framing. Do not copy its subject matter.`]
+      : []),
     `Scene: ${scene}`,
     `ABSOLUTE REQUIREMENT: the image must contain NO text, NO letters, NO numbers, NO logos, NO watermarks.`,
     `Leave the upper third visually calm and mostly empty — Hebrew copy will be composited there afterwards.`,
@@ -247,10 +295,33 @@ async function overlayHebrew(framePath, jobDir, index, lines, textColor) {
 async function runJob(job) {
   const jobDir = path.join(OUTPUT_ROOT, job.id);
   fs.mkdirSync(jobDir, { recursive: true });
-  const { article, slideCount, override } = job.input;
+  const { slideCount, override, referenceImage, sourceUrl } = job.input;
+  let article = job.input.article;
+
+  // Reference screenshot: written to disk first so Hermes can open it during art direction.
+  let referencePath = null;
+  if (referenceImage) {
+    referencePath = saveReferenceImage(referenceImage, jobDir);
+    job.reference = path.basename(referencePath);
+  }
+
+  // A source URL replaces the article text with the real content behind the link, so both the
+  // art direction and the copy are grounded in it rather than in whatever the caller typed.
+  if (sourceUrl) {
+    job.status = 'importing';
+    const imported = await importSource(sourceUrl);
+    article = {
+      ...article,
+      title: imported.title || article.title,
+      source: imported.source || article.source,
+      articleText: imported.body || article.articleText,
+    };
+    job.imported = { title: article.title, source: article.source, chars: article.articleText.length };
+  }
+  job.article = { title: article.title, source: article.source };
 
   job.status = 'art-direction';
-  job.plan = await generateArtDirection(article, slideCount, override);
+  job.plan = await generateArtDirection(article, slideCount, override, referencePath);
   job.progress = { done: 0, total: slideCount };
 
   job.status = 'copywriting';
@@ -290,7 +361,7 @@ async function runJob(job) {
     const plan = job.plan.slides[i] || job.plan.slides[job.plan.slides.length - 1];
     const copy = job.deck[i] || {};
     const lines = [copy.headline, copy.subhead].filter(Boolean);
-    const frame = await generateFrame(jobDir, i, plan.scene, job.plan.palette);
+    const frame = await generateFrame(jobDir, i, plan.scene, job.plan.palette, referencePath);
     const slide = await overlayHebrew(frame, jobDir, i, lines.length ? lines : [article.title], job.plan.textColor);
     job.slides.push({
       index: i,
@@ -326,7 +397,8 @@ function startJob(input) {
 // --- server -----------------------------------------------------------------------------------
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+// Reference screenshots arrive as base64 data URLs, which inflate ~33% over the raw file.
+app.use(express.json({ limit: '12mb' }));
 app.use((req, res, next) => {
   // Reflect only allow-listed origins. `*` is deliberately NOT used: with a tunnel in front, any
   // web page could otherwise drive Hermes on this machine from a visitor's browser.
@@ -375,12 +447,27 @@ app.get('/health', (_req, res) => {
 });
 
 app.post('/carousel/generate', (req, res) => {
-  const { article, slideCount, override } = req.body ?? {};
-  if (!article?.title || String(article.articleText || '').trim().length < 60) {
-    return res.status(400).json({ ok: false, error: 'article.title and article.articleText (>=60 chars) required' });
+  const { article, slideCount, override, referenceImage, sourceUrl } = req.body ?? {};
+  // A sourceUrl supplies the article text itself, so the inline text requirement only applies
+  // when no URL was given.
+  const hasUrl = typeof sourceUrl === 'string' && /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}/i.test(sourceUrl.trim());
+  if (!article?.title && !hasUrl) {
+    return res.status(400).json({ ok: false, error: 'article.title or a valid sourceUrl is required' });
+  }
+  if (!hasUrl && String(article?.articleText || '').trim().length < 60) {
+    return res.status(400).json({ ok: false, error: 'article.articleText (>=60 chars) required when no sourceUrl is given' });
+  }
+  if (sourceUrl && !hasUrl) {
+    return res.status(400).json({ ok: false, error: `not a valid URL: ${String(sourceUrl).slice(0, 80)}` });
   }
   const count = Math.min(MAX_SLIDES, Math.max(1, Number(slideCount) || DEFAULT_SLIDES));
-  const job = startJob({ article, slideCount: count, override: override ? String(override) : '' });
+  const job = startJob({
+    article: article || { title: '', source: '', topic: 'general', articleText: '' },
+    slideCount: count,
+    override: override ? String(override) : '',
+    referenceImage: referenceImage ? String(referenceImage) : '',
+    sourceUrl: hasUrl ? sourceUrl.trim() : '',
+  });
   res.json({ ok: true, jobId: job.id, slideCount: count });
 });
 
@@ -394,6 +481,10 @@ app.get('/carousel/job/:id', (req, res) => {
     progress: job.progress,
     concept: job.plan?.concept || '',
     palette: job.plan?.palette || [],
+    typography: job.plan?.typography || '',
+    layout: job.plan?.layout || '',
+    imported: job.imported || null,
+    usedReference: Boolean(job.reference),
     slides: job.slides || [],
     post: job.post || null,
     copyWarning: job.copyWarning || null,

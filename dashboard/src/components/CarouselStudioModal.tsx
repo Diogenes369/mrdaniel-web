@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import {
   X, ChevronLeft, ChevronRight, Download, Copy, Check, Sparkles,
-  AlertTriangle, Loader2, Send, Image as ImageIcon,
+  AlertTriangle, Loader2, Send, Image as ImageIcon, Upload, Link2, Trash2,
 } from 'lucide-react';
 import {
   startCarousel, fetchJob, adjustCarousel, checkBridge, slideUrl, bridgeBase, STATUS_LABEL,
+  fileToDataUrl, MAX_REFERENCE_BYTES, REFERENCE_ACCEPT,
   type ArticleInput, type CarouselJob, type BridgeHealth,
 } from '../lib/carouselBridge';
 
@@ -35,6 +36,10 @@ export default function CarouselStudioModal({
   const [active, setActive] = useState(0);
   const [slideCount, setSlideCount] = useState(4);
   const [instruction, setInstruction] = useState('');
+  // Design reference: a screenshot Hermes studies for palette, typography and framing.
+  const [reference, setReference] = useState<{ dataUrl: string; name: string } | null>(null);
+  // Source URL: when set, the bridge extracts the page/post content and uses it as the copy source.
+  const [sourceUrl, setSourceUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [zipping, setZipping] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -86,13 +91,31 @@ export default function CarouselStudioModal({
     setError(null);
     setJob(null);
     try {
-      setJobId(await startCarousel(article, slideCount, override));
+      setJobId(await startCarousel(article, slideCount, {
+        override,
+        referenceImage: reference?.dataUrl,
+        sourceUrl: sourceUrl.trim(),
+      }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'failed to start');
     } finally {
       setStarting(false);
     }
-  }, [article, slideCount]);
+  }, [article, slideCount, reference, sourceUrl]);
+
+  const pickReference = useCallback(async (file: File | null) => {
+    if (!file) return;
+    if (file.size > MAX_REFERENCE_BYTES) {
+      setError(`התמונה ${(file.size / 1e6).toFixed(1)}MB — המקסימום הוא 8MB`);
+      return;
+    }
+    try {
+      setError(null);
+      setReference({ dataUrl: await fileToDataUrl(file), name: file.name });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'could not read the file');
+    }
+  }, []);
 
   const sendAdjustment = useCallback(async () => {
     if (!jobId || instruction.trim().length < 3) return;
@@ -208,6 +231,59 @@ export default function CarouselStudioModal({
           )}
 
           {!job && !starting && (
+            <div className="mb-4 space-y-3 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+              {/* Design reference — Hermes opens the file and mirrors its palette, type and framing. */}
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-zinc-300">
+                  <Upload className="h-3.5 w-3.5 text-brand-400" />
+                  צילום מסך כהשראה לעיצוב (אופציונלי)
+                </label>
+                {reference ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-brand-500/30 bg-brand-500/[0.06] p-2">
+                    <img src={reference.dataUrl} alt="" className="h-14 w-14 rounded object-cover" />
+                    <span className="flex-1 truncate text-[12px] text-zinc-300">{reference.name}</span>
+                    <button
+                      onClick={() => setReference(null)}
+                      aria-label="הסרת ההשראה"
+                      className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-white/10 hover:text-rose-300"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    type="file"
+                    accept={REFERENCE_ACCEPT}
+                    onChange={(e) => void pickReference(e.target.files?.[0] ?? null)}
+                    className="w-full cursor-pointer rounded-lg border border-white/15 bg-black/40 p-2 text-[12px] text-zinc-400 file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-brand-500/20 file:px-3 file:py-1 file:text-[12px] file:font-bold file:text-brand-300"
+                  />
+                )}
+                <p className="mt-1 text-[10px] text-zinc-500">
+                  Hermes ינתח פלטה, טיפוגרפיה ומבנה מהתמונה ויחיל אותם על השקופיות. עד 8MB · PNG/JPEG/WebP.
+                </p>
+              </div>
+
+              {/* Source URL — the bridge extracts the real content and uses it as the copy source. */}
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-zinc-300">
+                  <Link2 className="h-3.5 w-3.5 text-brand-400" />
+                  קישור לפוסט או לכתבה (אופציונלי)
+                </label>
+                <input
+                  value={sourceUrl}
+                  onChange={(e) => setSourceUrl(e.target.value)}
+                  placeholder="https://www.instagram.com/p/... או קישור לכתבה"
+                  dir="ltr"
+                  className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[12px] text-white placeholder:text-zinc-600"
+                />
+                <p className="mt-1 text-[10px] text-zinc-500">
+                  אם מוזן, התוכן יישלף מהקישור וישמש כמקור לקופי במקום תקציר הכתבה שנבחרה.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!job && !starting && (
             <div className="flex flex-wrap items-center gap-3">
               <label className="text-[13px] text-zinc-400">
                 מספר שקופיות
@@ -274,6 +350,31 @@ export default function CarouselStudioModal({
                   </>
                 )}
               </div>
+
+              {(job.usedReference || job.imported || job.typography) && (
+                <div className="mb-3 flex flex-wrap gap-1.5 text-[10px]">
+                  {job.usedReference && (
+                    <span className="rounded border border-brand-500/30 bg-brand-500/10 px-2 py-0.5 text-brand-300">
+                      עוצב לפי צילום ההשראה
+                    </span>
+                  )}
+                  {job.imported && (
+                    <span className="rounded border border-sky-400/30 bg-sky-500/10 px-2 py-0.5 text-sky-300">
+                      מקור: {job.imported.source || 'קישור'} · {job.imported.chars} תווים
+                    </span>
+                  )}
+                  {job.typography && (
+                    <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-zinc-400">
+                      {job.typography}
+                    </span>
+                  )}
+                  {job.layout && (
+                    <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-zinc-400">
+                      {job.layout}
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
                 {slides.map((s, i) => (

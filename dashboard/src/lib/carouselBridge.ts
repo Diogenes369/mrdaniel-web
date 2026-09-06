@@ -79,7 +79,8 @@ export interface CarouselSlide {
   scene: string;
 }
 
-export type CarouselStatus = 'queued' | 'art-direction' | 'copywriting' | 'rendering' | 'done' | 'error';
+export type CarouselStatus =
+  | 'queued' | 'importing' | 'art-direction' | 'copywriting' | 'rendering' | 'done' | 'error';
 
 export interface CarouselJob {
   ok: boolean;
@@ -88,6 +89,13 @@ export interface CarouselJob {
   progress: { done: number; total: number };
   concept: string;
   palette: string[];
+  /** Type treatment Hermes derived, from the design reference when one was supplied. */
+  typography?: string;
+  /** Composition Hermes derived, from the design reference when one was supplied. */
+  layout?: string;
+  /** Present when a sourceUrl was parsed instead of using the pasted article text. */
+  imported?: { title: string; source: string; chars: number } | null;
+  usedReference?: boolean;
   slides: CarouselSlide[];
   post: { body: string; hashtags: string[]; altText?: string } | null;
   error: string | null;
@@ -115,15 +123,30 @@ export async function checkBridge(): Promise<BridgeHealth> {
   }
 }
 
+export interface CarouselOptions {
+  /** Free-text art direction from Daniel. Optional — Hermes decides on its own by default. */
+  override?: string;
+  /** base64 data URL of a design reference screenshot; Hermes analyses its style and framing. */
+  referenceImage?: string;
+  /** Article or post URL. When set, the bridge extracts its content and uses that as the source. */
+  sourceUrl?: string;
+}
+
 export async function startCarousel(
   article: ArticleInput,
   slideCount = 4,
-  override = ''
+  opts: CarouselOptions = {}
 ): Promise<string> {
   const res = await fetch(`${bridgeBase()}/carousel/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ article, slideCount, override }),
+    body: JSON.stringify({
+      article,
+      slideCount,
+      override: opts.override || '',
+      referenceImage: opts.referenceImage || '',
+      sourceUrl: opts.sourceUrl || '',
+    }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) throw new Error(data.error || `bridge responded ${res.status}`);
@@ -151,9 +174,24 @@ export async function adjustCarousel(jobId: string, instruction: string): Promis
 
 export const STATUS_LABEL: Record<CarouselStatus, string> = {
   queued: 'ממתין בתור',
+  importing: 'מייבא תוכן מהקישור',
   'art-direction': 'Hermes בוחר קונספט ויזואלי',
   copywriting: 'מנסח קופי בעברית',
   rendering: 'מייצר שקופיות ומרנדר עברית',
   done: 'מוכן',
   error: 'שגיאה',
 };
+
+/** Reads a picked File into a base64 data URL for the bridge's referenceImage field. */
+export function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('could not read the file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Bridge cap is 8MB decoded; base64 inflates ~33%, so reject early with a clear message. */
+export const MAX_REFERENCE_BYTES = 8 * 1024 * 1024;
+export const REFERENCE_ACCEPT = 'image/png,image/jpeg,image/webp';
