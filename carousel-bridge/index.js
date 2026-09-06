@@ -446,6 +446,10 @@ async function generateArtDirection(article, slideCount, override, referencePath
 
 async function generateFrame(jobDir, index, scene, palette, referencePath) {
   const outPath = path.join(jobDir, `frame_${String(index).padStart(2, '0')}.png`);
+  // Defensive: runJob creates this, but generateFrame is the only thing that depends on it
+  // existing, and a missing directory would surface as the same opaque "no usable frame".
+  fs.mkdirSync(jobDir, { recursive: true });
+
   const prompt = [
     `Generate ONE image and save it to ${outPath.replace(/\\/g, '/')}.`,
     `Format: 9:16 vertical.`,
@@ -460,21 +464,81 @@ async function generateFrame(jobDir, index, scene, palette, referencePath) {
     `Generate the image EXACTLY ONCE. Save it, then reply with only the absolute file path and stop.`,
     `Do not review, critique, regenerate or iterate on the image — one generation only.`,
   ].join('\n');
-  // Hermes sometimes writes the image and then keeps deliberating until the timeout. The artwork
-  // on disk is still good, so a timeout is only fatal when nothing was produced — otherwise we
-  // keep the file and move on rather than discarding minutes of work.
+
+  // Two attempts. Image generation fails intermittently — the model declines, writes to a path of
+  // its own choosing, or returns prose instead of a file — and a single miss should not sink a job
+  // that has already spent minutes on the preceding slides.
+  let lastOutput = '';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      lastOutput = await run(HERMES, ['-z', prompt]);
+    } catch (err) {
+      // A timeout that still produced a complete file is a success — see isCompletePng.
+      if (isCompletePng(outPath)) {
+        console.warn(`[carousel-bridge] slide ${index}: ${err.message} — frame is complete on disk, using it.`);
+        return outPath;
+      }
+      lastOutput = err.message;
+      console.warn(`[carousel-bridge] slide ${index} attempt ${attempt}/2 failed: ${err.message}`);
+      continue;
+    }
+
+    if (isCompletePng(outPath)) return outPath;
+
+    // Hermes exited cleanly but the expected file is not there. It commonly saved somewhere else
+    // and named that path in its reply, so try to recover it before burning another attempt.
+    const recovered = recoverFrame(lastOutput, jobDir, outPath);
+    if (recovered) {
+      console.warn(`[carousel-bridge] slide ${index}: recovered frame from ${recovered}`);
+      return outPath;
+    }
+
+    // Nothing usable. Log what Hermes actually said — previously this was swallowed entirely,
+    // which is why the failure read as an unexplained "no usable frame".
+    console.error(
+      `[carousel-bridge] slide ${index} attempt ${attempt}/2 produced no file at ${outPath}\n`
+      + `  hermes output: ${(lastOutput || '(empty)').slice(0, 1200)}`
+    );
+  }
+
+  throw new Error(
+    `Hermes produced no usable frame for slide ${index} at ${outPath}. `
+    + `Last Hermes output: ${(lastOutput || '(empty)').slice(0, 400)}`
+  );
+}
+
+/**
+ * Salvages a frame Hermes wrote somewhere other than the requested path.
+ *
+ * Looks first for an absolute path named in its reply, then for any PNG that appeared in the job
+ * directory in the last few minutes. Either is copied into place so the pipeline can continue.
+ */
+function recoverFrame(hermesOutput, jobDir, outPath) {
+  const claimed = String(hermesOutput || '').match(/[A-Za-z]:[\\/][^\r\n"'`<>|]+?\.png/i);
+  if (claimed) {
+    const candidate = claimed[0].replace(/\//g, path.sep);
+    if (candidate !== outPath && isCompletePng(candidate)) {
+      fs.copyFileSync(candidate, outPath);
+      return candidate;
+    }
+  }
   try {
-    await run(HERMES, ['-z', prompt]);
-  } catch (err) {
-    // Only salvage a COMPLETE file. A timeout can land mid-write, and a truncated PNG would fail
-    // downstream in Pillow with a far more confusing error than the timeout itself.
-    if (!isCompletePng(outPath)) throw err;
-    console.warn(`[carousel-bridge] slide ${index}: ${err.message} — frame is complete on disk, using it.`);
+    // No recency filter: every job gets its own directory, so any complete non-slide PNG sitting
+    // in it belongs to this job. (An mtime window was tried and rejected — it silently discarded
+    // valid frames, since copyFileSync preserves the source timestamp on Windows.)
+    const stray = fs.readdirSync(jobDir)
+      .filter((f) => f.toLowerCase().endsWith('.png') && !f.startsWith('slide_'))
+      .map((f) => path.join(jobDir, f))
+      .filter((f) => f !== outPath && isCompletePng(f))
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+    if (stray) {
+      fs.copyFileSync(stray, outPath);
+      return stray;
+    }
+  } catch {
+    /* directory unreadable — fall through to the caller's error */
   }
-  if (!isCompletePng(outPath)) {
-    throw new Error(`Hermes produced no usable frame for slide ${index} at ${outPath}`);
-  }
-  return outPath;
+  return null;
 }
 
 /**
