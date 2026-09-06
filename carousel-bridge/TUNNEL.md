@@ -23,7 +23,17 @@ accidentally expose an open instance.
 | Cloudflare login | **you must do this — interactive** |
 | DNS | **blocked — see below** |
 
-## Blocker: the domain is not on Cloudflare
+## Active setup: quick tunnel (chosen 2026-09-06)
+
+Running: `cloudflared tunnel --url http://localhost:8787 --no-autoupdate`
+Current URL: `https://ongoing-cups-alternatives-pete.trycloudflare.com`
+
+A quick tunnel is NOT a service and its URL is NOT stable. Every restart of cloudflared mints a new
+hostname, which means: update `VITE_CAROUSEL_BRIDGE_URL` on the dashboard project and redeploy, or
+override per-browser with `localStorage.setItem('carousel-bridge-base', ...)`. There is no Access
+identity gate on this path — `BRIDGE_TOKEN` is the only thing protecting Hermes.
+
+## Blocker for the named tunnel: the domain is not on Cloudflare
 
 `mrdaniel.co.il` currently uses `ns1/ns2.sitesdepot.com`. A named tunnel with a
 `bridge.mrdaniel.co.il` hostname requires the zone to be on Cloudflare. Options:
