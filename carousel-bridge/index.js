@@ -175,15 +175,107 @@ function run(cmd, args, { timeoutMs = HERMES_TIMEOUT_MS, cwd = REPO_ROOT } = {})
 }
 
 /** Pull the first JSON object/array out of a model response that may be fenced or chatty. */
-function extractJson(text) {
+/**
+ * Parses JSON out of a model reply, repairing the malformations LLMs actually produce.
+ *
+ * The previous version did a naive slice between the first brace and the last closer and handed
+ * that straight to JSON.parse, so a reply truncated mid-array surfaced as an unhandled
+ * "Expected ',' or ']' after array element in JSON at position 4135" and killed the job.
+ *
+ * Repairs applied, in order, each retried against JSON.parse:
+ *   1. strip code fences and any prose either side of the JSON
+ *   2. balance unclosed strings, arrays and objects (the truncation case)
+ *   3. remove trailing commas before a closer
+ *   4. drop the last, presumably partial, array element
+ * Returns null rather than throwing when nothing parses, so callers can fall back deliberately.
+ */
+function repairJson(raw) {
+  const text = String(raw || '');
   const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
   const start = cleaned.search(/[[{]/);
-  if (start === -1) throw new Error(`no JSON in Hermes response: ${text.slice(0, 200)}`);
+  if (start === -1) return null;
+
   const opener = cleaned[start];
   const closer = opener === '{' ? '}' : ']';
-  const end = cleaned.lastIndexOf(closer);
-  if (end <= start) throw new Error(`unterminated JSON in Hermes response`);
-  return JSON.parse(cleaned.slice(start, end + 1));
+  const candidates = [];
+
+  // 1. Straight slice to the last matching closer — correct when the reply is merely wrapped.
+  const lastClose = cleaned.lastIndexOf(closer);
+  if (lastClose > start) candidates.push(cleaned.slice(start, lastClose + 1));
+
+  // 2. Balance whatever is open at the end of the payload (truncated replies).
+  const body = cleaned.slice(start);
+  const stack = [];
+  let inString = false;
+  let escaped = false;
+  for (const ch of body) {
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{' || ch === '[') stack.push(ch === '{' ? '}' : ']');
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+  let balanced = body;
+  if (inString) balanced += '"';
+  balanced += stack.reverse().join('');
+  candidates.push(balanced);
+
+  // 3/4. Trailing-comma removal, and dropping a partial final element.
+  const extra = [];
+  for (const c of candidates) {
+    extra.push(c.replace(/,\s*([}\]])/g, '$1'));
+    const lastComma = c.lastIndexOf(',');
+    if (lastComma > 0) {
+      const trimmed = c.slice(0, lastComma);
+      const st = [];
+      let ins = false, esc = false;
+      for (const ch of trimmed) {
+        if (esc) { esc = false; continue; }
+        if (ch === '\\') { esc = true; continue; }
+        if (ch === '"') { ins = !ins; continue; }
+        if (ins) continue;
+        if (ch === '{' || ch === '[') st.push(ch === '{' ? '}' : ']');
+        else if (ch === '}' || ch === ']') st.pop();
+      }
+      extra.push(trimmed + (ins ? '"' : '') + st.reverse().join(''));
+    }
+  }
+
+  for (const candidate of [...candidates, ...extra]) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      /* try the next repair */
+    }
+  }
+  return null;
+}
+
+/**
+ * Last-resort art direction, used when Hermes cannot return a usable plan even after a retry.
+ *
+ * Deliberately generic but on-brand and structurally valid, so a job degrades to a plainer
+ * carousel instead of failing outright and showing the operator a raw parser error.
+ */
+function fallbackArtDirection(article, slideCount) {
+  const subject = String(article.title || 'the topic').slice(0, 90);
+  return {
+    concept: `Fallback direction: a calm sketchnote canvas about "${subject}".`,
+    palette: ['#F8F6EF', '#1A1A1A', '#E85A2A', '#2E9E8F'],
+    typography: 'Clean modern Hebrew sans',
+    layout: 'Small central vignette with generous empty margins',
+    textColor: '#1A1A1A',
+    fallback: true,
+    slides: Array.from({ length: slideCount }, (_, i) => ({
+      index: i,
+      scene:
+        'A cute 2D hand-drawn clay-free robot character in charcoal ink on textured cream paper, '
+        + 'small and centred in the middle third of the canvas, beside one simple prop such as a '
+        + 'screen, a gauge or a checklist. Generous empty paper on all sides. Top 25% and bottom '
+        + '20% completely clean. No letters, no words, no numerals anywhere.',
+    })),
+  };
 }
 
 async function callSite(action, body) {
@@ -592,12 +684,37 @@ Return ONLY valid JSON, no prose:
 `.trim();
 
 async function generateArtDirection(article, slideCount, override, referencePath, aspect) {
-  const raw = await run(HERMES, ['-z', ART_DIRECTION_PROMPT(article, slideCount, override, referencePath, aspect)]);
-  const plan = extractJson(raw);
-  if (!Array.isArray(plan.slides) || plan.slides.length === 0) {
-    throw new Error('Hermes returned no slide plan');
+  const prompt = ART_DIRECTION_PROMPT(article, slideCount, override, referencePath, aspect);
+
+  // Two attempts, then a valid default. A malformed or truncated plan must never reach the
+  // dashboard as a raw parser error — the job degrades to a plainer carousel instead.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let raw = '';
+    try {
+      raw = await run(HERMES, ['-z', prompt]);
+    } catch (err) {
+      console.warn(`[carousel-bridge] art direction attempt ${attempt}/2 failed: ${err.message}`);
+      continue;
+    }
+    const plan = repairJson(raw);
+    if (plan && Array.isArray(plan.slides) && plan.slides.length > 0) {
+      if (plan.slides.length < slideCount) {
+        // Short plan: repeat the final scene rather than rendering fewer slides than requested.
+        const last = plan.slides[plan.slides.length - 1];
+        while (plan.slides.length < slideCount) {
+          plan.slides.push({ ...last, index: plan.slides.length });
+        }
+      }
+      return plan;
+    }
+    console.warn(
+      `[carousel-bridge] art direction attempt ${attempt}/2 returned unusable JSON`
+      + ` (${String(raw || '').length} chars): ${String(raw || '').slice(0, 300)}`
+    );
   }
-  return plan;
+
+  console.warn('[carousel-bridge] art direction falling back to default visual direction');
+  return fallbackArtDirection(article, slideCount);
 }
 
 async function generateFrame(jobDir, index, scene, palette, referencePath, aspect = '4:5') {
@@ -769,7 +886,7 @@ async function visionQa(slidePath) {
   ].join('\n');
   try {
     const raw = await run(HERMES, ['-z', prompt], { timeoutMs: 180_000 });
-    const verdict = extractJson(raw);
+    const verdict = repairJson(raw) || {};
     return {
       pass: verdict.pass !== false,
       overlap: Boolean(verdict.overlap),
@@ -879,9 +996,11 @@ async function rebrandSource(sourceText, sourceTitle, slideCount) {
   ].join('\n');
 
   const raw = await run(HERMES, ['-z', `${REBRAND_SYSTEM}\n\n${prompt}`], { timeoutMs: 300_000 });
-  const out = extractJson(raw);
-  if (!Array.isArray(out.slides) || out.slides.length === 0) {
-    throw new Error('rebrand returned no slides');
+  const out = repairJson(raw);
+  if (!out || !Array.isArray(out.slides) || out.slides.length === 0) {
+    throw new Error(
+      'the translator did not return usable slides. Try again, or shorten the source text.'
+    );
   }
   return {
     title: String(out.title || sourceTitle || ''),
@@ -1176,6 +1295,7 @@ app.get('/carousel/job/:id', (req, res) => {
     concept: job.plan?.concept || '',
     palette: job.plan?.palette || [],
     typography: job.plan?.typography || '',
+    usedFallbackDirection: Boolean(job.plan?.fallback),
     layout: job.plan?.layout || '',
     imported: job.imported || null,
     usedReference: Boolean(job.reference),
