@@ -43,6 +43,33 @@ FONTS = {
 }
 DEFAULT_FONT = "opensans"
 
+# Exact output dimensions per platform preset. Hermes' frame is normalised to these before any
+# typography is placed, so the safe-zone fractions below mean the same thing on every preset.
+PRESETS = {
+    "portrait": (1080, 1350),   # 4:5 — Instagram / LinkedIn carousel
+    "story": (1080, 1920),      # 9:16 — Stories / TikTok / Reels
+    "square": (1080, 1080),     # 1:1
+}
+DEFAULT_PRESET = "portrait"
+
+
+def fit_canvas(img: Image.Image, preset: str) -> Image.Image:
+    """
+    Normalises Hermes' frame to the preset's exact pixel size.
+
+    Cover-crops from the centre rather than stretching, so the artwork keeps its proportions —
+    a squashed robot is far more obvious than a slightly tighter crop.
+    """
+    target_w, target_h = PRESETS.get(preset, PRESETS[DEFAULT_PRESET])
+    if img.size == (target_w, target_h):
+        return img
+    src_w, src_h = img.size
+    scale = max(target_w / src_w, target_h / src_h)
+    resized = img.resize((max(1, round(src_w * scale)), max(1, round(src_h * scale))), Image.LANCZOS)
+    left = (resized.width - target_w) // 2
+    top = (resized.height - target_h) // 2
+    return resized.crop((left, top, left + target_w, top + target_h))
+
 # Site brand palette (src/index.css --color-brand-*). "brand" is the default scheme.
 PALETTES = {
     "brand": {
@@ -136,6 +163,30 @@ def fit_block(
     return font, lines[:keep], line_h
 
 
+def draw_text_plate(
+    img: Image.Image, box: tuple[int, int, int, int], fill: str, opacity: int = 232,
+) -> None:
+    """
+    Lays a translucent paper plate behind a text block.
+
+    Pass 1 is instructed to leave the lower part of each card empty, but the image model does not
+    honour that reliably — it fills the whole card and the copy then lands on a robot or a gauge.
+    This makes legibility deterministic instead of dependent on the model complying: the plate is
+    drawn on the composite, under the type, so text always has clean ground beneath it.
+    """
+    x0, y0, x1, y1 = box
+    if x1 <= x0 or y1 <= y0:
+        return
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    rgb = tuple(int(fill.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+    ImageDraw.Draw(overlay).rounded_rectangle(
+        [x0, y0, x1, y1], radius=max(8, (y1 - y0) // 8), fill=rgb + (opacity,)
+    )
+    img.alpha_composite(overlay) if img.mode == "RGBA" else img.paste(
+        Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"), (0, 0)
+    )
+
+
 def draw_block(
     draw: ImageDraw.ImageDraw, text: str, box: tuple[int, int, int, int], font_name: str,
     max_size: int, color: str, align: str = "right", valign: str = "top",
@@ -181,7 +232,7 @@ def compose(spec: dict) -> Path:
     # QA retry passes fontScale < 1 to shrink every band's ceiling, giving the fitter more room.
     scale = float(spec.get("fontScale", 1.0) or 1.0)
 
-    img = Image.open(src).convert("RGB")
+    img = fit_canvas(Image.open(src).convert("RGB"), spec.get("preset", DEFAULT_PRESET))
     draw = ImageDraw.Draw(img)
     W, H = img.size
     margin = int(spec.get("margin", W * 0.085))
@@ -208,6 +259,21 @@ def compose(spec: dict) -> Path:
             )
             text_box = (x0 + pad, y0 + pad + int(r * 2.4), x1 - pad, y1 - pad)
         if card.get("text"):
+            # Measure first so the plate hugs the actual text, then re-acquire the draw handle:
+            # the plate composites a new surface into `img`.
+            cf, clines, clh = fit_block(
+                clean_text(card["text"]), draw, text_box, font_name, int(W * 0.05 * scale)
+            )
+            block_h = len(clines) * clh
+            tx0, ty0, tx1, ty1 = text_box
+            cy = ty0 + (ty1 - ty0 - block_h) // 2
+            pad_x, pad_y = int(W * 0.018), int(W * 0.014)
+            draw_text_plate(
+                img,
+                (tx0 - pad_x, cy - pad_y, tx1 + pad_x, cy + block_h + pad_y),
+                spec.get("plateColor") or "#F8F6EF",
+            )
+            draw = ImageDraw.Draw(img)
             draw_block(
                 draw, card["text"], text_box, font_name,
                 int(W * 0.05 * scale), card.get("color") or colors["ink"],
@@ -230,7 +296,7 @@ def compose(spec: dict) -> Path:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     img.save(out)
-    print(f"OK: composed {out} ({font_name}, palette={spec.get('palette', 'brand')})")
+    print(f"OK: composed {out} {img.size} ({font_name}, palette={spec.get('palette', 'brand')}, preset={spec.get('preset', DEFAULT_PRESET)})")
     return out
 
 

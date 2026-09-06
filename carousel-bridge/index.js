@@ -50,6 +50,18 @@ for (const envFile of [path.join(__dirname, '.env'), path.join(REPO_ROOT, '.env'
 const OUTPUT_ROOT = path.join(__dirname, 'output');
 const RENDER_SCRIPT = path.join(REPO_ROOT, 'scripts', 'render_hebrew_banner.py');
 const COMPOSE_SCRIPT = path.join(REPO_ROOT, 'scripts', 'compose_slide.py');
+const PDF_SCRIPT = path.join(REPO_ROOT, 'scripts', 'compile_pdf.py');
+
+/**
+ * Output presets. Hermes is asked for the matching aspect and the compositor normalises its frame
+ * to these exact pixels, so the safe-zone fractions mean the same thing on every preset.
+ */
+const PRESETS = {
+  portrait: { w: 1080, h: 1350, ratio: '4:5', label: 'Instagram / LinkedIn carousel' },
+  story: { w: 1080, h: 1920, ratio: '9:16', label: 'Stories / TikTok / Reels' },
+  square: { w: 1080, h: 1080, ratio: '1:1', label: 'Square' },
+};
+const DEFAULT_PRESET = 'portrait';
 
 const PORT = Number(process.env.CAROUSEL_BRIDGE_PORT) || 8787;
 const SITE_ORIGIN = process.env.SITE_ORIGIN || 'https://mrdaniel.co.il';
@@ -530,7 +542,7 @@ const FRAME_STYLE = [
   'Inside each card confine the drawing to its upper 55% and leave the lower 45% as empty paper for text.',
 ].join(' ');
 
-const ART_DIRECTION_PROMPT = (article, slideCount, override, referencePath) => `
+const ART_DIRECTION_PROMPT = (article, slideCount, override, referencePath, aspect = '4:5') => `
 You are the art director for a Hebrew Instagram infographic carousel about this news story.
 
 TITLE: ${article.title}
@@ -542,7 +554,7 @@ ${METAPHOR_RULES}
 
 ${DESIGN_SYSTEM}
 
-Plan ${slideCount} slide(s), 9:16 vertical, as one coherent series that walks the reader through the
+Plan ${slideCount} slide(s), ${aspect} vertical, as one coherent series that walks the reader through the
 story: open with the situation, develop the mechanism or the numbers, close on the implication.
 Decide everything yourself — do not ask questions.
 ${override ? `\nThe user has additionally requested: "${override}". Honour it, but never at the cost of the banned-terms rule or the layout schema.\n` : ''}
@@ -568,8 +580,8 @@ Return ONLY valid JSON, no prose:
  "slides":[${Array.from({ length: slideCount }, (_, i) => `{"index":${i},"scene":"detailed drawn-imagery prompt for slide ${i + 1}, no lettering"}`).join(',')}]}
 `.trim();
 
-async function generateArtDirection(article, slideCount, override, referencePath) {
-  const raw = await run(HERMES, ['-z', ART_DIRECTION_PROMPT(article, slideCount, override, referencePath)]);
+async function generateArtDirection(article, slideCount, override, referencePath, aspect) {
+  const raw = await run(HERMES, ['-z', ART_DIRECTION_PROMPT(article, slideCount, override, referencePath, aspect)]);
   const plan = extractJson(raw);
   if (!Array.isArray(plan.slides) || plan.slides.length === 0) {
     throw new Error('Hermes returned no slide plan');
@@ -577,7 +589,7 @@ async function generateArtDirection(article, slideCount, override, referencePath
   return plan;
 }
 
-async function generateFrame(jobDir, index, scene, palette, referencePath) {
+async function generateFrame(jobDir, index, scene, palette, referencePath, aspect = '4:5') {
   const outPath = path.join(jobDir, `frame_${String(index).padStart(2, '0')}.png`);
   // Defensive: runJob creates this, but generateFrame is the only thing that depends on it
   // existing, and a missing directory would surface as the same opaque "no usable frame".
@@ -585,7 +597,7 @@ async function generateFrame(jobDir, index, scene, palette, referencePath) {
 
   const prompt = [
     `Generate ONE image and save it to ${outPath.replace(/\\/g, '/')}.`,
-    `Format: 9:16 vertical.`,
+    `Format: ${aspect} vertical.`,
     FRAME_STYLE,
     `Palette for this set: ${(palette || []).join(', ')}.`,
     ...(referencePath
@@ -706,6 +718,7 @@ async function composeSlide(framePath, jobDir, index, copy, opts) {
     output: outPath,
     font: opts.font || RENDER_FONT,
     palette: opts.palette || 'brand',
+    preset: opts.preset || DEFAULT_PRESET,
     headline: copy.headline || '',
     footer: copy.footer || '',
     footerBox: [0.07, 0.78, 0.93, 0.90],
@@ -820,8 +833,13 @@ ABSOLUTE RULES:
    belonging to the original brand, and any call to action pointing anywhere other than the new
    brand. Keep third-party TECHNICAL product names when they are part of the information itself
    (e.g. "Postgres", "Figma") — those are facts, not branding.
-3. NATURAL HEBREW. Idiomatic and readable, not a literal word-for-word calque. Technical terms may
-   stay in Latin script inside a Hebrew sentence. No markdown, no asterisks.
+3. NATURAL, HIGH-CONVERTING HEBREW. Localise, do not transliterate. Write the way an Israeli
+   practitioner actually speaks: direct second person plural, active voice, short sentences.
+   Technical terms may stay in Latin script inside a Hebrew sentence. No markdown, no asterisks.
+   Each slide headline must earn the swipe on its own — concrete and specific, never a label like
+   "שלב 2" or "טיפ נוסף". Read every line aloud in your head first; if it sounds like Google
+   Translate, rewrite it. Preserve the source's meaning exactly while making the Hebrew sound
+   native, and never invent a claim to make a line punchier.
 4. Each slide is one discrete step or idea from the source, in the source's original order.
 5. THREADED SOURCES. If the text arrives as a numbered chain ("1. ... 2. ... 3. ..."), that
    numbering is the thread's own reply order and is authoritative: emit exactly one slide per
@@ -870,6 +888,7 @@ async function runJob(job) {
   const jobDir = path.join(OUTPUT_ROOT, job.id);
   fs.mkdirSync(jobDir, { recursive: true });
   const { slideCount, override, referenceImage, sourceUrl } = job.input;
+  const preset = PRESETS[job.input.preset] || PRESETS[DEFAULT_PRESET];
   let article = job.input.article;
 
   // Reference screenshot: written to disk first so Hermes can open it during art direction.
@@ -895,7 +914,7 @@ async function runJob(job) {
   job.article = { title: article.title, source: article.source };
 
   job.status = 'art-direction';
-  job.plan = await generateArtDirection(article, slideCount, override, referencePath);
+  job.plan = await generateArtDirection(article, slideCount, override, referencePath, preset.ratio);
   job.progress = { done: 0, total: slideCount };
 
   // --- Instagram Rebrander: 1:1 translation replaces synthesis entirely -------------------
@@ -954,7 +973,7 @@ async function runJob(job) {
   for (let i = 0; i < slideCount; i++) {
     const plan = job.plan.slides[i] || job.plan.slides[job.plan.slides.length - 1];
     const copy = job.deck[i] || {};
-    const frame = await generateFrame(jobDir, i, plan.scene, job.plan.palette, referencePath);
+    const frame = await generateFrame(jobDir, i, plan.scene, job.plan.palette, referencePath, preset.ratio);
 
     // Slide copy, either as edited by Daniel in the dashboard editor or straight from the deck.
     const edited = (job.input.slideCopy || [])[i] || {};
@@ -967,7 +986,7 @@ async function runJob(job) {
     };
 
     let slide = await composeSlide(frame, jobDir, i, content, {
-      font: job.input.font, palette: job.input.palette,
+      font: job.input.font, palette: job.input.palette, preset: job.input.preset,
     });
 
     // Vision QA, with one corrective re-composite. Overflow/overlap are the failures a tighter
@@ -976,7 +995,7 @@ async function runJob(job) {
     if (!qa.pass && (qa.overflow || qa.overlap)) {
       job.qaRetries = (job.qaRetries || 0) + 1;
       slide = await composeSlide(frame, jobDir, i, content, {
-        font: job.input.font, palette: job.input.palette, fontScale: 0.82,
+        font: job.input.font, palette: job.input.palette, preset: job.input.preset, fontScale: 0.82,
       });
       qa = await visionQa(slide);
     }
@@ -991,6 +1010,16 @@ async function runJob(job) {
       qa,
     });
     job.progress = { done: i + 1, total: slideCount };
+  }
+
+  // LinkedIn document post: one PDF of every slide, in order. Non-fatal — a PDF failure must not
+  // discard a carousel that rendered correctly.
+  try {
+    const pdfPath = path.join(jobDir, `carousel-${job.id}.pdf`);
+    await run(PYTHON, [PDF_SCRIPT, '--dir', jobDir, '--out', pdfPath], { timeoutMs: 60_000 });
+    if (fs.existsSync(pdfPath)) job.pdfUrl = `/carousel/file/${job.id}/${path.basename(pdfPath)}`;
+  } catch (err) {
+    console.warn(`[carousel-bridge] PDF compilation skipped: ${err.message}`);
   }
 
   job.status = 'done';
@@ -1066,6 +1095,7 @@ app.get('/health', (_req, res) => {
     adminSecret: Boolean(ADMIN_SECRET),
     renderScript: fs.existsSync(RENDER_SCRIPT),
     hermesTimeoutMs: HERMES_TIMEOUT_MS,
+    presets: Object.keys(PRESETS),
     tokenRequired: Boolean(BRIDGE_TOKEN),
     instagramOEmbed: Boolean(process.env.INSTAGRAM_OEMBED_TOKEN),
     threadsApp: Boolean(process.env.THREADS_APP_ID && process.env.THREADS_APP_SECRET),
@@ -1118,6 +1148,7 @@ app.post('/carousel/generate', (req, res) => {
     skipQa: Boolean(req.body?.skipQa),
     // 'rebrand' = 1:1 unbranded Hebrew translation of a source post; otherwise synthesis.
     mode: req.body?.mode === 'rebrand' ? 'rebrand' : 'article',
+    preset: PRESETS[req.body?.preset] ? req.body.preset : DEFAULT_PRESET,
   });
   res.json({ ok: true, jobId: job.id, slideCount: count });
 });
@@ -1138,6 +1169,8 @@ app.get('/carousel/job/:id', (req, res) => {
     usedReference: Boolean(job.reference),
     deck: job.deck || [],
     rebrand: job.rebrand || null,
+    preset: job.input?.preset || DEFAULT_PRESET,
+    pdfUrl: job.pdfUrl || null,
     qaRetries: job.qaRetries || 0,
     slides: job.slides || [],
     post: job.post || null,
