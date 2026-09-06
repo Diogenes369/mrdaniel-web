@@ -76,7 +76,10 @@ export interface CarouselSlide {
   url: string;
   headline: string;
   subhead: string;
+  cards?: string[];
   scene: string;
+  /** Vision QA verdict for this slide. */
+  qa?: { pass: boolean; overlap?: boolean; overflow?: boolean; brokenGlyphs?: boolean; lowContrast?: boolean; note?: string; skipped?: boolean };
 }
 
 export type CarouselStatus =
@@ -96,6 +99,9 @@ export interface CarouselJob {
   /** Present when a sourceUrl was parsed instead of using the pasted article text. */
   imported?: { title: string; source: string; chars: number } | null;
   usedReference?: boolean;
+  /** Copy the engine produced, so the editor can seed itself from a first pass. */
+  deck?: Array<{ headline?: string; subhead?: string; body?: string; bullets?: string[] }>;
+  qaRetries?: number;
   slides: CarouselSlide[];
   post: { body: string; hashtags: string[]; altText?: string } | null;
   error: string | null;
@@ -134,6 +140,36 @@ export async function checkBridge(): Promise<BridgeHealth> {
   }
 }
 
+/** Brand palettes the compositor understands (scripts/compose_slide.py PALETTES). */
+export const PALETTES = [
+  { id: 'brand', label: 'מותג האתר', swatch: ['#0B0F17', '#76B900', '#9FE870'] },
+  { id: 'sketchnote', label: 'סקצ׳נוט חם', swatch: ['#1A1A1A', '#E85A2A', '#2E9E8F'] },
+  { id: 'carbon', label: 'קרבון כהה', swatch: ['#F4F4F5', '#00FF66', '#22D3EE'] },
+] as const;
+
+/** Open Sans is the default and carries full Hebrew (verified 27/27). */
+export const FONTS = [
+  { id: 'opensans', label: 'Open Sans Hebrew' },
+  { id: 'heebo', label: 'Heebo' },
+  { id: 'assistant', label: 'Assistant' },
+  { id: 'rubik', label: 'Rubik' },
+] as const;
+
+/** Layout presets — how many content cards the compositor lays out. */
+export const TEMPLATES = [
+  { id: 1, label: 'כרטיס יחיד', hint: 'הצהרה או נתון בודד' },
+  { id: 2, label: 'השוואה', hint: 'לפני / אחרי, שני מדדים' },
+  { id: 3, label: '3 שלבים', hint: 'רצף ממוספר' },
+  { id: 4, label: '4 שלבים', hint: 'רשת של ארבעה' },
+] as const;
+
+/** Per-slide copy as edited in the dashboard before rendering. */
+export interface SlideCopy {
+  headline: string;
+  cards: string[];
+  footer: string;
+}
+
 export interface CarouselOptions {
   /** Free-text art direction from Daniel. Optional — Hermes decides on its own by default. */
   override?: string;
@@ -141,6 +177,12 @@ export interface CarouselOptions {
   referenceImage?: string;
   /** Article or post URL. When set, the bridge extracts its content and uses that as the source. */
   sourceUrl?: string;
+  /** Reviewed/edited copy per slide. Overrides whatever the copy engine produced. */
+  slideCopy?: SlideCopy[];
+  font?: string;
+  palette?: string;
+  /** Skips the vision QA pass — faster, but no overlap/overflow check. */
+  skipQa?: boolean;
 }
 
 export async function startCarousel(
@@ -157,6 +199,10 @@ export async function startCarousel(
       override: opts.override || '',
       referenceImage: opts.referenceImage || '',
       sourceUrl: opts.sourceUrl || '',
+      slideCopy: opts.slideCopy || null,
+      font: opts.font || 'opensans',
+      palette: opts.palette || 'brand',
+      skipQa: Boolean(opts.skipQa),
     }),
   });
   const data = await res.json().catch(() => ({}));

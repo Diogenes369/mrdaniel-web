@@ -3,11 +3,12 @@ import JSZip from 'jszip';
 import {
   X, ChevronLeft, ChevronRight, Download, Copy, Check, Sparkles,
   AlertTriangle, Loader2, Send, Image as ImageIcon, Upload, Link2, Trash2,
+  Palette, Type, LayoutGrid, ShieldCheck,
 } from 'lucide-react';
 import {
   startCarousel, fetchJob, adjustCarousel, checkBridge, slideUrl, bridgeBase, STATUS_LABEL,
-  fileToDataUrl, MAX_REFERENCE_BYTES, REFERENCE_ACCEPT,
-  type ArticleInput, type CarouselJob, type BridgeHealth,
+  fileToDataUrl, MAX_REFERENCE_BYTES, REFERENCE_ACCEPT, PALETTES, FONTS, TEMPLATES,
+  type ArticleInput, type CarouselJob, type BridgeHealth, type SlideCopy,
 } from '../lib/carouselBridge';
 
 /**
@@ -40,6 +41,13 @@ export default function CarouselStudioModal({
   const [reference, setReference] = useState<{ dataUrl: string; name: string } | null>(null);
   // Source URL: when set, the bridge extracts the page/post content and uses it as the copy source.
   const [sourceUrl, setSourceUrl] = useState('');
+  // Pre-render editor: reviewed copy per slide, plus brand/typography controls.
+  const [slideCopy, setSlideCopy] = useState<SlideCopy[]>([]);
+  const [editing, setEditing] = useState(false);
+  const [font, setFont] = useState<string>('opensans');
+  const [palette, setPalette] = useState<string>('brand');
+  const [template, setTemplate] = useState<number>(2);
+  const [skipQa, setSkipQa] = useState(false);
   const [copied, setCopied] = useState(false);
   const [zipping, setZipping] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -95,13 +103,34 @@ export default function CarouselStudioModal({
         override,
         referenceImage: reference?.dataUrl,
         sourceUrl: sourceUrl.trim(),
+        slideCopy: slideCopy.length ? slideCopy : undefined,
+        font,
+        palette,
+        skipQa,
       }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'failed to start');
     } finally {
       setStarting(false);
     }
-  }, [article, slideCount, reference, sourceUrl]);
+  }, [article, slideCount, reference, sourceUrl, slideCopy, font, palette, skipQa]);
+
+  /** Seeds one editable entry per slide so copy can be reviewed before any image is generated. */
+  const openEditor = useCallback(() => {
+    if (!article) return;
+    setSlideCopy(
+      Array.from({ length: slideCount }, (_, i) => ({
+        headline: i === 0 ? article.title : '',
+        cards: Array.from({ length: template }, () => ''),
+        footer: '',
+      }))
+    );
+    setEditing(true);
+  }, [article, slideCount, template]);
+
+  const patchSlide = useCallback((i: number, patch: Partial<SlideCopy>) => {
+    setSlideCopy((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  }, []);
 
   const pickReference = useCallback(async (file: File | null) => {
     if (!file) return;
@@ -291,6 +320,125 @@ export default function CarouselStudioModal({
             </div>
           )}
 
+          {/* Brand, typography and layout controls. */}
+          {!job && !starting && (
+            <div className="mb-4 grid gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 sm:grid-cols-3">
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-zinc-300">
+                  <Palette className="h-3.5 w-3.5 text-brand-400" /> פלטת מותג
+                </label>
+                <div className="space-y-1">
+                  {PALETTES.map((pal) => (
+                    <button
+                      key={pal.id}
+                      onClick={() => setPalette(pal.id)}
+                      className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border px-2 py-1.5 text-[11px] ${
+                        palette === pal.id
+                          ? 'border-brand-500/60 bg-brand-500/10 text-white'
+                          : 'border-white/10 text-zinc-400 hover:bg-white/5'
+                      }`}
+                    >
+                      <span className="flex gap-0.5">
+                        {pal.swatch.map((c) => (
+                          <span key={c} className="h-3.5 w-3.5 rounded-sm border border-white/20" style={{ background: c }} />
+                        ))}
+                      </span>
+                      {pal.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-zinc-300">
+                  <Type className="h-3.5 w-3.5 text-brand-400" /> גופן
+                </label>
+                <select
+                  value={font}
+                  onChange={(e) => setFont(e.target.value)}
+                  className="w-full cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-[12px] text-white"
+                >
+                  {FONTS.map((f) => (
+                    <option key={f.id} value={f.id}>{f.label}</option>
+                  ))}
+                </select>
+                <label className="mt-2 flex cursor-pointer items-center gap-2 text-[11px] text-zinc-400">
+                  <input
+                    type="checkbox"
+                    checked={!skipQa}
+                    onChange={(e) => setSkipQa(!e.target.checked)}
+                    className="accent-brand-500"
+                  />
+                  בדיקת QA ויזואלית
+                </label>
+              </div>
+
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-zinc-300">
+                  <LayoutGrid className="h-3.5 w-3.5 text-brand-400" /> פריסת שקופית
+                </label>
+                <div className="grid grid-cols-2 gap-1">
+                  {TEMPLATES.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setTemplate(t.id)}
+                      title={t.hint}
+                      className={`cursor-pointer rounded-lg border p-1.5 text-[10px] leading-tight ${
+                        template === t.id
+                          ? 'border-brand-500/60 bg-brand-500/10 text-white'
+                          : 'border-white/10 text-zinc-400 hover:bg-white/5'
+                      }`}
+                    >
+                      <span className="mb-1 flex justify-center gap-0.5">
+                        {Array.from({ length: t.id }).map((_, i) => (
+                          <span key={i} className="h-4 w-2.5 rounded-[2px] border border-current opacity-70" />
+                        ))}
+                      </span>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pre-render slide editor — review and edit every line before any image is generated. */}
+          {!job && !starting && editing && (
+            <div className="mb-4 space-y-3">
+              {slideCopy.map((sl, i) => (
+                <div key={i} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                  <p className="mb-2 text-[11px] font-bold text-brand-400">שקופית {i + 1}</p>
+                  <input
+                    value={sl.headline}
+                    onChange={(e) => patchSlide(i, { headline: e.target.value })}
+                    placeholder="כותרת ראשית"
+                    dir="rtl"
+                    className="mb-1.5 w-full rounded border border-white/15 bg-black/40 px-2 py-1.5 text-[12px] text-white placeholder:text-zinc-600"
+                  />
+                  {sl.cards.map((c, ci) => (
+                    <input
+                      key={ci}
+                      value={c}
+                      onChange={(e) =>
+                        patchSlide(i, { cards: sl.cards.map((v, vi) => (vi === ci ? e.target.value : v)) })
+                      }
+                      placeholder={`תוכן כרטיס ${ci + 1}`}
+                      dir="rtl"
+                      className="mb-1.5 w-full rounded border border-white/15 bg-black/40 px-2 py-1.5 text-[12px] text-white placeholder:text-zinc-600"
+                    />
+                  ))}
+                  <input
+                    value={sl.footer}
+                    onChange={(e) => patchSlide(i, { footer: e.target.value })}
+                    placeholder="שורת סיכום בבאנר התחתון"
+                    dir="rtl"
+                    className="w-full rounded border border-white/15 bg-black/40 px-2 py-1.5 text-[12px] text-white placeholder:text-zinc-600"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           {!job && !starting && (
             <div className="flex flex-wrap items-center gap-3">
               <label className="text-[13px] text-zinc-400">
@@ -310,7 +458,13 @@ export default function CarouselStudioModal({
               >
                 <ImageIcon className="h-4 w-4" /> צור קרוסלה ויזואלית
               </button>
-              <span className="text-[11px] text-zinc-500">Hermes בוחר את הקונספט, הפלטה וההרכב לבד</span>
+              <button
+                onClick={editing ? () => setEditing(false) : openEditor}
+                className="cursor-pointer rounded-lg border border-white/15 px-3 py-2 text-sm font-bold text-zinc-200 hover:bg-white/5"
+              >
+                {editing ? 'סגירת העורך' : 'עריכת טקסטים לפני רינדור'}
+              </button>
+              <span className="text-[11px] text-zinc-500">Hermes בוחר קונספט והרכב; הטקסט תמיד שלכם</span>
             </div>
           )}
 
@@ -358,6 +512,20 @@ export default function CarouselStudioModal({
                   </>
                 )}
               </div>
+
+              {current?.qa && !current.qa.skipped && (
+                <div
+                  className={`mb-2 flex items-center gap-1.5 rounded border px-2 py-1 text-[10px] ${
+                    current.qa.pass
+                      ? 'border-brand-500/30 bg-brand-500/10 text-brand-300'
+                      : 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+                  }`}
+                >
+                  <ShieldCheck className="h-3 w-3" />
+                  {current.qa.pass ? 'QA ויזואלי: עבר' : `QA ויזואלי: ${current.qa.note || 'נמצאו חריגות'}`}
+                  {job.qaRetries ? ` · ${job.qaRetries} תיקון` : ''}
+                </div>
+              )}
 
               {(job.usedReference || job.imported || job.typography) && (
                 <div className="mb-3 flex flex-wrap gap-1.5 text-[10px]">

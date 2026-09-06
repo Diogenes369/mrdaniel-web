@@ -49,6 +49,7 @@ for (const envFile of [path.join(__dirname, '.env'), path.join(REPO_ROOT, '.env'
 }
 const OUTPUT_ROOT = path.join(__dirname, 'output');
 const RENDER_SCRIPT = path.join(REPO_ROOT, 'scripts', 'render_hebrew_banner.py');
+const COMPOSE_SCRIPT = path.join(REPO_ROOT, 'scripts', 'compose_slide.py');
 
 const PORT = Number(process.env.CAROUSEL_BRIDGE_PORT) || 8787;
 const SITE_ORIGIN = process.env.SITE_ORIGIN || 'https://mrdaniel.co.il';
@@ -75,7 +76,7 @@ const ALLOWED_ORIGINS = (process.env.BRIDGE_ALLOWED_ORIGINS ||
   'http://localhost:5174,http://127.0.0.1:5174')
   .split(',').map((o) => o.trim()).filter(Boolean);
 /** Clean Hebrew sans for the overlay. Override with RENDER_FONT=assistant|rubik. */
-const RENDER_FONT = process.env.RENDER_FONT || 'heebo';
+const RENDER_FONT = process.env.RENDER_FONT || 'opensans';
 const DEFAULT_SLIDES = 4;
 const MAX_SLIDES = 8;
 
@@ -268,10 +269,16 @@ LAYOUT SCHEMA — every slide follows this vertical structure:
    it afterwards.
 
 TEXT RULE — absolute:
-Draw NO Hebrew letters and NO words in any language. All wording is composited afterwards by a
-separate Hebrew typesetting step, and any lettering you draw will collide with it and read as
-gibberish. Numerals (1, 2, 3, 62.7%, 99.9%) and symbols (arrows, ticks, %) ARE allowed and
-encouraged — they carry the data. Everything else is drawn imagery only.`;
+Draw NO glyphs of ANY kind: no letters in any language, no words, no NUMERALS, no digits, no
+percentages, no labels, no logos, no watermarks. Symbols carrying no text (arrows, ticks, gauge
+needles, progress fills) are fine. Every number and every word is composited afterwards by a
+precision typography pass, so anything you draw appears TWICE and collides.
+
+RESERVED ZONES — absolute:
+Inside every card, confine the illustration to the UPPER 55% and leave the LOWER 45% visibly empty
+— plain paper ground, no linework, no texture, no character overlapping it. Text is composited into
+that empty region. A card whose drawing fills its whole interior is wrong. Keep the top ~22% header
+band and the footer banner interior completely clear for the same reason.`;
 
 /**
  * Forces literal, story-specific imagery. The failure mode this exists to prevent is a beautiful
@@ -310,6 +317,8 @@ const FRAME_STYLE = [
   'Palette: #F8F6EF cream, #1A1A1A charcoal ink, #E85A2A orange accents, #2E9E8F teal, #F5C542 highlight.',
   'Hand-drawn rounded ink boxes frame each card. Cute 2D robot characters, gauges, checklists, arrows.',
   'NOT clay, NOT claymorphism, NOT 3D, NOT abstract blobs or organic shapes, no gradients, no photorealism.',
+  'Draw NO letters, NO words and NO numerals anywhere — all typography is composited separately and would collide.',
+  'Inside each card confine the drawing to its upper 55% and leave the lower 45% as empty paper for text.',
 ].join(' ');
 
 const ART_DIRECTION_PROMPT = (article, slideCount, override, referencePath) => `
@@ -370,8 +379,8 @@ async function generateFrame(jobDir, index, scene, palette, referencePath) {
       ? [`Match the design language of the reference image at ${referencePath.replace(/\\/g, '/')} — its palette, spacing rhythm and structural framing. Do not copy its subject matter.`]
       : []),
     `Scene: ${scene}`,
-    `ABSOLUTE REQUIREMENT: draw NO letters and NO words in any language, and no logos or watermarks. Numerals and symbols (1, 2, 3, 62.7%, arrows, ticks) ARE allowed and carry the data.`,
-    `Leave the top ~22% band and the inside of the footer banner visually clean — Hebrew copy is composited into both afterwards.`,
+    `ABSOLUTE REQUIREMENT: draw NO letters, NO words and NO numerals or digits anywhere, plus no logos or watermarks. All type and all numbers are composited afterwards — anything you draw appears twice.`,
+    `Leave the top ~22% band and the footer banner interior completely clear, and inside every card leave the lower 45% as empty paper — Hebrew is composited into those zones.`,
     `Generate the image EXACTLY ONCE. Save it, then reply with only the absolute file path and stop.`,
     `Do not review, critique, regenerate or iterate on the image — one generation only.`,
   ].join('\n');
@@ -397,52 +406,80 @@ async function generateFrame(jobDir, index, scene, palette, referencePath) {
  * (headline + subhead) was dumped at the top at a fixed 52px, which wrapped to ~10 lines and ran
  * straight across the illustration and into the banner.
  */
-async function overlayHebrew(framePath, jobDir, index, copy, textColor) {
+/**
+ * Pass 2 — precision typography via scripts/compose_slide.py.
+ *
+ * Every element gets an explicit rectangle and is auto-fitted inside it on BOTH axes, so text
+ * cannot overflow its band or land on the artwork. Numbered badges are drawn here and only here;
+ * Pass 1 is forbidden from drawing any glyph, which is what produced duplicated numbers.
+ */
+async function composeSlide(framePath, jobDir, index, copy, opts) {
   const outPath = path.join(jobDir, `slide_${String(index).padStart(2, '0')}.png`);
-  const headline = String(copy.headline || '').trim();
-  const takeaway = String(copy.footer || copy.subhead || '').trim();
+  const cards = (copy.cards || []).slice(0, 4);
+  // Cards occupy the middle band; text lands in the lower 45% of each, which Pass 1 leaves empty.
+  const boxes = {
+    1: [[0.12, 0.27, 0.88, 0.62]],
+    2: [[0.10, 0.27, 0.49, 0.62], [0.51, 0.27, 0.90, 0.62]],
+    3: [[0.10, 0.26, 0.90, 0.40], [0.10, 0.42, 0.90, 0.56], [0.10, 0.58, 0.90, 0.72]],
+    4: [[0.10, 0.26, 0.49, 0.44], [0.51, 0.26, 0.90, 0.44], [0.10, 0.46, 0.49, 0.64], [0.51, 0.46, 0.90, 0.64]],
+  }[Math.max(1, cards.length)] || [];
 
-  const header = [
-    RENDER_SCRIPT,
-    '-i', framePath,
-    '-o', outPath,
-    '-l', headline,
-    '--font', RENDER_FONT,
-    '--font-size', '54',
-    '--start-y', '52',
-    '--margin', '64',
-    '--max-width-pct', '0.80',
-    '--max-lines', '3',
-    '--color', textColor || '#1A1A1A',
-    '--outline', 'none',
-  ];
-  await run(PYTHON, header, { timeoutMs: 60_000 });
-  if (!fs.existsSync(outPath)) throw new Error(`render script produced no output for slide ${index}`);
-
-  // Footer banner: drawn by the image model at roughly the bottom 18%, so the takeaway is placed
-  // inside it in white. Skipped when there is no takeaway rather than printing an empty band.
-  if (takeaway) {
-    const { height } = await imageSize(outPath);
-    const footer = [
-      RENDER_SCRIPT,
-      '-i', outPath,
-      '-o', outPath,
-      '-l', takeaway,
-      '--font', RENDER_FONT,
-      '--font-size', '32',
-      // The banner occupies roughly the bottom 18% (~0.77-0.89 of the canvas). Start at 0.80 so a
-      // two-line takeaway sits inside it; 0.845 pushed the second line past the banner's edge.
-      '--start-y', String(Math.round(height * 0.80)),
-      '--margin', '96',
-      '--max-width-pct', '0.68',
-      '--max-lines', '2',
-      '--align', 'center',
-      '--color', '#FFFFFF',
-      '--outline', 'none',
-    ];
-    await run(PYTHON, footer, { timeoutMs: 60_000 });
-  }
+  const spec = {
+    input: framePath,
+    output: outPath,
+    font: opts.font || RENDER_FONT,
+    palette: opts.palette || 'brand',
+    headline: copy.headline || '',
+    footer: copy.footer || '',
+    footerBox: [0.07, 0.78, 0.93, 0.90],
+    drawFooterBox: true,
+    cards: cards.map((c, i) => ({
+      box: boxes[i] || boxes[boxes.length - 1],
+      number: cards.length > 1 ? i + 1 : undefined,
+      text: typeof c === 'string' ? c : c.text || '',
+    })),
+    ...(opts.fontScale ? { fontScale: opts.fontScale } : {}),
+  };
+  const specPath = path.join(jobDir, `spec_${String(index).padStart(2, '0')}.json`);
+  fs.writeFileSync(specPath, JSON.stringify(spec, null, 2), 'utf8');
+  await run(PYTHON, [COMPOSE_SCRIPT, '--spec', specPath], { timeoutMs: 60_000 });
+  if (!fs.existsSync(outPath)) throw new Error(`compositor produced no output for slide ${index}`);
   return outPath;
+}
+
+/**
+ * Pass 3 — automated vision QA.
+ *
+ * Hermes looks at the composited slide and reports whether type overlaps artwork, overflows its
+ * band, or reads with poor contrast. On failure the caller re-composites with tighter settings.
+ * Advisory by design: a QA call that itself fails must never sink a finished slide.
+ */
+async function visionQa(slidePath) {
+  const prompt = [
+    `Open the image at ${slidePath.replace(/\\/g, '/')} and inspect it as a layout reviewer.`,
+    `Check exactly four things:`,
+    `1. Does any text overlap illustration, linework or a character, instead of sitting on clear ground?`,
+    `2. Does any text run outside its container, off the canvas, or past the top or bottom edge?`,
+    `3. Is every glyph clean and fully formed — no empty boxes, no clipped or cut-off letters?`,
+    `4. Is text contrast against its background strong enough to read comfortably?`,
+    `Reply with ONLY this JSON, no prose:`,
+    `{"pass":true|false,"overlap":true|false,"overflow":true|false,"brokenGlyphs":true|false,"lowContrast":true|false,"note":"one short sentence"}`,
+  ].join('\n');
+  try {
+    const raw = await run(HERMES, ['-z', prompt], { timeoutMs: 180_000 });
+    const verdict = extractJson(raw);
+    return {
+      pass: verdict.pass !== false,
+      overlap: Boolean(verdict.overlap),
+      overflow: Boolean(verdict.overflow),
+      brokenGlyphs: Boolean(verdict.brokenGlyphs),
+      lowContrast: Boolean(verdict.lowContrast),
+      note: String(verdict.note || ''),
+    };
+  } catch (err) {
+    console.warn(`[carousel-bridge] vision QA skipped: ${err.message}`);
+    return { pass: true, skipped: true, note: 'QA unavailable' };
+  }
 }
 
 /** Pixel height of a PNG, read from the IHDR header — avoids pulling in an image library. */
@@ -526,17 +563,40 @@ async function runJob(job) {
     const plan = job.plan.slides[i] || job.plan.slides[job.plan.slides.length - 1];
     const copy = job.deck[i] || {};
     const frame = await generateFrame(jobDir, i, plan.scene, job.plan.palette, referencePath);
-    const slide = await overlayHebrew(
-      frame, jobDir, i,
-      { headline: copy.headline || article.title, footer: copy.subhead || '' },
-      job.plan.textColor
-    );
+
+    // Slide copy, either as edited by Daniel in the dashboard editor or straight from the deck.
+    const edited = (job.input.slideCopy || [])[i] || {};
+    const content = {
+      headline: edited.headline || copy.headline || article.title,
+      footer: edited.footer || copy.subhead || '',
+      cards: edited.cards || (Array.isArray(copy.bullets) && copy.bullets.length
+        ? copy.bullets.slice(0, 4)
+        : [copy.body || copy.quote || ''].filter(Boolean)),
+    };
+
+    let slide = await composeSlide(frame, jobDir, i, content, {
+      font: job.input.font, palette: job.input.palette,
+    });
+
+    // Vision QA, with one corrective re-composite. Overflow/overlap are the failures a tighter
+    // fit can actually fix, so only those trigger a retry.
+    let qa = job.input.skipQa ? { pass: true, skipped: true } : await visionQa(slide);
+    if (!qa.pass && (qa.overflow || qa.overlap)) {
+      job.qaRetries = (job.qaRetries || 0) + 1;
+      slide = await composeSlide(frame, jobDir, i, content, {
+        font: job.input.font, palette: job.input.palette, fontScale: 0.82,
+      });
+      qa = await visionQa(slide);
+    }
+
     job.slides.push({
       index: i,
       url: `/carousel/file/${job.id}/${path.basename(slide)}`,
-      headline: copy.headline || '',
-      subhead: copy.subhead || '',
+      headline: content.headline,
+      subhead: content.footer,
+      cards: content.cards,
       scene: plan.scene,
+      qa,
     });
     job.progress = { done: i + 1, total: slideCount };
   }
@@ -640,6 +700,11 @@ app.post('/carousel/generate', (req, res) => {
     override: override ? String(override) : '',
     referenceImage: referenceImage ? String(referenceImage) : '',
     sourceUrl: hasUrl ? sourceUrl.trim() : '',
+    // Editor-supplied per-slide copy; when absent the deck's own copy is used.
+    slideCopy: Array.isArray(req.body?.slideCopy) ? req.body.slideCopy : null,
+    font: typeof req.body?.font === 'string' ? req.body.font : '',
+    palette: typeof req.body?.palette === 'string' ? req.body.palette : 'brand',
+    skipQa: Boolean(req.body?.skipQa),
   });
   res.json({ ok: true, jobId: job.id, slideCount: count });
 });
@@ -658,6 +723,8 @@ app.get('/carousel/job/:id', (req, res) => {
     layout: job.plan?.layout || '',
     imported: job.imported || null,
     usedReference: Boolean(job.reference),
+    deck: job.deck || [],
+    qaRetries: job.qaRetries || 0,
     slides: job.slides || [],
     post: job.post || null,
     copyWarning: job.copyWarning || null,
