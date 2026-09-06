@@ -362,17 +362,32 @@ export default function CarouselStudioModal({
               <div>
                 <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-zinc-300">
                   <Link2 className="h-3.5 w-3.5 text-brand-400" />
-                  קישור לפוסט או לכתבה (אופציונלי)
+                  {mode === 'rebrand' ? 'קישור או הדבקת כיתוב הפוסט' : 'קישור לפוסט או לכתבה (אופציונלי)'}
                 </label>
-                <input
-                  value={sourceUrl}
-                  onChange={(e) => setSourceUrl(e.target.value)}
-                  placeholder="https://www.instagram.com/p/... או קישור לכתבה"
-                  dir="ltr"
-                  className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[12px] text-white placeholder:text-zinc-600"
-                />
+                {/* Rebrander input takes either a link or a pasted caption, so it needs room for
+                    multi-line text. The backend discriminates on an http(s):// prefix. */}
+                {mode === 'rebrand' ? (
+                  <textarea
+                    value={sourceUrl}
+                    onChange={(e) => setSourceUrl(e.target.value)}
+                    rows={5}
+                    placeholder={'https://www.instagram.com/p/...\n\nאו הדביקו כאן את כיתוב הפוסט המלא'}
+                    dir="auto"
+                    className="w-full resize-y rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[12px] leading-relaxed text-white placeholder:text-zinc-600"
+                  />
+                ) : (
+                  <input
+                    value={sourceUrl}
+                    onChange={(e) => setSourceUrl(e.target.value)}
+                    placeholder="https://www.instagram.com/p/... או קישור לכתבה"
+                    dir="ltr"
+                    className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[12px] text-white placeholder:text-zinc-600"
+                  />
+                )}
                 <p className="mt-1 text-[10px] text-zinc-500">
-                  אם מוזן, התוכן יישלף מהקישור וישמש כמקור לקופי במקום תקציר הכתבה שנבחרה.
+                  {mode === 'rebrand'
+                    ? `מתחיל ב-http(s):// → נשלף מהקישור. אחרת → הטקסט עצמו משמש כמקור לתרגום (40 תווים ומעלה).${sourceUrl.trim() && !/^https?:\/\//i.test(sourceUrl.trim()) ? ` · ${sourceUrl.trim().length} תווים` : ''}`
+                    : 'אם מוזן, התוכן יישלף מהקישור וישמש כמקור לקופי במקום תקציר הכתבה שנבחרה.'}
                 </p>
               </div>
             </div>

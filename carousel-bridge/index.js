@@ -872,25 +872,40 @@ app.get('/health', (_req, res) => {
 
 app.post('/carousel/generate', (req, res) => {
   const { article, slideCount, override, referenceImage, sourceUrl } = req.body ?? {};
-  // A sourceUrl supplies the article text itself, so the inline text requirement only applies
-  // when no URL was given.
-  const hasUrl = typeof sourceUrl === 'string' && /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}/i.test(sourceUrl.trim());
-  if (!article?.title && !hasUrl) {
-    return res.status(400).json({ ok: false, error: 'article.title or a valid sourceUrl is required' });
-  }
-  if (!hasUrl && String(article?.articleText || '').trim().length < 60) {
-    return res.status(400).json({ ok: false, error: 'article.articleText (>=60 chars) required when no sourceUrl is given' });
-  }
-  if (sourceUrl && !hasUrl) {
-    return res.status(400).json({ ok: false, error: `not a valid URL: ${String(sourceUrl).slice(0, 80)}` });
+  const rawSource = typeof sourceUrl === 'string' ? sourceUrl.trim() : '';
+
+  // The source field accepts EITHER a link or a pasted caption, so the discriminator is an
+  // explicit scheme. A looser pattern (host.tld anywhere) misread captions as URLs — "Node.js
+  // tips" and "check ai.com for more" both matched — and pasted text was rejected outright with
+  // "not a valid URL". Anything without http(s):// is now simply treated as the source text.
+  const hasUrl = /^https?:\/\//i.test(rawSource);
+  const pastedText = !hasUrl && rawSource.length >= 40 ? rawSource : '';
+
+  // Inline article text, a pasted caption, and a URL are three ways to supply the same thing.
+  const inlineText = String(article?.articleText || '').trim();
+  const sourceText = inlineText.length >= 40 ? inlineText : pastedText;
+
+  if (!hasUrl && !sourceText) {
+    return res.status(400).json({
+      ok: false,
+      error: rawSource
+        ? `source text is too short (${rawSource.length} chars, need 40+). Paste the full caption, or give an http(s):// link.`
+        : 'provide an http(s):// link, or paste the caption text (40+ chars).',
+    });
   }
   const count = Math.min(MAX_SLIDES, Math.max(1, Number(slideCount) || DEFAULT_SLIDES));
   const job = startJob({
-    article: article || { title: '', source: '', topic: 'general', articleText: '' },
+    article: {
+      title: article?.title || (sourceText ? sourceText.split('\n')[0].slice(0, 120) : ''),
+      source: article?.source || (hasUrl ? 'link' : 'pasted'),
+      topic: article?.topic || 'general',
+      // Pasted caption stands in as the article text so the rebrander translates it directly.
+      articleText: sourceText || '',
+    },
     slideCount: count,
     override: override ? String(override) : '',
     referenceImage: referenceImage ? String(referenceImage) : '',
-    sourceUrl: hasUrl ? sourceUrl.trim() : '',
+    sourceUrl: hasUrl ? rawSource : '',
     // Editor-supplied per-slide copy; when absent the deck's own copy is used.
     slideCopy: Array.isArray(req.body?.slideCopy) ? req.body.slideCopy : null,
     font: typeof req.body?.font === 'string' ? req.body.font : '',
