@@ -1,6 +1,7 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import type { NewsItem } from './newsAgentTypes';
 import type { ReelScript, ReelScriptScene } from './agentTypes';
+import { getAdminSecret } from './adminSecret';
 
 /**
  * Client lib for the "תסריט לרילס" (Reel Generator) mode in NewsContentAgent — article-grounded
@@ -9,13 +10,13 @@ import type { ReelScript, ReelScriptScene } from './agentTypes';
  * sentences, so the operator always gets a usable draft.
  */
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
+
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
 async function post(body: Record<string, unknown>, timeoutMs = 75000): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+    ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
   };
   const payload = JSON.stringify({ action: 'reel-script-synthesize', ...body });
   for (let attempt = 0; ; attempt++) {

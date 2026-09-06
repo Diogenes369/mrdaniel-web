@@ -1,5 +1,6 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import type { ReelScript } from './agentTypes';
+import { getAdminSecret } from './adminSecret';
 
 /**
  * Media & audio asset assembly for the Reel video compositor (Step B). For every beat in a
@@ -15,7 +16,7 @@ import type { ReelScript } from './agentTypes';
  * never blocks the others or the overall render.
  */
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
+
 const AGENT_ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 const PEXELS_ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/pexels-search`;
 
@@ -39,7 +40,7 @@ export interface ReelBeat {
 }
 
 function authHeaders(): HeadersInit {
-  return ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {};
+  return getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {};
 }
 
 /** ~14 Hebrew characters/sec spoken — a reasonable estimate for a beat with no audio track. */

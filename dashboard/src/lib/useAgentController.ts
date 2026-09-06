@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { onValue, ref, set, update, query as dbQuery, limitToLast } from 'firebase/database';
 import { db } from '../firebase';
 import type { AgentConfig, AgentMode, AgentWebhookConfig, ContentFormat, Platform, QueueItem, LeadIntent, VideoScript } from './agentTypes';
+import { getAdminSecret } from './adminSecret';
 
 // Unlike the main site (where the API and the page serving it are always same-origin), this
 // dashboard runs on its own dev-server origin (localhost:5174) with no deployed origin of its own
@@ -9,7 +10,6 @@ import type { AgentConfig, AgentMode, AgentWebhookConfig, ContentFormat, Platfor
 // to the *production* site's API by default, since this tool is built to operate on live data.
 // Override via VITE_AGENT_API_BASE if you're running the main site's `server.ts` locally too.
 const API_BASE = import.meta.env.VITE_AGENT_API_BASE || 'https://mrdaniel.co.il/api/agent-generate';
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
 export interface RateLimitedResponse {
   ok: false;
@@ -23,7 +23,7 @@ async function callAgentApi<T>(action: string, payload: Record<string, unknown> 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+      ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
     },
     body: JSON.stringify({ action, ...payload }),
   });

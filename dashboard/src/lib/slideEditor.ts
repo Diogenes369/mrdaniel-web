@@ -1,7 +1,7 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import { applySlideEdits, localSlideEdit, slidesToEditable, type StoryPayload } from './storySlides';
+import { getAdminSecret } from './adminSecret';
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
 export interface EditResult {
   payload: StoryPayload;
@@ -23,7 +23,7 @@ export async function editDeck(payload: StoryPayload, instruction: string): Prom
     const url = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+      ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
     };
     const body = JSON.stringify({ action: 'slides-edit', instruction, slides: editable });
 

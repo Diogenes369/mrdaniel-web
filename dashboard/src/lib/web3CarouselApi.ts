@@ -2,6 +2,7 @@ import { SITE_ORIGIN } from './useDashboardRefresh';
 import { importUrl, parseRawText, stripAuthorNoise, cleanExtractedBody } from './repurposeApi';
 import type { NewsTopic } from './newsAgentTypes';
 import type { LayoutKind, ResearchBrief, SlideRole, StudioDeck, StudioPreset, StudioSlide, StudioTheme } from './carouselStudioTypes';
+import { getAdminSecret } from './adminSecret';
 
 /**
  * Agents 1 & 2 of the WEB3 Carousel Studio.
@@ -14,13 +15,13 @@ import type { LayoutKind, ResearchBrief, SlideRole, StudioDeck, StudioPreset, St
  *                            deterministic local builder. NEVER throws.
  */
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
+
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
 async function post(body: Record<string, unknown>, timeoutMs = 90000): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+    ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
   };
   const payload = JSON.stringify({ action: 'carousel-studio', ...body });
   for (let attempt = 0; ; attempt++) {

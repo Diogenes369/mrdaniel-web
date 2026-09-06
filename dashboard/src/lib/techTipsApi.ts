@@ -1,5 +1,6 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import type { NewsItem } from './newsAgentTypes';
+import { getAdminSecret } from './adminSecret';
 
 /**
  * Tech Tips & Motion Studio — content layer.
@@ -34,7 +35,7 @@ export interface TechTipDeck {
   createdAt: number;
 }
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
+
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
 // ─── the tip "feed" ─────────────────────────────────────────────────────────────────────────
@@ -98,7 +99,7 @@ export async function fetchTipFeed(limit = 8): Promise<TipTopic[]> {
 async function post(body: Record<string, unknown>, timeoutMs = 90000): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+    ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
   };
   const payload = JSON.stringify({ action: 'tech-tip-deck', ...body });
   for (let attempt = 0; ; attempt++) {

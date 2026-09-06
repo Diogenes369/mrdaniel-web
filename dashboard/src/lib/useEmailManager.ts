@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { onValue, ref, set, update, remove, query as dbQuery, limitToLast } from 'firebase/database';
 import { db } from '../firebase';
 import { SITE_ORIGIN } from './useDashboardRefresh';
+import { getAdminSecret } from './adminSecret';
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
+
 const API = `${SITE_ORIGIN}/api/leads`;
 const AGENT_API = `${SITE_ORIGIN}/api/agent-generate`;
 
 function authHeaders(): HeadersInit {
-  return { 'Content-Type': 'application/json', ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}) };
+  return { 'Content-Type': 'application/json', ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}) };
 }
 
 export interface EmailTemplate {

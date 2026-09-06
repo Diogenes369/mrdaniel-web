@@ -60,8 +60,8 @@ const PREVIEW_DIMS: Record<SlideFormat, { w: number; h: number }> = {
 import { SITE_ORIGIN } from '../lib/useDashboardRefresh';
 import CarouselStudioModal from './CarouselStudioModal';
 import type { ArticleInput } from '../lib/carouselBridge';
+import { getAdminSecret } from '../lib/adminSecret';
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
 const CATEGORIES: NewsCategory[] = ['cyber', 'ai', 'tech', 'all'];
 const PLATFORM_ICON: Record<SocialPlatform, typeof Linkedin> = { linkedin: Linkedin, instagram: Instagram };
@@ -270,7 +270,7 @@ export default function NewsContentAgent() {
       setPosting(true);
       void (async () => {
         try {
-          const synth = await synthesizeNewsPost(it, platform, { apiBase: SITE_ORIGIN, adminSecret: ADMIN_SECRET });
+          const synth = await synthesizeNewsPost(it, platform, { apiBase: SITE_ORIGIN, adminSecret: getAdminSecret() });
           if (pSeq === postSeq.current) {
             setPost(synth);
             postCache.current.set(pKey, synth);
@@ -321,7 +321,7 @@ export default function NewsContentAgent() {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+          ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
         },
         body: JSON.stringify({
           action: 'publish-social',

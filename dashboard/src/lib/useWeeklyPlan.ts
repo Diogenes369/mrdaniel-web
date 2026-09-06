@@ -2,13 +2,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { onValue, ref, update } from 'firebase/database';
 import { db } from '../firebase';
 import type { WeeklyPlan, DailyContentPlan, ContentStatus } from './weeklyPlanTypes';
+import { getAdminSecret } from './adminSecret';
 
 // Same production-API-by-default reasoning as useAgentController.ts — this dashboard has no
 // deployed origin of its own, so it talks to the live main site by default.
 const API_BASE = import.meta.env.VITE_AGENT_API_BASE
   ? import.meta.env.VITE_AGENT_API_BASE.replace('/agent-generate', '/generate-weekly-plan')
   : 'https://mrdaniel.co.il/api/generate-weekly-plan';
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
 /**
  * Firebase Realtime Database does not store empty arrays (or `null`/`undefined` values) — writing
@@ -84,7 +84,7 @@ export function useWeeklyPlan() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+          ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
         },
       });
       const data = await res.json();

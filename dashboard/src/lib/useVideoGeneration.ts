@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { VideoJobStatus, VideoProvider } from './agentTypes';
+import { getAdminSecret } from './adminSecret';
 
 /** Mirrors src/agent/VideoGenerationEngine.ts's VideoScriptInput — accepts either the agent
  * queue's scene-by-scene script or the weekly plan's flatter body+visualCues script, since both
@@ -16,7 +17,7 @@ export interface VideoScriptInput {
 // Same reasoning as useAgentController.ts's API_BASE — this dashboard has no deployed origin of its
 // own, so it talks to the production site's API directly by default.
 const VIDEO_API_BASE = import.meta.env.VITE_VIDEO_API_BASE || 'https://mrdaniel.co.il/api/generate-video';
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
+
 const POLL_INTERVAL_MS = 4000;
 
 export interface VideoGenState {
@@ -29,7 +30,7 @@ export interface VideoGenState {
 function authHeaders(): HeadersInit {
   return {
     'Content-Type': 'application/json',
-    ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+    ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
   };
 }
 

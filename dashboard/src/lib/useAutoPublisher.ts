@@ -9,14 +9,15 @@ import {
   type APFrequency,
   type PublishedPostRecord,
 } from './autoPublisherTypes';
+import { getAdminSecret } from './adminSecret';
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
+
 // The auto-publisher shares the /api/agent-generate function (Vercel Hobby caps a deployment at
 // 12 Serverless Functions) via `action: 'auto-publish-run' | 'auto-publish-dispatch'`.
 const AGENT_API = `${SITE_ORIGIN}/api/agent-generate`;
 
 function authHeaders(): HeadersInit {
-  return { 'Content-Type': 'application/json', ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}) };
+  return { 'Content-Type': 'application/json', ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}) };
 }
 
 function normalizeConfig(raw: unknown): AutoPublisherConfig {

@@ -11,8 +11,9 @@ import type {
   ReplyStyle,
 } from './igGrowthTypes';
 import { REPLY_META } from './igGrowthTypes';
+import { getAdminSecret } from './adminSecret';
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
+
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
 /** POST to /api/agent-generate with a hard per-attempt timeout + ONE bounded retry:
@@ -23,7 +24,7 @@ const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 async function post(action: string, body: Record<string, unknown>, timeoutMs = 75000): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+    ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
   };
   const payload = JSON.stringify({ action, ...body });
   for (let attempt = 0; ; attempt++) {

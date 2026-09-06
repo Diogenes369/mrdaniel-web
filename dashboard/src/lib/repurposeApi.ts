@@ -1,13 +1,13 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
+import { getAdminSecret } from './adminSecret';
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
 /** Shared POST helper with one bounded 429 retry (Gemini free-tier hourly cap). */
 async function post(action: string, body: Record<string, unknown>): Promise<Response> {
   const url = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {}),
+    ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
   };
   const payload = JSON.stringify({ action, ...body });
   let res = await fetch(url, { method: 'POST', headers, body: payload });
@@ -27,7 +27,7 @@ async function post(action: string, body: Record<string, unknown>): Promise<Resp
 
 function explain(status: number): string {
   if (status === 429) return 'מכסת ה-API החינמית של Gemini לשעה זו מוצתה (429) — נסו שוב מאוחר יותר.';
-  if (status === 401) return 'אימות מול /api/agent-generate נכשל (401) — בדקו את VITE_ADMIN_API_SECRET.';
+  if (status === 401) return 'אימות מול /api/agent-generate נכשל (401) — בדקו את המפתח (localStorage.adminSecret או VITE_ADMIN_API_SECRET).';
   if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת הריצה של האתר (503).';
   return `שרת ה-AI החזיר שגיאה ${status}.`;
 }

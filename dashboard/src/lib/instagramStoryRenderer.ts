@@ -16,8 +16,8 @@ import {
   type StorySlide,
   type StoryPayload,
 } from './storySlides';
+import { getAdminSecret } from './adminSecret';
 
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
 /**
  * Universal branded slide renderer — one <canvas> per slide, no server render. Drives the same
@@ -444,7 +444,7 @@ export async function renderSlidesFromSource(
 ): Promise<RenderedDeck> {
   const format = opts.format ?? '9:16';
   const apiBase = opts.apiBase ?? SITE_ORIGIN;
-  const adminSecret = opts.adminSecret ?? ADMIN_SECRET;
+  const adminSecret = opts.adminSecret ?? getAdminSecret();
   const photo = 'photo' in opts ? (opts.photo ?? null) : await resolveBgForSource(src, format);
   bgCache.set(bgKey(src.id, format), photo);
 

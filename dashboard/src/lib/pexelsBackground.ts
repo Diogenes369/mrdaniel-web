@@ -1,3 +1,4 @@
+import { getAdminSecret } from './adminSecret';
 // Resolves ONE background photo per SLIDE (not per carousel) — every slide gets its own unique,
 // contextually-relevant image, sourced two ways: the site's Pexels search proxy (api/pexels-search.ts)
 // runs that slide's actual Hebrew text through a Gemini "creative photo director" pass first (see
@@ -7,7 +8,6 @@
 // photos is used instead, picked without repeats within one carousel where possible.
 
 const PEXELS_SEARCH_BASE = import.meta.env.VITE_PEXELS_SEARCH_BASE || 'https://mrdaniel.co.il/api/pexels-search';
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_API_SECRET as string | undefined;
 
 export type PhotoOrientation = 'landscape' | 'portrait' | 'square';
 
@@ -28,7 +28,7 @@ const FALLBACK_PHOTOS = [
 ];
 
 function authHeaders(): HeadersInit {
-  return ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {};
+  return getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {};
 }
 
 /** Maps this content's topic pillars (see SocialAgentEngine.ts's BRAND_KNOWLEDGE_BASE — the same
