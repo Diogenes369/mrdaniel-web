@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import unicodedata
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -80,6 +81,32 @@ def resolve_font(name: str, size: int) -> ImageFont.FreeTypeFont:
         known = ", ".join(k for k, p in FONTS.items() if p.exists())
         raise FileNotFoundError(f"Font not found: {candidate}\nAvailable: {known}")
     return ImageFont.truetype(str(candidate), size)
+
+
+def clean_text(text: str) -> str:
+    """
+    Strips invisible Unicode formatting/control characters before layout and rendering.
+
+    Hebrew copy arriving from the pipeline carries bidi marks — the site's sanitizeHebrewText wraps
+    every embedded Latin run in RLM (U+200F) so mixed text reads correctly in HTML. Those marks are
+    invisible directives, not glyphs: no font has one, so assert_glyph_coverage rightly refused to
+    render ("no glyph for: '‏'"), and Pillow would draw .notdef boxes for them anyway.
+
+    Removes the whole Cf (format) category — RLM/LRM/ALM, zero-width space/joiners, directional
+    isolates and embeddings, BOM — plus C0/C1 controls, keeping newline and tab. Stripping happens
+    BEFORE get_display() so the bidi algorithm runs on clean logical text.
+    """
+    out = []
+    for ch in text or "":
+        if ch == chr(10) or ch == chr(9):
+            out.append(ch)
+            continue
+        category = unicodedata.category(ch)
+        if category in ("Cf", "Cc", "Co", "Cs"):
+            continue
+        out.append(ch)
+    # Collapse any double spaces left where a mark used to sit.
+    return " ".join("".join(out).split(" ")).strip()
 
 
 def assert_glyph_coverage(font: ImageFont.FreeTypeFont, text: str, font_name: str) -> None:
@@ -152,6 +179,9 @@ def render_banner(
     max_width_pct: float = 0.82,
     max_lines: int = 0,
 ) -> Path:
+    text_lines = [clean_text(line) for line in text_lines]
+    text_lines = [line for line in text_lines if line]
+
     img = Image.open(image_path).convert("RGB")
     draw = ImageDraw.Draw(img)
     font = resolve_font(font_name, font_size)
