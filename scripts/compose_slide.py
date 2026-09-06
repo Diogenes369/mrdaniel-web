@@ -26,7 +26,7 @@ import sys
 import unicodedata
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 try:
     from bidi.algorithm import get_display
@@ -163,51 +163,102 @@ def fit_block(
     return font, lines[:keep], line_h
 
 
-def draw_text_plate(
-    img: Image.Image, box: tuple[int, int, int, int], fill: str, opacity: int = 232,
+def soft_halo(
+    img: Image.Image, lines: list[str], font: ImageFont.FreeTypeFont, positions: list[tuple[int, int]],
+    anchor: str, canvas_color: str, radius: int = 7, opacity: int = 120,
 ) -> None:
     """
-    Lays a translucent paper plate behind a text block.
+    Boxless edge legibility: a blurred copy of the glyphs themselves, in the canvas colour, laid
+    under the crisp text.
 
-    Pass 1 is instructed to leave the lower part of each card empty, but the image model does not
-    honour that reliably — it fills the whole card and the copy then lands on a robot or a gauge.
-    This makes legibility deterministic instead of dependent on the model complying: the plate is
-    drawn on the composite, under the type, so text always has clean ground beneath it.
+    This replaces the translucent plate that used to sit behind card copy. A plate reads as a UI
+    chip pasted onto the artwork; a halo is invisible as a shape — it only lifts the letterforms
+    off whatever line work happens to be behind them. Because it is the glyph silhouette rather
+    than a rectangle, there is no edge, no corner and no frame anywhere in the output.
+
+    Applied only where it is needed (card copy over artwork), never to the headline sitting on
+    clean paper.
+    """
+    if not lines:
+        return
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ld = ImageDraw.Draw(layer)
+    rgb = tuple(int(canvas_color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+    for line, pos in zip(lines, positions):
+        ld.text(pos, line, font=font, fill=rgb + (opacity,), anchor=anchor,
+                stroke_width=radius, stroke_fill=rgb + (opacity,))
+    blurred = layer.filter(ImageFilter.GaussianBlur(radius))
+    img.paste(Image.alpha_composite(img.convert("RGBA"), blurred).convert("RGB"), (0, 0))
+
+
+def draw_accent_rule(
+    img: Image.Image, box: tuple[int, int, int, int], color: str, width_frac: float = 0.28,
+) -> None:
+    """
+    Soft accent underline beneath the headline.
+
+    Deliberately understated: a short, slightly tapered hairline right-aligned under the last line
+    of RTL type. An earlier version alternated the y by a pixel to look hand-drawn and instead read
+    as a broken dashed line, so it is now a clean single stroke with a soft alpha falloff at the
+    tail — closer to a marker stroke lifting off the paper than to a UI divider.
     """
     x0, y0, x1, y1 = box
-    if x1 <= x0 or y1 <= y0:
-        return
-    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    rgb = tuple(int(fill.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
-    ImageDraw.Draw(overlay).rounded_rectangle(
-        [x0, y0, x1, y1], radius=max(8, (y1 - y0) // 8), fill=rgb + (opacity,)
-    )
-    img.alpha_composite(overlay) if img.mode == "RGBA" else img.paste(
-        Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB"), (0, 0)
-    )
+    span = max(40, int((x1 - x0) * width_frac))
+    start_x = max(x0, x1 - span)
+    thickness = max(3, (y1 - y0) // 40)
+    rgb = tuple(int(color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ld = ImageDraw.Draw(layer)
+    steps = 48
+    for i in range(steps):
+        seg_x0 = start_x + int(span * i / steps)
+        seg_x1 = start_x + int(span * (i + 1) / steps) + 1
+        # Full strength at the right (where RTL text begins), fading out to the left.
+        alpha = int(235 * (1 - (i / steps) ** 2.2))
+        ld.rectangle([seg_x0, y1, seg_x1, y1 + thickness], fill=rgb + (alpha,))
+    img.paste(Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB"), (0, 0))
 
 
 def draw_block(
     draw: ImageDraw.ImageDraw, text: str, box: tuple[int, int, int, int], font_name: str,
     max_size: int, color: str, align: str = "right", valign: str = "top",
-) -> None:
+    img: Image.Image | None = None, halo: str | None = None, line_gap_ratio: float = 0.34,
+) -> tuple[int, int] | None:
+    """
+    Lays a text block inside `box`. Returns (bottom_y, right_x) so callers can position an accent
+    rule under it.
+
+    `line_gap_ratio` defaults higher than typographic minimum: editorial social layouts breathe,
+    and cramped leading was part of what made earlier slides feel like a form rather than a poster.
+    `halo` (a canvas colour) turns on the boxless soft halo for copy sitting over artwork.
+    """
     text = clean_text(text)
     if not text:
-        return
-    font, lines, line_h = fit_block(text, draw, box, font_name, max_size)
+        return None
+    font, lines, line_h = fit_block(text, draw, box, font_name, max_size, line_gap_ratio=line_gap_ratio)
     assert_coverage(font, text, font_name)
     x0, y0, x1, y1 = box
     total_h = len(lines) * line_h
     y = y0 if valign == "top" else y0 + (y1 - y0 - total_h) // 2
-    for line in lines:
-        visual = get_display(line)
-        if align == "right":
-            draw.text((x1, y), visual, font=font, fill=color, anchor="rt")
-        elif align == "center":
-            draw.text(((x0 + x1) // 2, y), visual, font=font, fill=color, anchor="mt")
-        else:
-            draw.text((x0, y), visual, font=font, fill=color, anchor="lt")
-        y += line_h
+
+    visual = [get_display(l) for l in lines]
+    if align == "right":
+        anchor, positions = "rt", [(x1, y + i * line_h) for i in range(len(lines))]
+    elif align == "center":
+        anchor, positions = "mt", [((x0 + x1) // 2, y + i * line_h) for i in range(len(lines))]
+    else:
+        anchor, positions = "lt", [(x0, y + i * line_h) for i in range(len(lines))]
+
+    if halo and img is not None:
+        soft_halo(img, visual, font, positions, anchor, halo)
+        draw = ImageDraw.Draw(img)
+
+    for line, pos in zip(visual, positions):
+        draw.text(pos, line, font=font, fill=color, anchor=anchor)
+
+    widest = max((draw.textlength(l, font=font) for l in visual), default=0)
+    return (y + total_h, x1 if align == "right" else x0 + int(widest))
 
 
 def draw_number_badge(
@@ -239,11 +290,18 @@ def compose(spec: dict) -> Path:
 
     # --- header band: top 22%, text auto-fitted inside it ---
     if spec.get("headline"):
-        draw_block(
-            draw, spec["headline"],
-            (margin, int(H * 0.045), W - margin, int(H * 0.225)),
-            font_name, int(W * 0.082 * scale), colors["ink"], align="right", valign="top",
+        head_box = (margin, int(H * 0.05), W - margin, int(H * 0.215))
+        end = draw_block(
+            draw, spec["headline"], head_box, font_name,
+            int(W * 0.088 * scale), colors["ink"], align="right", valign="top",
+            line_gap_ratio=0.30,
         )
+        # Thin accent rule directly under the headline — a hairline, never a container.
+        if end and spec.get("accentRule", True):
+            bottom, right = end
+            draw_accent_rule(img, (margin, head_box[1], right, bottom + int(H * 0.012)),
+                             colors["accent"])
+            draw = ImageDraw.Draw(img)
 
     # --- cards: each gets an explicit rect; badge and copy both live inside it ---
     for card in spec.get("cards", []):
@@ -259,26 +317,15 @@ def compose(spec: dict) -> Path:
             )
             text_box = (x0 + pad, y0 + pad + int(r * 2.4), x1 - pad, y1 - pad)
         if card.get("text"):
-            # Measure first so the plate hugs the actual text, then re-acquire the draw handle:
-            # the plate composites a new surface into `img`.
-            cf, clines, clh = fit_block(
-                clean_text(card["text"]), draw, text_box, font_name, int(W * 0.05 * scale)
-            )
-            block_h = len(clines) * clh
-            tx0, ty0, tx1, ty1 = text_box
-            cy = ty0 + (ty1 - ty0 - block_h) // 2
-            pad_x, pad_y = int(W * 0.018), int(W * 0.014)
-            draw_text_plate(
-                img,
-                (tx0 - pad_x, cy - pad_y, tx1 + pad_x, cy + block_h + pad_y),
-                spec.get("plateColor") or "#F8F6EF",
-            )
-            draw = ImageDraw.Draw(img)
+            # No plate. A boxless halo in the canvas colour lifts the glyphs off any linework
+            # behind them; it is the glyph silhouette blurred, so it has no edge or corner.
             draw_block(
                 draw, card["text"], text_box, font_name,
                 int(W * 0.05 * scale), card.get("color") or colors["ink"],
                 align=card.get("align", "right"), valign="middle",
+                img=img, halo=spec.get("canvasColor") or "#F8F6EF",
             )
+            draw = ImageDraw.Draw(img)
 
     # --- footer banner: bottom band, high contrast on the accent fill ---
     footer = spec.get("footer")
@@ -291,7 +338,7 @@ def compose(spec: dict) -> Path:
         draw_block(
             draw, footer, (x0 + pad, y0 + pad, x1 - pad, y1 - pad), font_name,
             int(W * 0.045 * scale), spec.get("footerColor") or colors["onAccent"],
-            align="center", valign="middle",
+            align="center", valign="middle", line_gap_ratio=0.30,
         )
 
     out.parent.mkdir(parents=True, exist_ok=True)

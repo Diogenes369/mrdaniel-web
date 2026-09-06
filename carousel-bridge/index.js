@@ -495,11 +495,20 @@ percentages, no labels, no logos, no watermarks. Symbols carrying no text (arrow
 needles, progress fills) are fine. Every number and every word is composited afterwards by a
 precision typography pass, so anything you draw appears TWICE and collides.
 
-RESERVED ZONES — absolute:
-Inside every card, confine the illustration to the UPPER 55% and leave the LOWER 45% visibly empty
-— plain paper ground, no linework, no texture, no character overlapping it. Text is composited into
-that empty region. A card whose drawing fills its whole interior is wrong. Keep the top ~22% header
-band and the footer banner interior completely clear for the same reason.`;
+RESERVED ZONES — absolute, and the single most important rule here:
+This is a BACKGROUND for typography, not a finished illustration. Compose it like a premium
+editorial poster whose words have not been set yet.
+- Keep the artwork SMALL and CENTRAL. One focused vignette occupying roughly the middle third of
+  the canvas, generous empty paper all around it. Do not fill the frame.
+- The top ~25% must be clean paper: no linework, no texture, no character, nothing. A large Hebrew
+  headline is set there afterwards.
+- The bottom ~20% must be clean paper for the same reason.
+- Inside any card or container you draw, the lower half must be empty paper — the drawing lives in
+  its upper half only.
+- Nothing may sit behind where text will go. Text is composited with no backing panel, so anything
+  you draw in a reserved zone will show through the letters and ruin them.
+Err heavily towards emptiness. A sparse, calm canvas with one small robot and a lot of paper is
+CORRECT; a rich, busy, edge-to-edge illustration is WRONG no matter how attractive it looks.`;
 
 /**
  * Forces literal, story-specific imagery. The failure mode this exists to prevent is a beautiful
@@ -539,7 +548,9 @@ const FRAME_STYLE = [
   'Hand-drawn rounded ink boxes frame each card. Cute 2D robot characters, gauges, checklists, arrows.',
   'NOT clay, NOT claymorphism, NOT 3D, NOT abstract blobs or organic shapes, no gradients, no photorealism.',
   'Draw NO letters, NO words and NO numerals anywhere — all typography is composited separately and would collide.',
-  'Inside each card confine the drawing to its upper 55% and leave the lower 45% as empty paper for text.',
+  'Keep artwork SMALL and CENTRAL — one vignette in the middle third, generous empty paper all around.',
+  'Top 25% and bottom 20% must be completely clean paper: no linework, no texture, nothing behind the text.',
+  'Err towards emptiness: a sparse calm canvas is correct, an edge-to-edge illustration is wrong.',
 ].join(' ');
 
 const ART_DIRECTION_PROMPT = (article, slideCount, override, referencePath, aspect = '4:5') => `
@@ -605,7 +616,8 @@ async function generateFrame(jobDir, index, scene, palette, referencePath, aspec
       : []),
     `Scene: ${scene}`,
     `ABSOLUTE REQUIREMENT: draw NO letters, NO words and NO numerals or digits anywhere, plus no logos or watermarks. All type and all numbers are composited afterwards — anything you draw appears twice.`,
-    `Leave the top ~22% band and the footer banner interior completely clear, and inside every card leave the lower 45% as empty paper — Hebrew is composited into those zones.`,
+    `Keep the artwork small and central. The top ~25% and bottom ~20% must be completely clean paper — Hebrew type is composited there with NO backing panel, so anything drawn in those bands shows through the letters.`,
+    `Err heavily towards emptiness: sparse and calm is correct, edge-to-edge is wrong.`,
     `Generate the image EXACTLY ONCE. Save it, then reply with only the absolute file path and stop.`,
     `Do not review, critique, regenerate or iterate on the image — one generation only.`,
   ].join('\n');
