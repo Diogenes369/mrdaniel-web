@@ -26,6 +26,21 @@ export interface TechTipSlide {
   visualPrompt: string;
 }
 
+/**
+ * Renumbers step slides 1..N from their position.
+ *
+ * Defensive twin of the server-side pass: a deck can also arrive from cache, from the local
+ * fallback, or from an older build, and the renderer only draws a badge when stepNumber > 0.
+ * Deriving from position guarantees no step slide is ever left unbadged.
+ */
+export function renumberSteps<T extends { kind: string; stepNumber: number }>(slides: T[]): T[] {
+  let seq = 0;
+  for (const slide of slides) {
+    slide.stepNumber = slide.kind === 'step' ? ++seq : 0;
+  }
+  return slides;
+}
+
 export interface TechTipDeck {
   title: string;
   slides: TechTipSlide[];
@@ -176,7 +191,7 @@ export async function synthesizeTechTipDeck(topic: string, notes?: string): Prom
     }
     return {
       title: data.deck.title || topic,
-      slides: data.deck.slides,
+      slides: renumberSteps(data.deck.slides),
       hashtags: data.deck.hashtags?.length ? data.deck.hashtags : ['#פיתוח', '#AI', '#קוד'],
       synthesized: true,
       createdAt: Date.now(),

@@ -85,6 +85,40 @@ export function pollinationsUrl(prompt: string, width: number, height: number, s
 
 /** Resolves one AI backdrop per slide. Bounded concurrency + per-image timeout; any failure just
  * yields null and the slide falls back to the procedural backdrop. */
+/**
+ * Technologies whose logos meaningfully sharpen an illustration.
+ *
+ * A generic "abstract tech grid" backdrop is interchangeable between guides. Naming the actual
+ * stack in the image prompt — the Python emblem, the Docker whale — anchors the illustration to
+ * the subject and makes the set read as one deliberate series rather than stock filler.
+ * Matched case-insensitively on word boundaries so "Go" does not fire on "Google".
+ */
+const BRAND_TERMS: { re: RegExp; visual: string }[] = [
+  { re: /\bpython\b/i, visual: 'Python logo emblem, blue and yellow entwined serpents' },
+  { re: /\bdocker\b/i, visual: 'Docker whale logo carrying shipping containers' },
+  { re: /\b(kubernetes|k8s)\b/i, visual: 'Kubernetes blue helm wheel logo' },
+  { re: /\breact\b/i, visual: 'React atom orbital logo in cyan' },
+  { re: /\bnode(\.js)?\b/i, visual: 'Node.js green hexagon logo' },
+  { re: /\b(typescript|ts)\b/i, visual: 'TypeScript blue square TS logo' },
+  { re: /\bpostgres(ql)?\b/i, visual: 'PostgreSQL blue elephant logo' },
+  { re: /\bmongo(db)?\b/i, visual: 'MongoDB green leaf logo' },
+  { re: /\bredis\b/i, visual: 'Redis red stacked cubes logo' },
+  { re: /\b(aws|amazon web services)\b/i, visual: 'AWS orange logo above a cloud datacenter' },
+  { re: /\bazure\b/i, visual: 'Microsoft Azure blue triangle logo' },
+  { re: /\bgit(hub)?\b/i, visual: 'GitHub Octocat logo with branching version control graph' },
+  { re: /\b(linux|ubuntu)\b/i, visual: 'Linux Tux penguin logo beside a terminal' },
+  { re: /\bnginx\b/i, visual: 'NGINX green N logo' },
+  { re: /\b(tensorflow|pytorch)\b/i, visual: 'machine learning framework logo over a neural network' },
+  { re: /\b(openai|gpt)\b/i, visual: 'OpenAI hexagonal knot emblem' },
+  { re: /\bfigma\b/i, visual: 'Figma multicoloured shapes logo' },
+  { re: /\bterraform\b/i, visual: 'Terraform purple T logo, infrastructure as code' },
+];
+
+/** Brand/tech visuals named anywhere in the slide's own text. */
+function brandVisualsFor(text: string): string[] {
+  return BRAND_TERMS.filter((t) => t.re.test(text)).map((t) => t.visual).slice(0, 3);
+}
+
 /** Background sources offered in the Tips & Guides control bar. */
 export type TipStyle = 'photoreal' | 'enterprise' | 'dark-minimal' | 'sketchnote';
 
@@ -115,7 +149,15 @@ export async function resolveTipBackgrounds(
       const slide = deck.slides[i];
       if (style === 'sketchnote') {
         // Illustrated art: keep the existing Pollinations path driven by the slide's visualPrompt.
-        const prompt = slide.visualPrompt || 'abstract dark cyber technology grid, neon green accents, no text';
+        const subject = [slide.title, slide.body, slide.code].filter(Boolean).join(' ');
+        const brands = brandVisualsFor(subject);
+        const prompt = [
+          slide.visualPrompt || 'dark cyber technology scene, neon green accents',
+          ...brands,
+          // Pushes the model off generic wallpaper and towards a deliberate, readable illustration.
+          'bold high-contrast digital illustration, dramatic rim lighting, deep dark background,',
+          'sharp focal subject, cinematic depth, no text, no letters, no watermark',
+        ].join(', ');
         out[i] = await Promise.race([
           loadImage(pollinationsUrl(prompt, Math.round(width / 2), Math.round(height / 2), i + 7)),
           new Promise<null>((r) => setTimeout(() => r(null), 30000)),
@@ -368,35 +410,49 @@ function drawCodeBlock(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, sl
   ctx.fillText((slide.codeLang || 'code').toUpperCase(), r.x + r.w - b.W * 0.028, top + b.W * 0.032);
   ctx.restore();
 
-  // Fit the snippet: shrink until every line fits both the panel height AND its width.
+  // Fit the snippet. Shrinking alone was not enough: once the floor size was reached a long line
+  // simply kept overflowing the terminal border (the slide-03 bug), because nothing ever wrapped.
+  // Now the width budget is enforced by WRAPPING at the token level after shrinking, and the panel
+  // is clipped as a final guarantee that no glyph can paint outside the box.
   const innerTop = top + b.W * 0.062;
   const innerH = panelH - b.W * 0.078;
+  const innerX = r.x + b.W * 0.028;
   const innerW = r.w - b.W * 0.075;
+
   let px = b.W * 0.026;
   const minPx = b.W * 0.0135;
+  let wrapped: { toks: { text: string; color: keyof typeof TOKEN_PALETTE }[]; num: number | null }[] = [];
+
   for (let i = 0; i < 24; i++) {
     setMono(ctx, px, 500);
-    const widest = lines.reduce((m, toks) => Math.max(m, ctx.measureText(toks.map((t) => t.text).join('')).width), 0);
-    if ((lines.length * px * 1.5 <= innerH && widest <= innerW) || px <= minPx) break;
+    const gutter = px * 2.2;
+    const textW = innerW - gutter;
+    wrapped = wrapCodeLines(ctx, lines, textW);
+    if ((wrapped.length * px * 1.5 <= innerH && maxTokenWidth(ctx, wrapped) <= textW) || px <= minPx) break;
     px = Math.max(minPx, px * 0.94);
   }
   setMono(ctx, px, 500);
   const lh = px * 1.5;
+  const gutterW = px * 2.2;
 
   ctx.save();
+  // Hard clip to the panel interior — belt and braces against any residual overflow.
+  ctx.beginPath();
+  ctx.rect(innerX - px * 0.3, innerTop - px, innerW + px * 0.6, innerH + px);
+  ctx.clip();
   ctx.direction = 'ltr';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   let y = innerTop + px;
-  const gutterW = px * 2.2;
-  for (let i = 0; i < lines.length; i++) {
+  for (const row of wrapped) {
     if (y > innerTop + innerH) break;
-    // line number gutter
-    ctx.fillStyle = 'rgba(148,163,184,0.35)';
-    ctx.fillText(String(i + 1).padStart(2, ' '), r.x + b.W * 0.028, y);
-    // tokens
-    let x = r.x + b.W * 0.028 + gutterW;
-    for (const tok of lines[i]) {
+    if (row.num !== null) {
+      ctx.fillStyle = 'rgba(148,163,184,0.35)';
+      ctx.fillText(String(row.num).padStart(2, ' '), innerX, y);
+    }
+    // Continuation rows indent slightly so a wrapped line reads as one statement.
+    let x = innerX + gutterW + (row.num === null ? px * 1.2 : 0);
+    for (const tok of row.toks) {
       ctx.fillStyle = TOKEN_PALETTE[tok.color];
       ctx.fillText(tok.text, x, y);
       x += ctx.measureText(tok.text).width;
@@ -404,6 +460,73 @@ function drawCodeBlock(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, sl
     y += lh;
   }
   ctx.restore();
+}
+
+/** Widest rendered row, used by the fit loop. */
+function maxTokenWidth(
+  ctx: CanvasRenderingContext2D,
+  rows: { toks: { text: string; color: keyof typeof TOKEN_PALETTE }[] }[]
+): number {
+  return rows.reduce(
+    (m, row) => Math.max(m, ctx.measureText(row.toks.map((t) => t.text).join('')).width),
+    0
+  );
+}
+
+/**
+ * Wraps highlighted code lines to a pixel width, preserving token colours.
+ *
+ * Splits on token boundaries first and only breaks inside a token when a single token is itself
+ * wider than the budget (a long URL or path), so syntax colouring survives the wrap. Continuation
+ * rows carry `num: null` so the line-number gutter is not repeated.
+ */
+function wrapCodeLines(
+  ctx: CanvasRenderingContext2D,
+  lines: { text: string; color: keyof typeof TOKEN_PALETTE }[][],
+  maxW: number
+): { toks: { text: string; color: keyof typeof TOKEN_PALETTE }[]; num: number | null }[] {
+  const out: { toks: { text: string; color: keyof typeof TOKEN_PALETTE }[]; num: number | null }[] = [];
+  if (maxW <= 0) return out;
+
+  lines.forEach((toks, idx) => {
+    let row: { text: string; color: keyof typeof TOKEN_PALETTE }[] = [];
+    let rowW = 0;
+    let first = true;
+    const push = () => {
+      out.push({ toks: row, num: first ? idx + 1 : null });
+      first = false;
+      row = [];
+      rowW = 0;
+    };
+
+    for (const tok of toks) {
+      let text = tok.text;
+      while (text) {
+        const w = ctx.measureText(text).width;
+        if (rowW + w <= maxW) {
+          row.push({ text, color: tok.color });
+          rowW += w;
+          break;
+        }
+        // Find how much of this token still fits on the current row.
+        let fit = text.length;
+        while (fit > 0 && rowW + ctx.measureText(text.slice(0, fit)).width > maxW) fit--;
+        if (fit === 0) {
+          if (row.length === 0) fit = 1; // pathological: force at least one char to avoid a stall
+          else {
+            push();
+            continue;
+          }
+        }
+        row.push({ text: text.slice(0, fit), color: tok.color });
+        text = text.slice(fit);
+        push();
+      }
+    }
+    if (row.length > 0 || first) push();
+  });
+
+  return out;
 }
 
 function drawBulletList(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, bullets: string[], top: number, maxH: number, marker: 'check' | 'dot') {

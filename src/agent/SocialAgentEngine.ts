@@ -1273,7 +1273,7 @@ ${HEBREW_COPY_RULES}
 2..N. גוף הדק — 8 עד 10 שקופיות, שילוב של:
    • kind:"concept" — הסבר רעיון/מונח בפסקה אחת (25–45 מילים). title קצר.
    • kind:"code" — שקופית קוד: title קצר שמסביר מה הקוד עושה, body של משפט אחד, ו-code עם קטע קוד **אמיתי ורץ** (עד 12 שורות, בלי markdown fence). codeLang אחד מתוך: python | ts | js | bash | json.
-   • kind:"step" — שלב בתהליך: stepNumber (1,2,3...), title קצר, body עם ההוראה המדויקת.
+   • kind:"step" — שלב בתהליך: stepNumber (1,2,3...), title קצר, body עם ההוראה המדויקת. מספר את השלבים ברצף רציף (1,2,3,4,5) — בלי לדלג, בלי לחזור על מספר, וה-kicker חייב להתאים ("שלב 3" ל-stepNumber 3).
    • kind:"tool" — סקירת כלים: title + bullets של 3–5 כלים, כל אחד "שם — מה הוא עושה בפועל".
    • kind:"takeaway" — סיכום פעולה: title + bullets של 2–4 נקודות ליישום מיידי.
    דרישות תמהיל: לפחות 2 שקופיות code ולפחות 2 שקופיות step או concept. אל תשתמש באותו kind יותר מ-4 פעמים ברצף.
@@ -1344,6 +1344,16 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
     .filter((s) => s.title.length > 1 || s.body.length > 10 || s.code.length > 5 || s.bullets.length > 0);
 
   if (slides.length < 5) throw new Error('model returned too few usable tip slides');
+
+  // Renumber step slides from their POSITION rather than trusting the model's stepNumber. Models
+  // routinely emit 1, 2 and then 0 or a repeat for later steps, and the renderer only draws a badge
+  // when stepNumber > 0 — which is why a five-trick guide showed badges on the first two slides
+  // only. Position is the single source of truth, so 1..N is always sequential and complete.
+  let stepSeq = 0;
+  for (const slide of slides) {
+    if (slide.kind === 'step') slide.stepNumber = ++stepSeq;
+    else slide.stepNumber = 0;
+  }
 
   const hashtags = Array.isArray(parsed.hashtags)
     ? parsed.hashtags.map((h) => String(h).trim()).filter((h) => h.startsWith('#')).slice(0, 8)
