@@ -3,11 +3,12 @@ import JSZip from 'jszip';
 import {
   X, ChevronLeft, ChevronRight, Download, Copy, Check, Sparkles,
   AlertTriangle, Loader2, Send, Image as ImageIcon, Upload, Link2, Trash2,
-  Palette, Type, LayoutGrid, ShieldCheck, Instagram, Newspaper, KeyRound,
+  Palette, Type, LayoutGrid, ShieldCheck, Instagram, Newspaper, KeyRound, Wand2, Monitor,
 } from 'lucide-react';
 import {
   startCarousel, fetchJob, adjustCarousel, checkBridge, slideUrl, bridgeBase, STATUS_LABEL,
   fileToDataUrl, MAX_REFERENCE_BYTES, REFERENCE_ACCEPT, PALETTES, FONTS, TEMPLATES,
+  STYLES, OUTPUT_PRESETS, redesignCarousel,
   bridgeToken, setBridgeToken,
   type ArticleInput, type CarouselJob, type BridgeHealth, type SlideCopy,
 } from '../lib/carouselBridge';
@@ -51,6 +52,9 @@ export default function CarouselStudioModal({
   const [skipQa, setSkipQa] = useState(false);
   // 'rebrand' translates a source post 1:1 into unbranded Hebrew; 'article' synthesises new copy.
   const [mode, setMode] = useState<'article' | 'rebrand'>('article');
+  const [style, setStyle] = useState<string>('sketchnote');
+  const [outputPreset, setOutputPreset] = useState<string>('portrait');
+  const [redesigning, setRedesigning] = useState(false);
   // Bridge token lives in localStorage, never in the bundle. Editable here so the operator
   // never has to open a browser console to authenticate.
   const [tokenDraft, setTokenDraft] = useState('');
@@ -116,6 +120,8 @@ export default function CarouselStudioModal({
         palette,
         skipQa,
         mode,
+        style,
+        preset: outputPreset,
       }));
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'failed to start';
@@ -128,7 +134,7 @@ export default function CarouselStudioModal({
     } finally {
       setStarting(false);
     }
-  }, [article, slideCount, reference, sourceUrl, slideCopy, font, palette, skipQa, mode]);
+  }, [article, slideCount, reference, sourceUrl, slideCopy, font, palette, skipQa, mode, style, outputPreset]);
 
   /** Seeds one editable entry per slide so copy can be reviewed before any image is generated. */
   const openEditor = useCallback(() => {
@@ -158,6 +164,22 @@ export default function CarouselStudioModal({
     window.setTimeout(() => setTokenSaved(false), 2000);
     void checkBridge().then(setHealth);
   }, [tokenDraft]);
+
+  /** Re-renders backdrop + composition in the chosen style. Approved copy is untouched. */
+  const redesign = useCallback(async (slideIndex?: number) => {
+    if (!jobId) return;
+    setRedesigning(true);
+    setError(null);
+    try {
+      await redesignCarousel(jobId, { style, preset: outputPreset, font, palette, slideIndex });
+      const next = await fetchJob(jobId);
+      setJob(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'redesign failed');
+    } finally {
+      setRedesigning(false);
+    }
+  }, [jobId, style, outputPreset, font, palette]);
 
   const pickReference = useCallback(async (file: File | null) => {
     if (!file) return;
@@ -491,6 +513,43 @@ export default function CarouselStudioModal({
 
               <div>
                 <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-zinc-300">
+                  <Wand2 className="h-3.5 w-3.5 text-brand-400" /> סגנון עיצוב
+                </label>
+                <select
+                  value={style}
+                  onChange={(e) => setStyle(e.target.value)}
+                  className="w-full cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-[12px] text-white"
+                >
+                  {STYLES.map((st) => (
+                    <option key={st.id} value={st.id}>{st.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                  {STYLES.find((st) => st.id === style)?.hint}
+                  {STYLES.find((st) => st.id === style)?.source === 'photo' && ' · תמונה נשלפת לפי הקשר השקופית'}
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-zinc-300">
+                  <Monitor className="h-3.5 w-3.5 text-brand-400" /> פורמט פלט
+                </label>
+                <select
+                  value={outputPreset}
+                  onChange={(e) => setOutputPreset(e.target.value)}
+                  className="w-full cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-[12px] text-white"
+                >
+                  {OUTPUT_PRESETS.map((op) => (
+                    <option key={op.id} value={op.id}>{op.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[10px] text-zinc-500">
+                  {OUTPUT_PRESETS.find((op) => op.id === outputPreset)?.hint}
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-zinc-300">
                   <LayoutGrid className="h-3.5 w-3.5 text-brand-400" /> פריסת שקופית
                 </label>
                 <div className="grid grid-cols-2 gap-1">
@@ -725,6 +784,55 @@ export default function CarouselStudioModal({
                   <span className="font-bold text-sky-300">ALT: </span>{job.post.altText}
                 </p>
               )}
+
+              <div className="mb-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <p className="mb-2 text-[12px] font-bold text-zinc-300">עיצוב מחדש / בחירת סגנון</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={style}
+                    onChange={(e) => setStyle(e.target.value)}
+                    className="cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-[12px] text-white"
+                  >
+                    {STYLES.map((st) => <option key={st.id} value={st.id}>{st.label}</option>)}
+                  </select>
+                  <select
+                    value={outputPreset}
+                    onChange={(e) => setOutputPreset(e.target.value)}
+                    className="cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-[12px] text-white"
+                  >
+                    {OUTPUT_PRESETS.map((op) => <option key={op.id} value={op.id}>{op.label}</option>)}
+                  </select>
+                  <button
+                    onClick={() => void redesign(current?.index)}
+                    disabled={redesigning}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-500/50 px-3 py-1.5 text-[12px] font-bold text-brand-400 hover:bg-brand-500/10 disabled:opacity-40"
+                  >
+                    {redesigning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                    עצב מחדש שקופית
+                  </button>
+                  <button
+                    onClick={() => void redesign()}
+                    disabled={redesigning}
+                    className="cursor-pointer rounded-lg border border-white/15 px-3 py-1.5 text-[12px] font-bold text-zinc-200 hover:bg-white/5 disabled:opacity-40"
+                  >
+                    עצב מחדש הכל
+                  </button>
+                  {job.pdfUrl && (
+                    <a
+                      href={slideUrl(job.pdfUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-lg border border-white/15 px-3 py-1.5 text-[12px] font-bold text-zinc-200 hover:bg-white/5"
+                    >
+                      PDF ללינקדאין
+                    </a>
+                  )}
+                </div>
+                <p className="mt-1.5 text-[10px] text-zinc-500">
+                  הטקסט המאושר נשמר כפי שהוא — משתנים רק הרקע וההרכב.
+                  {current?.photoCredit && ` · צילום: ${current.photoCredit}`}
+                </p>
+              </div>
 
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <p className="mb-2 text-[12px] font-bold text-zinc-300">רוצים לכוון את Hermes אחרת?</p>

@@ -80,6 +80,9 @@ export interface CarouselSlide {
   subhead: string;
   cards?: string[];
   scene: string;
+  /** Scene context used to retrieve the backdrop photo. */
+  visualQuery?: string;
+  photoCredit?: string;
   /** Vision QA verdict for this slide. */
   qa?: { pass: boolean; overlap?: boolean; overflow?: boolean; brokenGlyphs?: boolean; lowContrast?: boolean; note?: string; skipped?: boolean };
 }
@@ -105,6 +108,10 @@ export interface CarouselJob {
   /** Copy the engine produced, so the editor can seed itself from a first pass. */
   deck?: Array<{ headline?: string; subhead?: string; body?: string; bullets?: string[] }>;
   qaRetries?: number;
+  style?: string;
+  preset?: string;
+  /** LinkedIn-ready PDF of the whole set, once compiled. */
+  pdfUrl?: string | null;
   /** Rebrander audit: what branding was stripped and how much source text was available. */
   rebrand?: { removed: string[]; sourceChars: number; title: string } | null;
   slides: CarouselSlide[];
@@ -160,6 +167,22 @@ export const FONTS = [
   { id: 'rubik', label: 'Rubik' },
 ] as const;
 
+/** Visual styles. `photo` styles pull a contextually matched stock image as the backdrop. */
+export const STYLES = [
+  { id: 'sketchnote', label: 'סקצ׳נוט מצויר', hint: 'איור דיו על נייר קרם', source: 'hermes' },
+  { id: 'photoreal', label: 'צילום קונטקסטואלי', hint: 'תצלום אמיתי תואם נושא', source: 'photo' },
+  { id: 'dark-minimal', label: 'טק מינימליסטי כהה', hint: 'רקע כהה, ניגודיות גבוהה', source: 'photo' },
+  { id: 'concept-art', label: 'אמנות קונספט', hint: 'איור מושגי', source: 'hermes' },
+  { id: 'enterprise', label: 'ארגוני בהיר', hint: 'נקי, עסקי, ניגודיות חדה', source: 'photo' },
+] as const;
+
+/** Output presets — exact pixel dimensions per platform. */
+export const OUTPUT_PRESETS = [
+  { id: 'portrait', label: '4:5 קרוסלה', hint: '1080x1350 · אינסטגרם ולינקדאין' },
+  { id: 'story', label: '9:16 סטורי', hint: '1080x1920 · סטוריז וטיקטוק' },
+  { id: 'square', label: '1:1 ריבוע', hint: '1080x1080' },
+] as const;
+
 /** Layout presets — how many content cards the compositor lays out. */
 export const TEMPLATES = [
   { id: 1, label: 'כרטיס יחיד', hint: 'הצהרה או נתון בודד' },
@@ -190,6 +213,10 @@ export interface CarouselOptions {
   skipQa?: boolean;
   /** 'rebrand' = 1:1 unbranded Hebrew translation of a source post; 'article' = synthesis. */
   mode?: 'article' | 'rebrand';
+  /** Visual style id (see STYLES). Photo styles fetch a contextual backdrop. */
+  style?: string;
+  /** Output preset id (see OUTPUT_PRESETS). */
+  preset?: string;
 }
 
 export async function startCarousel(
@@ -211,6 +238,8 @@ export async function startCarousel(
       palette: opts.palette || 'brand',
       skipQa: Boolean(opts.skipQa),
       mode: opts.mode || 'article',
+      style: opts.style || 'sketchnote',
+      preset: opts.preset || 'portrait',
     }),
   });
   const data = await res.json().catch(() => ({}));
@@ -261,3 +290,24 @@ export function fileToDataUrl(file: File): Promise<string> {
 /** Bridge cap is 8MB decoded; base64 inflates ~33%, so reject early with a clear message. */
 export const MAX_REFERENCE_BYTES = 8 * 1024 * 1024;
 export const REFERENCE_ACCEPT = 'image/png,image/jpeg,image/webp';
+
+/**
+ * Re-render an existing job in a different visual style.
+ *
+ * The approved copy is never regenerated — the bridge reads it back from the job's own slide
+ * records — so a redesign can only change the backdrop and composition. Omit `slideIndex` to
+ * redesign the whole carousel.
+ */
+export async function redesignCarousel(
+  jobId: string,
+  opts: { style?: string; preset?: string; font?: string; palette?: string; slideIndex?: number }
+): Promise<number[]> {
+  const res = await fetch(`${bridgeBase()}/carousel/redesign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ jobId, ...opts }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || `bridge responded ${res.status}`);
+  return (data.redesigning as number[]) || [];
+}

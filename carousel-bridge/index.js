@@ -269,6 +269,7 @@ function fallbackArtDirection(article, slideCount) {
     fallback: true,
     slides: Array.from({ length: slideCount }, (_, i) => ({
       index: i,
+      visualQuery: 'modern technology workspace',
       scene:
         'A cute 2D hand-drawn clay-free robot character in charcoal ink on textured cream paper, '
         + 'small and centred in the middle third of the canvas, beside one simple prop such as a '
@@ -772,6 +773,11 @@ reference is 3D, photographic or claymorphic, take only its layout and ignore it
 Do NOT copy its subject matter.\n`
     : ''
 }
+For each slide also give "visualQuery": 2-5 plain English words naming a CONCRETE, PHOTOGRAPHABLE
+scene that matches that slide's idea — "server rack cabling", "developer writing code on laptop",
+"cloud data centre aisle". Physical subjects only; no abstractions, no Hebrew, no brand names. It is
+used to retrieve a stock photograph when a photographic style is selected.
+
 For each slide, "scene" must be a complete, self-contained image prompt that names the concrete
 drawn objects (which robot, doing what, holding what, next to which gauge/box/arrow), the card
 count and their arrangement, where the numerals sit, and the footer banner colour. Restate the
@@ -782,8 +788,65 @@ Return ONLY valid JSON, no prose:
  "palette":["#F8F6EF","#1A1A1A","#E85A2A","#2E9E8F"],
  "typography":"one phrase","layout":"one phrase",
  "textColor":"#1A1A1A",
- "slides":[${Array.from({ length: slideCount }, (_, i) => `{"index":${i},"scene":"detailed drawn-imagery prompt for slide ${i + 1}, no lettering"}`).join(',')}]}
+ "slides":[${Array.from({ length: slideCount }, (_, i) => `{"index":${i},"scene":"detailed drawn-imagery prompt for slide ${i + 1}, no lettering","visualQuery":"2-5 English words naming a concrete photographable scene for slide ${i + 1}, e.g. server rack cabling"}`).join(',')}]}
 `.trim();
+
+/**
+ * Visual styles offered in the dashboard.
+ *
+ * `source: 'hermes'` draws the background with the image model; `source: 'photo'` pulls a
+ * contextually matched stock photograph instead, which is what "Tips & Guides" wanted — a real
+ * server rack behind a slide about cabling rather than an abstract drawing of one.
+ */
+const STYLES = {
+  sketchnote: { label: 'סקצ׳נוט מצויר', source: 'hermes' },
+  'dark-minimal': { label: 'טק מינימליסטי כהה', source: 'photo', tone: 'dark moody minimal technology' },
+  photoreal: { label: 'צילום קונטקסטואלי', source: 'photo', tone: 'professional photography' },
+  'concept-art': { label: 'אמנות קונספט מאוירת', source: 'hermes' },
+  enterprise: { label: 'ארגוני בקונטרסט גבוה', source: 'photo', tone: 'bright clean corporate' },
+};
+const DEFAULT_STYLE = 'sketchnote';
+
+/**
+ * Contextually matched stock photo for one slide.
+ *
+ * `visualQuery` comes from the art-direction plan — a concrete scene ("server rack cabling",
+ * "developer writing code on a modern laptop") rather than the slide's Hebrew text, which searches
+ * badly. Returns null on any failure so the caller can fall back to a Hermes-drawn frame.
+ */
+async function fetchContextPhoto(jobDir, index, visualQuery, tone, preset) {
+  const query = [visualQuery, tone].filter(Boolean).join(' ').trim();
+  if (!query) return null;
+  const orientation = preset === 'square' ? 'square' : 'portrait';
+  const url =
+    `${SITE_ORIGIN}/api/pexels-search?query=${encodeURIComponent(query)}`
+    + `&orientation=${orientation}`;
+  try {
+    const res = await fetch(url, {
+      headers: ADMIN_SECRET ? { 'x-admin-secret': ADMIN_SECRET } : {},
+      signal: AbortSignal.timeout(20_000),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok || !data.photoUrl) {
+      console.warn(`[carousel-bridge] photo search failed for "${query}": ${data.error || res.status}`);
+      return null;
+    }
+    const img = await fetch(data.photoUrl, { signal: AbortSignal.timeout(30_000) });
+    if (!img.ok) return null;
+    const outPath = path.join(jobDir, `frame_${String(index).padStart(2, '0')}.png`);
+    fs.writeFileSync(outPath, Buffer.from(await img.arrayBuffer()));
+    if (!isCompletePng(outPath)) {
+      // Pexels serves JPEG; Pillow reads it regardless of the .png name, but the PNG validator
+      // would reject it, so only the existence check applies here.
+      if (!fs.existsSync(outPath) || fs.statSync(outPath).size < 1024) return null;
+    }
+    console.log(`[carousel-bridge] slide ${index}: photo backdrop "${data.usedQuery || query}"`);
+    return { path: outPath, credit: data.photographer || '', query: data.usedQuery || query };
+  } catch (err) {
+    console.warn(`[carousel-bridge] photo fetch failed: ${err.message}`);
+    return null;
+  }
+}
 
 async function generateArtDirection(article, slideCount, override, referencePath, aspect) {
   const prompt = ART_DIRECTION_PROMPT(article, slideCount, override, referencePath, aspect);
@@ -950,6 +1013,7 @@ async function composeSlide(framePath, jobDir, index, copy, opts) {
     font: opts.font || RENDER_FONT,
     palette: opts.palette || 'brand',
     preset: opts.preset || DEFAULT_PRESET,
+    style: opts.style || DEFAULT_STYLE,
     headline: copy.headline || '',
     footer: copy.footer || '',
     footerBox: [0.07, 0.78, 0.93, 0.90],
@@ -1257,7 +1321,19 @@ async function runJob(job) {
   for (let i = 0; i < slideCount; i++) {
     const plan = job.plan.slides[i] || job.plan.slides[job.plan.slides.length - 1];
     const copy = job.deck[i] || {};
-    const frame = await generateFrame(jobDir, i, plan.scene, job.plan.palette, referencePath, preset.ratio);
+    // Photographic styles source the backdrop from Pexels using the slide's own visual context;
+    // drawn styles keep Hermes as the background engine. A failed photo search falls back to
+    // Hermes rather than failing the slide.
+    const style = STYLES[job.input.style] || STYLES[DEFAULT_STYLE];
+    let frame = null;
+    let photo = null;
+    if (style.source === 'photo') {
+      photo = await fetchContextPhoto(jobDir, i, plan.visualQuery, style.tone, job.input.preset);
+      if (photo) frame = photo.path;
+    }
+    if (!frame) {
+      frame = await generateFrame(jobDir, i, plan.scene, job.plan.palette, referencePath, preset.ratio);
+    }
 
     // Slide copy, either as edited by Daniel in the dashboard editor or straight from the deck.
     const edited = (job.input.slideCopy || [])[i] || {};
@@ -1271,6 +1347,7 @@ async function runJob(job) {
 
     let slide = await composeSlide(frame, jobDir, i, content, {
       font: job.input.font, palette: job.input.palette, preset: job.input.preset,
+      style: job.input.style,
     });
 
     // Vision QA, with one corrective re-composite. Overflow/overlap are the failures a tighter
@@ -1279,7 +1356,8 @@ async function runJob(job) {
     if (!qa.pass && (qa.overflow || qa.overlap)) {
       job.qaRetries = (job.qaRetries || 0) + 1;
       slide = await composeSlide(frame, jobDir, i, content, {
-        font: job.input.font, palette: job.input.palette, preset: job.input.preset, fontScale: 0.82,
+        font: job.input.font, palette: job.input.palette, preset: job.input.preset,
+        style: job.input.style, fontScale: 0.82,
       });
       qa = await visionQa(slide);
     }
@@ -1291,6 +1369,8 @@ async function runJob(job) {
       subhead: content.footer,
       cards: content.cards,
       scene: plan.scene,
+      visualQuery: plan.visualQuery || '',
+      photoCredit: photo?.credit || '',
       qa,
     });
     job.progress = { done: i + 1, total: slideCount };
@@ -1380,6 +1460,7 @@ app.get('/health', (_req, res) => {
     renderScript: fs.existsSync(RENDER_SCRIPT),
     hermesTimeoutMs: HERMES_TIMEOUT_MS,
     presets: Object.keys(PRESETS),
+    styles: Object.keys(STYLES),
     tokenRequired: Boolean(BRIDGE_TOKEN),
     instagramOEmbed: Boolean(process.env.INSTAGRAM_OEMBED_TOKEN),
     threadsApp: Boolean(process.env.THREADS_APP_ID && process.env.THREADS_APP_SECRET),
@@ -1433,6 +1514,7 @@ app.post('/carousel/generate', (req, res) => {
     // 'rebrand' = 1:1 unbranded Hebrew translation of a source post; otherwise synthesis.
     mode: req.body?.mode === 'rebrand' ? 'rebrand' : 'article',
     preset: PRESETS[req.body?.preset] ? req.body.preset : DEFAULT_PRESET,
+    style: STYLES[req.body?.style] ? req.body.style : DEFAULT_STYLE,
   });
   res.json({ ok: true, jobId: job.id, slideCount: count });
 });
@@ -1455,6 +1537,7 @@ app.get('/carousel/job/:id', (req, res) => {
     deck: job.deck || [],
     rebrand: job.rebrand || null,
     preset: job.input?.preset || DEFAULT_PRESET,
+    style: job.input?.style || DEFAULT_STYLE,
     pdfUrl: job.pdfUrl || null,
     qaRetries: job.qaRetries || 0,
     slides: job.slides || [],
@@ -1477,6 +1560,79 @@ app.post('/carousel/adjust', (req, res) => {
     override: [prev.input.override, String(instruction)].filter(Boolean).join('. '),
   });
   res.json({ ok: true, jobId: job.id, adjustedFrom: prev.id });
+});
+
+/**
+ * Redesign — re-render an existing job's slides in a different visual style.
+ *
+ * The approved copy is untouched: it is re-read from the job's own slide records, so a redesign
+ * can never alter wording that has already been reviewed. Only the backdrop and the typographic
+ * composition change. Passing `slideIndex` redesigns one slide; omitting it does the whole set.
+ */
+app.post('/carousel/redesign', async (req, res) => {
+  const { jobId, style, preset, font, palette, slideIndex } = req.body ?? {};
+  const job = jobs.get(jobId);
+  if (!job) return res.status(404).json({ ok: false, error: 'job not found' });
+  if (!Array.isArray(job.slides) || job.slides.length === 0) {
+    return res.status(400).json({ ok: false, error: 'job has no rendered slides yet' });
+  }
+  if (style && !STYLES[style]) {
+    return res.status(400).json({ ok: false, error: `unknown style: ${style}` });
+  }
+
+  // Applied to the job so a later redesign or PDF rebuild stays consistent.
+  if (style) job.input.style = style;
+  if (PRESETS[preset]) job.input.preset = preset;
+  if (font) job.input.font = font;
+  if (palette) job.input.palette = palette;
+
+  const targets =
+    Number.isInteger(slideIndex) ? job.slides.filter((s) => s.index === slideIndex) : job.slides;
+  if (targets.length === 0) return res.status(400).json({ ok: false, error: 'no such slide' });
+
+  res.json({ ok: true, jobId: job.id, redesigning: targets.map((t) => t.index) });
+
+  // Continue after responding: a redesign is as slow as a render, and the dashboard polls anyway.
+  (async () => {
+    const jobDir = path.join(OUTPUT_ROOT, job.id);
+    const activeStyle = STYLES[job.input.style] || STYLES[DEFAULT_STYLE];
+    job.status = 'rendering';
+    job.progress = { done: 0, total: targets.length };
+    try {
+      for (let n = 0; n < targets.length; n++) {
+        const slide = targets[n];
+        const plan = job.plan?.slides?.[slide.index] || {};
+        let frame = path.join(jobDir, `frame_${String(slide.index).padStart(2, '0')}.png`);
+        let photo = null;
+        if (activeStyle.source === 'photo') {
+          photo = await fetchContextPhoto(
+            jobDir, slide.index, slide.visualQuery || plan.visualQuery, activeStyle.tone, job.input.preset
+          );
+          if (photo) frame = photo.path;
+        } else if (!fs.existsSync(frame)) {
+          frame = await generateFrame(
+            jobDir, slide.index, plan.scene || '', job.plan?.palette, null,
+            (PRESETS[job.input.preset] || PRESETS[DEFAULT_PRESET]).ratio
+          );
+        }
+        // Copy is read back from the slide record — never regenerated.
+        await composeSlide(
+          frame, jobDir, slide.index,
+          { headline: slide.headline, footer: slide.subhead, cards: slide.cards || [] },
+          { font: job.input.font, palette: job.input.palette, preset: job.input.preset, style: job.input.style }
+        );
+        if (photo) slide.photoCredit = photo.credit;
+        // Cache-bust so the dashboard re-fetches the replaced file.
+        slide.url = `/carousel/file/${job.id}/slide_${String(slide.index).padStart(2, '0')}.png?v=${Date.now()}`;
+        job.progress = { done: n + 1, total: targets.length };
+      }
+      job.status = 'done';
+    } catch (err) {
+      job.status = 'error';
+      job.error = `redesign failed: ${err.message}`;
+      console.error(`[carousel-bridge] redesign ${job.id} failed:`, err.message);
+    }
+  })();
 });
 
 app.use('/carousel/file', express.static(OUTPUT_ROOT, { maxAge: '1h' }));

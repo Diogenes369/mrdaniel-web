@@ -52,6 +52,17 @@ PRESETS = {
 }
 DEFAULT_PRESET = "portrait"
 
+# Visual styles. `scrim` decides how much the background is darkened/lightened behind text, and
+# `ink` is the text colour that pairs with it. A photographic background needs a real scrim; a
+# drawn sketchnote on cream paper needs none.
+STYLES = {
+    "sketchnote": {"ink": "#1A1A1A", "scrim": None, "accent": "#E85A2A"},
+    "photoreal": {"ink": "#FFFFFF", "scrim": ("dark", 0.55), "accent": "#9FE870"},
+    "dark-minimal": {"ink": "#F4F4F5", "scrim": ("dark", 0.72), "accent": "#00FF66"},
+    "enterprise": {"ink": "#0B0F17", "scrim": ("light", 0.60), "accent": "#76B900"},
+}
+DEFAULT_STYLE = "sketchnote"
+
 
 def fit_canvas(img: Image.Image, preset: str) -> Image.Image:
     """
@@ -161,6 +172,43 @@ def fit_block(
     lines = wrap(text, font, max_w, draw)
     keep = max(1, max_h // line_h)
     return font, lines[:keep], line_h
+
+
+def apply_scrim(img: Image.Image, mode: str, strength: float) -> Image.Image:
+    """
+    Non-intrusive legibility wash over a photographic background.
+
+    A vertical gradient rather than a flat tint: strongest in the header band and the footer band
+    where the Hebrew sits, and nearly clear across the middle so the photograph still reads. This
+    is what lets a real photo back the slide without fighting the type.
+    """
+    w, h = img.size
+    base = (0, 0, 0) if mode == "dark" else (255, 255, 255)
+    grad = Image.new("L", (1, h))
+    px = grad.load()
+    for y in range(h):
+        t = y / max(1, h - 1)
+        # Full strength across the top ~26% and bottom ~24%, easing through the middle.
+        if t < 0.26:
+            a = 1.0
+        elif t > 0.76:
+            a = 1.0
+        else:
+            mid = abs((t - 0.51) / 0.25)
+            a = 0.34 + 0.42 * mid
+        px[0, y] = int(255 * strength * a)
+    mask = grad.resize((w, h))
+    wash = Image.new("RGB", (w, h), base)
+    return Image.composite(wash, img, mask.point(lambda v: v))
+
+
+def mean_luminance(img: Image.Image, box: tuple[int, int, int, int]) -> float:
+    """Average perceived brightness of a region, 0..1 — drives automatic text colour."""
+    x0, y0, x1, y1 = (max(0, box[0]), max(0, box[1]), min(img.width, box[2]), min(img.height, box[3]))
+    if x1 <= x0 or y1 <= y0:
+        return 1.0
+    crop = img.crop((x0, y0, x1, y1)).convert("L").resize((32, 32))
+    return sum(crop.getdata()) / (32 * 32 * 255)
 
 
 def soft_halo(
@@ -278,12 +326,17 @@ def compose(spec: dict) -> Path:
     out = Path(spec["output"])
     font_name = spec.get("font", DEFAULT_FONT)
     palette = PALETTES.get(spec.get("palette", "brand"), PALETTES["brand"])
-    colors = {**palette, **(spec.get("colors") or {})}
+    style = STYLES.get(spec.get("style", DEFAULT_STYLE), STYLES[DEFAULT_STYLE])
+    # Style ink/accent override the palette's; an explicit spec["colors"] still wins over both.
+    colors = {**palette, "ink": style["ink"], "accent": style["accent"], **(spec.get("colors") or {})}
 
     # QA retry passes fontScale < 1 to shrink every band's ceiling, giving the fitter more room.
     scale = float(spec.get("fontScale", 1.0) or 1.0)
-
     img = fit_canvas(Image.open(src).convert("RGB"), spec.get("preset", DEFAULT_PRESET))
+
+    # Photographic styles get a gradient scrim so the Hebrew stays legible over any image.
+    if style["scrim"]:
+        img = apply_scrim(img, style["scrim"][0], style["scrim"][1])
     draw = ImageDraw.Draw(img)
     W, H = img.size
     margin = int(spec.get("margin", W * 0.085))
@@ -291,9 +344,14 @@ def compose(spec: dict) -> Path:
     # --- header band: top 22%, text auto-fitted inside it ---
     if spec.get("headline"):
         head_box = (margin, int(H * 0.05), W - margin, int(H * 0.215))
+        # Automatic contrast: a light band takes charcoal, a dark band takes near-white, whatever
+        # the background happens to be. Keeps the ratio comfortable without hand-tuning per style.
+        head_ink = colors["ink"] if spec.get("colors", {}).get("ink") else (
+            "#0B0F17" if mean_luminance(img, head_box) > 0.55 else "#FFFFFF"
+        )
         end = draw_block(
             draw, spec["headline"], head_box, font_name,
-            int(W * 0.088 * scale), colors["ink"], align="right", valign="top",
+            int(W * 0.088 * scale), head_ink, align="right", valign="top",
             line_gap_ratio=0.30,
         )
         # Thin accent rule directly under the headline — a hairline, never a container.
@@ -319,11 +377,13 @@ def compose(spec: dict) -> Path:
         if card.get("text"):
             # No plate. A boxless halo in the canvas colour lifts the glyphs off any linework
             # behind them; it is the glyph silhouette blurred, so it has no edge or corner.
+            light_bg = mean_luminance(img, text_box) > 0.55
+            card_ink = card.get("color") or ("#0B0F17" if light_bg else "#FFFFFF")
             draw_block(
                 draw, card["text"], text_box, font_name,
-                int(W * 0.05 * scale), card.get("color") or colors["ink"],
+                int(W * 0.05 * scale), card_ink,
                 align=card.get("align", "right"), valign="middle",
-                img=img, halo=spec.get("canvasColor") or "#F8F6EF",
+                img=img, halo=spec.get("canvasColor") or ("#F8F6EF" if light_bg else "#0B0F17"),
             )
             draw = ImageDraw.Draw(img)
 
@@ -343,7 +403,7 @@ def compose(spec: dict) -> Path:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     img.save(out)
-    print(f"OK: composed {out} {img.size} ({font_name}, palette={spec.get('palette', 'brand')}, preset={spec.get('preset', DEFAULT_PRESET)})")
+    print(f"OK: composed {out} {img.size} ({font_name}, palette={spec.get('palette', 'brand')}, preset={spec.get('preset', DEFAULT_PRESET)}, style={spec.get('style', DEFAULT_STYLE)})")
     return out
 
 
