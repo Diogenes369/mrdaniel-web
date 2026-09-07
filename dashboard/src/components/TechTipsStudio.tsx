@@ -304,13 +304,35 @@ export default function TechTipsStudio() {
           </>
         )}
 
-        <input
-          value={customTopic}
-          onChange={(e) => setCustomTopic(e.target.value)}
-          placeholder="…או כתבו נושא משלכם: 'איך לחבר Claude ל-CRM ב-30 שורות'"
-          dir="rtl"
-          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 mb-2"
-        />
+        {/* Custom guide generator — a first-class path, not an afterthought under the presets.
+            A count in the topic ("5 טיפים…") is honoured exactly by the deck engine. */}
+        <div className="mb-2 rounded-lg border border-brand-500/25 bg-brand-500/[0.05] p-3">
+          <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-brand-300">
+            <Sparkles className="w-3.5 h-3.5" /> מחולל מדריכים חופשי
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={customTopic}
+              onChange={(e) => setCustomTopic(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !busy && customTopic.trim().length > 5 && void generate()}
+              placeholder="הקלד נושא למדריך (לדוגמה: 5 טיפים לאבטחת מידע בארגון)"
+              dir="rtl"
+              className="min-w-[16rem] flex-1 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600"
+            />
+            <button
+              onClick={() => void generate()}
+              disabled={busy || customTopic.trim().length < 6}
+              className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-black cursor-pointer disabled:opacity-40"
+            >
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              ג׳נרט מדריך מותאם אישית
+            </button>
+          </div>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
+            ציינו מספר בנושא ("3 טריקים ב-Python") והמדריך ייבנה עם בדיוק אותו מספר שלבים ממוספרים —
+            קאבר, הסבר, קוד/שלבים, סיכום ו-CTA.
+          </p>
+        </div>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}

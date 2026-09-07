@@ -593,9 +593,16 @@ function drawStepBadge(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, n:
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   setDisplay(ctx, size * 0.52, 900);
+  // Glow and numeral are drawn as separate passes: a shadowBlur applied to the fill itself
+  // smeared the digit's own edges. The halo goes down first, then the numeral is painted crisp
+  // with the shadow cleared, so the badge reads sharp at slide scale.
   ctx.fillStyle = BRAND_GREEN;
   ctx.shadowColor = BRAND_GREEN;
-  ctx.shadowBlur = 18;
+  ctx.shadowBlur = 16;
+  ctx.globalAlpha = 0.55;
+  ctx.fillText(String(n), x + size / 2, y + size / 2 + 2);
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
   ctx.fillText(String(n), x + size / 2, y + size / 2 + 2);
   ctx.restore();
   return y + size + b.W * 0.03;

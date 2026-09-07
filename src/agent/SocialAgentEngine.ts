@@ -1305,14 +1305,73 @@ function mapTipKind(v: unknown): TipSlideKind {
 
 const VALID_CODE_LANGS = new Set(['python', 'ts', 'js', 'bash', 'json']);
 
+/**
+ * How many tips/tricks/steps the topic asks for, or null when unspecified.
+ *
+ * The cover slide routinely promised "5 tricks" while only three step slides existed, because
+ * nothing tied the two together. Parsing the count up front lets the prompt demand exactly that
+ * many sections, and lets the title be corrected afterwards if the model still under-delivers.
+ * Handles digits and Hebrew number words in both genders.
+ */
+const HEBREW_NUMERALS: Record<string, number> = {
+  '\u05d0\u05d7\u05d3': 1, '\u05d0\u05d7\u05ea': 1,
+  '\u05e9\u05e0\u05d9': 2, '\u05e9\u05ea\u05d9': 2, '\u05e9\u05e0\u05d9\u05d9\u05dd': 2, '\u05e9\u05ea\u05d9\u05d9\u05dd': 2,
+  '\u05e9\u05dc\u05d5\u05e9': 3, '\u05e9\u05dc\u05d5\u05e9\u05d4': 3,
+  '\u05d0\u05e8\u05d1\u05e2': 4, '\u05d0\u05e8\u05d1\u05e2\u05d4': 4,
+  '\u05d7\u05de\u05e9': 5, '\u05d7\u05de\u05d9\u05e9\u05d4': 5,
+  '\u05e9\u05e9': 6, '\u05e9\u05d9\u05e9\u05d4': 6,
+  '\u05e9\u05d1\u05e2': 7, '\u05e9\u05d1\u05e2\u05d4': 7,
+  '\u05e9\u05de\u05d5\u05e0\u05d4': 8, '\u05ea\u05e9\u05e2': 9, '\u05ea\u05e9\u05e2\u05d4': 9, '\u05e2\u05e9\u05e8': 10, '\u05e2\u05e9\u05e8\u05d4': 10,
+};
+const COUNT_NOUNS =
+  '\u05d8\u05e8\u05d9\u05e7\u05d9\u05dd|\u05d8\u05e8\u05d9\u05e7|\u05d8\u05d9\u05e4\u05d9\u05dd|\u05d8\u05d9\u05e4|\u05e9\u05dc\u05d1\u05d9\u05dd|\u05e9\u05dc\u05d1|\u05d3\u05e8\u05db\u05d9\u05dd|\u05d3\u05e8\u05da|\u05db\u05dc\u05dc\u05d9\u05dd|\u05e2\u05e6\u05d5\u05ea|tricks?|tips?|steps?|ways?|rules?';
+
+function requestedSectionCount(topic: string): number | null {
+  const text = String(topic || '');
+  const digit = new RegExp(`(\\d{1,2})\\s*(?:${COUNT_NOUNS})`, 'i').exec(text);
+  if (digit) {
+    const n = Number(digit[1]);
+    if (n >= 1 && n <= 12) return n;
+  }
+  const word = new RegExp(`([\\u05d0-\\u05ea]{2,6})\\s+(?:${COUNT_NOUNS})`).exec(text);
+  if (word && HEBREW_NUMERALS[word[1]]) return HEBREW_NUMERALS[word[1]];
+  return null;
+}
+
+/**
+ * Rewrites a leading count in the deck title to the number of sections actually produced.
+ *
+ * Last line of defence: if the model promised five and delivered four, the cover is corrected
+ * rather than shipping a slide that contradicts the deck behind it.
+ */
+function syncTitleCount(title: string, actual: number): string {
+  if (!actual) return title;
+  return String(title || '').replace(
+    new RegExp(`(\\d{1,2}|[\\u05d0-\\u05ea]{2,6})(\\s+)(${COUNT_NOUNS})`, 'i'),
+    (m: string, num: string, gap: string, noun: string) => {
+      const parsedNum = /^\d+$/.test(num) ? Number(num) : HEBREW_NUMERALS[num];
+      return parsedNum && parsedNum !== actual ? `${actual}${gap}${noun}` : m;
+    }
+  );
+}
+
 export async function synthesizeTechTipDeck(input: { topic: string; notes?: string }): Promise<TechTipDeck> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
   const { clean } = sanitizeInput(`${input.topic}\n${input.notes ?? ''}`.slice(0, 3000));
   if (clean.trim().length < 8) throw new Error('topic too short for a tech-tip deck');
 
+  // When the topic names a count ("5 טריקים"), the deck must contain exactly that many step
+  // sections and the cover must say the same number.
+  const wanted = requestedSectionCount(input.topic);
+  const countDirective = wanted
+    ? `\n\nחובה מוחלטת: הנושא מבקש בדיוק ${wanted} טריקים/טיפים. הפק בדיוק ${wanted} שקופיות מסוג `
+      + `"step" — לא פחות ולא יותר — ממוספרות ברצף 1..${wanted}, וה-kicker של כל אחת חייב להיות `
+      + `"טריק N" בהתאמה למספרה. כותרת הקאבר חייבת לומר ${wanted}. אל תדלג על אף מספר.`
+    : '';
+
   const response = await generateContentWithRetry({
     model: 'gemini-3.6-flash',
-    contents: [{ role: 'user', parts: [{ text: `נושא המדריך:\n"""\n${clean}\n"""` }] }],
+    contents: [{ role: 'user', parts: [{ text: `נושא המדריך:\n"""\n${clean}\n"""${countDirective}` }] }],
     config: { systemInstruction: TECH_TIP_SYSTEM_INSTRUCTION, temperature: 0.6, topP: 0.9, responseMimeType: 'application/json' },
   });
 
@@ -1351,8 +1410,15 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
   // only. Position is the single source of truth, so 1..N is always sequential and complete.
   let stepSeq = 0;
   for (const slide of slides) {
-    if (slide.kind === 'step') slide.stepNumber = ++stepSeq;
-    else slide.stepNumber = 0;
+    if (slide.kind === 'step') {
+      slide.stepNumber = ++stepSeq;
+      // Keep the visible kicker in step with the badge, so "טריק 3" can never sit on badge 4.
+      if (/^\s*(\u05d8\u05e8\u05d9\u05e7|\u05e9\u05dc\u05d1|\u05d8\u05d9\u05e4|step|tip|trick)\b/i.test(slide.kicker)) {
+        slide.kicker = `\u05d8\u05e8\u05d9\u05e7 ${stepSeq}`;
+      }
+    } else {
+      slide.stepNumber = 0;
+    }
   }
 
   const hashtags = Array.isArray(parsed.hashtags)
@@ -1360,7 +1426,12 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
     : [];
 
   return {
-    title: stripMetaFraming(sanitizeHebrewText(String(parsed.title ?? input.topic).trim())).slice(0, 140),
+    // Title count reconciled with the sections actually produced — a cover that promises five
+    // while the deck holds four is the exact mismatch this guards against.
+    title: syncTitleCount(
+      stripMetaFraming(sanitizeHebrewText(String(parsed.title ?? input.topic).trim())),
+      stepSeq
+    ).slice(0, 140),
     slides: slides.slice(0, 12),
     hashtags: hashtags.length ? hashtags : ['#פיתוח', '#AI', '#קוד', '#כלים_למפתחים'],
   };
