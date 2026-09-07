@@ -517,6 +517,14 @@ const CHROME_LINE_RE = [
   /^[\s•·]*(sign in|join now|new to linkedin\?|create account|report this post|feed post number \d+)/i,
   // Comment attributions: "Name (title) 2h" style leading lines inside a thread.
   /^[\s•·]*(reply|replies|\d+ repl(y|ies))\s*$/i,
+  // Hebrew relative timestamps: "3 שבועות", "לפני 5 ימים", "שבוע · ערוך".
+  /^[\s•·]*(לפני\s+)?\d+\s*(שניו?ת|דקו?ת|שעו?ת|ימים|יום|שבועו?ת|חודשי?ם|שני?ם)\s*[•·]?\s*(ערוך)?\s*$/,
+  /^[\s•·]*(אהבתי|תגובה|שתף|שלח|עקוב|עוקב|התחבר|הצג תרגום|ראה עוד|קרא עוד)\s*$/,
+  /^[\s•·]*[\d,.]+\s*(תגובות|תגובות|שיתופים|צפיות|לייקים)\s*$/,
+  // A line that is nothing but hashtags — the source's own tag block, not narrative.
+  /^[\s•·]*(#[\w֐-׿][\w֐-׿-]*[\s,]*){2,}$/,
+  // Byline with an honorific or credential, on its own line.
+  /^[\s•·]*(dr\.?|prof\.?|mr\.?|ms\.?|mrs\.?)\s+[A-Z֐-׿][\w֐-׿'-]*(\s+[A-Z֐-׿][\w֐-׿'-]*){0,3}\s*(,\s*(PhD|MD|MBA|CPA))?\s*$/i,
 ];
 
 /** Everything from these markers onward is the comment thread, not the post. */
@@ -528,13 +536,29 @@ const COMMENTS_START_RE =
  * professional headline ("Jane Cohen" / "CTO | AI | SaaS"). Detected as that specific PAIR rather
  * than by guessing at names, so a genuine hook is never mistaken for a byline.
  */
+/** A bare personal name occupying its own line: 2-4 capitalised words, no sentence punctuation. */
+const NAME_LINE_RE =
+  /^[A-Z֐-׿][\w֐-׿'-]*(\s+[A-Z֐-׿][\w֐-׿'-]*){1,3}$/;
+
 function dropAuthorHeader(lines) {
   const firstContent = lines.findIndex((l) => l.trim());
   if (firstContent === -1) return lines;
+
+  // A name alone on the first content line is a byline. Requires no terminal punctuation and no
+  // verb-ish length, so a real hook ("Most teams reach for a bigger instance") is never matched.
+  const first = lines[firstContent].trim();
+  if (NAME_LINE_RE.test(first) && first.length <= 42 && !/[.!?:,]$/.test(first)) {
+    lines = lines.slice(firstContent + 1);
+  }
+
+  // Re-find the first content line: removing the name above shifts everything up, and the
+  // professional headline may now BE that first line (this is why it previously survived).
+  const head = lines.findIndex((l) => l.trim());
+  if (head === -1) return lines;
   const headlineAt = lines.findIndex(
     (l, i) =>
-      i > firstContent &&
-      i <= firstContent + 2 &&
+      i >= head &&
+      i <= head + 2 &&
       /\S\s*\|\s*\S/.test(l) &&
       l.trim().length < 90
   );
@@ -1073,25 +1097,39 @@ function detectSourceLanguage(text) {
   return hebrew >= 20 && hebrew >= latin * 0.5 ? 'he' : 'en';
 }
 
-const ENRICH_RULES = `THE SOURCE IS ALREADY HEBREW. Do not translate it — REWRITE and ENRICH it.
+const CONCISION_RULES = `LENGTH — this is a slide carousel, not an article:
+- Every headline: at most 8 words. Every card line: at most 18 words, one idea.
+- The footer takeaway: one short sentence.
+- Cut ruthlessly. Ceremony, throat-clearing, restated context and "as we all know" openings all go.
+- Prefer a concrete noun and an active verb over an adjective. Numbers beat adjectives.
+- If a sentence survives with fewer words, it must be written with fewer words.
+Never output a wall of text. If the source rambles, the carousel must not.`;
+
+const ENRICH_RULES = `THE SOURCE IS ALREADY HEBREW. Do not translate it — CONDENSE and POLISH it.
 - Keep every fact, number, step and claim the source makes. Add none.
 - Sharpen the opening into a real hook: a concrete claim, a surprising number, or a question the
   reader wants answered. Never a label like "טיפים" or "שלב 1".
 - Restructure into clear, well-spaced beats — one idea per slide, in a logical order the reader can
   follow. Expand a terse line into a full, readable sentence where the source was clipped.
 - Executive tone: confident, specific, professional. No hype, no filler, no emoji stacking.
-- Where the source is vague, make it concrete using only what is already there.`;
+- Where the source is vague, make it concrete using only what is already there.
+- Tighten: keep the substance, drop the padding. Personal brand voice — first-hand, specific,
+  written by a practitioner who has done the thing, not a summariser describing it.`;
 
 const TRANSLATE_RULES = `THE SOURCE IS NOT HEBREW. Translate and ADAPT it into Hebrew.
 - Localise, do not transliterate: write the way an Israeli professional actually writes.
 - Preserve every step, number and claim exactly, in the source's order.
 - Adapt idioms and cultural references rather than rendering them literally.
-- Technical terms may stay in Latin script inside a Hebrew sentence.`;
+- Technical terms may stay in Latin script inside a Hebrew sentence.
+- SUMMARISE while translating: distil each idea to its sharpest form rather than rendering every
+  clause. Structure the result as a hook followed by tight, scannable points.`;
 
 async function rebrandSource(sourceText, sourceTitle, slideCount) {
   const lang = detectSourceLanguage(sourceText);
   const prompt = [
     lang === 'he' ? ENRICH_RULES : TRANSLATE_RULES,
+    '',
+    CONCISION_RULES,
     '',
     `SOURCE POST TITLE: ${sourceTitle || '(none)'}`,
     '',

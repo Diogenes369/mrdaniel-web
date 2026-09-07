@@ -119,12 +119,12 @@ export default function App() {
   return (
     <div dir="rtl" className="dash-root min-h-screen bg-carbon-950 text-zinc-100 p-5 md:p-8 font-sans">
       <div className="w-full">
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
           <div>
             <h1 className="font-display font-black text-2xl md:text-3xl text-white">לוח בקרה בזמן אמת</h1>
             <p className="text-zinc-500 text-sm mt-1">Live Analytics · דניאל בן ברוך</p>
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2.5">
             <LiveStatus connected={connected} />
             <ExportControls leads={leads} events={events} health={health} />
             <button
@@ -150,10 +150,13 @@ export default function App() {
             const items = TABS.filter((t) => t.group === g.id);
             if (items.length === 0) return null;
             return (
-              <div key={g.id} className="flex flex-wrap items-center gap-2">
-                <span className="w-full text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600 sm:w-auto sm:min-w-[7.5rem]">
+              <div key={g.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5">
+                {/* Label on its own line. The previous version put it inline with a min-width,
+                    which collided with the pills once a row wrapped. */}
+                <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   {g.label}
                 </span>
+                <div className="flex flex-wrap items-center gap-2">
                 {items.map((t) => {
                   const Icon = t.icon;
                   const active = tab === t.id;
@@ -173,6 +176,7 @@ export default function App() {
                     </button>
                   );
                 })}
+                </div>
               </div>
             );
           })}
