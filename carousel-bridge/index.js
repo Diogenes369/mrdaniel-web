@@ -486,6 +486,79 @@ const THREADS_PASTE_HINT =
   + 'THREADS_USER_TOKEN (an OAuth user token, not the app secret). Copy & paste the thread text '
   + 'directly into the text box instead.';
 
+const LINKEDIN_URL_RE = /linkedin\.com\/(?:posts|feed\/update|pulse)\//i;
+
+function isLinkedInUrl(url) {
+  return LINKEDIN_URL_RE.test(String(url || ''));
+}
+
+/**
+ * Strips social-platform chrome so only the post body reaches the rebrander.
+ *
+ * A scraped LinkedIn page carries far more than the post: reaction and comment counts, connection
+ * degrees, follow buttons, timestamps, "see more"/"show translation" affordances, the comment
+ * thread itself, and sign-in prompts. All of it used to be handed to the translator, which then
+ * dutifully turned "1,234 likes · 56 comments" into Hebrew slides.
+ *
+ * Everything here is line-oriented and conservative: a line is dropped only when it matches a
+ * chrome pattern outright, never merely because it is short, so genuine post copy survives.
+ */
+const CHROME_LINE_RE = [
+  // Reactions, comments, reposts, impressions — with or without thousands separators.
+  /^[\s•·]*[\d,.]+\s*(likes?|reactions?|comments?|reposts?|shares?|impressions?|views?)\b/i,
+  /^[\s•·]*(like|comment|repost|share|send|follow|following|connect|subscribe)\s*$/i,
+  // Connection degree / promoted / timestamps.
+  /^[\s•·]*(\d+(st|nd|rd|th)\+?|promoted|sponsored)\s*$/i,
+  /^[\s•·]*\d+\s*(second|minute|hour|day|week|month|year)s?\s*(ago)?\s*[•·]?\s*(edited)?\s*$/i,
+  /^[\s•·]*\d+\s*(s|m|h|d|w|mo|y)\s*[•·]?\s*(edited)?\s*$/i,
+  // Expand / translate / more affordances.
+  /^[\s•·]*(see more|show more|see less|…more|show translation|see translation|load more comments|view \d+ (more )?comments?)\s*$/i,
+  // Auth walls and app nags.
+  /^[\s•·]*(sign in|join now|new to linkedin\?|create account|report this post|feed post number \d+)/i,
+  // Comment attributions: "Name (title) 2h" style leading lines inside a thread.
+  /^[\s•·]*(reply|replies|\d+ repl(y|ies))\s*$/i,
+];
+
+/** Everything from these markers onward is the comment thread, not the post. */
+const COMMENTS_START_RE =
+  /^\s*(most relevant|most recent|top comments?|all comments?|add a comment|\d+\s+comments?)\s*$/i;
+
+/**
+ * Author header: a LinkedIn scrape opens with the poster's name then their pipe-separated
+ * professional headline ("Jane Cohen" / "CTO | AI | SaaS"). Detected as that specific PAIR rather
+ * than by guessing at names, so a genuine hook is never mistaken for a byline.
+ */
+function dropAuthorHeader(lines) {
+  const firstContent = lines.findIndex((l) => l.trim());
+  if (firstContent === -1) return lines;
+  const headlineAt = lines.findIndex(
+    (l, i) =>
+      i > firstContent &&
+      i <= firstContent + 2 &&
+      /\S\s*\|\s*\S/.test(l) &&
+      l.trim().length < 90
+  );
+  if (headlineAt === -1) return lines;
+  return lines.slice(headlineAt + 1);
+}
+
+function isolatePostBody(text) {
+  const lines = dropAuthorHeader(String(text || '').split(/\r?\n/));
+  const kept = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (COMMENTS_START_RE.test(line)) break; // comment thread begins — stop here
+    if (!line) { kept.push(''); continue; }
+    if (CHROME_LINE_RE.some((re) => re.test(line))) continue;
+    kept.push(line);
+  }
+  return kept
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\s*hashtag\s*#/gi, ' #')   // LinkedIn renders tags as "hashtag#foo"
+    .trim();
+}
+
 async function importSource(url) {
   // Instagram first: the generic og:/readability extractor cannot see past the login wall, so the
   // official oEmbed endpoint is the only route that returns a caption.
@@ -509,7 +582,12 @@ async function importSource(url) {
 
   const { imported } = await callSite('import-url', { url });
   const title = String(imported?.title || '').trim();
-  const body = String(imported?.body || '').trim();
+  // Strip platform chrome and any comment thread before anything downstream sees the text.
+  const rawBody = String(imported?.body || '').trim();
+  const body = isolatePostBody(rawBody);
+  if (isLinkedInUrl(url) && rawBody.length !== body.length) {
+    console.log(`[carousel-bridge] linkedin: isolated post body, ${rawBody.length} -> ${body.length} chars`);
+  }
   if (body.length < 60 && title.length < 10) {
     if (isThreadsUrl(url)) {
       throw new Error(THREADS_PASTE_HINT);
@@ -983,8 +1061,38 @@ Return ONLY valid JSON, no prose:
  "hashtags":["#tag","#tag","#tag"],
  "removed":["what branding you stripped, for audit"]}`;
 
+/**
+ * Which mode the rebrander runs in. A source that is already Hebrew does not need translating —
+ * it needs rewriting into a punchier, better-structured post — so the two cases get different
+ * instructions rather than one prompt that tries to cover both.
+ */
+function detectSourceLanguage(text) {
+  const sample = String(text || '').slice(0, 4000);
+  const hebrew = (sample.match(/[֐-׿]/g) || []).length;
+  const latin = (sample.match(/[A-Za-z]/g) || []).length;
+  return hebrew >= 20 && hebrew >= latin * 0.5 ? 'he' : 'en';
+}
+
+const ENRICH_RULES = `THE SOURCE IS ALREADY HEBREW. Do not translate it — REWRITE and ENRICH it.
+- Keep every fact, number, step and claim the source makes. Add none.
+- Sharpen the opening into a real hook: a concrete claim, a surprising number, or a question the
+  reader wants answered. Never a label like "טיפים" or "שלב 1".
+- Restructure into clear, well-spaced beats — one idea per slide, in a logical order the reader can
+  follow. Expand a terse line into a full, readable sentence where the source was clipped.
+- Executive tone: confident, specific, professional. No hype, no filler, no emoji stacking.
+- Where the source is vague, make it concrete using only what is already there.`;
+
+const TRANSLATE_RULES = `THE SOURCE IS NOT HEBREW. Translate and ADAPT it into Hebrew.
+- Localise, do not transliterate: write the way an Israeli professional actually writes.
+- Preserve every step, number and claim exactly, in the source's order.
+- Adapt idioms and cultural references rather than rendering them literally.
+- Technical terms may stay in Latin script inside a Hebrew sentence.`;
+
 async function rebrandSource(sourceText, sourceTitle, slideCount) {
+  const lang = detectSourceLanguage(sourceText);
   const prompt = [
+    lang === 'he' ? ENRICH_RULES : TRANSLATE_RULES,
+    '',
     `SOURCE POST TITLE: ${sourceTitle || '(none)'}`,
     '',
     'SOURCE POST TEXT:',
@@ -1003,6 +1111,7 @@ async function rebrandSource(sourceText, sourceTitle, slideCount) {
     );
   }
   return {
+    sourceLanguage: lang,
     title: String(out.title || sourceTitle || ''),
     slides: out.slides.map((sl) => ({
       headline: String(sl.headline || ''),
@@ -1063,7 +1172,13 @@ async function runJob(job) {
       headline: sl.headline, cards: sl.cards, footer: sl.footer,
     }));
     job.post = { body: rebrand.caption, hashtags: rebrand.hashtags, altText: '' };
-    job.rebrand = { removed: rebrand.removed, sourceChars: article.articleText.length, title: rebrand.title };
+    job.rebrand = {
+      removed: rebrand.removed,
+      sourceChars: article.articleText.length,
+      title: rebrand.title,
+      sourceLanguage: rebrand.sourceLanguage,
+      mode: rebrand.sourceLanguage === 'he' ? 'enrich' : 'translate',
+    };
     job.copyWarning = null;
   } else {
 

@@ -30,22 +30,34 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'repurpose' | 'carousel-studio' | 'tech-tips' | 'ig-growth' | 'auto-publisher' | 'email' | 'weekly-plan';
 
-const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
-  { id: 'overview', label: 'סקירה כללית', icon: LayoutGrid },
-  { id: 'visitors', label: 'מבקרים', icon: Users2 },
-  { id: 'events', label: 'אירועים ותוכן', icon: Activity },
-  { id: 'leads', label: 'לידים וניוזלטר', icon: UserPlus },
-  { id: 'security', label: 'אבטחה ופעילות סוכן', icon: ShieldAlert },
-  { id: 'agent', label: 'סוכן AI חברתי', icon: Bot },
-  { id: 'news-agent', label: 'מחולל תוכן מחדשות', icon: Newspaper },
-  { id: 'story', label: 'מחולל סטורי', icon: Film },
-  { id: 'repurpose', label: 'יבוא ושכתוב תוכן', icon: Recycle },
-  { id: 'carousel-studio', label: 'סטודיו קרוסלות WEB3', icon: LayoutTemplate },
-  { id: 'tech-tips', label: 'טיפים ומדריכים', icon: GraduationCap },
-  { id: 'ig-growth', label: 'סוכן צמיחה באינסטגרם', icon: TrendingUp },
-  { id: 'auto-publisher', label: 'אוטונומיה', icon: Rocket },
-  { id: 'email', label: 'מערכת דיוור ומיילים', icon: Mail },
-  { id: 'weekly-plan', label: 'לוח תוכן שבועי', icon: Calendar },
+/**
+ * Tab groups. Fifteen equal-weight pills in one row read as a wall of options, so they are grouped
+ * by what the operator is trying to do. Ids, labels and icons are untouched — this only adds a
+ * `group` field for rendering, so every existing route, panel and API binding is unaffected.
+ */
+const GROUPS = [
+  { id: 'analytics', label: 'ניתוח ונתונים' },
+  { id: 'create', label: 'יצירת תוכן' },
+  { id: 'growth', label: 'צמיחה ואוטומציה' },
+] as const;
+type GroupId = (typeof GROUPS)[number]['id'];
+
+const TABS: { id: Tab; label: string; icon: typeof LayoutGrid; group: GroupId }[] = [
+  { id: 'overview', label: 'סקירה כללית', icon: LayoutGrid, group: 'analytics' },
+  { id: 'visitors', label: 'מבקרים', icon: Users2, group: 'analytics' },
+  { id: 'events', label: 'אירועים ותוכן', icon: Activity, group: 'analytics' },
+  { id: 'leads', label: 'לידים וניוזלטר', icon: UserPlus, group: 'analytics' },
+  { id: 'security', label: 'אבטחה ופעילות סוכן', icon: ShieldAlert, group: 'analytics' },
+  { id: 'news-agent', label: 'מחולל תוכן מחדשות', icon: Newspaper, group: 'create' },
+  { id: 'story', label: 'מחולל סטורי', icon: Film, group: 'create' },
+  { id: 'carousel-studio', label: 'סטודיו קרוסלות WEB3', icon: LayoutTemplate, group: 'create' },
+  { id: 'repurpose', label: 'יבוא ושכתוב תוכן', icon: Recycle, group: 'create' },
+  { id: 'tech-tips', label: 'טיפים ומדריכים', icon: GraduationCap, group: 'create' },
+  { id: 'agent', label: 'סוכן AI חברתי', icon: Bot, group: 'growth' },
+  { id: 'ig-growth', label: 'סוכן צמיחה באינסטגרם', icon: TrendingUp, group: 'growth' },
+  { id: 'auto-publisher', label: 'אוטונומיה', icon: Rocket, group: 'growth' },
+  { id: 'email', label: 'מערכת דיוור ומיילים', icon: Mail, group: 'growth' },
+  { id: 'weekly-plan', label: 'לוח תוכן שבועי', icon: Calendar, group: 'growth' },
 ];
 
 /** Live connection strip — Firebase realtime link + an independent 5s round-trip probe to the
@@ -131,25 +143,40 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab nav — wraps onto multiple rows instead of a horizontal scrollbar. */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.id;
+        {/* Tab nav — grouped by purpose. Same buttons and same setTab calls as before; only the
+            arrangement changed, so no pathway is altered. */}
+        <nav className="mb-6 space-y-2.5" aria-label="ניווט ראשי">
+          {GROUPS.map((g) => {
+            const items = TABS.filter((t) => t.group === g.id);
+            if (items.length === 0) return null;
             return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                  active ? 'bg-brand-500 text-black' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 border border-white/10'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {t.label}
-              </button>
+              <div key={g.id} className="flex flex-wrap items-center gap-2">
+                <span className="w-full text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600 sm:w-auto sm:min-w-[7.5rem]">
+                  {g.label}
+                </span>
+                {items.map((t) => {
+                  const Icon = t.icon;
+                  const active = tab === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setTab(t.id)}
+                      aria-current={active ? 'page' : undefined}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                        active
+                          ? 'bg-brand-500 text-black'
+                          : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 border border-white/10'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
-        </div>
+        </nav>
 
         {tab === 'overview' && (
           <ErrorBoundary label="סקירה כללית">
