@@ -3,6 +3,7 @@ import { loadImage, getLogo, loadFont, wrapRtl, BRAND_GREEN } from './newsImageC
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
 import { highlightCode, TOKEN_PALETTE } from './syntaxHighlight';
 import type { TechTipDeck, TechTipSlide } from './techTipsApi';
+import { resolveSlidePhotoUrl, loadPhoto } from './pexelsBackground';
 
 /**
  * Tech Tips slide painter — dark-cyber teaching slides, drawn on <canvas> so the SAME painter
@@ -84,25 +85,60 @@ export function pollinationsUrl(prompt: string, width: number, height: number, s
 
 /** Resolves one AI backdrop per slide. Bounded concurrency + per-image timeout; any failure just
  * yields null and the slide falls back to the procedural backdrop. */
+/** Background sources offered in the Tips & Guides control bar. */
+export type TipStyle = 'photoreal' | 'enterprise' | 'dark-minimal' | 'sketchnote';
+
+/** Extra search terms per style, appended to the slide's own contextual query. */
+const STYLE_TONE: Record<TipStyle, string> = {
+  photoreal: 'professional photography',
+  enterprise: 'bright clean corporate office technology',
+  'dark-minimal': 'dark moody minimal technology',
+  sketchnote: '',
+};
+
 export async function resolveTipBackgrounds(
   deck: TechTipDeck,
   width: number,
   height: number,
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
+  style: TipStyle = 'photoreal'
 ): Promise<(HTMLImageElement | null)[]> {
   const total = deck.slides.length;
   const out: (HTMLImageElement | null)[] = new Array(total).fill(null);
   let done = 0;
   let cursor = 0;
+  // Tracks fallback photos already used so two slides never land on the same stock image.
+  const usedFallbacks = new Set<number>();
   const workers = Array.from({ length: Math.min(3, total) }, async () => {
     while (cursor < total) {
       const i = cursor++;
       const slide = deck.slides[i];
-      const prompt = slide.visualPrompt || 'abstract dark cyber technology grid, neon green accents, no text';
-      out[i] = await Promise.race([
-        loadImage(pollinationsUrl(prompt, Math.round(width / 2), Math.round(height / 2), i + 7)),
-        new Promise<null>((r) => setTimeout(() => r(null), 30000)),
-      ]);
+      if (style === 'sketchnote') {
+        // Illustrated art: keep the existing Pollinations path driven by the slide's visualPrompt.
+        const prompt = slide.visualPrompt || 'abstract dark cyber technology grid, neon green accents, no text';
+        out[i] = await Promise.race([
+          loadImage(pollinationsUrl(prompt, Math.round(width / 2), Math.round(height / 2), i + 7)),
+          new Promise<null>((r) => setTimeout(() => r(null), 30000)),
+        ]);
+      } else {
+        // Photographic styles: build the query from THIS slide's own text, not the deck title, so
+        // each slide gets its own matched image. resolveSlidePhotoUrl sends the slide text to the
+        // server, which derives a targeted English scene query for it.
+        const slideText = [slide.title, slide.body, slide.visualPrompt]
+          .filter(Boolean).join(' ').slice(0, 320);
+        const orientation = height > width ? 'portrait' : height === width ? 'square' : 'landscape';
+        const url = await resolveSlidePhotoUrl(
+          `${slideText} ${STYLE_TONE[style]}`.trim(),
+          deck.title || slide.title || 'technology',
+          orientation,
+          i + 7,
+          usedFallbacks
+        );
+        out[i] = await Promise.race([
+          loadPhoto(url, 12000),
+          new Promise<null>((r) => setTimeout(() => r(null), 15000)),
+        ]);
+      }
       done++;
       onProgress?.(done, total);
     }

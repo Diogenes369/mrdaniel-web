@@ -23,7 +23,15 @@ import {
   type TechTipDeck,
   type TipTopic,
 } from '../lib/techTipsApi';
-import { renderTipDeckImages, exportTipDeckZip, resolveTipBackgrounds } from '../lib/techTipRenderer';
+import { renderTipDeckImages, exportTipDeckZip, resolveTipBackgrounds, type TipStyle } from '../lib/techTipRenderer';
+
+/** Background styles offered for a guide. Photoreal contextual is the default. */
+const TIP_STYLES: { id: TipStyle; label: string; hint: string }[] = [
+  { id: 'photoreal', label: 'תמונות קונטקסטואליות', hint: 'תצלום אמיתי תואם לתוכן כל שקופית' },
+  { id: 'enterprise', label: 'הייטק / עסקי נקי', hint: 'בהיר, מקצועי, ניגודיות חדה' },
+  { id: 'dark-minimal', label: 'כהה מינימליסטי', hint: 'רקע כהה ומאופק' },
+  { id: 'sketchnote', label: 'איור אמנותי (AI)', hint: 'איור נוצר לפי תיאור השקופית' },
+];
 import { renderTipDeckVideo, isMotionSupported } from '../lib/motionStudioService';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
@@ -57,7 +65,10 @@ export default function TechTipsStudio() {
   const [active, setActive] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  const [useAiBg, setUseAiBg] = useState(false);
+  // Photoreal contextual is the default: guides should render with matched imagery immediately.
+  const [style, setStyle] = useState<TipStyle>('photoreal');
+  const [redesigning, setRedesigning] = useState(false);
+  const [useAiBg, setUseAiBg] = useState(true);
   const [bgProgress, setBgProgress] = useState<{ done: number; total: number } | null>(null);
   const [backgrounds, setBackgrounds] = useState<(HTMLImageElement | null)[]>([]);
 
@@ -105,6 +116,37 @@ export default function TechTipsStudio() {
     setVideoPct(0);
   };
 
+  /**
+   * Swaps backgrounds and re-renders in the currently selected style.
+   *
+   * The deck itself is never regenerated — `deck` is reused as-is — so approved copy, ordering and
+   * hashtags all survive. Only the imagery and the rendered PNGs change.
+   */
+  const redesign = useCallback(async () => {
+    if (!deck) return;
+    setRedesigning(true);
+    setError(null);
+    try {
+      const bgs = useAiBg
+        ? await resolveTipBackgrounds(deck, 1080, 1350, (done, total) => setBgProgress({ done, total }), style)
+        : [];
+      setBackgrounds(bgs);
+      setRenderProgress({ done: 0, total: deck.slides.length });
+      const imgs = await renderTipDeckImages(
+        deck,
+        { backgrounds: bgs },
+        (done, total) => setRenderProgress({ done, total })
+      );
+      setImages(imgs);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'עיצוב מחדש נכשל');
+    } finally {
+      setRedesigning(false);
+      setBgProgress(null);
+      setRenderProgress(null);
+    }
+  }, [deck, style, useAiBg]);
+
   const generate = useCallback(async () => {
     const topic = customTopic.trim() || selected?.topic || '';
     if (topic.trim().length < 8) {
@@ -121,7 +163,7 @@ export default function TechTipsStudio() {
       let bgs: (HTMLImageElement | null)[] = [];
       if (useAiBg) {
         setBgProgress({ done: 0, total: d.slides.length });
-        bgs = await resolveTipBackgrounds(d, 1080, 1350, (done, total) => setBgProgress({ done, total }));
+        bgs = await resolveTipBackgrounds(d, 1080, 1350, (done, total) => setBgProgress({ done, total }), style);
         setBackgrounds(bgs);
         setBgProgress(null);
       }
@@ -154,7 +196,7 @@ export default function TechTipsStudio() {
       let bgs = backgrounds;
       if (useAiBg) {
         setVideoStage(null);
-        bgs = await resolveTipBackgrounds(deck, 1080, 1920);
+        bgs = await resolveTipBackgrounds(deck, 1080, 1920, undefined, style);
       }
       const { blob } = await renderTipDeckVideo(deck, { backgrounds: bgs, music: withMusic }, (pct, stage) => {
         setVideoPct(pct);
@@ -287,15 +329,33 @@ export default function TechTipsStudio() {
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             צור מדריך (10–12 שקופיות)
           </button>
+          <label className="flex items-center gap-2 text-xs text-zinc-300">
+            <Wand2 className="w-3.5 h-3.5 text-brand-400" />
+            סגנון עיצוב
+            <select
+              value={style}
+              onChange={(e) => setStyle(e.target.value as TipStyle)}
+              className="cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-white"
+            >
+              {TIP_STYLES.map((st) => (
+                <option key={st.id} value={st.id}>{st.label}</option>
+              ))}
+            </select>
+          </label>
           <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
             <input type="checkbox" checked={useAiBg} onChange={(e) => setUseAiBg(e.target.checked)} className="accent-brand-500 w-4 h-4" />
-            <Wand2 className="w-3.5 h-3.5 text-brand-400" />
-            רקעי AI (Pollinations · חינמי, מוסיף זמן)
+            רקעים מאוירים/מצולמים
           </label>
         </div>
 
+        <p className="mt-2 text-[11px] text-zinc-500">
+          {TIP_STYLES.find((st) => st.id === style)?.hint}
+        </p>
         {bgProgress && (
-          <p className="mt-3 text-[11px] text-sky-400/90">מייצר רקעי AI… {bgProgress.done}/{bgProgress.total}</p>
+          <p className="mt-3 text-[11px] text-sky-400/90">
+            {style === 'sketchnote' ? 'מייצר איורים…' : 'מאתר תמונות תואמות לכל שקופית…'}{' '}
+            {bgProgress.done}/{bgProgress.total}
+          </p>
         )}
         {renderProgress && (
           <p className="mt-2 text-[11px] text-sky-400/90">מרנדר שקופיות… {renderProgress.done}/{renderProgress.total}</p>
@@ -326,6 +386,24 @@ export default function TechTipsStudio() {
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? 'הועתק ✓' : 'העתק כיתוב'}
                 </button>
+                <button
+                  onClick={() => void redesign()}
+                  disabled={redesigning || busy}
+                  title="מחליף רקעים ומרנדר מחדש בסגנון שנבחר — הטקסט נשאר כפי שהוא"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-500/50 text-brand-400 text-xs font-bold cursor-pointer hover:bg-brand-500/10 disabled:opacity-40"
+                >
+                  {redesigning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                  עיצוב מחדש
+                </button>
+                <select
+                  value={style}
+                  onChange={(e) => setStyle(e.target.value as TipStyle)}
+                  className="cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-white"
+                >
+                  {TIP_STYLES.map((st) => (
+                    <option key={st.id} value={st.id}>{st.label}</option>
+                  ))}
+                </select>
                 <button
                   onClick={exportZip}
                   disabled={!images.length || busy}
