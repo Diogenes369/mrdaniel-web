@@ -311,3 +311,94 @@ export async function redesignCarousel(
   if (!res.ok || !data.ok) throw new Error(data.error || `bridge responded ${res.status}`);
   return (data.redesigning as number[]) || [];
 }
+
+
+// --- public publishing (ManyChat) --------------------------------------------------------------
+
+/**
+ * Canonical public host for a published guide.
+ *
+ * Always the site, never the bridge's own tunnel URL. The tunnel hostname is re-minted on every
+ * cloudflared restart, so a link built from it dies the next time the tunnel bounces — and a link
+ * handed to a ManyChat subscriber has to keep working. `mrdaniel.co.il/api/download/<id>` is stable
+ * and resolves the current tunnel server-side on each request.
+ */
+const PUBLIC_SITE = (import.meta.env.VITE_PUBLIC_SITE_ORIGIN || 'https://mrdaniel.co.il')
+  .replace(/\/$/, '');
+
+export interface PublishedGuide {
+  guideId: string;
+  expiresAt: number;
+  slides: number;
+  /** Public link to hand to ManyChat. */
+  publicUrl: string;
+}
+
+export function publicGuideUrl(guideId: string): string {
+  return `${PUBLIC_SITE}/api/download/${guideId}`;
+}
+
+/**
+ * Mints a public download link for a finished job.
+ *
+ * Token-gated on the bridge: publishing is the moment private output becomes world-readable, so it
+ * is an explicit admin action rather than a side effect of rendering.
+ */
+export async function publishGuide(
+  jobId: string,
+  opts: { title?: string; ttlHours?: number } = {}
+): Promise<PublishedGuide> {
+  const res = await fetch(`${bridgeBase()}/carousel/publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ jobId, ...opts }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || `bridge responded ${res.status}`);
+  return {
+    guideId: data.guideId,
+    expiresAt: data.expiresAt,
+    slides: data.slides,
+    publicUrl: publicGuideUrl(data.guideId),
+  };
+}
+
+/** Revokes a public link immediately. */
+export async function unpublishGuide(guideId: string): Promise<void> {
+  const res = await fetch(`${bridgeBase()}/carousel/unpublish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ guideId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || `bridge responded ${res.status}`);
+}
+
+/**
+ * Copies text, falling back to a hidden textarea.
+ *
+ * `navigator.clipboard` needs a secure context and rejects outright when the document is not
+ * focused, which is exactly the state a just-clicked button can be in. The fallback keeps the one
+ * click working rather than silently doing nothing.
+ */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}

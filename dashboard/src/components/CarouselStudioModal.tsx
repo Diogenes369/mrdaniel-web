@@ -4,13 +4,15 @@ import {
   X, ChevronLeft, ChevronRight, Download, Copy, Check, Sparkles,
   AlertTriangle, Loader2, Send, Image as ImageIcon, Upload, Link2, Trash2,
   Palette, Type, LayoutGrid, ShieldCheck, Instagram, Newspaper, KeyRound, Wand2, Monitor,
+  Globe, LinkIcon, EyeOff,
 } from 'lucide-react';
 import {
   startCarousel, fetchJob, adjustCarousel, checkBridge, slideUrl, bridgeBase, STATUS_LABEL,
   fileToDataUrl, MAX_REFERENCE_BYTES, REFERENCE_ACCEPT, PALETTES, FONTS, TEMPLATES,
   STYLES, OUTPUT_PRESETS, redesignCarousel,
   bridgeToken, setBridgeToken,
-  type ArticleInput, type CarouselJob, type BridgeHealth, type SlideCopy,
+  publishGuide, unpublishGuide, copyText,
+  type ArticleInput, type CarouselJob, type BridgeHealth, type SlideCopy, type PublishedGuide,
 } from '../lib/carouselBridge';
 
 /**
@@ -62,6 +64,12 @@ export default function CarouselStudioModal({
   const [hasToken, setHasToken] = useState(() => Boolean(bridgeToken()));
   const [copied, setCopied] = useState(false);
   const [zipping, setZipping] = useState(false);
+  // Public ManyChat link for this job. Null until the operator explicitly publishes — rendering a
+  // carousel must never make it world-readable on its own.
+  const [guide, setGuide] = useState<PublishedGuide | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -166,6 +174,51 @@ export default function CarouselStudioModal({
   }, [tokenDraft]);
 
   /** Re-renders backdrop + composition in the chosen style. Approved copy is untouched. */
+  /** Mints the public link. The job must be finished — publishing a half-rendered deck ships
+   *  missing slides to whoever opens the link. */
+  const handlePublish = useCallback(async () => {
+    if (!jobId || job?.status !== 'done') return;
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      // Title order: the imported source wins over the caller-supplied one, because when a URL
+      // was parsed the imported title is the real headline.
+      const title = job?.imported?.title || article?.title || '';
+      const result = await publishGuide(jobId, { title });
+      setGuide(result);
+      // Copy straight away: the whole point of the button is getting this into ManyChat.
+      if (await copyText(result.publicUrl)) {
+        setLinkCopied(true);
+        window.setTimeout(() => setLinkCopied(false), 2500);
+      }
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : 'publish failed');
+    } finally {
+      setPublishing(false);
+    }
+  }, [jobId, job, article]);
+
+  const handleCopyLink = useCallback(async () => {
+    if (!guide) return;
+    if (await copyText(guide.publicUrl)) {
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2500);
+    }
+  }, [guide]);
+
+  const handleUnpublish = useCallback(async () => {
+    if (!guide) return;
+    setPublishing(true);
+    try {
+      await unpublishGuide(guide.guideId);
+      setGuide(null);
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : 'unpublish failed');
+    } finally {
+      setPublishing(false);
+    }
+  }, [guide]);
+
   const redesign = useCallback(async (slideIndex?: number) => {
     if (!jobId) return;
     setRedesigning(true);
@@ -768,7 +821,63 @@ export default function CarouselStudioModal({
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   {copied ? 'הועתק ✓' : 'העתק טקסט לפוסט'}
                 </button>
+                {!guide && (
+                  <button
+                    onClick={() => void handlePublish()}
+                    disabled={publishing || job.status !== 'done'}
+                    title="יוצר קישור ציבורי להורדה עבור ManyChat"
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40"
+                  >
+                    {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+                    פרסם קישור ל-ManyChat
+                  </button>
+                )}
               </div>
+
+              {publishError && (
+                <p className="mb-3 rounded-lg border border-rose-400/30 bg-rose-500/[0.07] p-2 text-[12px] text-rose-300">
+                  פרסום נכשל: {publishError}
+                </p>
+              )}
+
+              {guide && (
+                <div className="mb-4 rounded-lg border border-emerald-400/30 bg-emerald-500/[0.06] p-3">
+                  <p className="mb-2 flex items-center gap-2 text-[12px] font-bold text-emerald-300">
+                    <LinkIcon className="h-3.5 w-3.5" />
+                    קישור ציבורי פעיל · פג ב-{new Date(guide.expiresAt).toLocaleDateString('he-IL')}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* readOnly + dir=ltr: this is a URL, and RTL would scramble how it reads. */}
+                    <input
+                      readOnly
+                      dir="ltr"
+                      value={guide.publicUrl}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="min-w-0 flex-1 rounded border border-white/15 bg-black/50 px-2 py-1.5 font-mono text-[11px] text-zinc-200"
+                    />
+                    <button
+                      onClick={() => void handleCopyLink()}
+                      className="flex cursor-pointer items-center gap-1.5 rounded border border-emerald-400/40 px-3 py-1.5 text-[12px] font-bold text-emerald-300 hover:bg-emerald-500/15"
+                    >
+                      {linkCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {linkCopied ? 'הועתק ✓' : 'העתק'}
+                    </button>
+                    <button
+                      onClick={() => void handleUnpublish()}
+                      disabled={publishing}
+                      title="מבטל את הקישור מיידית"
+                      className="flex cursor-pointer items-center gap-1.5 rounded border border-white/15 px-3 py-1.5 text-[12px] text-zinc-400 hover:bg-white/5 disabled:opacity-40"
+                    >
+                      <EyeOff className="h-3.5 w-3.5" />
+                      בטל פרסום
+                    </button>
+                  </div>
+                  <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">
+                    כל מי שמחזיק בקישור יכול להוריד את הקובץ — אין צורך בהזדהות. הדביקו אותו בכפתור
+                    External Request ב-ManyChat.
+                  </p>
+                </div>
+              )}
 
               {postText && (
                 <textarea
