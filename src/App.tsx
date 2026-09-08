@@ -47,6 +47,7 @@ import NewsArticlePage from './pages/NewsArticlePage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import AccessibilityPage from './pages/AccessibilityPage';
+import GuideDownloadPage from './pages/GuideDownloadPage';
 
 function RouteScrollManager() {
   const { pathname } = useLocation();
@@ -92,6 +93,24 @@ export default function App() {
       window.removeEventListener('open-agent-qualifier', handleQualifierOpen);
     };
   }, []);
+
+  // Public guide-download links render WITHOUT the site chrome: no header, ticker, footer, cookie
+  // banner, assistant widget or 3D scene. The visitor arrived by tapping a link in an Instagram DM
+  // on a phone and wants one file — every extra element is another thing to load over mobile data
+  // and another thing between them and the download button. The route still lives in this router so
+  // the SPA rewrite and <Link to="/"> back-navigation keep working.
+  if (/^\/(?:download|g)(?:\/|$)/.test(location.pathname)) {
+    return (
+      <div className="relative min-h-screen w-full bg-carbon-950 text-zinc-100 font-sans" dir="rtl">
+        <RouteScrollManager />
+        <Routes location={location}>
+          <Route path="/download" element={<GuideDownloadPage />} />
+          <Route path="/download/:guideId" element={<GuideDownloadPage />} />
+          <Route path="/g/:guideId" element={<GuideDownloadPage />} />
+        </Routes>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -99,9 +99,28 @@ export function useScrollRestoration() {
       currentPathRef.current = location.pathname;
     }
 
-    // Anchor links keep their existing behaviour.
+    // Anchor links keep their existing behaviour, but wait for the target to exist first.
+    //
+    // smoothScrollTo silently no-ops on a selector that matches nothing, and on a COLD load of a
+    // deep link like `/#contact-portal` the homepage's lower sections have not mounted by the time
+    // this effect runs — so the scroll was dropped and the visitor was left at the hero. Poll
+    // briefly for the element (covers lazy sections and webfont/image reflow), then scroll.
     if (location.hash) {
-      smoothScrollTo(location.hash);
+      let tries = 0;
+      const tryScroll = () => {
+        let el: Element | null = null;
+        try {
+          el = document.querySelector(location.hash);
+        } catch {
+          return; // malformed hash — not a selector we can use
+        }
+        if (el) {
+          smoothScrollTo(location.hash);
+          return;
+        }
+        if (++tries < 25) window.setTimeout(tryScroll, 100); // give up after ~2.5s
+      };
+      tryScroll();
       return;
     }
 
