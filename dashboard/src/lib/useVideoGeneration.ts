@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { VideoJobStatus, VideoProvider } from './agentTypes';
-import { getAdminSecret } from './adminSecret';
+import { getAdminSecret, reportAuthFailure } from './adminSecret';
 
 /** Mirrors src/agent/VideoGenerationEngine.ts's VideoScriptInput — accepts either the agent
  * queue's scene-by-scene script or the weekly plan's flatter body+visualCues script, since both
@@ -96,6 +96,7 @@ export function useVideoGeneration() {
           body: JSON.stringify({ script, topic, aspectRatio, provider, visualPrompt }),
         });
         const data = await res.json();
+        if (res.status === 401) reportAuthFailure('agent-generate');
         if (!res.ok || !data.ok) {
           setJobs((prev) => ({ ...prev, [key]: { status: 'error', error: data?.error || `request failed (${res.status})` } }));
           return;

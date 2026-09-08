@@ -27,6 +27,7 @@ import TechTipsStudio from './components/TechTipsStudio';
 import EmailManagerPanel from './components/EmailManagerPanel';
 import WeeklyPlanCalendar from './components/WeeklyPlanCalendar';
 import ErrorBoundary from './components/ErrorBoundary';
+import AdminAuthGate from './components/AdminAuthGate';
 
 type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'repurpose' | 'carousel-studio' | 'tech-tips' | 'ig-growth' | 'auto-publisher' | 'email' | 'weekly-plan';
 
@@ -285,6 +286,9 @@ export default function App() {
       </div>
 
       <PrintableLeadsReport leads={leads} />
+      {/* Surfaces one actionable re-auth prompt when the site API rejects x-admin-secret,
+          instead of letting each failing call raise its own raw 401 toast. */}
+      <AdminAuthGate />
     </div>
   );
 }

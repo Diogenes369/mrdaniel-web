@@ -11,7 +11,7 @@ import type {
   ReplyStyle,
 } from './igGrowthTypes';
 import { REPLY_META } from './igGrowthTypes';
-import { getAdminSecret } from './adminSecret';
+import { getAdminSecret, reportAuthFailure } from './adminSecret';
 
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
@@ -58,7 +58,12 @@ async function post(action: string, body: Record<string, unknown>, timeoutMs = 7
 
 function httpReason(status: number): string {
   if (status === 429) return 'מכסת ה-API של Gemini לשעה זו מוצתה (429)';
-  if (status === 401) return 'אימות מול /api/agent-generate נכשל (401)';
+  if (status === 401) {
+    // Surface one actionable re-auth prompt — the usual cause is a build-time
+    // secret that went stale after ADMIN_API_SECRET was rotated on the site.
+    reportAuthFailure('agent-generate');
+    return 'אימות מול /api/agent-generate נכשל (401)';
+  }
   if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת הריצה (503)';
   return `שרת ה-AI החזיר שגיאה ${status}`;
 }

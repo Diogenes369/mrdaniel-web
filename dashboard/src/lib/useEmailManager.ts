@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { onValue, ref, set, update, remove, query as dbQuery, limitToLast } from 'firebase/database';
 import { db } from '../firebase';
 import { SITE_ORIGIN } from './useDashboardRefresh';
-import { getAdminSecret } from './adminSecret';
+import { getAdminSecret, reportAuthFailure } from './adminSecret';
 
 
 const API = `${SITE_ORIGIN}/api/leads`;
@@ -168,6 +168,10 @@ export function useEmailManager() {
         if (res.status === 429) {
           const j = await res.json();
           return { ok: false, error: j.message ?? 'rate limited', retryAfterSeconds: j.retryAfterSeconds };
+        }
+        if (res.status === 401) {
+          reportAuthFailure('agent-generate');
+          return { ok: false, error: 'אימות מול /api/agent-generate נכשל (401)' };
         }
         return await res.json();
       } catch {

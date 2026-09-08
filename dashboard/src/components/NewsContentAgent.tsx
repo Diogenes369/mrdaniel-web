@@ -60,7 +60,7 @@ const PREVIEW_DIMS: Record<SlideFormat, { w: number; h: number }> = {
 import { SITE_ORIGIN } from '../lib/useDashboardRefresh';
 import CarouselStudioModal from './CarouselStudioModal';
 import type { ArticleInput } from '../lib/carouselBridge';
-import { getAdminSecret } from '../lib/adminSecret';
+import { getAdminSecret, reportAuthFailure } from '../lib/adminSecret';
 
 
 const CATEGORIES: NewsCategory[] = ['cyber', 'ai', 'tech', 'all'];
@@ -335,6 +335,7 @@ export default function NewsContentAgent() {
           category: item.category,
         }),
       });
+      if (res.status === 401) reportAuthFailure('agent-generate');
       const json = (await res.json()) as { ok?: boolean; message?: string; status?: string; provider?: string };
       setPublishResult({ ok: Boolean(json?.ok), message: json?.message ?? (json?.ok ? 'נשלח לפרסום / תזמון' : 'השליחה נכשלה'), status: json?.status, provider: json?.provider });
     } catch {

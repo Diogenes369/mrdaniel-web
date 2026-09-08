@@ -1,4 +1,5 @@
 import type { NewsItem, NewsTopic } from './newsAgentTypes';
+import { reportAuthFailure } from './adminSecret';
 
 /**
  * Universal slide-synthesis engine (text/data only — the canvas render lives in
@@ -420,7 +421,10 @@ async function requestSynthesis(
   );
 
   if (res.status === 429) throw new Error('מכסת ה-API החינמית של Gemini לשעה זו מוצתה (429) — נסו שוב מאוחר יותר או שדרגו את המפתח');
-  if (res.status === 401) throw new Error('אימות מול /api/agent-generate נכשל (401) — x-admin-secret חסר או לא תואם ל-ADMIN_API_SECRET באתר');
+  if (res.status === 401) {
+    reportAuthFailure('agent-generate'); // one shared prompt, not a raw toast per call
+    throw new Error('אימות מול /api/agent-generate נכשל (401) — x-admin-secret חסר או לא תואם ל-ADMIN_API_SECRET באתר');
+  }
   if (res.status === 503) throw new Error('GEMINI_API_KEY לא מוגדר בסביבת הריצה של האתר (503)');
   if (!res.ok) throw new Error(`שרת ה-AI החזיר שגיאה ${res.status}`);
 

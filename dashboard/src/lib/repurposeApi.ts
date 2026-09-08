@@ -1,5 +1,5 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
-import { getAdminSecret } from './adminSecret';
+import { getAdminSecret, reportAuthFailure } from './adminSecret';
 
 
 /** Shared POST helper with one bounded 429 retry (Gemini free-tier hourly cap). */
@@ -27,7 +27,12 @@ async function post(action: string, body: Record<string, unknown>): Promise<Resp
 
 function explain(status: number): string {
   if (status === 429) return 'מכסת ה-API החינמית של Gemini לשעה זו מוצתה (429) — נסו שוב מאוחר יותר.';
-  if (status === 401) return 'אימות מול /api/agent-generate נכשל (401) — בדקו את המפתח (localStorage.adminSecret או VITE_ADMIN_API_SECRET).';
+  if (status === 401) {
+    // Surface one actionable re-auth prompt — the usual cause is a build-time
+    // secret that went stale after ADMIN_API_SECRET was rotated on the site.
+    reportAuthFailure('agent-generate');
+    return 'אימות מול /api/agent-generate נכשל (401) — בדקו את המפתח (localStorage.adminSecret או VITE_ADMIN_API_SECRET).';
+  }
   if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת הריצה של האתר (503).';
   return `שרת ה-AI החזיר שגיאה ${status}.`;
 }

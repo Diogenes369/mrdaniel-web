@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { onValue, ref, set, update, query as dbQuery, limitToLast } from 'firebase/database';
 import { db } from '../firebase';
 import type { AgentConfig, AgentMode, AgentWebhookConfig, ContentFormat, Platform, QueueItem, LeadIntent, VideoScript } from './agentTypes';
-import { getAdminSecret } from './adminSecret';
+import { getAdminSecret, reportAuthFailure } from './adminSecret';
 
 // Unlike the main site (where the API and the page serving it are always same-origin), this
 // dashboard runs on its own dev-server origin (localhost:5174) with no deployed origin of its own
@@ -32,6 +32,12 @@ async function callAgentApi<T>(action: string, payload: Record<string, unknown> 
   // from. Every other non-OK status still throws, matching the existing "catch → show a generic
   // error" behavior at every call site.
   if (res.status === 429) return res.json();
+  // 401 gets its own branch: it is not a transient API error but a credential mismatch the operator
+  // can fix in place, so raise the shared re-auth prompt rather than a generic thrown error.
+  if (res.status === 401) {
+    reportAuthFailure('agent-generate');
+    throw new Error('אימות מול /api/agent-generate נכשל (401)');
+  }
   if (!res.ok) throw new Error(`agent api error: ${res.status}`);
   return res.json();
 }

@@ -1,4 +1,5 @@
 import { SITE_PROMO_FOOTER, type NewsItem, type NewsTopic, type SocialPlatform } from './newsAgentTypes';
+import { reportAuthFailure } from './adminSecret';
 import { stripMetaPhrases } from './storySlides';
 
 /**
@@ -385,7 +386,10 @@ export async function synthesizeNewsPost(
     res = await fetch(url, { method: 'POST', headers, body: reqBody });
   }
   if (res.status === 429) throw new Error('post-synthesize rate-limited (429) — Gemini free-tier hourly quota');
-  if (res.status === 401) throw new Error('post-synthesize unauthorized (401) — x-admin-secret missing/mismatched');
+  if (res.status === 401) {
+    reportAuthFailure('agent-generate'); // one shared prompt, not a raw toast per call
+    throw new Error('post-synthesize unauthorized (401) — x-admin-secret missing/mismatched');
+  }
   if (!res.ok) throw new Error(`post-synthesize responded ${res.status}`);
   const data = (await res.json()) as {
     ok?: boolean;

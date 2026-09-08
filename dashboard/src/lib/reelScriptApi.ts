@@ -1,7 +1,7 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import type { NewsItem } from './newsAgentTypes';
 import type { ReelScript, ReelScriptScene } from './agentTypes';
-import { getAdminSecret } from './adminSecret';
+import { getAdminSecret, reportAuthFailure } from './adminSecret';
 
 /**
  * Client lib for the "תסריט לרילס" (Reel Generator) mode in NewsContentAgent — article-grounded
@@ -50,7 +50,12 @@ async function post(body: Record<string, unknown>, timeoutMs = 75000): Promise<R
 
 function httpReason(status: number): string {
   if (status === 429) return 'מכסת ה-API של Gemini לשעה זו מוצתה (429)';
-  if (status === 401) return 'אימות מול /api/agent-generate נכשל (401)';
+  if (status === 401) {
+    // Surface one actionable re-auth prompt — the usual cause is a build-time
+    // secret that went stale after ADMIN_API_SECRET was rotated on the site.
+    reportAuthFailure('agent-generate');
+    return 'אימות מול /api/agent-generate נכשל (401)';
+  }
   if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת השרת (503)';
   return `שרת ה-AI החזיר שגיאה ${status}`;
 }

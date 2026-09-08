@@ -1,6 +1,6 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import type { ReelScript } from './agentTypes';
-import { getAdminSecret } from './adminSecret';
+import { getAdminSecret, reportAuthFailure } from './adminSecret';
 
 /**
  * Media & audio asset assembly for the Reel video compositor (Step B). For every beat in a
@@ -56,6 +56,7 @@ async function fetchPexelsImage(query: string): Promise<string | null> {
   try {
     const url = `${PEXELS_ENDPOINT}?${new URLSearchParams({ query, orientation: 'portrait' }).toString()}`;
     const res = await fetch(url, { headers: authHeaders(), signal: ctrl.signal });
+    if (res.status === 401) reportAuthFailure('agent-generate');
     if (!res.ok) return null;
     const data = (await res.json()) as { ok?: boolean; photoUrl?: string };
     return data.ok && data.photoUrl ? data.photoUrl : null;
@@ -77,6 +78,7 @@ async function fetchVoiceover(text: string): Promise<{ audioBase64: string; mime
       body: JSON.stringify({ action: 'reel-tts', text }),
       signal: ctrl.signal,
     });
+    if (res.status === 401) reportAuthFailure('agent-generate');
     if (!res.ok) return null;
     const data = (await res.json()) as { ok?: boolean; audioBase64?: string; mimeType?: string };
     if (!data.ok || !data.audioBase64) return null;
