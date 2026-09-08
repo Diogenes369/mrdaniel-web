@@ -1841,11 +1841,27 @@ app.post('/carousel/publish', async (req, res) => {
     ? job.slides.map((sl) => String(sl.headline || '').trim()).filter(Boolean).slice(0, 6)
     : [];
 
+  // Full per-slide copy, so the public landing page can render the guide's REAL content as an
+  // editorial article rather than padding a bare headline with invented prose. Everything here was
+  // already reviewed and composited onto the slide itself, so publishing it reveals nothing new.
+  const sections = Array.isArray(job?.slides)
+    ? job.slides.map((sl, i) => ({
+        index: i,
+        headline: String(sl.headline || '').trim(),
+        subhead: String(sl.subhead || '').trim(),
+        cards: (Array.isArray(sl.cards) ? sl.cards : [])
+          .map((c) => (typeof c === 'string' ? c : String(c?.text || '')).trim())
+          .filter(Boolean)
+          .slice(0, 4),
+      })).filter((sec) => sec.headline || sec.subhead || sec.cards.length)
+    : [];
+
   const record = {
     guideId,
     jobId: String(jobId),
     title: guideTitle,
     topics,
+    sections,
     zip: path.basename(zipPath),
     slides: slideFiles,
     pdf: pdfFile,
@@ -2024,6 +2040,7 @@ app.get('/public/guide/:guideId', (req, res) => {
     slides: rec.slides.length,
     hasPdf: Boolean(rec.pdf),
     topics: rec.topics || [],
+    sections: rec.sections || [],
     createdAt: rec.createdAt,
     expiresAt: rec.expiresAt,
     zipPath: `/public/download/${rec.guideId}`,

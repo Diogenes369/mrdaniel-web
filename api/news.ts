@@ -186,6 +186,7 @@ async function handleDownload(req: any, res: any) {
       slides?: number;
       hasPdf?: boolean;
       topics?: string[];
+      sections?: Array<{ index: number; headline: string; subhead: string; cards: string[] }>;
       createdAt?: number;
       expiresAt?: number;
     };
@@ -219,6 +220,9 @@ async function handleDownload(req: any, res: any) {
         // Slide headlines, when the bridge captured them at publish time. Absent for guides
         // published before this shipped — the landing page falls back rather than rendering empty.
         topics: Array.isArray(info.topics) ? info.topics : [],
+        // Real per-slide copy, when the bridge captured it at publish time. Drives the editorial
+        // body on the landing page; absent for guides published before this shipped.
+        sections: Array.isArray(info.sections) ? info.sections : [],
         createdAt: info.createdAt || null,
         expiresAt: info.expiresAt || null,
         downloadUrl: target,

@@ -1,40 +1,30 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
-  Download, FileText, ArrowLeft, ShieldCheck, Clock, Layers,
-  AlertTriangle, Loader2, MessageSquare, Check, Sparkles, Lock, Zap,
+  Download, FileText, ArrowLeft, ShieldCheck, Clock, AlertTriangle,
+  Loader2, MessageSquare, Check, Lock, BookOpen, Quote, FlaskConical,
 } from 'lucide-react';
 import Seo from '../components/seo/Seo';
+import { DEMO_GUIDE, DEMO_IDS, type GuideMeta, type GuideSection } from './guideDemoFixture';
 
 /**
  * Public guide download landing page — `/download/:guideId`, `/download?id=…`, `/g/:guideId`.
  *
- * Structure follows the editorial article skeleton of the reference page supplied for this design
- * (financy.open-finance.ai): eyebrow badge → dominant title → muted subtitle → metadata row →
- * hairline rule → body, all in one narrow centred column with generous vertical rhythm and no
- * decorative card chrome. That reference is a light text-only article with no preview image and no
- * conversion block, so the visual centrepiece, value grid and CTA pair below come from this site's
- * own brief; only the hero proportions and reading rhythm are borrowed.
+ * Structured as a full editorial article rather than a bare download card, following the reference
+ * supplied for this design (financy.open-finance.ai): H2 sections with generous top margin, a
+ * bolded lead-in clause opening each section, ~1.9 line-height body, inline emphasis, a spec table,
+ * and a persistent bottom conversion bar adapted from that page's sticky chat pill. The reference
+ * is a light text-only article with no preview imagery and no CTA block, so the visual
+ * interstitials and conversion sections here are this site's own; the reading rhythm is borrowed.
  *
- * The audience is someone who tapped a link in an Instagram DM on a phone, so this assumes a cold
- * visitor with no context. It is also deliberately `noindex`: every URL here is a per-recipient
- * capability token, and indexing one would publish a link handed to one person.
+ * The body renders the guide's REAL slide copy, captured by the bridge at publish time. It does not
+ * generate educational prose around a headline: that would mean fabricating claims about what a
+ * guide teaches, on a public page. Guides published before capture shipped degrade to a shorter
+ * format-led layout instead.
  *
- * Everything is read through the site's own `/api/download/*` router, never the bridge, so the
- * ephemeral tunnel hostname never reaches the browser. See PROJECT_STATE.md §5.
+ * Bare route (no site chrome) because the visitor tapped a link in an Instagram DM on a phone, and
+ * `noindex` because every URL here is a per-recipient capability token.
  */
-
-interface GuideMeta {
-  ok: boolean;
-  guideId: string;
-  title: string;
-  slides: number;
-  hasPdf: boolean;
-  /** Slide headlines captured at publish time. Empty for guides published before that shipped. */
-  topics: string[];
-  createdAt: number | null;
-  expiresAt: number | null;
-}
 
 type State =
   | { kind: 'loading' }
@@ -48,9 +38,7 @@ const GUIDE_ID_RE = /^[a-f0-9]{32}$/;
 /** Real anchor on the homepage — `#contact` does not exist, `<ContactPortal id="contact-portal">` does. */
 const CONSULT_HREF = '/#contact-portal';
 
-function apiUrl(guideId: string, query = ''): string {
-  return `/api/download/${guideId}${query}`;
-}
+const apiUrl = (guideId: string, query = '') => `/api/download/${guideId}${query}`;
 
 function formatDate(ts: number | null): string {
   if (!ts) return '';
@@ -65,16 +53,23 @@ function formatExpiry(ts: number | null): string {
   return `זמין עוד ${days} ימים`;
 }
 
+/** Reading time from the actual rendered copy — 200 Hebrew words/min, floored at 1. */
+function readingMinutes(sections: GuideSection[]): number {
+  const words = sections.reduce(
+    (n, s) => n + `${s.headline} ${s.subhead} ${s.cards.join(' ')}`.trim().split(/\s+/).length,
+    0
+  );
+  return Math.max(1, Math.round(words / 200));
+}
+
 /**
- * Guide badge derived from the title.
- *
- * The publish record carries no category field, so rather than invent one the badge is inferred
- * from words already in the title and falls back to a neutral label. A wrong-but-confident category
- * would be worse than a generic one.
+ * Guide badge derived from the title. The publish record carries no category field, so rather than
+ * invent one this reads words already in the title and falls back to a neutral label — a
+ * confidently wrong category would be worse than a generic one.
  */
 function guideBadge(title: string): string {
   const t = title.toLowerCase();
-  if (/סייבר|אבטח|פריצ|תקיפ|פגיעו|cyber|security/.test(t)) return 'מדריך סייבר';
+  if (/סייבר|אבטח|פריצ|תקיפ|פגיעו|injection|cyber|security/.test(t)) return 'מדריך סייבר';
   if (/אוטומצ|תהליך|workflow|automation/.test(t)) return 'מדריך אוטומציה';
   if (/ai|בינה מלאכותית|סוכן|agent|llm|gpt/.test(t)) return 'מדריך AI';
   return 'מדריך מעשי';
@@ -83,18 +78,17 @@ function guideBadge(title: string): string {
 export default function GuideDownloadPage() {
   const params = useParams();
   const [search] = useSearchParams();
-  // Three accepted shapes so a link survives being pasted from anywhere: /download/<id>, /g/<id>,
-  // and /download?id=<id>.
   const guideId = (params.guideId || search.get('id') || '').trim().toLowerCase();
 
   const [state, setState] = useState<State>({ kind: 'loading' });
-  const [coverFailed, setCoverFailed] = useState(false);
-  const [coverLoaded, setCoverLoaded] = useState(false);
 
   useEffect(() => {
     if (!guideId) return setState({ kind: 'noid' });
-    // Validated client-side too, so a malformed id renders the branded state instantly rather than
-    // after a pointless round trip.
+
+    // Demo short-circuits the API entirely so the full layout is reviewable with no live guide,
+    // no bridge and no tunnel.
+    if (DEMO_IDS.has(guideId)) return setState({ kind: 'ready', meta: DEMO_GUIDE });
+
     if (!GUIDE_ID_RE.test(guideId)) return setState({ kind: 'missing' });
 
     let alive = true;
@@ -115,7 +109,7 @@ export default function GuideDownloadPage() {
           });
         }
         const meta = (await res.json()) as GuideMeta;
-        if (alive) setState({ kind: 'ready', meta });
+        if (alive) setState({ kind: 'ready', meta: { ...meta, sections: meta.sections ?? [], topics: meta.topics ?? [] } });
       } catch {
         if (alive) setState({ kind: 'unavailable', detail: 'לא הצלחנו להתחבר לשירות ההורדות.' });
       }
@@ -128,7 +122,7 @@ export default function GuideDownloadPage() {
 
   const download = useCallback(
     (variant?: 'pdf') => {
-      // Plain navigation rather than fetch+blob: the API answers 302 and the bridge sends
+      // Plain navigation, not fetch+blob: the API answers 302 and the bridge sends
       // Content-Disposition, so the browser saves natively and a 5MB ZIP never enters page memory.
       window.location.href = apiUrl(guideId, variant === 'pdf' ? '?variant=pdf' : '');
     },
@@ -139,28 +133,18 @@ export default function GuideDownloadPage() {
     <div className="relative min-h-screen overflow-hidden bg-carbon-950" dir="rtl">
       <Seo
         title="הורדת מדריך | דניאל בן ברוך"
-        description="הורדת מדריך מקצועי בנושאי AI, סייבר ואוטומציה לעסקים."
+        description="מדריך מקצועי להורדה בנושאי AI, סייבר ואוטומציה לעסקים."
         path="/download"
         noindex
       />
       <CarbonMesh />
 
-      {/* Narrow single column, matching the reference's ~700px reading measure. */}
-      <main className="relative z-10 mx-auto w-full max-w-[46rem] px-5 py-10 sm:px-8 sm:py-16">
+      {/* ~700px measure, matching the reference's reading column. */}
+      <main className="relative z-10 mx-auto w-full max-w-[46rem] px-5 pt-10 pb-32 sm:px-8 sm:pt-16">
         <BrandMark />
 
         {state.kind === 'loading' && <LoadingBlock />}
-        {state.kind === 'ready' && (
-          <GuideView
-            meta={state.meta}
-            guideId={guideId}
-            coverFailed={coverFailed}
-            coverLoaded={coverLoaded}
-            onCoverError={() => setCoverFailed(true)}
-            onCoverLoad={() => setCoverLoaded(true)}
-            onDownload={download}
-          />
-        )}
+        {state.kind === 'ready' && <GuideArticle meta={state.meta} guideId={guideId} onDownload={download} />}
         {state.kind === 'missing' && (
           <ProblemBlock title="הקישור לא נמצא" body="הקישור שגוי או שהמדריך הוסר. אם קיבלתם אותו בהודעה, בקשו קישור מעודכן." />
         )}
@@ -175,38 +159,43 @@ export default function GuideDownloadPage() {
         )}
 
         <footer className="mt-14 border-t border-white/[0.07] pt-6 text-center">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-[13px] font-medium text-zinc-400 transition-colors hover:text-brand-400"
-          >
+          <Link to="/" className="inline-flex items-center gap-2 text-[13px] font-medium text-zinc-400 transition-colors hover:text-brand-400">
             <ArrowLeft className="h-3.5 w-3.5 rtl:rotate-180" />
             mrdaniel.co.il — סוכני AI, סייבר ואוטומציה לעסקים
           </Link>
         </footer>
       </main>
+
+      {state.kind === 'ready' && <StickyBar meta={state.meta} onDownload={download} />}
     </div>
   );
 }
 
-// ─── hero + body ────────────────────────────────────────────────────────────────────────────────
+// ─── article ────────────────────────────────────────────────────────────────────────────────────
 
-function GuideView({
-  meta, guideId, coverFailed, coverLoaded, onCoverError, onCoverLoad, onDownload,
+function GuideArticle({
+  meta, guideId, onDownload,
 }: {
   meta: GuideMeta;
   guideId: string;
-  coverFailed: boolean;
-  coverLoaded: boolean;
-  onCoverError: () => void;
-  onCoverLoad: () => void;
   onDownload: (variant?: 'pdf') => void;
 }) {
+  const sections = meta.sections ?? [];
+  const hasBody = sections.length > 0;
+  const minutes = useMemo(() => readingMinutes(sections), [sections]);
   const published = formatDate(meta.createdAt);
   const expiry = formatExpiry(meta.expiresAt);
 
   return (
     <article>
-      {/* HERO — eyebrow, dominant title, subtitle, metadata row, rule. */}
+      {meta.isDemo && (
+        <p className="mb-6 rounded-lg border border-amber-400/30 bg-amber-400/[0.07] px-3 py-2 text-[12px] text-amber-200">
+          <FlaskConical className="mb-0.5 ml-1.5 inline h-3.5 w-3.5" />
+          תצוגת דמו לבדיקת פריסה — התוכן לדוגמה בלבד ואין מאחוריו קובץ להורדה.
+        </p>
+      )}
+
+      {/* HERO */}
       <p className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 font-cyber text-[10px] tracking-[0.2em] text-brand-300 uppercase">
         <ShieldCheck className="h-3 w-3" />
         {guideBadge(meta.title)}
@@ -217,96 +206,126 @@ function GuideView({
       </h1>
 
       <p className="mt-4 text-[15px] leading-relaxed text-zinc-400 sm:text-base">
-        מדריך מעשי להורדה — {meta.slides} שקופיות, בפורמט {meta.hasPdf ? 'ZIP ו-PDF' : 'ZIP'}, מוכן
+        מדריך מעשי בפורמט קרוסלה — {meta.slides} שקופיות, {meta.hasPdf ? 'ZIP ו-PDF' : 'ZIP'}, מוכן
         לקריאה במובייל ולשיתוף בצוות.
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-zinc-500">
         <span className="font-semibold text-zinc-300">דניאל בן ברוך</span>
-        {published && (
-          <>
-            <span aria-hidden>·</span>
-            <span>{published}</span>
-          </>
-        )}
+        {published && (<><span aria-hidden>·</span><span>{published}</span></>)}
+        {hasBody && (<><span aria-hidden>·</span><span>{minutes} דק׳ קריאה</span></>)}
         <span aria-hidden>·</span>
         <span>{meta.slides} שקופיות</span>
         {expiry && (
-          <>
-            <span aria-hidden>·</span>
-            <span className="inline-flex items-center gap-1 text-brand-400">
-              <Clock className="h-3 w-3" />
-              {expiry}
-            </span>
-          </>
+          <><span aria-hidden>·</span>
+          <span className="inline-flex items-center gap-1 text-brand-400"><Clock className="h-3 w-3" />{expiry}</span></>
         )}
       </div>
 
       <hr className="my-8 border-white/[0.08]" />
 
-      {/* VISUAL CENTREPIECE */}
-      {!coverFailed && (
-        <div
-          className={`relative mb-10 overflow-hidden rounded-2xl border border-white/10 bg-carbon-800/50 ${
-            coverLoaded ? '' : 'aspect-[4/5] animate-pulse'
-          }`}
-        >
-          {/* Space reserved at the slides' native 4:5 until the image lands, then released so a
-              9:16 or 1:1 deck is not letterboxed. A full slide is ~1MB over the tunnel; without the
-              reservation the page visibly jumps under the reader's thumb as it arrives. */}
-          <img
-            src={`/api/download/${guideId}?variant=slide&n=1`}
-            alt={`עמוד השער של ${meta.title || 'המדריך'}`}
-            loading="eager"
-            onError={onCoverError}
-            onLoad={onCoverLoad}
-            className={`block h-auto w-full transition-opacity duration-500 ${
-              coverLoaded ? 'opacity-100' : 'absolute inset-0 opacity-0'
-            }`}
-          />
-          {coverLoaded && (
-            <span className="absolute bottom-3 left-3 rounded-md bg-black/70 px-2 py-1 font-cyber text-[10px] tracking-wider text-zinc-300 backdrop-blur-sm">
-              1 / {meta.slides}
-            </span>
-          )}
-        </div>
-      )}
+      {/* COVER */}
+      <SlidePreview guideId={guideId} n={1} total={meta.slides} eager isDemo={meta.isDemo} />
 
-      {/* VALUE PROPOSITION */}
-      <section className="mb-10">
-        <h2 className="mb-5 font-display text-lg font-bold text-white sm:text-xl">מה תמצאו במדריך</h2>
-
-        {meta.topics.length > 0 ? (
-          // Real per-guide topics: the slide headlines captured when the guide was published.
+      {/* EXECUTIVE SUMMARY */}
+      <section className="my-10 rounded-2xl border border-brand-500/25 bg-brand-500/[0.05] p-5 sm:p-6">
+        <h2 className="mb-4 flex items-center gap-2 font-display text-base font-bold text-brand-300">
+          <BookOpen className="h-4 w-4" />
+          מה תקבלו במדריך
+        </h2>
+        {hasBody ? (
           <ul className="space-y-2.5">
-            {meta.topics.map((topic, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-3 border-r-2 border-brand-500/40 bg-white/[0.02] py-2.5 pr-4 pl-3 text-[14px] leading-relaxed text-zinc-300"
-              >
+            {sections.map((s, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-[14px] leading-relaxed text-zinc-200">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
-                <span>{topic}</span>
+                <span>{s.headline}</span>
               </li>
             ))}
           </ul>
         ) : (
-          // Fallback for guides published before headline capture shipped. Describes the format,
-          // which is always true, rather than inventing subject matter this page cannot know.
-          <div className="grid gap-3 sm:grid-cols-3">
-            <ValueCard icon={<Layers className="h-4 w-4" />} title={`${meta.slides} שקופיות`} body="תוכן מרוכז, שקופית לנושא, בלי מילוי." />
-            <ValueCard icon={<Zap className="h-4 w-4" />} title="מעשי ליישום" body="צעדים ברורים שאפשר להריץ בעסק כבר השבוע." />
-            <ValueCard icon={<Sparkles className="h-4 w-4" />} title={meta.hasPdf ? 'ZIP + PDF' : 'ZIP'} body="תמונות לשיתוף ומסמך אחד לקריאה רציפה." />
-          </div>
+          <p className="text-[14px] leading-relaxed text-zinc-300">
+            {meta.slides} שקופיות מרוכזות, שקופית לנושא — תוכן מעשי שאפשר ליישם בעסק כבר השבוע,
+            בפורמט שנוח לקרוא בנייד ולהעביר הלאה בצוות.
+          </p>
         )}
       </section>
 
-      {/* CTA BLOCK */}
-      <section className="rounded-2xl border border-brand-500/25 bg-carbon-900/70 p-5 shadow-[0_0_60px_-20px_rgba(118,185,0,0.45)] backdrop-blur-xl sm:p-6">
+      {/* BODY — real guide copy. Interstitial previews every second section. */}
+      {hasBody &&
+        sections.map((s, i) => (
+          <section key={i} className="mt-11">
+            <h2 className="font-display text-xl leading-snug font-bold text-white sm:text-2xl">
+              {s.headline}
+            </h2>
+
+            {s.subhead && (
+              <p className="mt-3.5 text-[15px] leading-[1.9] text-zinc-300">
+                {/* Lead-in clause carries the section's weight, as in the reference. */}
+                <span className="font-semibold text-white">{leadClause(s.subhead)}</span>
+                {restClause(s.subhead)}
+              </p>
+            )}
+
+            {s.cards.length > 0 && (
+              <ul className="mt-5 space-y-2.5">
+                {s.cards.map((card, j) => (
+                  <li
+                    key={j}
+                    className="flex items-start gap-3 border-r-2 border-brand-500/40 bg-white/[0.02] py-2.5 pr-4 pl-3 text-[14px] leading-relaxed text-zinc-300"
+                  >
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                    <span>{card}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Pull-quote on the opening section, so the article has one moment of emphasis. */}
+            {i === 0 && s.cards[0] && (
+              <blockquote className="mt-6 border-r-2 border-brand-500 bg-brand-500/[0.04] py-3 pr-5 pl-4">
+                <Quote className="mb-1.5 h-4 w-4 text-brand-500/70" />
+                <p className="font-display text-[15px] leading-relaxed font-semibold text-zinc-100">{s.cards[0]}</p>
+              </blockquote>
+            )}
+
+            {/* Interstitial: the slide this section came from. Lazy — each is ~1MB over the tunnel. */}
+            {i > 0 && i % 2 === 0 && i < meta.slides && (
+              <figure className="mt-8">
+                <div className="mx-auto max-w-[17rem]">
+                  <SlidePreview guideId={guideId} n={i + 1} total={meta.slides} isDemo={meta.isDemo} compact />
+                </div>
+                <figcaption className="mt-2.5 text-center text-[11px] text-zinc-500">
+                  שקופית {i + 1} מתוך {meta.slides} — מתוך המדריך המלא
+                </figcaption>
+              </figure>
+            )}
+          </section>
+        ))}
+
+      {/* SPEC TABLE */}
+      <section className="mt-12">
+        <h2 className="mb-4 font-display text-lg font-bold text-white">מה בדיוק בקובץ</h2>
+        <dl className="overflow-hidden rounded-xl border border-white/10">
+          <SpecRow label="פורמט" value={meta.hasPdf ? 'ZIP (תמונות) + PDF' : 'ZIP (תמונות)'} />
+          <SpecRow label="שקופיות" value={`${meta.slides}`} />
+          <SpecRow label="שפה" value="עברית" />
+          <SpecRow label="הרשמה" value="לא נדרשת — הורדה ישירה" />
+          {expiry && <SpecRow label="זמינות הקישור" value={expiry} last />}
+        </dl>
+      </section>
+
+      {/* CONVERSION */}
+      <section className="mt-12 rounded-2xl border border-brand-500/25 bg-carbon-900/70 p-5 shadow-[0_0_60px_-20px_rgba(118,185,0,0.45)] backdrop-blur-xl sm:p-6">
         <span
           aria-hidden
           className="mb-5 block h-px w-full"
           style={{ background: 'linear-gradient(90deg, transparent, rgba(0,255,102,0.55), transparent)' }}
         />
+        <h2 className="mb-1.5 font-display text-lg font-extrabold text-white sm:text-xl">קחו את המדריך המלא</h2>
+        <p className="mb-5 text-[13px] leading-relaxed text-zinc-400">
+          כל {meta.slides} השקופיות באיכות מלאה, מוכנות לשמירה ולשיתוף.
+        </p>
+
         <button
           type="button"
           onClick={() => onDownload()}
@@ -345,14 +364,108 @@ function GuideView({
   );
 }
 
-function ValueCard({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
+/** Splits the first sentence off a paragraph so it can carry the section's weight in bold. */
+function leadClause(text: string): string {
+  const m = text.match(/^[^.!?]*[.!?]/);
+  return m ? m[0] : text;
+}
+function restClause(text: string): string {
+  return text.slice(leadClause(text).length);
+}
+
+function SpecRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-      <span className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/12 text-brand-400">
-        {icon}
-      </span>
-      <p className="mb-1 text-[13px] font-bold text-white">{title}</p>
-      <p className="text-[12px] leading-relaxed text-zinc-400">{body}</p>
+    <div className={`flex items-center justify-between gap-4 px-4 py-3 ${last ? '' : 'border-b border-white/[0.07]'}`}>
+      <dt className="text-[13px] text-zinc-500">{label}</dt>
+      <dd className="text-[13px] font-semibold text-zinc-200">{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * One carousel slide.
+ *
+ * Slides are 1-BASED on the bridge — n=0 is rejected. Space is reserved at the native 4:5 until the
+ * image lands and then released, so a 9:16 deck is not letterboxed and the article does not jump
+ * under the reader's thumb. Interstitials load lazily because each slide is ~1MB over the tunnel.
+ */
+function SlidePreview({
+  guideId, n, total, eager = false, isDemo = false, compact = false,
+}: {
+  guideId: string;
+  n: number;
+  total: number;
+  eager?: boolean;
+  isDemo?: boolean;
+  /** Inline figure inside the article body rather than the full-width cover. */
+  compact?: boolean;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // No such guide exists on the bridge in demo mode, so show the frame rather than a broken image.
+  if (isDemo) {
+    return (
+      <div
+        className={`flex aspect-[4/5] w-full items-center justify-center border border-dashed border-white/12 bg-carbon-800/40 ${
+          compact ? 'rounded-xl' : 'rounded-2xl'
+        }`}
+      >
+        <span className="font-cyber text-[10px] tracking-widest text-zinc-600 uppercase">
+          slide {n} / {total}
+        </span>
+      </div>
+    );
+  }
+  if (failed) return null;
+
+  return (
+    <div
+      className={`relative overflow-hidden border border-white/10 bg-carbon-800/50 ${
+        compact ? 'rounded-xl' : 'rounded-2xl'
+      } ${loaded ? '' : 'aspect-[4/5] animate-pulse'}`}
+    >
+      <img
+        src={`/api/download/${guideId}?variant=slide&n=${n}`}
+        alt={`שקופית ${n} מתוך ${total}`}
+        loading={eager ? 'eager' : 'lazy'}
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+        className={`block h-auto w-full transition-opacity duration-500 ${loaded ? 'opacity-100' : 'absolute inset-0 opacity-0'}`}
+      />
+      {loaded && !compact && (
+        <span className="absolute bottom-3 left-3 rounded-md bg-black/70 px-2 py-1 font-cyber text-[10px] tracking-wider text-zinc-300 backdrop-blur-sm">
+          {n} / {total}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Persistent bottom conversion bar, adapted from the reference's sticky chat pill.
+ *
+ * The article is long enough that the CTA scrolls out of reach, and this page has exactly one job.
+ * Hidden once the in-page CTA block is on screen would need an observer for little gain — it simply
+ * stays, sized so it never covers more than one line of body text.
+ */
+function StickyBar({ meta, onDownload }: { meta: GuideMeta; onDownload: (variant?: 'pdf') => void }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-brand-500/20 bg-carbon-950/90 px-4 py-3 backdrop-blur-lg">
+      <div className="mx-auto flex w-full max-w-[46rem] items-center gap-3">
+        <div className="hidden min-w-0 flex-1 sm:block">
+          <p className="truncate text-[13px] font-semibold text-zinc-200">{meta.title}</p>
+          <p className="text-[11px] text-zinc-500">{meta.slides} שקופיות · {meta.hasPdf ? 'ZIP + PDF' : 'ZIP'}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onDownload()}
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-3 text-sm font-extrabold text-carbon-950 transition-colors hover:bg-brand-400 sm:flex-none"
+        >
+          <Download className="h-4 w-4" />
+          הורד מדריך
+        </button>
+      </div>
     </div>
   );
 }
@@ -360,13 +473,13 @@ function ValueCard({ icon, title, body }: { icon: React.ReactNode; title: string
 // ─── chrome ─────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * Carbon mesh backdrop — two CSS gradients plus a green bloom. No canvas, no image request.
- * On a phone opening this from a DM the first paint is the whole experience, so the background must
- * cost nothing and must never be the reason the page looks broken on a slow connection.
+ * Carbon mesh backdrop — two CSS gradients plus a green bloom. No canvas, no image request. On a
+ * phone opening this from a DM the first paint is the whole experience, so the background must cost
+ * nothing and must never be the reason the page looks broken on a slow connection.
  */
 function CarbonMesh() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0">
+    <div aria-hidden className="pointer-events-none fixed inset-0">
       <div className="absolute inset-0 bg-carbon-950" />
       <div
         className="absolute inset-0 opacity-[0.35]"
@@ -421,3 +534,4 @@ function ProblemBlock({ title, body }: { title: string; body: string }) {
     </section>
   );
 }
+

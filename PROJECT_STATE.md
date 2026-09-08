@@ -540,7 +540,28 @@ contain most of the patterns a brief might assume from it. What was genuinely ex
 The preview centrepiece, value grid and CTA pair come from the site's own brief, **not** the
 reference. Don't re-derive them from that URL.
 
-### Structure
+### Structure (editorial rebuild)
+
+Hero (badge → title → subtitle → author · date · reading time · slides · expiry → rule) → full-width
+cover → **executive summary callout** → **body sections** → spec table → conversion block, with a
+**persistent bottom bar** (adapted from the reference's sticky chat pill).
+
+Each body section renders an H2, a lead paragraph whose first sentence is bolded to carry the
+section's weight, and bordered bullet rows; the opening section also gets a pull-quote. Interstitial
+slide previews appear every second section as **`max-w-[17rem]` inline figures with captions** — at
+full column width three 4:5 slides added ~2600px of image to a ~700px column and buried the text.
+
+**The body renders the guide's REAL slide copy** (`headline` / `subhead` / `cards`), captured by the
+bridge at publish time. It does not generate educational prose around a headline: on a public page
+that would be fabricating claims about what a guide teaches. Guides without captured sections fall
+back to a shorter format-led layout.
+
+**Demo view: `/download?id=demo`** (also `preview`, `sample`) renders `guideDemoFixture.ts` and
+short-circuits the API entirely, so the whole layout is reviewable with no live guide, no bridge and
+no tunnel. It shows a visible demo banner and framed slide placeholders so it can never be mistaken
+for a published artefact.
+
+### Route wiring
 
 Hero (badge → title → subtitle → metadata → rule) → 4:5 preview with `1 / N` counter → "מה תמצאו
 במדריך" → CTA block. Bare route (no header/ticker/footer/cookie banner/assistant/3D scene) via the
