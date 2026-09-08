@@ -26,7 +26,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +47,11 @@ for (const envFile of [path.join(__dirname, '.env'), path.join(REPO_ROOT, '.env'
     console.warn(`[carousel-bridge] could not read ${envFile}: ${err.message}`);
   }
 }
-const OUTPUT_ROOT = path.join(__dirname, 'output');
+// Overridable so the retention sweep and the public routes can be exercised against a scratch
+// directory without touching real job output.
+const OUTPUT_ROOT = process.env.CAROUSEL_OUTPUT_ROOT
+  ? path.resolve(process.env.CAROUSEL_OUTPUT_ROOT)
+  : path.join(__dirname, 'output');
 const RENDER_SCRIPT = path.join(REPO_ROOT, 'scripts', 'render_hebrew_banner.py');
 const COMPOSE_SCRIPT = path.join(REPO_ROOT, 'scripts', 'compose_slide.py');
 const PDF_SCRIPT = path.join(REPO_ROOT, 'scripts', 'compile_pdf.py');
@@ -92,11 +96,148 @@ const RENDER_FONT = process.env.RENDER_FONT || 'opensans';
 const DEFAULT_SLIDES = 4;
 const MAX_SLIDES = 8;
 
+const BUNDLE_SCRIPT = path.join(REPO_ROOT, 'scripts', 'make_bundle.py');
+/** Where published guides are registered. Public download IDs must survive a bridge restart, so
+ *  unlike `jobs` this map is persisted to disk. */
+const REGISTRY_PATH = path.join(OUTPUT_ROOT, 'published.json');
+/** Unpublished job directories are swept after this long. 48h by default. */
+const OUTPUT_RETENTION_MS = Number(process.env.OUTPUT_RETENTION_MS) || 48 * 60 * 60 * 1000;
+/** A PUBLISHED guide's lifetime. Its job directory is exempt from the sweep until this expires —
+ *  otherwise the 48h sweep would silently 404 a link already handed to a ManyChat subscriber. */
+const GUIDE_TTL_MS = Number(process.env.GUIDE_TTL_MS) || 7 * 24 * 60 * 60 * 1000;
+/** How often the sweep runs while the process is alive. */
+const PRUNE_INTERVAL_MS = Number(process.env.PRUNE_INTERVAL_MS) || 60 * 60 * 1000;
+/** Public origin this bridge is reachable at (the tunnel), used to build absolute download URLs. */
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+
 fs.mkdirSync(OUTPUT_ROOT, { recursive: true });
 
 /** jobId -> job record. In-memory by design: this is a single-user local tool, and the PNGs
  *  themselves are on disk under output/<jobId>/ so a restart loses status, not artwork. */
 const jobs = new Map();
+
+/** Public-download rate limiting. Declared here, beside `jobs`, because the startup retention
+ *  sweep also sweeps these buckets — a `const` declared further down is still in the temporal
+ *  dead zone at that point and throws on boot. */
+const PUBLIC_RATE_WINDOW_MS = Number(process.env.PUBLIC_RATE_WINDOW_MS) || 5 * 60 * 1000;
+const PUBLIC_RATE_MAX = Number(process.env.PUBLIC_RATE_MAX) || 60;
+/** clientKey -> timestamps of requests inside the current window. */
+const publicHits = new Map();
+
+/**
+ * guideId -> published guide record. Persisted, unlike `jobs`.
+ *
+ * A guideId is 32 hex chars (128 bits) from randomBytes, NOT the 8-char jobId. A public download
+ * link is an unauthenticated capability: anyone holding it gets the file, so the identifier has to
+ * be unguessable. The internal jobId is 32 bits and is handed around in dashboard URLs and logs —
+ * fine for a local tool, not fine as a public secret. The two namespaces stay separate, and
+ * nothing is reachable publicly until it is explicitly published.
+ */
+const published = new Map();
+
+function loadRegistry() {
+  try {
+    if (!fs.existsSync(REGISTRY_PATH)) return;
+    const raw = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
+    for (const [guideId, rec] of Object.entries(raw || {})) published.set(guideId, rec);
+    console.log(`[carousel-bridge] loaded ${published.size} published guide(s)`);
+  } catch (err) {
+    console.warn(`[carousel-bridge] could not read registry: ${err.message}`);
+  }
+}
+
+function saveRegistry() {
+  try {
+    const obj = Object.fromEntries(published);
+    fs.writeFileSync(`${REGISTRY_PATH}.tmp`, JSON.stringify(obj, null, 2), 'utf8');
+    fs.renameSync(`${REGISTRY_PATH}.tmp`, REGISTRY_PATH); // atomic-ish: no torn reads
+  } catch (err) {
+    console.warn(`[carousel-bridge] could not write registry: ${err.message}`);
+  }
+}
+
+/** jobIds that must survive the sweep because a live public link points at them. */
+function protectedJobIds(now = Date.now()) {
+  const keep = new Set();
+  for (const rec of published.values()) if (rec.expiresAt > now) keep.add(rec.jobId);
+  return keep;
+}
+
+/**
+ * Retention sweep: drops expired guide registrations, then deletes job directories that no live
+ * guide depends on and that are older than OUTPUT_RETENTION_MS.
+ *
+ * Directory mtime is the age signal, not the in-memory job record — job status dies with the
+ * process while the artwork does not, so after a restart the filesystem is the only thing that
+ * still knows how old a job is.
+ */
+function pruneOutput() {
+  const now = Date.now();
+  sweepRateBuckets(now); // same timer: a limiter map that only grows is its own denial of service
+  let droppedGuides = 0;
+  for (const [guideId, rec] of published) {
+    if (rec.expiresAt <= now) {
+      published.delete(guideId);
+      droppedGuides++;
+    }
+  }
+  if (droppedGuides) saveRegistry();
+
+  const keep = protectedJobIds(now);
+  let removed = 0;
+  let freed = 0;
+  let entries = [];
+  try {
+    entries = fs.readdirSync(OUTPUT_ROOT, { withFileTypes: true });
+  } catch (err) {
+    console.warn(`[carousel-bridge] sweep could not read output root: ${err.message}`);
+    return { removed, freed, droppedGuides };
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue; // published.json and friends are files — never touched
+    if (keep.has(entry.name)) continue;
+    const dir = path.join(OUTPUT_ROOT, entry.name);
+    try {
+      const age = now - fs.statSync(dir).mtimeMs;
+      if (age < OUTPUT_RETENTION_MS) continue;
+      // An in-flight job must never have its directory pulled out from under it.
+      const job = jobs.get(entry.name);
+      if (job && !['done', 'error'].includes(job.status)) continue;
+      freed += dirSize(dir);
+      fs.rmSync(dir, { recursive: true, force: true });
+      jobs.delete(entry.name);
+      removed++;
+    } catch (err) {
+      console.warn(`[carousel-bridge] sweep could not remove ${entry.name}: ${err.message}`);
+    }
+  }
+  if (removed || droppedGuides) {
+    console.log(
+      `[carousel-bridge] sweep: removed ${removed} dir(s), ${(freed / 1048576).toFixed(1)} MB, `
+      + `expired ${droppedGuides} guide(s)`
+    );
+  }
+  return { removed, freed, droppedGuides };
+}
+
+/** Recursive byte total, best-effort — only used for the sweep's log line. */
+function dirSize(dir) {
+  let total = 0;
+  try {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      total += e.isDirectory() ? dirSize(full) : fs.statSync(full).size;
+    }
+  } catch {
+    /* best effort */
+  }
+  return total;
+}
+
+loadRegistry();
+pruneOutput(); // sweep once at startup, then on a timer
+setInterval(pruneOutput, PRUNE_INTERVAL_MS).unref();
 
 // --- helpers ----------------------------------------------------------------------------------
 
@@ -1416,7 +1557,12 @@ app.use((req, res, next) => {
   // Reflect only allow-listed origins. `*` is deliberately NOT used: with a tunnel in front, any
   // web page could otherwise drive Hermes on this machine from a visitor's browser.
   const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+  // Public download routes are world-readable by design (ManyChat, mail clients and link previews
+  // all fetch with no Origin or an unpredictable one). Everything else stays on the allow-list:
+  // those routes can reach Hermes, and `*` there would let any web page drive this machine.
+  if (req.path.startsWith('/public/')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   } else if (!origin) {
@@ -1633,6 +1779,289 @@ app.post('/carousel/redesign', async (req, res) => {
       console.error(`[carousel-bridge] redesign ${job.id} failed:`, err.message);
     }
   })();
+});
+
+/**
+ * Publish a finished job as a public guide.
+ *
+ * Token-gated: minting a public link is an admin action. It is the ONLY way anything under
+ * output/ becomes reachable without a token, which keeps the public surface an explicit,
+ * per-guide decision rather than a property of the whole directory.
+ */
+app.post('/carousel/publish', async (req, res) => {
+  const { jobId, ttlHours, title } = req.body ?? {};
+  if (!/^[a-f0-9]{8}$/i.test(String(jobId || ''))) {
+    return res.status(400).json({ ok: false, error: 'valid jobId required' });
+  }
+  const job = jobs.get(jobId);
+  const jobDir = path.join(OUTPUT_ROOT, String(jobId));
+
+  // A job the registry no longer holds in memory (bridge restarted) is still publishable as long
+  // as its directory has slides — the artwork outlives the process, so publishing should too.
+  if (!fs.existsSync(jobDir)) return res.status(404).json({ ok: false, error: 'job not found' });
+  if (job && !['done', 'error'].includes(job.status)) {
+    return res.status(409).json({ ok: false, error: `job is still ${job.status}` });
+  }
+
+  const guideId = randomBytes(16).toString('hex'); // 128 bits
+  const zipPath = path.join(jobDir, `guide-${guideId}.zip`);
+  const caption = [job?.post?.body || '', (job?.post?.hashtags || []).join(' ')]
+    .filter(Boolean).join('\n\n');
+  const guideTitle = String(title || job?.article?.title || 'guide').slice(0, 120);
+
+  try {
+    await run(
+      PYTHON,
+      [BUNDLE_SCRIPT, '--dir', jobDir, '--out', zipPath, '--caption', caption, '--title', guideTitle],
+      { timeoutMs: 120_000 }
+    );
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: `bundling failed: ${err.message}` });
+  }
+  if (!fs.existsSync(zipPath)) {
+    return res.status(500).json({ ok: false, error: 'bundler produced no archive' });
+  }
+
+  const hours = Number(ttlHours);
+  const ttl = Number.isFinite(hours) && hours > 0
+    ? Math.min(hours, 24 * 365) * 3600_000
+    : GUIDE_TTL_MS;
+
+  // Slide filenames are recorded at publish time so the public file route can validate against a
+  // known list instead of ever joining a caller-supplied path onto the output root.
+  const dirFiles = fs.readdirSync(jobDir);
+  const slideFiles = dirFiles.filter((f) => /^slide_\d{2}\.png$/.test(f)).sort();
+  const pdfFile = dirFiles.find((f) => /^carousel-.+\.pdf$/.test(f)) || null;
+
+  // Slide headlines captured at publish time so the public landing page can list what the guide
+  // actually covers. Read from the job record, which only exists in memory — a guide published
+  // after a bridge restart has no headlines available and the page falls back to generic value
+  // points rather than showing an empty section.
+  const topics = Array.isArray(job?.slides)
+    ? job.slides.map((sl) => String(sl.headline || '').trim()).filter(Boolean).slice(0, 6)
+    : [];
+
+  const record = {
+    guideId,
+    jobId: String(jobId),
+    title: guideTitle,
+    topics,
+    zip: path.basename(zipPath),
+    slides: slideFiles,
+    pdf: pdfFile,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + ttl,
+  };
+  published.set(guideId, record);
+  saveRegistry();
+
+  res.json({
+    ok: true,
+    guideId,
+    expiresAt: record.expiresAt,
+    slides: slideFiles.length,
+    downloadPath: `/public/download/${guideId}`,
+    downloadUrl: PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL}/public/download/${guideId}` : null,
+  });
+});
+
+/** Revoke a published guide immediately. Token-gated — unpublishing is an admin action too. */
+app.post('/carousel/unpublish', (req, res) => {
+  const guideId = String(req.body?.guideId || '');
+  if (!published.has(guideId)) {
+    return res.status(404).json({ ok: false, error: 'guide not found' });
+  }
+  published.delete(guideId);
+  saveRegistry();
+  res.json({ ok: true, revoked: guideId });
+});
+
+/** Published guides, for the dashboard. Token-gated: this is the index the public must not have. */
+app.get('/carousel/published', (_req, res) => {
+  const now = Date.now();
+  res.json({
+    ok: true,
+    guides: [...published.values()]
+      .filter((r) => r.expiresAt > now)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((r) => ({
+        guideId: r.guideId, jobId: r.jobId, title: r.title, slides: r.slides.length,
+        hasPdf: Boolean(r.pdf), createdAt: r.createdAt, expiresAt: r.expiresAt,
+        downloadPath: `/public/download/${r.guideId}`,
+      })),
+  });
+});
+
+// --- public, unauthenticated read-only surface ------------------------------------------------
+//
+// Everything below is reachable with no token. Three rules hold it safe:
+//   1. Only a 32-hex guideId is accepted, and it must already be in the registry — an unpublished
+//      job is not addressable here at all.
+//   2. No caller-supplied string is ever joined onto a filesystem path. Filenames come from the
+//      registry record captured at publish time and are re-validated before use.
+//   3. Expired guides answer 410 and serve nothing.
+
+/**
+ * Sliding-window rate limiter for the public download surface.
+ *
+ * These routes are the only unauthenticated way into this process, and they serve multi-megabyte
+ * files off a home connection — an external script looping on a leaked guideId would saturate the
+ * uplink long before it exhausted anything else. The budget is per client, generous enough that a
+ * human clicking through a guide never notices and a link preview fetching metadata never trips it.
+ *
+ * In-memory and per-process by design: the bridge is a single instance, so a shared store would add
+ * a dependency for no gain. The bucket map is swept on the same timer as everything else, because a
+ * limiter that grows one entry per attacker IP is itself the denial of service.
+ */
+
+/**
+ * Identifies the caller behind the tunnel.
+ *
+ * Every request arrives from cloudflared on loopback, so the socket address is the same for
+ * everyone and useless as a key. Cloudflare overwrites `CF-Connecting-IP` on the way in, which
+ * makes it the one forwarded header a client cannot forge here. `X-Forwarded-For` is only consulted
+ * as a fallback and only its first hop; the socket address is the last resort, which is also the
+ * correct answer for a direct loopback caller.
+ */
+function clientKey(req) {
+  const cf = req.get('cf-connecting-ip');
+  if (cf) return cf.trim();
+  const xff = req.get('x-forwarded-for');
+  if (xff) return xff.split(',')[0].trim();
+  return req.socket.remoteAddress || 'unknown';
+}
+
+function sweepRateBuckets(now = Date.now()) {
+  for (const [key, hits] of publicHits) {
+    const live = hits.filter((t) => now - t < PUBLIC_RATE_WINDOW_MS);
+    if (live.length === 0) publicHits.delete(key);
+    else publicHits.set(key, live);
+  }
+}
+
+app.use('/public', (req, res, next) => {
+  const now = Date.now();
+  const key = clientKey(req);
+  const hits = (publicHits.get(key) || []).filter((t) => now - t < PUBLIC_RATE_WINDOW_MS);
+
+  if (hits.length >= PUBLIC_RATE_MAX) {
+    // Retry-After is computed from the OLDEST hit in the window — that is the moment a slot frees.
+    const retryAfter = Math.max(1, Math.ceil((PUBLIC_RATE_WINDOW_MS - (now - hits[0])) / 1000));
+    publicHits.set(key, hits);
+    res.setHeader('Retry-After', String(retryAfter));
+    res.setHeader('X-RateLimit-Limit', String(PUBLIC_RATE_MAX));
+    res.setHeader('X-RateLimit-Remaining', '0');
+    console.warn(`[carousel-bridge] rate limited ${key} on ${req.path}`);
+    return res.status(429).json({ ok: false, error: 'too many requests', retryAfter });
+  }
+
+  hits.push(now);
+  publicHits.set(key, hits);
+  res.setHeader('X-RateLimit-Limit', String(PUBLIC_RATE_MAX));
+  res.setHeader('X-RateLimit-Remaining', String(PUBLIC_RATE_MAX - hits.length));
+  next();
+});
+
+const GUIDE_ID_RE = /^[a-f0-9]{32}$/;
+
+/** Resolves a guide, or writes the correct error response and returns null. */
+function resolveGuide(req, res) {
+  const guideId = String(req.params.guideId || '');
+  if (!GUIDE_ID_RE.test(guideId)) {
+    res.status(400).json({ ok: false, error: 'malformed guide id' });
+    return null;
+  }
+  const rec = published.get(guideId);
+  // Unknown and expired answer distinctly: a subscriber whose link aged out deserves to be told it
+  // expired rather than that it never existed.
+  if (!rec) {
+    res.status(404).json({ ok: false, error: 'guide not found' });
+    return null;
+  }
+  if (rec.expiresAt <= Date.now()) {
+    published.delete(guideId);
+    saveRegistry();
+    res.status(410).json({ ok: false, error: 'guide expired' });
+    return null;
+  }
+  return rec;
+}
+
+/** Sends one file from a guide's directory with download headers. */
+function sendGuideFile(res, rec, filename, downloadName, disposition = 'attachment') {
+  const root = path.resolve(OUTPUT_ROOT, rec.jobId);
+  const full = path.resolve(root, filename);
+  // Defence in depth: even though `filename` came from the registry, confirm the resolved path is
+  // still inside the job directory before opening it.
+  if (full !== root && !full.startsWith(root + path.sep)) {
+    return res.status(400).json({ ok: false, error: 'invalid path' });
+  }
+  if (!fs.existsSync(full)) {
+    return res.status(404).json({ ok: false, error: 'file is no longer available' });
+  }
+  // RFC 6266/5987. A header value is Latin-1, so a Hebrew title cannot ride in `filename=` — it
+  // silently degrades to dashes. Send an ASCII-folded name for old clients AND `filename*` with the
+  // real UTF-8 name percent-encoded, which every current browser prefers.
+  const asciiName = downloadName.replace(/[^ -~]/g, '').replace(/[\\"]/g, '').trim()
+    || `guide-${rec.guideId.slice(0, 8)}${path.extname(downloadName)}`;
+  res.setHeader(
+    'Content-Disposition',
+    `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`
+  );
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.sendFile(full);
+}
+
+/** Metadata only — lets the site's /api/download route answer without proxying the bytes. */
+app.get('/public/guide/:guideId', (req, res) => {
+  const rec = resolveGuide(req, res);
+  if (!rec) return;
+  res.json({
+    ok: true,
+    guideId: rec.guideId,
+    title: rec.title,
+    slides: rec.slides.length,
+    hasPdf: Boolean(rec.pdf),
+    topics: rec.topics || [],
+    createdAt: rec.createdAt,
+    expiresAt: rec.expiresAt,
+    zipPath: `/public/download/${rec.guideId}`,
+  });
+});
+
+/** The ZIP bundle — the main public artefact. */
+app.get('/public/download/:guideId', (req, res) => {
+  const rec = resolveGuide(req, res);
+  if (!rec) return;
+  const safeTitle = (rec.title || 'guide').replace(/[^\p{L}\p{N}_-]+/gu, '-').slice(0, 60) || 'guide';
+  sendGuideFile(res, rec, rec.zip, `${safeTitle}-${rec.guideId.slice(0, 8)}.zip`);
+});
+
+/** The LinkedIn document PDF, when the job produced one. */
+app.get('/public/download/:guideId/pdf', (req, res) => {
+  const rec = resolveGuide(req, res);
+  if (!rec) return;
+  if (!rec.pdf) return res.status(404).json({ ok: false, error: 'this guide has no PDF' });
+  sendGuideFile(res, rec, rec.pdf, `${rec.guideId.slice(0, 8)}.pdf`);
+});
+
+/** One slide by 1-based position. An index, never a filename — the caller never names a path. */
+app.get('/public/download/:guideId/slide/:n', (req, res) => {
+  const rec = resolveGuide(req, res);
+  if (!rec) return;
+  const n = Number(req.params.n);
+  if (!Number.isInteger(n) || n < 1 || n > rec.slides.length) {
+    return res.status(404).json({ ok: false, error: `slide out of range (1-${rec.slides.length})` });
+  }
+  const filename = rec.slides[n - 1];
+  if (!/^slide_\d{2}\.png$/.test(filename)) {
+    return res.status(500).json({ ok: false, error: 'corrupt registry entry' });
+  }
+  // `inline`, not `attachment`: this route feeds the <img> on the public landing page. Desktop
+  // browsers ignore Content-Disposition on a subresource, but in-app webviews (Instagram's
+  // especially — the main referrer for these links) are not reliable about that.
+  sendGuideFile(res, rec, filename, `slide-${String(n).padStart(2, '0')}.png`, 'inline');
 });
 
 app.use('/carousel/file', express.static(OUTPUT_ROOT, { maxAge: '1h' }));

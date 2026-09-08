@@ -4,6 +4,7 @@
     { "source": "/api/news", "destination": "/api/news.ts" },
     { "source": "/api/news/item/:slug", "destination": "/api/news-item.ts?slug=:slug" },
     { "source": "/api/news/analyze", "destination": "/api/news.ts?action=analyze" },
+    { "source": "/api/download/:guideId", "destination": "/api/news.ts?action=download&guideId=:guideId" },
     { "source": "/api/ai-news", "destination": "/api/ai-news.ts" },
     { "source": "/api/leads", "destination": "/api/leads.ts" },
     { "source": "/api/chat", "destination": "/api/chat.ts" },

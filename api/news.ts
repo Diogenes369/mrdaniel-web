@@ -25,6 +25,13 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+  // `GET /api/download/:guideId` is rewritten here as `?action=download&guideId=...` (vercel.json).
+  // Checked before the analyze branch because that branch claims every POST.
+  if (req.query?.action === 'download') {
+    await handleDownload(req, res);
+    return;
+  }
+
   if (req.query?.action === 'analyze' || req.method === 'POST') {
     await handleAnalyze(req, res);
     return;
@@ -102,5 +109,129 @@ function safeParse(raw: string): Record<string, unknown> {
     return JSON.parse(raw);
   } catch {
     return {};
+  }
+}
+
+/**
+ * `GET /api/download/:guideId` — public, unauthenticated guide download.
+ *
+ * Lives inside this function rather than in `api/download.ts` because the Hobby plan caps a
+ * deployment at 12 Serverless Functions and `api/` is already at exactly 12; a new file would fail
+ * the build. Same reason `?action=analyze` is hosted here.
+ *
+ * This is a ROUTER, not a proxy. It resolves the guide's metadata on the bridge and then 302s the
+ * client at the bridge's own public file route, so the bytes never traverse a Vercel function —
+ * a 60s maxDuration and a serverless response cap make proxying a multi-megabyte ZIP a bad idea,
+ * and the bridge already serves the file with the right Content-Disposition.
+ *
+ * Deliberately requires NO x-admin-secret: a ManyChat button, a mail client and a link preview all
+ * fetch this with no credentials. The security model is the guideId itself — 128 random bits minted
+ * per publish, holding nothing but that one guide. The admin secret must never be required here,
+ * and must never be *accepted* here either: this path grants no privilege.
+ */
+async function handleDownload(req: any, res: any) {
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.status(405).json({ ok: false, error: 'method not allowed' });
+    return;
+  }
+
+  const guideId = String(req.query?.guideId || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{32}$/.test(guideId)) {
+    res.status(400).json({ ok: false, error: 'malformed guide id' });
+    return;
+  }
+
+  const bridge = String(process.env.CAROUSEL_BRIDGE_URL || '').replace(/\/$/, '');
+  if (!bridge) {
+    // A misconfigured server must not look like a missing guide.
+    res.status(503).json({ ok: false, error: 'download service is not configured' });
+    return;
+  }
+
+  // Never cache a negative or a redirect target: the bridge sits behind an ephemeral quick-tunnel
+  // whose hostname changes on every restart, so a cached 302 would outlive the URL it points at.
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    // Resolve metadata first so we can answer 404/410 accurately instead of bouncing the client to
+    // a URL that will fail. `variant` picks which artefact the redirect targets.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    let meta: Response;
+    try {
+      meta = await fetch(`${bridge}/public/guide/${guideId}`, { signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (meta.status === 404) {
+      res.status(404).json({ ok: false, error: 'guide not found' });
+      return;
+    }
+    if (meta.status === 410) {
+      res.status(410).json({ ok: false, error: 'this download link has expired' });
+      return;
+    }
+    if (!meta.ok) {
+      res.status(502).json({ ok: false, error: 'download service returned an error' });
+      return;
+    }
+
+    const info = (await meta.json()) as {
+      title?: string;
+      slides?: number;
+      hasPdf?: boolean;
+      topics?: string[];
+      createdAt?: number;
+      expiresAt?: number;
+    };
+
+    const variant = String(req.query?.variant || 'zip').toLowerCase();
+    let target = `${bridge}/public/download/${guideId}`;
+    if (variant === 'pdf') {
+      if (!info.hasPdf) {
+        res.status(404).json({ ok: false, error: 'this guide has no PDF' });
+        return;
+      }
+      target += '/pdf';
+    } else if (variant === 'slide') {
+      const n = Number(req.query?.n || 1);
+      if (!Number.isInteger(n) || n < 1 || n > Number(info.slides || 0)) {
+        res.status(404).json({ ok: false, error: 'slide out of range' });
+        return;
+      }
+      target += `/slide/${n}`;
+    }
+
+    // `?meta=1` answers with JSON instead of redirecting — lets a ManyChat flow show the title and
+    // slide count before it offers the file.
+    if (String(req.query?.meta || '') === '1') {
+      res.status(200).json({
+        ok: true,
+        guideId,
+        title: info.title || '',
+        slides: info.slides || 0,
+        hasPdf: Boolean(info.hasPdf),
+        // Slide headlines, when the bridge captured them at publish time. Absent for guides
+        // published before this shipped — the landing page falls back rather than rendering empty.
+        topics: Array.isArray(info.topics) ? info.topics : [],
+        createdAt: info.createdAt || null,
+        expiresAt: info.expiresAt || null,
+        downloadUrl: target,
+      });
+      return;
+    }
+
+    res.status(302).setHeader('Location', target);
+    res.end();
+  } catch (err) {
+    // An unreachable bridge (tunnel down, laptop asleep) is a 503, not a 404 — the guide may well
+    // exist. Saying "not found" here would send someone hunting for a link that is actually fine.
+    console.error('[api/news?action=download] bridge unreachable:', err);
+    res.status(503).json({ ok: false, error: 'download service is temporarily unavailable' });
   }
 }
