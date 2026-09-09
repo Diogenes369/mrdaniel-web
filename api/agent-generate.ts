@@ -1,5 +1,6 @@
-import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck } from '../src/agent/SocialAgentEngine.js';
+import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck, synthesizeThreadDeck } from '../src/agent/SocialAgentEngine.js';
 import { importUrlContent } from '../src/server/contentImport.js';
+import { importThreadContent, parseThreadRawText, isThreadsUrl } from '../src/server/threadsImport.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
 import { pushQueueItem, readAgentMode, readAgentWebhooks, readStrategicContext, writeAutoPilotRunTimestamp, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
@@ -380,6 +381,68 @@ export default async function handler(req: any, res: any) {
       const deck = await synthesizeTechTipDeck({ topic, notes: typeof notes === 'string' ? notes : undefined });
       // Code is excluded from the output guard on purpose: sanitizeOutput's heuristics flag ordinary
       // source (URLs, key-like identifiers) as leaks. The Hebrew prose is what gets checked.
+      const prose = deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
+      const security = sanitizeOutput(prose);
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, deck });
+      return;
+    }
+
+    if (action === 'parse-thread') {
+      // Threads → carousel, step 1. Deliberately never fails on a blocked/gated post: it answers
+      // 200 with ok:false + a note, and the dashboard switches to the manual-paste path. `rawText`
+      // alone (no fetch at all) is a first-class input, used when the operator pastes the thread.
+      const { url, rawText } = req.body ?? {};
+      const pastedText = typeof rawText === 'string' ? rawText.trim() : '';
+      const rawTarget = typeof url === 'string' ? url.trim() : '';
+
+      if (!pastedText && !rawTarget) {
+        res.status(400).json({ ok: false, error: 'url or rawText required' });
+        return;
+      }
+
+      const thread = pastedText
+        ? parseThreadRawText(pastedText, rawTarget)
+        : isThreadsUrl(rawTarget)
+          ? await importThreadContent(rawTarget)
+          : null;
+
+      if (!thread) {
+        res.status(400).json({ ok: false, error: 'valid threads.net / threads.com post url required' });
+        return;
+      }
+
+      const security = sanitizeOutput(thread.text.slice(0, 6000));
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, thread });
+      return;
+    }
+
+    if (action === 'thread-deck') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { posts, author, sourceUrl, notes } = req.body ?? {};
+      const cleanPosts = (Array.isArray(posts) ? posts : []).map((p: unknown) => String(p ?? '').trim()).filter(Boolean);
+      if (cleanPosts.join('\n').length < 40) {
+        res.status(400).json({ ok: false, error: 'posts (>= 40 chars total) required' });
+        return;
+      }
+      const deck = await synthesizeThreadDeck({
+        posts: cleanPosts.slice(0, 30),
+        author: typeof author === 'string' ? author.slice(0, 60) : undefined,
+        sourceUrl: typeof sourceUrl === 'string' ? sourceUrl.slice(0, 300) : undefined,
+        notes: typeof notes === 'string' ? notes.slice(0, 600) : undefined,
+      });
+      // Same carve-out as tech-tip-deck: the guard's heuristics flag ordinary source code as a
+      // leak, so only the Hebrew prose is checked.
       const prose = deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
       const security = sanitizeOutput(prose);
       if (!security.passed) {

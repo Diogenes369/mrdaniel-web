@@ -1475,3 +1475,181 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
     hashtags: hashtags.length ? hashtags : ['#פיתוח', '#AI', '#קוד', '#כלים_למפתחים'],
   };
 }
+
+// --- Threads → Hebrew carousel — translate & adapt an imported thread -------------------------
+// Powers the dashboard's "יבוא מ-Threads" tab. The source here is a REAL thread someone else
+// wrote (usually English), so unlike synthesizeTechTipDeck — which invents a guide from a topic —
+// this is a translation/adaptation job: every claim must come from the thread, and the output is
+// a TechTipDeck so the whole existing Tech-Tips render/export pipeline applies unchanged.
+
+/** Hard caps the deck contract promises. Enforced in code, not only in the prompt. */
+const THREAD_DECK_LIMITS = { titleWords: 8, bodyWords: 30, bullets: 4, bulletWords: 8 } as const;
+
+/** Trim to at most `max` whitespace-separated words, dropping a dangling connector/punctuation. */
+function clampWords(text: string, max: number): string {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length <= max) return words.join(' ');
+  return words
+    .slice(0, max)
+    .join(' ')
+    .replace(/[,;:\-–—״"']+$/, '')
+    .trim();
+}
+
+const THREAD_DECK_SYSTEM_INSTRUCTION = `אתה מתרגם ומעבד תוכן עבור דניאל בן ברוך. קיבלת שרשור (thread) שפורסם ב-Threads — בדרך כלל באנגלית — והמשימה שלך היא להפוך אותו לקרוסלת לימוד בעברית ישראלית טבעית.
+
+${BRAND_KNOWLEDGE_BASE}
+
+${HEBREW_COPY_RULES}
+
+${AUDIENCE_RULES}
+
+המשימה: תרגם והתאם את השרשור לדק של 10 עד 12 שקופיות בעברית. זו לא תרגום מילולי — זו התאמה: אותו מסר, אותן עובדות, בעברית שנשמעת כאילו נכתבה מלכתחילה בעברית לקהל ישראלי.
+
+מבנה חובה:
+1. השקופית הראשונה היא תמיד kind:"cover" — כותרת שמבטיחה את הערך של השרשור.
+2. השקופיות באמצע (8–10) עוקבות אחרי סדר הרעיונות בשרשור: kind:"concept" להסבר רעיון, kind:"step" לשלב בתהליך (עם stepNumber רץ 1,2,3…), kind:"tool" לרשימת כלים, kind:"code" רק אם השרשור עצמו הכיל קוד, kind:"takeaway" לסיכום נקודות.
+3. השקופית האחרונה היא תמיד kind:"cta" — הפניה ל-mrdaniel.co.il ולעקוב, לא מכירתי אגרסיבי.
+
+מגבלות אורך — כלל אדום, נאכפות אוטומטית אחרי הפלט שלך (אם תחרוג, הטקסט ייחתך):
+- title: עד ${THREAD_DECK_LIMITS.titleWords} מילים. קצר, קונקרטי, בלי מילות קישור מיותרות.
+- body: עד ${THREAD_DECK_LIMITS.bodyWords} מילים. משפט אחד או שניים, לא פסקה.
+- bullets: עד ${THREAD_DECK_LIMITS.bullets} פריטים, כל פריט עד ${THREAD_DECK_LIMITS.bulletWords} מילים.
+- kicker: עד 3 מילים.
+
+חוקי נאמנות למקור (קריטי):
+1. אסור להוסיף עובדה, מספר, שם כלי או טענה שלא מופיעים בשרשור המקורי. אם השרשור לא אמר את זה — זה לא נכנס לדק.
+2. אסור להשמיט את הרעיון המרכזי של השרשור או להפוך את משמעותו.
+3. מספרים, שמות מוצרים, שמות חברות ומונחים טכניים — מועתקים כמו שהם מהמקור, בלי "לעגל" ובלי לתרגם שמות מותג.
+4. אם השרשור מכיל קוד — העתק אותו כמו שהוא לשדה code (בלי markdown fence), עם codeLang אחד מתוך: python | ts | js | bash | json. אל תמציא קוד שלא היה שם.
+5. הומור או סלנג אנגלי מותאם לעברית ישראלית מקבילה, לא מתורגם מילולית.
+6. אסור תוויות מסגור ("הקשר:", "כותרת:", "תרגום:") בתוך title או body.
+7. אסור לקרדט את מחבר השרשור המקורי או לאזכר את Threads בתוך הדק. שם המחבר ניתן לך כהקשר לטון בלבד — המותג היחיד שמופיע בפלט הוא mrdaniel.co.il.
+
+לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית בלבד**, נטול טקסט: רקע אבסטרקטי-טכני כהה שמתאים לתוכן השקופית (dark cyber, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent). חובה לכלול בסוף: "no text, no letters, no words, no logos, no watermark". אין אנשים, אין לוגואים.
+
+פלט: JSON תקין בלבד, בלי markdown code fence:
+{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"visualPrompt":"..."}]}
+שדות שאינם רלוונטיים ל-kind: "" או [] או 0.`;
+
+/** The text-free guard every visualPrompt must carry — the overlay pipeline draws the real text. */
+const TEXT_FREE_GUARD = 'no text, no letters, no words, no logos, no watermark';
+
+const NEUTRAL_VISUAL =
+  'abstract dark cyber technology background, deep obsidian, circuit and node grid geometry, neon green and cyan accents';
+
+function normalizeVisualPrompt(raw: string): string {
+  const base = String(raw || '').trim() || NEUTRAL_VISUAL;
+  // Hebrew in a visualPrompt breaks the image generator (and would paint Hebrew glyphs into the
+  // backdrop the overlay then writes over), so a Hebrew prompt is replaced, not patched.
+  const clean = /[֐-׿]/.test(base) ? NEUTRAL_VISUAL : base;
+  return (/no text/i.test(clean) ? clean : `${clean}, ${TEXT_FREE_GUARD}`).slice(0, 400);
+}
+
+export async function synthesizeThreadDeck(input: {
+  posts: string[];
+  author?: string;
+  sourceUrl?: string;
+  notes?: string;
+}): Promise<TechTipDeck> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const source = input.posts
+    .map((p) => String(p ?? '').trim())
+    .filter(Boolean)
+    .map((p, i) => `[${i + 1}] ${p}`)
+    .join('\n\n');
+  const { clean } = sanitizeInput(source.slice(0, 12000));
+  if (clean.trim().length < 40) throw new Error('thread too short to adapt');
+
+  const context = [
+    input.author ? `מחבר השרשור: ${input.author}` : '',
+    input.sourceUrl ? `מקור: ${input.sourceUrl}` : '',
+    input.notes ? `הנחיות המפעיל: ${String(input.notes).slice(0, 600)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const response = await generateContentWithRetry({
+    model: 'gemini-3.6-flash',
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: `${context ? `${context}\n\n` : ''}השרשור המקורי (כל פסקה ממוספרת היא פוסט אחד בשרשור):\n"""\n${clean}\n"""`,
+          },
+        ],
+      },
+    ],
+    config: {
+      systemInstruction: THREAD_DECK_SYSTEM_INSTRUCTION,
+      temperature: 0.55,
+      topP: 0.9,
+      responseMimeType: 'application/json',
+    },
+  });
+
+  const raw = stripCodeFence(response.text?.trim() || '{}');
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const slidesRaw = Array.isArray(parsed.slides) ? parsed.slides : [];
+
+  const hebrew = (v: unknown, words: number): string =>
+    sanitizeHebrewText(clampWords(stripMetaFraming(stripSourceCredits(String(v ?? '').trim())), words));
+
+  const slides: TechTipSlide[] = slidesRaw
+    .map((s): TechTipSlide => {
+      const rec = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+      const kind = mapTipKind(rec.kind);
+      const lang = String(rec.codeLang ?? '').toLowerCase().trim();
+      return {
+        kind,
+        kicker: hebrew(rec.kicker, 3).slice(0, 40) || 'מהשרשור',
+        title: hebrew(rec.title, THREAD_DECK_LIMITS.titleWords).slice(0, 120),
+        body: hebrew(rec.body, THREAD_DECK_LIMITS.bodyWords).slice(0, 300),
+        bullets: Array.isArray(rec.bullets)
+          ? rec.bullets
+              .map((b) => hebrew(b, THREAD_DECK_LIMITS.bulletWords).slice(0, 90))
+              .filter((b) => b.length > 1)
+              .slice(0, THREAD_DECK_LIMITS.bullets)
+          : [],
+        // Code stays verbatim — the Hebrew sanitiser would mangle operators, quotes and Latin runs.
+        code: stripCodeFence(String(rec.code ?? '').trim()).slice(0, 900),
+        codeLang: VALID_CODE_LANGS.has(lang) ? lang : kind === 'code' ? 'python' : '',
+        stepNumber: Number.isFinite(Number(rec.stepNumber)) ? Math.max(0, Math.min(20, Number(rec.stepNumber))) : 0,
+        visualPrompt: normalizeVisualPrompt(String(rec.visualPrompt ?? '')),
+      };
+    })
+    .filter((s) => s.title.length > 1 || s.body.length > 10 || s.code.length > 5 || s.bullets.length > 0);
+
+  // A short deck means the adaptation failed, and padding it would mean inventing slides the
+  // thread never contained — so this throws and the client falls back to its source-faithful deck.
+  if (slides.length < 8) throw new Error('model returned too few usable thread slides');
+
+  const deck = slides.slice(0, 12);
+  // Structural contract: cover first, CTA last. The model gets this right most of the time; when
+  // it doesn't, coercing the kind is enough — the copy on those two slides is already right.
+  deck[0].kind = 'cover';
+  deck[deck.length - 1].kind = 'cta';
+
+  let stepSeq = 0;
+  for (const slide of deck) {
+    if (slide.kind === 'step') {
+      slide.stepNumber = ++stepSeq;
+      if (/^\s*(שלב|טיפ|טריק|step|tip|trick)\b/i.test(slide.kicker)) {
+        slide.kicker = `שלב ${stepSeq}`;
+      }
+    } else {
+      slide.stepNumber = 0;
+    }
+  }
+
+  const hashtags = Array.isArray(parsed.hashtags)
+    ? parsed.hashtags.map((h) => String(h).trim()).filter((h) => h.startsWith('#')).slice(0, 8)
+    : [];
+
+  return {
+    title: hebrew(parsed.title ?? deck[0].title, THREAD_DECK_LIMITS.titleWords).slice(0, 140),
+    slides: deck,
+    hashtags: hashtags.length ? hashtags : ['#AI', '#אוטומציה', '#עסקים', '#טכנולוגיה'],
+  };
+}
