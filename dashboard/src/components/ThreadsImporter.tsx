@@ -27,6 +27,7 @@ import {
   saveThreadState,
   loadThreadState,
   clearThreadState,
+  MIN_THREAD_CHARS,
   type ImportedThread,
 } from '../lib/threadsImportApi';
 import type { TechTipDeck } from '../lib/techTipsApi';
@@ -161,6 +162,9 @@ export default function ThreadsImporter() {
       const imported = await importThread(target);
       setThread(imported);
       setRawText(imported.text);
+      // `ok:false` now also covers a thin extraction — a gated post whose OG/oEmbed shell yielded a
+      // few characters. That used to pass as success and only surface later as a silent local-mode
+      // deck, so the paste box opens here instead, with the server's note explaining why.
       if (!imported.ok || imported.posts.length === 0) {
         setShowPaste(true);
         setImportError(imported.note ?? 'לא הצלחנו לקרוא את השרשור — הדביקו את הטקסט ידנית.');
@@ -201,8 +205,14 @@ export default function ThreadsImporter() {
   /** Stage 2 — translate & adapt, then render. */
   const generate = useCallback(async () => {
     const source = thread.posts.length ? thread : parseThreadRawText(rawText, url);
-    if (source.text.trim().length < 40) {
-      setError('אין מספיק טקסט מקור — ייבאו שרשור או הדביקו את תוכנו (לפחות 40 תווים).');
+    const sourceChars = source.text.trim().length;
+    if (sourceChars < MIN_THREAD_CHARS) {
+      // Same floor the server and the client lib use, so the operator is told what is missing
+      // rather than watching the run come back as an unexplained local-mode deck.
+      setShowPaste(true);
+      setError(
+        `אין מספיק טקסט מקור (${sourceChars} תווים, נדרשים ${MIN_THREAD_CHARS}) — הדביקו את טקסט השרשור המלא בתיבה למטה.`
+      );
       return;
     }
     if (!thread.posts.length) setThread(source);
@@ -430,7 +440,7 @@ export default function ThreadsImporter() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => void generate()}
-            disabled={busy || (thread.text.trim().length < 40 && rawText.trim().length < 40)}
+            disabled={busy || (thread.text.trim().length < MIN_THREAD_CHARS && rawText.trim().length < MIN_THREAD_CHARS)}
             className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-black cursor-pointer disabled:opacity-40"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}

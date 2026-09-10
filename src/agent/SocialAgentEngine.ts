@@ -3,10 +3,35 @@ import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
 import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck } from './types.js';
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+/**
+ * The text model every generation call in this file uses. Kept as one constant (overridable with
+ * GEMINI_MODEL) so a model rename is a one-line change instead of fifteen literals — a stale name
+ * otherwise fails as an opaque 500 on every action at once.
+ */
+export const GEMINI_TEXT_MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3.6-flash';
+
+/**
+ * The key, trimmed. A value that is present but obviously not a key (a `.env.example` placeholder,
+ * a quoted empty string, a shell-expanded blank) used to pass the truthy check and then fail at
+ * Google with 400/API_KEY_INVALID on every call — which surfaced to the dashboard as an
+ * indistinguishable 500. Treating it as "not configured" makes the endpoint answer 503 with the
+ * real reason instead. Google's keys are ~39 chars; 20 is a floor no real key falls under.
+ */
+const RAW_GEMINI_KEY = process.env.GEMINI_API_KEY?.trim().replace(/^["']|["']$/g, '') ?? '';
+const KEY_LOOKS_REAL = RAW_GEMINI_KEY.length >= 20 && !/^(?:your|placeholder|changeme|xxx|todo|<)/i.test(RAW_GEMINI_KEY);
+
+const genAI = KEY_LOOKS_REAL ? new GoogleGenAI({ apiKey: RAW_GEMINI_KEY }) : null;
 
 export function isEngineConfigured(): boolean {
   return genAI !== null;
+}
+
+/** Why the engine is unavailable — lets the endpoint say "key looks like a placeholder" rather
+ *  than the generic "not configured" when that is actually what happened. */
+export function engineConfigReason(): string | null {
+  if (genAI) return null;
+  if (!RAW_GEMINI_KEY) return 'GEMINI_API_KEY is not set in this runtime';
+  return 'GEMINI_API_KEY is set but does not look like a real key (placeholder or truncated value)';
 }
 
 // --- Brand knowledge base ------------------------------------------------------------------
@@ -126,6 +151,10 @@ export function stripCodeFence(text: string): string {
   return fenceMatch ? fenceMatch[1] : trimmed;
 }
 
+/** Error text that means "Google had a hiccup", not "your request was wrong" - the only
+ *  class of failure worth retrying automatically. */
+const TRANSIENT_UPSTREAM = /\b50[0-3]\b|INTERNAL|UNAVAILABLE|overloaded|deadline|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|fetch failed/i;
+
 export interface RateLimitInfo {
   retryAfterSeconds: number;
 }
@@ -143,6 +172,154 @@ export function detectGeminiRateLimit(err: unknown): RateLimitInfo | null {
   const match = message.match(/retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/i);
   const retryAfterSeconds = match ? Math.max(5, Math.ceil(parseFloat(match[1]))) : 60;
   return { retryAfterSeconds };
+}
+
+/**
+ * A model call that failed in a way worth telling the operator about, classified.
+ *
+ * Everything under this file used to reach the endpoint as a bare `Error`, so every distinct
+ * cause — a revoked key, a renamed model, a safety block, a truncated JSON answer, a transient
+ * Google outage — arrived at the dashboard as the same opaque HTTP 500. The dashboard's only
+ * possible response was "שרת ה-AI החזיר שגיאה 500", which tells the operator nothing about
+ * whether to retry, re-key, or paste the text manually. This maps each cause to an HTTP status,
+ * a stable machine code, and a Hebrew sentence that says what to actually do.
+ */
+export interface GeminiFailure {
+  /** HTTP status the endpoint should answer with. */
+  status: number;
+  /** Stable machine-readable cause, for the dashboard to branch on. */
+  code:
+    | 'rate_limited'
+    | 'invalid_api_key'
+    | 'model_not_found'
+    | 'safety_blocked'
+    | 'bad_model_output'
+    | 'upstream_unavailable'
+    | 'timeout'
+    | 'unknown';
+  /** Operator-facing Hebrew explanation — shown verbatim in the dashboard. */
+  message: string;
+  /** Whether retrying the same request unchanged could plausibly succeed. */
+  retryable: boolean;
+  retryAfterSeconds?: number;
+}
+
+/** Thrown when the model answered but the answer was unusable (empty, truncated, wrong shape).
+ *  Separate from a transport failure so it is never retried as if it were an outage. */
+export class ModelOutputError extends Error {
+  readonly blockedBySafety: boolean;
+  constructor(message: string, blockedBySafety = false) {
+    super(message);
+    this.name = 'ModelOutputError';
+    this.blockedBySafety = blockedBySafety;
+  }
+}
+
+export function classifyGeminiError(err: unknown): GeminiFailure {
+  const raw = err instanceof Error ? err.message : String(err);
+
+  const rateLimit = detectGeminiRateLimit(err);
+  if (rateLimit) {
+    return {
+      status: 429,
+      code: 'rate_limited',
+      message: 'הגעת למגבלת ה-API החינמית של Gemini לשעה זו — נסו שוב מאוחר יותר או שדרגו את המפתח.',
+      retryable: true,
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+    };
+  }
+
+  if (err instanceof ModelOutputError) {
+    return err.blockedBySafety
+      ? {
+          status: 422,
+          code: 'safety_blocked',
+          message: 'מסנני הבטיחות של Gemini חסמו את התשובה. נסחו מחדש את ההוראה או את טקסט המקור.',
+          retryable: false,
+        }
+      : {
+          status: 422,
+          code: 'bad_model_output',
+          message: `המודל החזיר תשובה לא תקינה (${raw}). נסו שוב — לרוב זה חולף.`,
+          retryable: true,
+        };
+  }
+
+  if (/API_KEY_INVALID|API key not valid|PERMISSION_DENIED|API_KEY_SERVICE_BLOCKED|\b401\b|\b403\b/i.test(raw)) {
+    return {
+      status: 503,
+      code: 'invalid_api_key',
+      message: 'מפתח ה-GEMINI_API_KEY בסביבת הריצה נדחה ע"י Google (לא תקין / בוטל). יש לעדכן אותו ב-Vercel ולפרוס מחדש.',
+      retryable: false,
+    };
+  }
+
+  if (/NOT_FOUND|is not found for API version|not supported for generateContent|\b404\b/i.test(raw)) {
+    return {
+      status: 503,
+      code: 'model_not_found',
+      message: `המודל "${GEMINI_TEXT_MODEL}" אינו זמין למפתח הזה. עדכנו את משתנה הסביבה GEMINI_MODEL לשם מודל נתמך.`,
+      retryable: false,
+    };
+  }
+
+  if (/aborted|AbortError|deadline|ETIMEDOUT|timed? ?out/i.test(raw)) {
+    return {
+      status: 504,
+      code: 'timeout',
+      message: 'הבקשה ל-Gemini עברה את זמן ההמתנה. נסו שוב, או קצרו את טקסט המקור.',
+      retryable: true,
+    };
+  }
+
+  if (TRANSIENT_UPSTREAM.test(raw)) {
+    return {
+      status: 502,
+      code: 'upstream_unavailable',
+      message: 'שרתי Gemini לא זמינים כרגע (תקלה זמנית אצל Google). נסו שוב בעוד רגע.',
+      retryable: true,
+    };
+  }
+
+  return {
+    status: 502,
+    code: 'unknown',
+    message: 'הקריאה למנוע ה-AI נכשלה. הפרטים המלאים בשדה detail.',
+    retryable: true,
+  };
+}
+
+/**
+ * Reads the text off a response, refusing the shapes that would otherwise blow up downstream.
+ *
+ * `response.text` is empty both when the candidate was blocked and when generation stopped at the
+ * token ceiling mid-JSON; in the second case `JSON.parse` throws a bare SyntaxError
+ * ("Unexpected end of JSON input") that says nothing about the real cause. Both are turned into a
+ * ModelOutputError carrying which one it was.
+ */
+function requireText(response: { text?: string; candidates?: Array<{ finishReason?: string }>; promptFeedback?: { blockReason?: string } }): string {
+  const finishReason = response.candidates?.[0]?.finishReason ?? '';
+  const blockReason = response.promptFeedback?.blockReason ?? '';
+  const text = response.text?.trim() ?? '';
+
+  if (blockReason || /SAFETY|BLOCKLIST|PROHIBITED|RECITATION/i.test(finishReason)) {
+    throw new ModelOutputError(`blocked by Gemini safety filters (${blockReason || finishReason})`, true);
+  }
+  if (!text) throw new ModelOutputError(`model returned an empty response (finishReason: ${finishReason || 'unknown'})`);
+  if (/MAX_TOKENS/i.test(finishReason)) {
+    throw new ModelOutputError('model hit the output token ceiling and the answer was cut off mid-way');
+  }
+  return text;
+}
+
+/** JSON.parse, with the failure reported as a model-output problem rather than a raw SyntaxError
+ *  bubbling all the way to the endpoint as an opaque 500. */
+function parseJsonOrThrow<T>(raw: string, what: string): T {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new ModelOutputError(`${what}: model did not return valid JSON (got: ${raw.slice(0, 120)})`);
+  }
 }
 
 /** Renders the admin's rolling WhatsApp strategic notes (see firebaseServer.ts's
@@ -175,8 +352,8 @@ export async function generateSocialContent(platform: Platform, topic: string, f
             platform === 'linkedin' ? 'LinkedIn (טון מקצועי-ארגוני, עד 200 מילה, פסקאות קצרות עם שורות ריקות ביניהן לקריאות)' : platform === 'tiktok' ? 'כיתוב TikTok (קצר וקולע, עד 60 מילה, hook חד בשורה הראשונה)' : "Instagram (טון נגיש יותר, עד 120 מילה, אפשר אימוג'ים מדודים)"
           } כולל Hook פותח חזק ו-CTA ברור בסיום.`;
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-3.6-flash',
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
     contents: [{ role: 'user', parts: [{ text: `נושא הפוסט: ${cleanTopic}\n\n${formatInstruction}` }] }],
     config: { systemInstruction: withStrategicContext(CONTENT_SYSTEM_INSTRUCTION, strategicContext), temperature: 0.85, topP: 0.95 },
   });
@@ -219,8 +396,8 @@ STRICT RULES:
 export async function generateVisualSearchQuery(slideText: string): Promise<string> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
   const { clean } = sanitizeInput(slideText);
-  const response = await genAI.models.generateContent({
-    model: 'gemini-3.6-flash',
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
     contents: [{ role: 'user', parts: [{ text: clean }] }],
     config: { systemInstruction: VISUAL_QUERY_SYSTEM_INSTRUCTION, temperature: 0.9, topP: 0.95 },
   });
@@ -268,8 +445,8 @@ export async function generateImageGenerationPrompt(platform: Platform, topic: s
   try {
     const { clean: cleanTopic } = sanitizeInput(topic);
     const { clean: cleanBody } = sanitizeInput(body);
-    const response = await genAI.models.generateContent({
-      model: 'gemini-3.6-flash',
+    const response = await generateContentWithRetry({
+      model: GEMINI_TEXT_MODEL,
       contents: [{ role: 'user', parts: [{ text: `Platform: ${platform}\nTopic: ${cleanTopic}\n\nPost text:\n${cleanBody}` }] }],
       config: { systemInstruction: IMAGE_GENERATION_SYSTEM_INSTRUCTION, temperature: 0.7, topP: 0.95 },
     });
@@ -285,13 +462,13 @@ export async function generateVideoScript(topic: string, strategicContext?: stri
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
   const { clean: cleanTopic } = sanitizeInput(topic);
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-3.6-flash',
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
     contents: [{ role: 'user', parts: [{ text: `נושא הווידאו: ${cleanTopic}` }] }],
     config: { systemInstruction: withStrategicContext(VIDEO_SCRIPT_SYSTEM_INSTRUCTION, strategicContext), temperature: 0.85, topP: 0.95, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '{}');
+  const raw = stripCodeFence(requireText(response));
   try {
     const parsed = JSON.parse(raw);
     if (!parsed.hook || !Array.isArray(parsed.scenes)) throw new Error('malformed video script JSON');
@@ -317,8 +494,8 @@ export async function generateVideoScript(topic: string, strategicContext?: stri
 export async function transcribeAudio(base64Audio: string, mimeType: string): Promise<string> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-3.6-flash',
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
     contents: [
       {
         role: 'user',
@@ -335,8 +512,8 @@ export async function draftEngagementMessage(query: string, intent: LeadIntent):
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
   const { clean: cleanQuery } = sanitizeInput(query);
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-3.6-flash',
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
     contents: [
       {
         role: 'user',
@@ -517,8 +694,8 @@ export async function synthesizeStorySlides(input: {
   const { clean } = sanitizeInput(input.articleText.slice(0, 8000));
   if (clean.trim().length < 40) throw new Error('article text too thin to summarise');
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-3.6-flash',
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
     contents: [
       {
         role: 'user',
@@ -532,8 +709,8 @@ export async function synthesizeStorySlides(input: {
     config: { systemInstruction: STORY_SYNTH_SYSTEM_INSTRUCTION, temperature: 0.4, topP: 0.9, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '[]');
-  const parsed = JSON.parse(raw) as unknown;
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow(raw, 'synthesizeStorySlides') as unknown;
   const arr = Array.isArray(parsed) ? parsed : (parsed as { slides?: unknown[] })?.slides;
   if (!Array.isArray(arr)) throw new Error('model did not return a slide array');
 
@@ -663,7 +840,7 @@ export async function synthesizeCarouselDeck(input: {
   const takeaways = (input.takeaways ?? []).map((t) => String(t).slice(0, 200)).filter(Boolean).slice(0, 8);
 
   const response = await generateContentWithRetry({
-    model: 'gemini-3.6-flash',
+    model: GEMINI_TEXT_MODEL,
     contents: [
       {
         role: 'user',
@@ -679,8 +856,8 @@ export async function synthesizeCarouselDeck(input: {
     config: { systemInstruction: CAROUSEL_STUDIO_SYSTEM_INSTRUCTION, temperature: 0.55, topP: 0.9, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '[]');
-  const parsed = JSON.parse(raw) as unknown;
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow(raw, 'synthesizeCarouselDeck') as unknown;
   const arr = Array.isArray(parsed) ? parsed : (parsed as { slides?: unknown[] })?.slides;
   if (!Array.isArray(arr)) throw new Error('model did not return a slide array');
 
@@ -771,8 +948,8 @@ export async function editSlideDeck(input: { instruction: string; slides: SlideE
 
   const deck = input.slides.map((s) => ({ n: Number(s.n), kind: String(s.kind || 'insight'), text: String(s.text || '') }));
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-3.6-flash',
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
     contents: [
       {
         role: 'user',
@@ -782,8 +959,8 @@ export async function editSlideDeck(input: { instruction: string; slides: SlideE
     config: { systemInstruction: SLIDE_EDIT_SYSTEM_INSTRUCTION, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '[]');
-  const parsed = JSON.parse(raw) as unknown;
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow(raw, 'editSlideDeck') as unknown;
   const arr = Array.isArray(parsed) ? parsed : (parsed as { slides?: unknown[] })?.slides;
   if (!Array.isArray(arr) || arr.length !== deck.length) throw new Error('editor did not return a matching slide array');
 
@@ -973,8 +1150,8 @@ export async function synthesizeNewsPost(input: {
     ? WHATSAPP_POST_SYSTEM_INSTRUCTION
     : NEWS_POST_SYSTEM_INSTRUCTION.replace('{FORMAT_SPEC}', formatSpec);
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-3.6-flash',
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
     contents: [
       {
         role: 'user',
@@ -1056,22 +1233,28 @@ const TREND_RADAR_MAX_ITEMS = 14;
 
 type GenContentReq = Parameters<GoogleGenAI['models']['generateContent']>[0];
 
-/** One-shot retry (800ms backoff) for a transient upstream 5xx from Gemini Flash — INTERNAL /
+/** Up to two retries (0.7s then 1.8s) for a transient upstream 5xx from Gemini Flash — INTERNAL /
  * UNAVAILABLE / "overloaded" / deadline / reset. A 429 is NOT retried here (surfaced so the
  * endpoint can return its structured rate-limit response); a genuine 4xx/parse error is not
  * retried either. */
 async function generateContentWithRetry(params: GenContentReq) {
-  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
-  try {
-    return await genAI.models.generateContent(params);
-  } catch (err) {
-    if (detectGeminiRateLimit(err)) throw err;
-    const msg = err instanceof Error ? err.message : String(err);
-    const transient = /\b50[0-3]\b|INTERNAL|UNAVAILABLE|overloaded|deadline|ECONNRESET|ETIMEDOUT|fetch failed/i.test(msg);
-    if (!transient) throw err;
-    await new Promise((r) => setTimeout(r, 800));
-    return await genAI.models.generateContent(params);
+  if (!genAI) throw new Error(engineConfigReason() ?? 'GEMINI_API_KEY not configured');
+  let lastErr: unknown;
+  // Two retries with a widening gap: a Gemini INTERNAL/UNAVAILABLE blip usually clears inside a
+  // second, and this is the difference between the operator seeing a 500 and seeing their deck.
+  for (const waitMs of [0, 700, 1800]) {
+    if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
+    try {
+      return await genAI.models.generateContent(params);
+    } catch (err) {
+      lastErr = err;
+      // A quota error is surfaced immediately - retrying it only burns the remaining budget.
+      if (detectGeminiRateLimit(err)) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!TRANSIENT_UPSTREAM.test(msg)) throw err;
+    }
   }
+  throw lastErr;
 }
 
 export async function analyzeTrendRadar(input: {
@@ -1092,13 +1275,13 @@ export async function analyzeTrendRadar(input: {
     .join('\n');
 
   const response = await generateContentWithRetry({
-    model: 'gemini-3.6-flash',
+    model: GEMINI_TEXT_MODEL,
     contents: [{ role: 'user', parts: [{ text: `כותרות עדכניות מהפיד:\n"""\n${digest}\n"""` }] }],
     config: { systemInstruction: TREND_RADAR_SYSTEM_INSTRUCTION, temperature: 0.6, topP: 0.95, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '{}');
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow(raw, 'analyzeTrendRadar') as Record<string, unknown>;
   const sanitizeDeep = (v: unknown): unknown => {
     if (typeof v === 'string') return stripMetaFraming(stripSourceCredits(sanitizeHebrewText(v)));
     if (Array.isArray(v)) return v.map(sanitizeDeep);
@@ -1142,7 +1325,7 @@ export async function generateEngagementReplies(input: {
   const lang = input.lang === 'en' ? 'en' : 'he';
 
   const response = await generateContentWithRetry({
-    model: 'gemini-3.6-flash',
+    model: GEMINI_TEXT_MODEL,
     contents: [
       {
         role: 'user',
@@ -1152,8 +1335,8 @@ export async function generateEngagementReplies(input: {
     config: { systemInstruction: ENGAGEMENT_REPLIES_SYSTEM_INSTRUCTION, temperature: 0.75, topP: 0.95, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '[]');
-  const parsed = JSON.parse(raw) as unknown;
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow(raw, 'generateEngagementReplies') as unknown;
   const arr = Array.isArray(parsed) ? parsed : (parsed as { replies?: unknown[] })?.replies;
   if (!Array.isArray(arr) || arr.length < 3) throw new Error('model did not return 3 replies');
 
@@ -1210,7 +1393,7 @@ export async function synthesizeReelScript(input: {
   if (clean.trim().length < 40) throw new Error('article text too thin for a reel script');
 
   const response = await generateContentWithRetry({
-    model: 'gemini-3.6-flash',
+    model: GEMINI_TEXT_MODEL,
     contents: [
       {
         role: 'user',
@@ -1224,8 +1407,8 @@ export async function synthesizeReelScript(input: {
     config: { systemInstruction: REEL_SCRIPT_SYSTEM_INSTRUCTION, temperature: 0.8, topP: 0.95, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '{}');
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow(raw, 'synthesizeReelScript') as Record<string, unknown>;
 
   const hook = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(parsed.hook ?? '').trim()))).slice(0, 180);
   const cta = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(parsed.cta ?? '').trim()))).slice(0, 220);
@@ -1409,13 +1592,13 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
     : '';
 
   const response = await generateContentWithRetry({
-    model: 'gemini-3.6-flash',
+    model: GEMINI_TEXT_MODEL,
     contents: [{ role: 'user', parts: [{ text: `נושא המדריך:\n"""\n${clean}\n"""${countDirective}` }] }],
     config: { systemInstruction: TECH_TIP_SYSTEM_INSTRUCTION, temperature: 0.6, topP: 0.9, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '{}');
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow(raw, 'synthesizeTechTipDeck') as Record<string, unknown>;
   const slidesRaw = Array.isArray(parsed.slides) ? parsed.slides : [];
 
   const slides: TechTipSlide[] = slidesRaw
@@ -1570,7 +1753,7 @@ export async function synthesizeThreadDeck(input: {
     .join('\n');
 
   const response = await generateContentWithRetry({
-    model: 'gemini-3.6-flash',
+    model: GEMINI_TEXT_MODEL,
     contents: [
       {
         role: 'user',
@@ -1589,8 +1772,8 @@ export async function synthesizeThreadDeck(input: {
     },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '{}');
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow(raw, 'synthesizeThreadDeck') as Record<string, unknown>;
   const slidesRaw = Array.isArray(parsed.slides) ? parsed.slides : [];
 
   const hebrew = (v: unknown, words: number): string =>

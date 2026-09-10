@@ -1,5 +1,6 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
-import { getAdminSecret, reportAuthFailure } from './adminSecret';
+import { getAdminSecret } from './adminSecret';
+import { describeAiError } from './aiErrors';
 import { renumberSteps, type TechTipDeck, type TechTipSlide } from './techTipsApi';
 
 /**
@@ -29,6 +30,10 @@ export interface ImportedThread {
   via: 'direct' | 'oembed' | 'jina' | 'manual' | 'none';
   note?: string;
 }
+
+/** Minimum source characters for AI adaptation - mirrors MIN_THREAD_CHARS in
+ *  src/server/threadsImport.ts, so client and server agree on what "too thin" means. */
+export const MIN_THREAD_CHARS = 60;
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
@@ -76,17 +81,6 @@ async function post(action: string, body: Record<string, unknown>, timeoutMs = 9
   }
 }
 
-function httpReason(status: number): string {
-  if (status === 429) return 'מכסת ה-API של Gemini לשעה זו מוצתה (429)';
-  if (status === 401) {
-    // One actionable re-auth prompt — the usual cause is a build-time secret that went stale
-    // after ADMIN_API_SECRET was rotated on the site.
-    reportAuthFailure('agent-generate');
-    return 'אימות מול /api/agent-generate נכשל (401)';
-  }
-  if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת השרת (503)';
-  return `שרת ה-AI החזיר שגיאה ${status}`;
-}
 
 // ─── step 1 · import ────────────────────────────────────────────────────────────────────────
 
@@ -99,7 +93,7 @@ function httpReason(status: number): string {
  */
 export async function importThread(url: string): Promise<ImportedThread> {
   const res = await post('parse-thread', { url }, 30000);
-  if (!res.ok) throw new Error(httpReason(res.status));
+  if (!res.ok) throw new Error((await describeAiError(res)).message);
   const data = (await res.json()) as { ok?: boolean; blocked?: boolean; thread?: ImportedThread; error?: string };
   if (data.blocked) throw new Error('התוכן שיובא נחסם ע"י מסנן התוכן.');
   if (!data.thread) throw new Error(data.error || 'לא הצלחנו לקרוא את השרשור — הדביקו את הטקסט ידנית.');
@@ -244,8 +238,14 @@ export async function synthesizeThreadDeck(
   notes?: string
 ): Promise<TechTipDeck> {
   const posts = thread.posts.filter((p) => p.trim());
-  if (posts.join('\n').trim().length < 40) {
-    return buildFallbackDeck(thread, 'טקסט השרשור קצר מדי לעיבוד AI');
+  // Mirrors MIN_THREAD_CHARS on the server. Below it there is not enough source text for a deck,
+  // and calling the model anyway just spends quota to get this same fallback back.
+  const sourceChars = posts.join(' ').trim().length;
+  if (sourceChars < MIN_THREAD_CHARS) {
+    return buildFallbackDeck(
+      thread,
+      `טקסט השרשור קצר מדי לעיבוד AI (${sourceChars} תווים, נדרשים ${MIN_THREAD_CHARS}) — הדביקו את הטקסט המלא`
+    );
   }
   try {
     const res = await post('thread-deck', {
@@ -254,7 +254,7 @@ export async function synthesizeThreadDeck(
       sourceUrl: thread.url || undefined,
       notes: notes?.trim() || undefined,
     });
-    if (!res.ok) return buildFallbackDeck(thread, httpReason(res.status));
+    if (!res.ok) return buildFallbackDeck(thread, (await describeAiError(res)).message);
     const data = (await res.json()) as {
       ok?: boolean;
       blocked?: boolean;

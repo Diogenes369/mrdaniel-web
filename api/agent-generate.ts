@@ -1,4 +1,4 @@
-import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, detectGeminiRateLimit, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck, synthesizeThreadDeck } from '../src/agent/SocialAgentEngine.js';
+import { classifyGeminiError, engineConfigReason, generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck, synthesizeThreadDeck } from '../src/agent/SocialAgentEngine.js';
 import { importUrlContent } from '../src/server/contentImport.js';
 import { importThreadContent, parseThreadRawText, isThreadsUrl } from '../src/server/threadsImport.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
@@ -184,7 +184,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'generate-content') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { platform, topic, format } = req.body ?? {};
@@ -214,7 +214,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'email-generate') {
       if (!isCopywriterConfigured()) {
-        res.status(200).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(200).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { goal, tone, notes, preset } = req.body ?? {};
@@ -272,7 +272,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'draft-engagement') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { query } = req.body ?? {};
@@ -304,7 +304,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'story-synthesize') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { title, source, topic, articleText } = req.body ?? {};
@@ -329,7 +329,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'reel-script-synthesize') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { title, source, topic, articleText } = req.body ?? {};
@@ -355,7 +355,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'reel-tts') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { text, voiceName } = req.body ?? {};
@@ -370,7 +370,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'tech-tip-deck') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { topic, notes } = req.body ?? {};
@@ -426,7 +426,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'thread-deck') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { posts, author, sourceUrl, notes } = req.body ?? {};
@@ -455,7 +455,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'post-synthesize') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { title, source, topic, platform, articleText, variant } = req.body ?? {};
@@ -498,7 +498,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'carousel-studio') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { title, source, topic, brief, takeaways } = req.body ?? {};
@@ -526,7 +526,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'slides-edit') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { instruction, slides } = req.body ?? {};
@@ -550,7 +550,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'trend-radar') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { items } = req.body ?? {};
@@ -579,7 +579,7 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'engagement-replies') {
       if (!isEngineConfigured()) {
-        res.status(503).json({ ok: false, error: 'GEMINI_API_KEY not configured' });
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
       const { postText, sourceUrl, lang } = req.body ?? {};
@@ -603,12 +603,35 @@ export default async function handler(req: any, res: any) {
 
     res.status(400).json({ ok: false, error: 'unknown action' });
   } catch (err) {
-    const rateLimit = detectGeminiRateLimit(err);
-    if (rateLimit) {
-      res.status(429).json({ ok: false, status: 'rate_limited', message: 'הגעת למגבלת ה-API החינמית לשעה זו', retryAfterSeconds: rateLimit.retryAfterSeconds });
+    // Every failure below this endpoint used to collapse into the same opaque 500, so the
+    // dashboard could only ever say "שרת ה-AI החזיר שגיאה 500" - which does not tell the operator
+    // whether to retry, re-key, or paste the text by hand. classifyGeminiError() maps the cause to
+    // a real status plus a stable `code` the dashboard can branch on and a Hebrew `message` it can
+    // show verbatim. `detail` keeps the underlying text for the server log and for debugging.
+    const failure = classifyGeminiError(err);
+    const detail = (err as Error)?.message?.slice(0, 400);
+
+    console.error(`[api/agent-generate] action=${action ?? 'unknown'} code=${failure.code} status=${failure.status}:`, err);
+
+    if (failure.code === 'rate_limited') {
+      // Unchanged shape - the dashboard clients already special-case this exact response.
+      res.status(429).json({
+        ok: false,
+        status: 'rate_limited',
+        code: failure.code,
+        message: failure.message,
+        retryAfterSeconds: failure.retryAfterSeconds,
+      });
       return;
     }
-    console.error('[api/agent-generate] error:', err);
-    res.status(500).json({ ok: false, error: 'generation failed', detail: (err as Error)?.message?.slice(0, 400) });
+
+    res.status(failure.status).json({
+      ok: false,
+      code: failure.code,
+      error: failure.code,
+      message: failure.message,
+      retryable: failure.retryable,
+      detail,
+    });
   }
 }

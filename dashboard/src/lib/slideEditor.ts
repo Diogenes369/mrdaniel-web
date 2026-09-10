@@ -1,6 +1,7 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import { applySlideEdits, localSlideEdit, slidesToEditable, type StoryPayload } from './storySlides';
-import { getAdminSecret, reportAuthFailure } from './adminSecret';
+import { getAdminSecret } from './adminSecret';
+import { describeAiError } from './aiErrors';
 
 
 export interface EditResult {
@@ -36,13 +37,9 @@ export async function editDeck(payload: StoryPayload, instruction: string): Prom
       clearTimeout(timer);
     }
 
-    if (res.status === 429) throw new Error('מכסת ה-API של Gemini לשעה זו מוצתה (429)');
-    if (res.status === 401) {
-      reportAuthFailure('agent-generate'); // one shared prompt, not a raw toast per call
-      throw new Error('אימות מול /api/agent-generate נכשל (401)');
-    }
-    if (res.status === 503) throw new Error('GEMINI_API_KEY לא מוגדר באתר (503)');
-    if (!res.ok) throw new Error(`שרת ה-AI החזיר שגיאה ${res.status}`);
+    // The endpoint says why it failed (revoked key / model gone / safety block / Google outage);
+    // showing that beats a bare status number, which the operator cannot act on.
+    if (!res.ok) throw new Error((await describeAiError(res)).message);
 
     const data = (await res.json()) as {
       ok?: boolean;

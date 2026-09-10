@@ -294,15 +294,38 @@ function parseJina(md: string, handle = ''): string {
   return cutAtRelated(text.replace(/\n{3,}/g, '\n\n').trim());
 }
 
+/**
+ * The floor for "we actually got the post", in characters.
+ *
+ * Only the Jina path used to enforce a length at all, so the direct and oEmbed paths could answer
+ * ok:true carrying a metadata shell - a truncated OG caption, an oEmbed blockquote that rendered to
+ * little more than the author handle. That reads as success: the UI shows no warning and leaves the
+ * paste box closed, and the operator only finds out at synthesis time, when the deck silently comes
+ * back as the local fallback. Below this, the extraction is reported as thin so the UI can say so
+ * up front and open the paste box, which is the documented first-class path.
+ */
+export const MIN_THREAD_CHARS = 60;
+
+function totalChars(posts: string[]): number {
+  return posts.reduce((n, p) => n + p.trim().length, 0);
+}
+
+const THIN_NOTE =
+  'הצלחנו למשוך רק קטע קצר מהפוסט (כנראה חסום מאחורי התחברות) — הדביקו את טקסט השרשור המלא כדי להמשיך.';
+
 function finish(base: ImportedThread, posts: string[], via: ImportedThread['via'], author: string): ImportedThread {
+  const chars = totalChars(posts);
+  // Thin extractions are still returned, not discarded: the operator sees what little came back and
+  // can paste the rest around it. They are just never reported as ok.
+  const thin = chars > 0 && chars < MIN_THREAD_CHARS;
   return {
     ...base,
-    ok: posts.length > 0,
+    ok: posts.length > 0 && !thin,
     author: author || base.author,
     posts,
     text: posts.join('\n\n'),
     via: posts.length ? via : 'none',
-    note: posts.length ? undefined : base.note,
+    note: !posts.length ? base.note : thin ? THIN_NOTE : undefined,
   };
 }
 
@@ -353,8 +376,9 @@ export async function importThreadContent(rawUrl: string): Promise<ImportedThrea
     // The reader answers 200 for a gated or deleted post and returns its own complaint as the
     // body, so gate text is stripped first and real substance is required after that.
     const posts = dropGatePosts(splitThreadPosts(parseJina(viaJina, normalized.handle)));
-    const totalChars = posts.reduce((n, p) => n + p.length, 0);
-    if (posts.length && totalChars > 120) {
+    // The reader's own boilerplate can survive the gate filter as a handful of characters, so
+    // this path keeps a stricter bar than the shared floor before it wins the result.
+    if (posts.length && totalChars(posts) > 120) {
       const result = finish(base, posts, 'jina', base.author);
       // The reader renders neighbouring feed posts alongside the target thread, so an unusually
       // long result is a sign the extraction over-reached. Flagged rather than silently trimmed —
@@ -365,13 +389,19 @@ export async function importThreadContent(rawUrl: string): Promise<ImportedThrea
     }
   }
 
+  // The OG-description floor: a truncated single caption. It goes through the same substance check
+  // as every other path, so a one-line shell is reported as thin rather than as a usable import.
   if (base.posts.length) {
+    const chars = totalChars(base.posts);
     return {
       ...base,
-      ok: true,
+      ok: chars >= MIN_THREAD_CHARS,
       text: base.posts.join('\n\n'),
       via: 'direct',
-      note: 'חולץ רק תקציר הפוסט (הפוסט חסום מאחורי התחברות) — השלימו ידנית אם חסר תוכן.',
+      note:
+        chars >= MIN_THREAD_CHARS
+          ? 'חולץ רק תקציר הפוסט (הפוסט חסום מאחורי התחברות) — השלימו ידנית אם חסר תוכן.'
+          : THIN_NOTE,
     };
   }
   return base;
@@ -408,13 +438,18 @@ export function parseThreadRawText(raw: string, url = ''): ImportedThread {
   const author = authorFromPaste(raw);
   // The "username · 3h" header is app furniture, not the post — it would otherwise open the deck.
   const posts = splitThreadPosts(stripPasteHeader(raw));
+  const chars = totalChars(posts);
   return {
-    ok: posts.length > 0,
+    ok: posts.length > 0 && chars >= MIN_THREAD_CHARS,
     url: url ? withScheme(url) : '',
     author,
     posts,
     text: posts.join('\n\n'),
     via: posts.length ? 'manual' : 'none',
-    note: posts.length ? undefined : 'לא נמצא טקסט שמיש בהדבקה.',
+    note: !posts.length
+      ? 'לא נמצא טקסט שמיש בהדבקה.'
+      : chars < MIN_THREAD_CHARS
+        ? `הטקסט שהודבק קצר מדי (${chars} תווים) — נדרשים לפחות ${MIN_THREAD_CHARS} תווים ליצירת קרוסלה.`
+        : undefined,
   };
 }
