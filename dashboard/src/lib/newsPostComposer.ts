@@ -1,4 +1,4 @@
-import { SITE_PROMO_FOOTER, type NewsItem, type NewsTopic, type SocialPlatform } from './newsAgentTypes';
+import { GENERIC_ENGAGEMENT_LINE, SITE_PROMO_FOOTER, type NewsItem, type NewsTopic, type SocialPlatform } from './newsAgentTypes';
 import { describeAiError } from './aiErrors';
 import { adminSecretHeader } from './adminSecret';
 import { stripMetaPhrases } from './storySlides';
@@ -290,9 +290,7 @@ function postTail(item: NewsItem, platform: SocialPlatform, hashtags: string[]):
   const articleUrl = isLinkedin ? canonicalArticleUrl(item.link) : null;
   const sourceLine = articleUrl ? `${citation}\nלכתבה המלאה: ${articleUrl}` : citation;
 
-  const engagement = isLinkedin
-    ? 'מה דעתכם? האם הארגון שלכם ערוך לזה?'
-    : 'שתפו בתגובות מה הכי מפתיע אתכם כאן 👇';
+  const engagement = GENERIC_ENGAGEMENT_LINE[platform];
   return [sourceLine, engagement, hashtags.join(' '), SITE_PROMO_FOOTER];
 }
 

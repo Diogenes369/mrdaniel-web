@@ -40,8 +40,21 @@ export interface ReelScriptScene {
   mediaPrompt: string;
 }
 
+/** Mirrors src/agent/types.ts's HookPattern / HookOption — one first-3-seconds opener: a visual
+ * pattern interrupt (`visual`) plus the line itself. Carousels use `line` as the cover headline,
+ * reels as the spoken + on-screen opener. */
+export type HookPattern = 'number' | 'contrarian' | 'risk' | 'result' | 'question' | 'myth';
+
+export interface HookOption {
+  line: string;
+  visual: string;
+  pattern: HookPattern;
+}
+
 export interface ReelScript {
   hook: string;
+  /** Three alternative openers, strongest first. Optional — the deterministic fallback reel has none. */
+  hookOptions?: HookOption[];
   scenes: ReelScriptScene[];
   cta: string;
 }

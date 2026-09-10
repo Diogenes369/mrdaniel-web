@@ -1,5 +1,6 @@
 import { classifyGeminiError, engineConfigReason, generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck, synthesizeThreadDeck } from '../src/agent/SocialAgentEngine.js';
 import { importUrlContent } from '../src/server/contentImport.js';
+import { optimizeForGrowth, flattenGrowthResult, GROWTH_OPS, type GrowthOp } from '../src/server/igGrowthStrategy.js';
 import { importThreadContent, parseThreadRawText, isThreadsUrl } from '../src/server/threadsImport.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
@@ -325,18 +326,21 @@ export default async function handler(req: any, res: any) {
         rejectThinInput(res, 'articleText (>= 40 chars) required', 'טקסט הכתבה קצר מדי לסינתוז AI (נדרשים לפחות 40 תווים) — הדביקו את גוף הכתבה המלא');
         return;
       }
-      const slides = await synthesizeStorySlides({
+      const { slides, hookOptions } = await synthesizeStorySlides({
         title: String(title ?? ''),
         source: String(source ?? ''),
         topic: String(topic ?? 'general'),
         articleText,
       });
-      const security = sanitizeOutput(slides.map((s) => `${s.title}\n${s.narrativeText}`).join('\n\n'));
+      const security = sanitizeOutput(
+        [...slides.map((s) => `${s.title}\n${s.narrativeText}`), ...hookOptions.map((h) => `${h.line}\n${h.visual}`)].join('\n\n')
+      );
       if (!security.passed) {
         res.status(200).json({ ok: true, blocked: true, security });
         return;
       }
-      res.status(200).json({ ok: true, slides });
+      // `hookOptions` is additive: older dashboard builds read `slides` only and ignore it.
+      res.status(200).json({ ok: true, slides, hookOptions });
       return;
     }
 
@@ -356,7 +360,7 @@ export default async function handler(req: any, res: any) {
         topic: String(topic ?? 'general'),
         articleText,
       });
-      const flat = `${reel.hook}\n${reel.scenes.map((s) => `${s.onScreenText}\n${s.voiceover}`).join('\n')}\n${reel.cta}`;
+      const flat = `${reel.hook}\n${(reel.hookOptions ?? []).map((h) => `${h.line}\n${h.visual}`).join('\n')}\n${reel.scenes.map((s) => `${s.onScreenText}\n${s.voiceover}`).join('\n')}\n${reel.cta}`;
       const security = sanitizeOutput(flat);
       if (!security.passed) {
         res.status(200).json({ ok: true, blocked: true, security });
@@ -611,6 +615,47 @@ export default async function handler(req: any, res: any) {
         return;
       }
       res.status(200).json({ ok: true, replies });
+      return;
+    }
+
+    if (action === 'growth-optimize') {
+      // IG Growth Strategy Engine — the dashboard Growth panel's one-click refines over content
+      // that already exists (see src/server/igGrowthStrategy.ts). Folded in here, not a new
+      // function: the Hobby plan is at its 12-function ceiling.
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
+        return;
+      }
+      const { op, kind, topic, title, hook, body, trigger } = req.body ?? {};
+      if (!(GROWTH_OPS as readonly string[]).includes(op)) {
+        res.status(400).json({ ok: false, error: 'invalid op — expected hooks | cheat-sheet | pack' });
+        return;
+      }
+      if (typeof body !== 'string' || body.trim().length < 40) {
+        rejectThinInput(res, 'body (>= 40 chars) required', 'התוכן קצר מדי לאופטימיזציית צמיחה (נדרשים לפחות 40 תווים)');
+        return;
+      }
+      const result = await optimizeForGrowth({
+        op: op as GrowthOp,
+        kind: typeof kind === 'string' ? kind : 'carousel',
+        topic: typeof topic === 'string' ? topic : 'general',
+        title: typeof title === 'string' ? title : '',
+        hook: typeof hook === 'string' ? hook : '',
+        body,
+        trigger:
+          trigger && typeof trigger === 'object'
+            ? {
+                keyword: typeof trigger.keyword === 'string' ? trigger.keyword : undefined,
+                deliverable: typeof trigger.deliverable === 'string' ? trigger.deliverable : undefined,
+              }
+            : undefined,
+      });
+      const security = sanitizeOutput(flattenGrowthResult(result));
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, ...result });
       return;
     }
 

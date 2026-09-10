@@ -66,7 +66,13 @@ Single POST endpoint, **action-dispatched** (`{ action, ...params }`). Auth: `x-
 
 Client libs in `dashboard/src/lib/*Api.ts` follow one rule: **never throw** — on 429/503/network/thin output they fall back to a deterministic local builder so content generation never fully stops.
 
-Actions incl.: `generate-content`, `draft-engagement`, `story-synthesize`, `post-synthesize`, `import-url`, `slides-edit`, `trend-radar`, `engagement-replies`, `carousel-studio`, `reel-script-synthesize`, `reel-tts`, `tech-tip-deck`, `email-generate`, `auto-publish-run`.
+Actions incl.: `generate-content`, `draft-engagement`, `story-synthesize`, `post-synthesize`, `import-url`, `slides-edit`, `trend-radar`, `engagement-replies`, `growth-optimize`, `carousel-studio`, `reel-script-synthesize`, `reel-tts`, `tech-tip-deck`, `email-generate`, `auto-publish-run`.
+
+### IG Growth Strategy Engine (organic, white-hat)
+- **Prompts** — `HOOK_RETENTION_RULES` + `SAVE_SHARE_RULES` in `SocialAgentEngine.ts` feed the story deck, Carousel Studio, reel and auto-pilot prompts. `story-synthesize` and `reel-script-synthesize` also return `hookOptions` (3 first-3-seconds openers: `line` + `visual` pattern interrupt + `pattern`), additive to the old response shape.
+- **`growth-optimize`** (`src/server/igGrowthStrategy.ts`) — `op: hooks | cheat-sheet | pack` over already-generated content. `pack` = Comment-to-DM lead magnet shaped for ManyChat (single bidi-free keyword + trigger variants, rotating public replies, DM text) + ≤5 blended hashtags (3 Israeli-niche Hebrew anchors + 2 high-volume English) + Instagram-search keywords.
+- **Dashboard** — `GrowthScorePanel.tsx` under the carousel/reel previews (News agent, Story Studio, Repurposer). Scoring is local and explainable (`growthScore.ts`); the AI runs only on the one-click refines. `growthPlaybook.ts` mirrors the server banks/templates for the offline fallback — keep the two in sync. The Engagement Trigger is **off by default**: turn it on only once a ManyChat flow exists for the keyword.
+- **No black-hat**: no engagement bait ("תייגו", "תגיבו כן"), no promise without a real deliverable, the SEO keyword line is visible text below the fold (U+2800 spacer lines), never hidden text.
 
 ### Carousel Studio (dashboard tab "סטודיו קרוסלות WEB3")
 4-agent pipeline (`dashboard/src/components/CarouselStudio.tsx` + `lib/useCarouselStudio.ts`):

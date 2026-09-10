@@ -21,7 +21,11 @@ import { buildWhatsappPayload, deterministicWhatsappBody, type WhatsappPayload }
 import { importUrl, synthesizeChannelPost, parseRawText, stripAuthorNoise } from '../lib/repurposeApi';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
+import GrowthScorePanel from './GrowthScorePanel';
 import { deckToCaption } from '../lib/socialPublish';
+import { rerenderDeck } from '../lib/instagramStoryRenderer';
+import { applySlideEdits, canInsertContentSlide, insertContentSlide, type StoryPayload } from '../lib/storySlides';
+import { deckToGrowthContent } from '../lib/growthPlaybook';
 
 const TOPICS: { id: NewsTopic; label: string }[] = [
   { id: 'ai', label: 'AI / בינה מלאכותית' },
@@ -83,6 +87,8 @@ export default function ContentRepurposer() {
   const [wa, setWa] = useState<WhatsappPayload | null>(null);
   const [cardImg, setCardImg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Growth-optimised caption from the Growth panel ('' = none yet / panel unmounted).
+  const [growthCaption, setGrowthCaption] = useState('');
 
   const target = useMemo(() => TARGETS.find((t) => t.id === targetId) ?? TARGETS[0], [targetId]);
   const topicLabel = TOPICS.find((t) => t.id === topic)?.label ?? 'טכנולוגיה';
@@ -244,6 +250,36 @@ export default function ContentRepurposer() {
       /* clipboard blocked — text is visible for manual copy */
     }
   };
+
+  // Growth panel → apply an edited deck and re-render it on the same background (rerenderDeck
+  // reuses the photo cached for this deck), the same path Story Studio's slide editor takes.
+  const applyDeckEdit = useCallback(
+    async (edited: StoryPayload) => {
+      if (!deck) return;
+      setBusy(true);
+      try {
+        setDeck(await rerenderDeck(edited, deck.format));
+      } catch (e) {
+        setError((e as Error).message || 'הרינדור מחדש נכשל.');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [deck]
+  );
+
+  const deckCaption = deck ? deckToCaption(deck.payload) : '';
+  const growthContent = useMemo(() => (deck ? deckToGrowthContent(deck.payload, deckCaption) : null), [deck, deckCaption]);
+
+  const applyCoverHook = useCallback(
+    (line: string) => {
+      if (!deck) return;
+      const n = deck.payload.slides.findIndex((s) => s.kind === 'cover') + 1;
+      if (n > 0) return applyDeckEdit(applySlideEdits(deck.payload, [{ n, kind: 'cover', text: line }]));
+    },
+    [deck, applyDeckEdit]
+  );
+  const addCheatSheetSlide = useCallback((text: string) => (deck ? applyDeckEdit(insertContentSlide(deck.payload, text)) : undefined), [deck, applyDeckEdit]);
 
   const hasSource = body.trim().length >= 60;
 
@@ -500,11 +536,24 @@ export default function ContentRepurposer() {
           </div>
 
           <QuickPublishBar
-            text={deckToCaption(deck.payload)}
+            text={growthCaption || deckCaption}
             image={deck.images[Math.min(activeSlide, deck.images.length - 1)]}
             label="פרסום מהיר · קרוסלה"
             className="mt-4 justify-center"
           />
+
+          {growthContent && (
+            <GrowthScorePanel
+              key={growthContent.contentKey}
+              content={growthContent}
+              busy={busy}
+              onApplyHook={applyCoverHook}
+              onAddCheatSheet={addCheatSheetSlide}
+              canAddCheatSheet={canInsertContentSlide(deck.payload)}
+              onCaptionChange={setGrowthCaption}
+              className="mt-4"
+            />
+          )}
         </div>
         </PreviewErrorBoundary>
       )}

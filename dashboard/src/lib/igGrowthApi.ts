@@ -11,8 +11,24 @@ import type {
   ReplyStyle,
 } from './igGrowthTypes';
 import { REPLY_META } from './igGrowthTypes';
+import type { EngagementTrigger, GrowthContent, GrowthPack, HookOption } from './igGrowthTypes';
 import { getAdminSecret } from './adminSecret';
 import { describeAiError } from './aiErrors';
+import {
+  ENGAGEMENT_BAIT,
+  blendHashtags,
+  buildCheatSheetLocal,
+  buildGrowthPackLocal,
+  buildHookOptionsLocal,
+  defaultDeliverable,
+  defaultTriggerKeyword,
+  leadMagnetTemplate,
+  normalizeHookOptions,
+  normalizeSeoKeywords,
+  normalizeTriggerKeyword,
+  stripBidi,
+  wordCount,
+} from './growthPlaybook';
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
@@ -354,5 +370,134 @@ export async function generateEngagementReplies(input: {
     return { replies, synthesized: true, createdAt: Date.now(), sourceUrl: input.sourceUrl };
   } catch (err) {
     return buildRepliesLocal(postText, (err as Error)?.message || 'הקריאה ל-AI נכשלה.', input.sourceUrl);
+  }
+}
+
+// ─── 3. ORGANIC GROWTH STRATEGY ENGINE (GrowthScorePanel) ────────────────────────────────────
+// action:"growth-optimize" · op hooks | cheat-sheet | pack. Same never-throw contract as the two
+// tools above: every failure resolves to the deterministic playbook build, stamped with the reason.
+
+type GrowthOp = 'hooks' | 'cheat-sheet' | 'pack';
+
+/** The grounding source for every op: the body units in order, then the caption. */
+function growthBody(content: GrowthContent): string {
+  return [...content.units, content.caption].filter(Boolean).join('\n\n').slice(0, 6000);
+}
+
+function growthRequest(op: GrowthOp, content: GrowthContent, trigger?: EngagementTrigger): Record<string, unknown> {
+  return {
+    op,
+    kind: content.kind,
+    topic: content.topic,
+    title: content.title,
+    hook: content.hook,
+    body: growthBody(content),
+    ...(trigger ? { trigger: { keyword: trigger.keyword.trim(), deliverable: trigger.deliverable.trim() } } : {}),
+  };
+}
+
+export interface HookRefineResult {
+  hookOptions: HookOption[];
+  synthesized: boolean;
+  fallbackReason?: string;
+}
+
+/** Three sharper first-3-seconds openers. Offline it ranks the content's own sentences instead. */
+export async function refineHooks(content: GrowthContent): Promise<HookRefineResult> {
+  const local = (reason: string): HookRefineResult => ({ hookOptions: buildHookOptionsLocal(content), synthesized: false, fallbackReason: reason });
+  if (growthBody(content).length < 40) return local('התוכן קצר מדי לחידוד AI — הוצגו חלופות מתוך הטקסט עצמו.');
+  try {
+    const res = await post('growth-optimize', growthRequest('hooks', content), 60000);
+    if (!res.ok) return local((await describeAiError(res)).message);
+    const data = (await res.json()) as { ok?: boolean; blocked?: boolean; hookOptions?: unknown };
+    if (data.blocked) return local('פלט ה-AI נחסם ע"י מסנן התוכן.');
+    const hookOptions = normalizeHookOptions(data.hookOptions);
+    if (!data.ok || hookOptions.length < 2) return local('מנוע ה-AI לא החזיר חלופות hook שמישות.');
+    return { hookOptions, synthesized: true };
+  } catch (err) {
+    return local((err as Error)?.message || 'הקריאה ל-AI נכשלה.');
+  }
+}
+
+export interface CheatSheetResult {
+  slideText: string;
+  shortLabel: string;
+  synthesized: boolean;
+  fallbackReason?: string;
+}
+
+/** One save-worthy summary unit. Resolves null only when neither the AI nor the offline builder
+ *  can make one (the content has fewer than two usable sentences). */
+export async function buildCheatSheet(content: GrowthContent): Promise<CheatSheetResult | null> {
+  const local = (reason: string): CheatSheetResult | null => {
+    const built = buildCheatSheetLocal(content);
+    return built ? { ...built, synthesized: false, fallbackReason: reason } : null;
+  };
+  if (growthBody(content).length < 40) return local('התוכן קצר מדי לסיכום AI.');
+  try {
+    const res = await post('growth-optimize', growthRequest('cheat-sheet', content), 60000);
+    if (!res.ok) return local((await describeAiError(res)).message);
+    const data = (await res.json()) as { ok?: boolean; blocked?: boolean; slideText?: unknown; shortLabel?: unknown };
+    if (data.blocked) return local('פלט ה-AI נחסם ע"י מסנן התוכן.');
+    const slideText = String(data.slideText ?? '').replace(/\s+/g, ' ').trim();
+    if (!data.ok || wordCount(slideText) < 18) return local('מנוע ה-AI לא החזיר סיכום שמיש.');
+    return { slideText, shortLabel: String(data.shortLabel ?? '').trim() || 'צ׳קליסט לשמירה', synthesized: true };
+  } catch (err) {
+    return local((err as Error)?.message || 'הקריאה ל-AI נכשלה.');
+  }
+}
+
+/**
+ * Re-validate the server's pack on this side of the wire, so the panel can rely on its invariants
+ * (a bidi-free single-word keyword, a CTA that carries it, ≤5 tags, 4–6 keywords) even if the two
+ * halves of the engine drift apart. Returns null when the lead magnet is missing altogether.
+ */
+function coerceGrowthPack(raw: unknown, content: GrowthContent, trigger: EngagementTrigger): GrowthPack | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (!r.leadMagnet || typeof r.leadMagnet !== 'object') return null;
+  const lm = r.leadMagnet as Record<string, unknown>;
+  const list = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x ?? '').trim()).filter(Boolean) : []);
+
+  const keyword = normalizeTriggerKeyword(String(lm.keyword ?? ''), normalizeTriggerKeyword(trigger.keyword, defaultTriggerKeyword(content.topic)));
+  const deliverable = String(lm.deliverable ?? '').trim() || trigger.deliverable.trim() || defaultDeliverable(content.kind);
+  const template = leadMagnetTemplate(keyword, deliverable);
+  const cta = String(lm.captionCta ?? '').trim();
+  const variants = [keyword, ...list(lm.triggerVariants).map((v) => normalizeTriggerKeyword(v, '')).filter(Boolean)];
+  const replies = list(lm.publicReplies).slice(0, 3);
+  const blended = blendHashtags(list(r.hashtags), content.topic);
+
+  return {
+    leadMagnet: {
+      keyword,
+      triggerVariants: [...new Set(variants)].slice(0, 6),
+      deliverable,
+      captionCta: cta && stripBidi(cta).includes(keyword) && !ENGAGEMENT_BAIT.test(cta) ? cta : template.captionCta,
+      publicReplies: replies.length >= 2 ? replies : template.publicReplies,
+      dmMessage: String(lm.dmMessage ?? '').trim() || template.dmMessage,
+      dmButtonLabel: String(lm.dmButtonLabel ?? '').trim().slice(0, 30) || template.dmButtonLabel,
+    },
+    hashtags: blended.hashtags,
+    nicheHashtags: blended.niche,
+    broadHashtags: blended.broad,
+    seoKeywords: normalizeSeoKeywords(r.seoKeywords, content.topic),
+    synthesized: true,
+    createdAt: Date.now(),
+  };
+}
+
+/** Lead magnet (Comment-to-DM) + blended hashtags + Instagram-search keywords. Never throws. */
+export async function fetchGrowthPack(content: GrowthContent, trigger: EngagementTrigger): Promise<GrowthPack> {
+  const local = (reason: string) => buildGrowthPackLocal(content, trigger, reason);
+  if (growthBody(content).length < 40) return local('התוכן קצר מדי לחבילת AI — הוצגה חבילה מקומית.');
+  try {
+    const res = await post('growth-optimize', growthRequest('pack', content, trigger), 60000);
+    if (!res.ok) return local((await describeAiError(res)).message);
+    const data = (await res.json()) as { ok?: boolean; blocked?: boolean; pack?: unknown };
+    if (data.blocked) return local('פלט ה-AI נחסם ע"י מסנן התוכן.');
+    if (!data.ok) return local('מנוע ה-AI לא החזיר חבילת צמיחה.');
+    return coerceGrowthPack(data.pack, content, trigger) ?? local('מבנה חבילת הצמיחה מה-AI לא היה שלם — הוצגה חבילה מקומית.');
+  } catch (err) {
+    return local((err as Error)?.message || 'הקריאה ל-AI נכשלה.');
   }
 }

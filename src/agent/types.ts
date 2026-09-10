@@ -55,9 +55,24 @@ export interface ReelScriptScene {
   mediaPrompt: string;
 }
 
+/** The six opener shapes the hook engine writes in (see HOOK_RETENTION_RULES in SocialAgentEngine.ts). */
+export type HookPattern = 'number' | 'contrarian' | 'risk' | 'result' | 'question' | 'myth';
+
+/** One first-3-seconds opener: what the viewer SEES (a visual pattern interrupt) plus what they
+ * READ/HEAR. Carousels use `line` as the cover headline; reels use it as the spoken + on-screen
+ * opener. Mirrored in dashboard/src/lib/agentTypes.ts. */
+export interface HookOption {
+  line: string;
+  visual: string;
+  pattern: HookPattern;
+}
+
 export interface ReelScript {
   /** 1–2 second opening line — must stop the scroll on its own. */
   hook: string;
+  /** Three alternative openers, strongest first — `hook` is normally a copy of the first. Optional:
+   * a deterministic fallback reel, or a model that skipped the field, simply has none. */
+  hookOptions?: HookOption[];
   scenes: ReelScriptScene[];
   cta: string;
 }

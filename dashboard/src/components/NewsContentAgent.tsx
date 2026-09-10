@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Newspaper,
   RefreshCw,
@@ -36,10 +36,12 @@ import { fetchNewsList } from '../lib/newsFeedClient';
 import { composeNewsPost, synthesizeNewsPost, citationDomain, type ComposedPost } from '../lib/newsPostComposer';
 import { renderNewsImage, type BgSource } from '../lib/newsImageComposer';
 import { renderStoryForItem, rerenderDeck, type SlideFormat } from '../lib/instagramStoryRenderer';
-import type { StoryPayload } from '../lib/storySlides';
+import { applySlideEdits, canInsertContentSlide, insertContentSlide, type StoryPayload } from '../lib/storySlides';
 import SlideEditorChat from './SlideEditorChat';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
+import GrowthScorePanel from './GrowthScorePanel';
+import { deckToGrowthContent, reelToGrowthContent } from '../lib/growthPlaybook';
 import { deckToCaption } from '../lib/socialPublish';
 import { loadDeck, saveDeckMeta, saveDeckImages, clearDeck } from '../lib/deckPersistence';
 import { synthesizeReel, reelToText } from '../lib/reelScriptApi';
@@ -120,6 +122,9 @@ export default function NewsContentAgent() {
   const [reelSynthesized, setReelSynthesized] = useState(false);
   const [reelFallbackReason, setReelFallbackReason] = useState<string | null>(null);
   const [reelCopied, setReelCopied] = useState(false);
+  // Minted per generation so the Growth panel starts clean for a regenerated script but keeps its
+  // state through hook swaps and added scenes (the reel has no persisted id of its own).
+  const [reelStamp, setReelStamp] = useState(0);
 
   // Reel VIDEO render (Step B/C) — assembles the current reelScript into a real 9:16 MP4 in the
   // browser (Pexels stills + Ken-Burns + burned-in Hebrew captions + Gemini TTS voiceover, muxed
@@ -148,6 +153,8 @@ export default function NewsContentAgent() {
   const [storyActive, setStoryActive] = useState(restored?.meta.activeIndex ?? 0);
   const [slideFormat, setSlideFormat] = useState<SlideFormat>(restored?.meta.format ?? '9:16');
   const storySeq = useRef(0);
+  // Growth-optimised carousel caption from the Growth panel ('' = none yet / panel unmounted).
+  const [growthCaption, setGrowthCaption] = useState('');
   // A restored deck whose images didn't fit the storage quota needs a one-time re-render.
   const needsImageRestore = useRef(!!restored && restored.images.length === 0);
 
@@ -361,6 +368,7 @@ export default function NewsContentAgent() {
       const { reel, synthesized, fallbackReason } = await synthesizeReel(item);
       setReelScript(reel);
       setReelItemId(item.id);
+      setReelStamp(Date.now());
       setReelSynthesized(synthesized);
       setReelFallbackReason(fallbackReason ?? null);
     } finally {
@@ -599,6 +607,49 @@ export default function NewsContentAgent() {
       }
     },
     [slideFormat]
+  );
+
+  // ─── Organic Growth panel adapters ─────────────────────────────────────────────────────────
+  // The carousel's base caption: the synthesised post when there is one, else the deck's own copy.
+  const deckCaption = storyPayload ? (post?.fullText || restoredPostText || deckToCaption(storyPayload)).trim() : '';
+  const deckGrowthContent = useMemo(() => (storyPayload ? deckToGrowthContent(storyPayload, deckCaption) : null), [storyPayload, deckCaption]);
+  const reelGrowthContent = useMemo(
+    () =>
+      reelScript
+        ? reelToGrowthContent(reelScript, { key: `${reelItemId ?? 'reel'}:${reelStamp}`, title: item?.title ?? '', topic: item?.topic ?? 'general' })
+        : null,
+    [reelScript, reelItemId, reelStamp, item?.title, item?.topic]
+  );
+
+  // Growth panel → put a hook on the cover and re-render on the same background.
+  const applyCoverHook = useCallback(
+    (line: string) => {
+      if (!storyPayload) return;
+      const n = storyPayload.slides.findIndex((s) => s.kind === 'cover') + 1;
+      if (n > 0) return applyStoryEdit(applySlideEdits(storyPayload, [{ n, kind: 'cover', text: line }]));
+    },
+    [storyPayload, applyStoryEdit]
+  );
+  const addCheatSheetSlide = useCallback(
+    (text: string) => (storyPayload ? applyStoryEdit(insertContentSlide(storyPayload, text)) : undefined),
+    [storyPayload, applyStoryEdit]
+  );
+  const applyReelHook = useCallback((line: string) => setReelScript((r) => (r ? { ...r, hook: line } : r)), []);
+  // The recap scene goes in before the closing scene, which the reel prompt writes to loop back to
+  // the hook. 7 scenes is the ceiling synthesizeReelScript itself enforces.
+  const addReelRecapScene = useCallback(
+    (text: string, label: string) =>
+      setReelScript((r) => {
+        if (!r || r.scenes.length >= 7) return r;
+        const scenes = [...r.scenes];
+        scenes.splice(Math.max(1, scenes.length - 1), 0, {
+          onScreenText: label,
+          voiceover: text,
+          mediaPrompt: 'IT professional reviewing a checklist on a tablet at a modern workstation, natural light, shallow depth of field, 35mm, photorealistic, 8k',
+        });
+        return { ...r, scenes };
+      }),
+    []
   );
 
   const downloadAllStorySlides = async () => {
@@ -1120,11 +1171,24 @@ export default function NewsContentAgent() {
                 </p>
 
                 <QuickPublishBar
-                  text={(post?.fullText || restoredPostText || deckToCaption(storyPayload)).trim()}
+                  text={growthCaption || deckCaption}
                   image={storyImages[Math.min(storyActive, storyImages.length - 1)]}
                   label="פרסום מהיר · קרוסלה"
                   className="mt-3 justify-center"
                 />
+
+                {deckGrowthContent && (
+                  <GrowthScorePanel
+                    key={deckGrowthContent.contentKey}
+                    content={deckGrowthContent}
+                    busy={storyRendering}
+                    onApplyHook={applyCoverHook}
+                    onAddCheatSheet={addCheatSheetSlide}
+                    canAddCheatSheet={canInsertContentSlide(storyPayload)}
+                    onCaptionChange={setGrowthCaption}
+                    className="mt-4"
+                  />
+                )}
 
                 <div className="mt-4">
                   <SlideEditorChat
@@ -1270,6 +1334,18 @@ export default function NewsContentAgent() {
                   <span className="block text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">CTA</span>
                   <p className="text-sm text-zinc-200 leading-relaxed">{reelScript.cta}</p>
                 </div>
+
+                {/* Organic Growth — first-3-seconds hook options, recap scene, Comment-to-DM + SEO */}
+                {reelGrowthContent && (
+                  <GrowthScorePanel
+                    key={reelGrowthContent.contentKey}
+                    content={reelGrowthContent}
+                    busy={videoRendering}
+                    onApplyHook={applyReelHook}
+                    onAddCheatSheet={addReelRecapScene}
+                    canAddCheatSheet={reelScript.scenes.length < 7}
+                  />
+                )}
 
                 {/* Video render — Step B/C: real MP4, encoded client-side (Pexels stills +
                     Ken-Burns + burned-in Hebrew captions + Gemini TTS, WebCodecs -> mp4-muxer). */}

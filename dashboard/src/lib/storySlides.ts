@@ -44,6 +44,14 @@ export interface StorySlide {
   source?: string;
 }
 
+/** Structural twin of agentTypes' HookOption — kept local so this engine, and its server copy in
+ * src/server/storySlides.ts, stay free of dashboard-only imports. */
+export interface StoryHookOption {
+  line: string;
+  visual: string;
+  pattern: string;
+}
+
 export interface StoryPayload {
   newsId: string;
   newsTitle: string;
@@ -57,6 +65,16 @@ export interface StoryPayload {
    * text, network) — surfaced in the dashboard so the operator sees why it fell back. */
   fallbackReason?: string;
   createdAt: number;
+  /** Three cover-hook alternatives from synthesis (first = the one on the cover). Absent on
+   * deterministic decks and on payloads persisted before hook options existed. */
+  hookOptions?: StoryHookOption[];
+  /** Lineage id — minted once per generation and carried through every edit (payload spreads keep
+   * it), so per-deck UI state such as the Growth panel's pack survives edits but not a regeneration. */
+  deckId?: string;
+}
+
+function newDeckId(sourceId: string): string {
+  return `${sourceId}:${Date.now().toString(36)}`;
 }
 
 /**
@@ -407,12 +425,28 @@ async function postStorySynth(url: string, headers: Record<string, string>, body
   }
 }
 
-/** Call the synth endpoint for one source; returns the raw SynthSlide[] or throws a descriptive
- * (Hebrew) error the caller can show and fall back on. */
+interface SynthResult {
+  slides: SynthSlide[];
+  hookOptions: StoryHookOption[];
+}
+
+/** Defensive read of the endpoint's optional cover-hook alternatives — anything malformed is
+ * dropped, and an older endpoint that sends none simply yields []. */
+function readHookOptions(raw: unknown): StoryHookOption[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((h) => (h && typeof h === 'object' ? (h as Record<string, unknown>) : {}))
+    .map((h) => ({ line: String(h.line ?? '').trim(), visual: String(h.visual ?? '').trim(), pattern: String(h.pattern ?? '').trim() }))
+    .filter((h) => h.line.length > 3)
+    .slice(0, 3);
+}
+
+/** Call the synth endpoint for one source; returns the raw SynthSlide[] (plus any cover-hook
+ * alternatives) or throws a descriptive (Hebrew) error the caller can show and fall back on. */
 async function requestSynthesis(
   src: SlideSource,
   opts: { apiBase: string; adminSecret?: string }
-): Promise<SynthSlide[]> {
+): Promise<SynthResult> {
   if (src.bodyText.trim().length < 60) throw new Error('הטקסט קצר מדי לסינתזת AI (פחות מ-60 תווים)');
 
   const res = await postStorySynth(
@@ -430,12 +464,12 @@ async function requestSynthesis(
   // is what buildSlides() stamps into `fallbackReason`, so it is read verbatim off the deck badge.
   if (!res.ok) throw new Error((await describeAiError(res)).message);
 
-  const data = (await res.json()) as { ok?: boolean; slides?: SynthSlide[]; blocked?: boolean };
+  const data = (await res.json()) as { ok?: boolean; slides?: SynthSlide[]; hookOptions?: unknown; blocked?: boolean };
   if (data.blocked) throw new Error('פלט ה-AI נחסם ע"י מסנן התוכן');
   if (!data.ok || !Array.isArray(data.slides) || data.slides.length < 3) {
     throw new Error('מנוע ה-AI לא החזיר מספיק שקופיות תקינות');
   }
-  return data.slides;
+  return { slides: data.slides, hookOptions: readHookOptions(data.hookOptions) };
 }
 
 /**
@@ -445,7 +479,7 @@ async function requestSynthesis(
  *     thin single line, ALL the content is re-grouped into balanced dense paragraphs.
  *   • CTA    = clean closing line.
  */
-function assembleSynthesized(src: SlideSource, synthSlides: SynthSlide[]): StoryPayload {
+function assembleSynthesized(src: SlideSource, synthSlides: SynthSlide[], hookOptions: StoryHookOption[] = []): StoryPayload {
   const kicker = KICKER[src.topic];
 
   const coverSynth = synthSlides.find((s) => s.kind === 'cover');
@@ -507,6 +541,8 @@ function assembleSynthesized(src: SlideSource, synthSlides: SynthSlide[]): Story
     slides,
     synthesized: true,
     createdAt: Date.now(),
+    deckId: newDeckId(src.id),
+    ...(hookOptions.length ? { hookOptions } : {}),
   });
 }
 
@@ -519,7 +555,7 @@ export async function synthesizeSlides(
   opts: { apiBase: string; adminSecret?: string }
 ): Promise<StoryPayload> {
   const synth = await requestSynthesis(src, opts);
-  return assembleSynthesized(src, synth);
+  return assembleSynthesized(src, synth.slides, synth.hookOptions);
 }
 
 // ─── FALLBACK: deterministic, source-grounded, no banks, no bullets ──────────────────────────
@@ -559,6 +595,7 @@ export function buildSlides(src: SlideSource, reason?: string): StoryPayload {
     synthesized: false,
     fallbackReason: reason,
     createdAt: Date.now(),
+    deckId: newDeckId(src.id),
   });
 }
 
@@ -599,6 +636,30 @@ export function applySlideEdits(payload: StoryPayload, edits: SlideEdit[]): Stor
     const body = ensureSentenceEnd(clean);
     return { ...s, kind: 'insight' as const, heading: '', narrativeText: body, body };
   });
+  stampIndexes(slides);
+  return finalizeDeck({ ...payload, slides, createdAt: Date.now() });
+}
+
+/** True while the deck still has room for one more content slide (MAX_CONTENT_SLIDES). */
+export function canInsertContentSlide(payload: StoryPayload): boolean {
+  const content = (payload?.slides ?? []).filter((s) => s && s.kind !== 'cover' && s.kind !== 'cta').length;
+  return content < MAX_CONTENT_SLIDES;
+}
+
+/**
+ * Insert one heading-less content slide right before the CTA — the Growth panel's save-worthy
+ * cheat-sheet slide. Same rules as every other content slide (meta-scrubbed, sentence-complete, no
+ * heading) and the same MAX_CONTENT_SLIDES budget: a full deck comes back unchanged rather than
+ * growing past what the carousel format and the progress bar were sized for.
+ */
+export function insertContentSlide(payload: StoryPayload, text: string): StoryPayload {
+  const body = ensureSentenceEnd(stripMetaPhrases((text || '').replace(/\s+/g, ' ').trim()));
+  if (!body || !canInsertContentSlide(payload)) return payload;
+  const kicker = payload.slides.find((s) => s.kind !== 'cover' && s.kind !== 'cta')?.kicker ?? KICKER[payload.topic] ?? '';
+  const slide: StorySlide = { kind: 'insight', index: 0, total: 0, kicker, heading: '', narrativeText: body, body };
+  const slides = [...payload.slides];
+  const ctaAt = slides.findIndex((s) => s.kind === 'cta');
+  slides.splice(ctaAt === -1 ? slides.length : ctaAt, 0, slide);
   stampIndexes(slides);
   return finalizeDeck({ ...payload, slides, createdAt: Date.now() });
 }

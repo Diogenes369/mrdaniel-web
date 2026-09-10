@@ -4,6 +4,7 @@ import type { ReelScript, ReelScriptScene } from './agentTypes';
 import { getAdminSecret } from './adminSecret';
 import { describeAiError } from './aiErrors';
 import { resolveArticleText } from './articleText';
+import { normalizeHookOptions } from './growthPlaybook';
 
 /**
  * Client lib for the "תסריט לרילס" (Reel Generator) mode in NewsContentAgent — article-grounded
@@ -111,7 +112,9 @@ export async function synthesizeReel(item: NewsItem): Promise<ReelResult> {
     if (!data.ok || !data.reel || !Array.isArray(data.reel.scenes) || data.reel.scenes.length < 3) {
       return { reel: buildFallbackReel(item), synthesized: false, fallbackReason: 'מנוע ה-AI לא החזיר תסריט שמיש' };
     }
-    return { reel: data.reel, synthesized: true };
+    // Hook options are optional and model-shaped — normalised here so every consumer can trust them.
+    const hookOptions = normalizeHookOptions(data.reel.hookOptions);
+    return { reel: { ...data.reel, hookOptions: hookOptions.length ? hookOptions : undefined }, synthesized: true };
   } catch (e) {
     return { reel: buildFallbackReel(item), synthesized: false, fallbackReason: (e as Error).message || 'שגיאת רשת מול מנוע ה-AI' };
   }
@@ -123,6 +126,11 @@ export function reelToText(reel: ReelScript, title?: string): string {
   const lines: string[] = [];
   if (title) lines.push(`תסריט רילס — ${title}`, '='.repeat(30), '');
   lines.push(`HOOK: ${reel.hook}`, '');
+  if (reel.hookOptions?.length) {
+    lines.push('חלופות ל-3 השניות הראשונות:');
+    reel.hookOptions.forEach((h, i) => lines.push(`  ${i + 1}. ${h.line}${h.visual ? `  [ויזואל: ${h.visual}]` : ''}`));
+    lines.push('');
+  }
   reel.scenes.forEach((s, i) => {
     lines.push(`סצנה ${i + 1}`);
     lines.push(`  טקסט על המסך: ${s.onScreenText}`);

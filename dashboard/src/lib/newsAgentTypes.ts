@@ -54,3 +54,12 @@ export const SITE_DOMAIN = 'mrdaniel.co.il';
 /** MANDATORY on every generated post — appended verbatim as the final block. */
 export const SITE_PROMO_FOOTER =
   '💡 אהבתם את התוכן? לעוד עדכונים, חדשות בזמן אמת ופתרונות סוכני AI מתקדמים – היכנסו עכשיו לאתר: mrdaniel.co.il';
+
+/** The deterministic post composer's stock engagement prompts (newsPostComposer.ts · postTail).
+ *  Exported so the Growth caption composer can drop them when a lead-magnet CTA takes the closing
+ *  slot — one clear ask converts better than two competing ones. */
+export const GENERIC_ENGAGEMENT_LINE: Record<SocialPlatform, string> = {
+  linkedin: 'מה דעתכם? האם הארגון שלכם ערוך לזה?',
+  instagram: 'שתפו בתגובות מה הכי מפתיע אתכם כאן 👇',
+};
+export const GENERIC_ENGAGEMENT_LINES: string[] = Object.values(GENERIC_ENGAGEMENT_LINE);

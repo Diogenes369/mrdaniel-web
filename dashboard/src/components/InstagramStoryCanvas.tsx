@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Newspaper,
   RefreshCw,
@@ -14,11 +14,13 @@ import {
 import { CATEGORY_LABEL, type NewsCategory, type NewsItem, type NewsTopic } from '../lib/newsAgentTypes';
 import { fetchNewsList } from '../lib/newsFeedClient';
 import { renderStoryForItem, renderSlidesForText, rerenderDeck, type SlideFormat, type RenderedDeck } from '../lib/instagramStoryRenderer';
-import type { StoryPayload } from '../lib/storySlides';
+import { applySlideEdits, canInsertContentSlide, insertContentSlide, type StoryPayload } from '../lib/storySlides';
 import SlideEditorChat from './SlideEditorChat';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
+import GrowthScorePanel from './GrowthScorePanel';
 import { deckToCaption } from '../lib/socialPublish';
+import { deckToGrowthContent } from '../lib/growthPlaybook';
 
 const CATEGORIES: NewsCategory[] = ['cyber', 'ai', 'tech', 'all'];
 const TOPIC_LABEL: Record<string, string> = { ai: 'AI', cyber: 'סייבר', cloud: 'ענן / IT', general: 'גאדג׳טים / טק' };
@@ -73,6 +75,8 @@ export default function InstagramStoryCanvas() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const seq = useRef(0);
+  // Growth-optimised caption from the Growth panel ('' = none yet / panel unmounted).
+  const [growthCaption, setGrowthCaption] = useState('');
 
   const fetchNews = useCallback(
     async (autoSelect = false) => {
@@ -227,6 +231,21 @@ export default function InstagramStoryCanvas() {
   };
 
   const canPreview = payload && images.length > 0;
+
+  const baseCaption = payload ? deckToCaption(payload) : '';
+  const growthContent = useMemo(() => (payload ? deckToGrowthContent(payload, baseCaption) : null), [payload, baseCaption]);
+
+  // Growth panel → hook onto the cover / cheat-sheet slide before the CTA, via the same
+  // re-render-on-the-same-background path the slide editor uses.
+  const applyCoverHook = useCallback(
+    (line: string) => {
+      if (!payload) return;
+      const n = payload.slides.findIndex((s) => s.kind === 'cover') + 1;
+      if (n > 0) return applyEdit(applySlideEdits(payload, [{ n, kind: 'cover', text: line }]));
+    },
+    [payload, applyEdit]
+  );
+  const addCheatSheetSlide = useCallback((text: string) => (payload ? applyEdit(insertContentSlide(payload, text)) : undefined), [payload, applyEdit]);
 
   return (
     <div className="space-y-5">
@@ -504,10 +523,23 @@ export default function InstagramStoryCanvas() {
 
           {payload && images.length > 0 && (
             <QuickPublishBar
-              text={deckToCaption(payload)}
+              text={growthCaption || baseCaption}
               image={images[Math.min(active, images.length - 1)]}
               label="פרסום מהיר · קרוסלה"
               className="mt-3 justify-center"
+            />
+          )}
+
+          {payload && growthContent && images.length > 0 && (
+            <GrowthScorePanel
+              key={growthContent.contentKey}
+              content={growthContent}
+              busy={rendering}
+              onApplyHook={applyCoverHook}
+              onAddCheatSheet={addCheatSheetSlide}
+              canAddCheatSheet={canInsertContentSlide(payload)}
+              onCaptionChange={setGrowthCaption}
+              className="mt-4"
             />
           )}
 

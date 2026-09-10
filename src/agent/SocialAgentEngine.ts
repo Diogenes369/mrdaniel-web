@@ -22,7 +22,7 @@ export { stripCodeFence, requireText, parseJsonOrThrow, ModelOutputError };
 export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
-import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck } from './types.js';
+import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern } from './types.js';
 
 
 // --- Brand knowledge base ------------------------------------------------------------------
@@ -95,6 +95,44 @@ export const ENGAGEMENT_RULES = `הנעה למעורבות — הפוסט נמד
    - שורה ריקה בין כל בלוק. פסקה לא עולה על 3 משפטים.
    - העובדות המרכזיות יורדות לשורות נפרדות (בולט או אימוג'י מוביל לפי הפורמט של הערוץ), לא נדחסות לתוך פסקה אחת.`;
 
+/**
+ * Hook & retention contract for the short-form visual formats (reels, carousels, stories).
+ *
+ * Instagram distributes a reel or a carousel on what happens in its first seconds — the swipe to
+ * slide 2, the watch past second 3 — so an accurate deck that opens on a label still dies in the
+ * feed. This is the opening half of that contract; SAVE_SHARE_RULES below is the closing half.
+ * Like ENGAGEMENT_RULES it is strictly additive: every grounding rule in the host prompt wins on
+ * conflict, so "punchier" can never license a number the source did not contain. Shared with
+ * src/server/igGrowthStrategy.ts, which applies the same rules when the operator asks the Growth
+ * panel for sharper openers after the fact.
+ */
+export const HOOK_RETENTION_RULES = `מנוע Hook ושימור — 3 השניות הראשונות מחליטות אם התוכן יופץ:
+1. Hook = הפרעת דפוס ויזואלית + משפט חד. הוויזואל עוצר את האגודל (תקריב פתאומי, מספר ענק על המסך, קו אדום שמוחק הנחה נפוצה, מסך שגיאה, מסך מפוצל לפני/אחרי); המשפט נותן סיבה להישאר. עד 10 מילים, בלי פתיחים שמבזבזים שנייה ("אז", "היום נדבר על", "שלום לכולם").
+2. תבניות hook מוכחות — בחר את זו שהמקור באמת תומך בה:
+   • number — מספר או נתון מהמקור בראש המשפט.
+   • contrarian — "כולם עושים X, בפועל Y" — סתירה לאינטואיציה.
+   • risk — הטעות או הסיכון הקונקרטי שהקורא כנראה עושה עכשיו.
+   • result — התוצאה קודם, התהליך אחר כך.
+   • question — שאלה חדה שאי אפשר לענות עליה בלי להמשיך.
+   • myth — מיתוס נפוץ שנשבר מול עובדה מהמקור.
+3. מבחן ההחלפה: אם אפשר להדביק את ה-hook על תוכן אחר מאותו תחום — הוא גנרי. כתוב אותו מחדש עם פרט ספציפי מהמקור.
+4. שימור אחרי ה-hook: הפריים או השקופית השנייה משלמים על ההבטחה מיד — ערך ראשון, לא הקדמה ולא רקע. מותר לפתוח לולאה אחת ("והנקודה השלישית היא זו שרוב העסקים מפספסים") ולסגור אותה רק בסוף, כדי שתהיה סיבה להגיע לסוף.
+5. אסור: clickbait שהתוכן לא מקיים, "לא תאמינו מה קרה", הבטחה שאין לה כיסוי בטקסט, או מספר שלא מופיע במקור. hook מדויק וחד עדיף על hook מנופח — אמינות היא מה שמביא עוקבים איכותיים.`;
+
+/**
+ * Save & share architecture — the other half of the retention contract.
+ *
+ * Saves and DM sends are the strongest ranking signals Instagram exposes for a B2B-technical niche,
+ * far above likes, and a deck earns them by leaving the reader with something to DO. Kept apart from
+ * HOOK_RETENTION_RULES because not every host prompt can take all of it: the 5-slide story deck is
+ * paragraph-only by a hard layout rule, so it gets a tailored one-line version instead of this block.
+ */
+export const SAVE_SHARE_RULES = `ארכיטקטורת שמירה ושיתוף — שמירות ושליחות ב-DM הן האותות החזקים ביותר לאלגוריתם, הרבה מעל לייקים:
+1. כל יחידת תוכן (שקופית או סצנה) משאירה את הקורא עם משהו שאפשר לעשות: צעד, בדיקה, הגדרה, פרומפט או החלטה — לא רק "מה קרה".
+2. מבנה שנשמר: צ'קליסט ("4 בדיקות לפני ש..."), תהליך AI צעד-אחר-צעד, רשימת פרומפטים מוכנים להעתקה, השוואת לפני/אחרי או טעות/תיקון. בחר את המבנה שהמקור באמת תומך בו — לא כולם בכל תוכן.
+3. טריגר שיתוף: ניסוח שגורם לקורא לחשוב על אדם מסוים ("שלחו את זה למי שמנהל את ה-IT אצלכם") — פעם אחת לכל היותר, לא בכל שקופית.
+4. הסתמכות על המקור גוברת על כל האמור כאן: צעדים, כלים ומספרים רק מהטקסט שסופק. אם המקור הוא ידיעה בלי צעדים — הצעדים הם ההשלכות המעשיות שהמקור עצמו מתאר, לא עצות כלליות מהמדף.`;
+
 export const HEBREW_COPY_RULES = `כללי כתיבה בעברית — מחייבים, ללא יוצא מן הכלל:
 - כל הטקסט חייב להיות בעברית תקנית ואיכותית — כותרות, כותרות משנה, גוף הטקסט, ה-Hook, ה-CTA, הכיתוב, שמות השקפים, הכול. אין לחרוג מכלל זה בשום נסיבה, גם אם הנושא שסופק כתוב באנגלית.
 - אנגלית מותרת אך ורק עבור: (1) מונחים טכניים שאין להם מקבילה עברית טבעית ומובנת (למשל: Zero-Trust, RAG, API, Prompt Injection) — במקרה כזה כתוב את המונח הטכני באנגלית בתוך משפט עברי, לא משפט שלם באנגלית; (2) שמות מותג/מוצר (LinkedIn, Instagram, Wi-Fi 7, MrDaniel.co.il); (3) קטעי קוד אם רלוונטי. מעבר לכך — אסור לחלוטין לכתוב משפטים, פסקאות או קריאות לפעולה באנגלית.
@@ -144,6 +182,8 @@ const VIDEO_SCRIPT_SYSTEM_INSTRUCTION = `אתה כותב תסריטים ל-TikTo
 ${BRAND_KNOWLEDGE_BASE}
 
 ${HEBREW_COPY_RULES}
+
+${HOOK_RETENTION_RULES}
 
 מבנה מחייב — Hook חזק ב-2 השניות הראשונות, 3-5 סצנות קצרות (משפט טקסט על המסך + שורת קריינות לכל סצנה), וסיום עם CTA קצר וברור (לא מכירתי אגרסיבי — משהו כמו "עקבו להמשך" או "שאלה בתגובות?").
 
@@ -288,7 +328,9 @@ export async function generateSocialContent(platform: Platform, topic: string, f
   const platformName = platform === 'linkedin' ? 'LinkedIn' : platform === 'tiktok' ? 'TikTok' : 'Instagram';
   const formatInstruction =
     format === 'carousel'
-      ? `בנה קרוסלה מקצועית ברמה גבוהה בת 7-9 שקפים ל-${platformName}, בסגנון קרוסלת "ציטוט/תובנה" עיתונאית מעמיקה (כמו ice.co.il) — פירוק אמיתי של הנושא למספר תתי-נושאים, לא רשימת נקודות שטחיות. כל שקף גוף הוא פסקה עשירה, לא משפט בודד, וכל שקף בונה על הקודם ליצירת קשת סיפורית אחת קוהרנטית מההוק ועד ה-CTA — לא נקודות מנותקות זו מזו:
+      ? `${HOOK_RETENTION_RULES}
+
+בנה קרוסלה מקצועית ברמה גבוהה בת 7-9 שקפים ל-${platformName}, בסגנון קרוסלת "ציטוט/תובנה" עיתונאית מעמיקה (כמו ice.co.il) — פירוק אמיתי של הנושא למספר תתי-נושאים, לא רשימת נקודות שטחיות. כל שקף גוף הוא פסקה עשירה, לא משפט בודד, וכל שקף בונה על הקודם ליצירת קשת סיפורית אחת קוהרנטית מההוק ועד ה-CTA — לא נקודות מנותקות זו מזו:
 - שקף 1 (Hook/כותרת): משפט קליטה אחד שעוצר גלילה — שאלה חדה או סטטמנט שנוגד אינטואיציה, קשור ישירות לנושא. עד 12 מילה, ייקרא ככותרת מרכזית.
 - שקפי גוף (5-7 שקפים): כל שקף הוא פסקה מלאה של 3-4 משפטים, 50-70 מילה — תת-נושא ממוקד אחד מתוך הנושא הכללי, מוסבר לעומק עם דוגמה או הבחנה טכנית אמיתית, לא רק כותרת מורחבת. חובה: כל שקף ממשיך את קו המחשבה מהשקף שלפניו (מבוא → מנגנון → יישום/הבדל מעשי → משמעות) כך שקריאת כל השקפים ברצף מרגישה כמו כתבה אחת, לא כמו רשימת "5 עובדות". בכל פסקה, סמן בדיוק ביטוי מפתח אחד (2-6 מילים, החלק החזק/המפתיע ביותר) בעטיפת כוכביות כפולות בפורמט **הביטוי המודגש** — זה ירונדר כטקסט מודגש בעיצוב, בדיוק כמו ההדגשה האמצע-פסקה בציטוטים של ice.co.il. אל תדגיש יותר מביטוי אחד לשקף.
 - שקף אחרון (CTA): קריאה לפעולה ברורה וחזקה, קצרה (עד 15 מילה) — תגובה/שמירה/פנייה, לא מכירתי אגרסיבי. אפשר לסמן מילה אחת ב-** אם רלוונטי.
@@ -546,6 +588,12 @@ const STORY_SYNTH_SYSTEM_INSTRUCTION = `אתה עורך תוכן טכנולוג�
 ד. קבץ עובדות קשורות יחד לפסקה מגובשת. כל שקופית מפתחת נושא אחר (למשל: מה הושק והמספרים; היכולת הטכנית והארכיטקטורה; תגובת השוק וההשלכה המעשית).
 ה. חלק את החומר באופן מאוזן — פסקאות באורך דומה, לא אחת ארוכה ושתיים קצרות.
 
+שימור וערך לשמירה — חלים על המבנה שלמעלה ולא מחליפים אותו:
+${HOOK_RETENTION_RULES}
+- בקרוסלה הזו ה-title של שקופית השער הוא ה-hook: עד 12 מילים, באחת התבניות שלמעלה, בנוי מהעובדה החזקה ביותר במקור. הוויזואל של השער הוא תמונת הרקע והכותרת בלבד, ולכן ה-hook חייב לעבוד כטקסט לבדו.
+- שקופית התוכן הראשונה (שקופית 2) נפתחת בעובדה החזקה או המפתיעה ביותר — לא ברקע ולא בהקדמה — כדי שתהיה החלקה לשקופית הבאה.
+- כל פסקת תוכן כוללת לפחות פרט אחד שבעל עסק יכול לפעול לפיו או לבדוק אצלו, כפי שהמקור מתאר אותו — בתוך הפסקה, לא כרשימה.
+
 חוקים מחייבים:
 1. הסתמכות מוחלטת על הטקסט: כל עובדה חייבת להופיע בטקסט המקור. אסור להמציא, אסור ידע כללי, ואסור משפטי מדף גנריים ("יש בינה מלאכותית", "אבטחה היא חלק מהאפיון"). עובדה שלא בטקסט — לא נכנסת.
 2. חילוץ עובדות חמות: מספרים, אחוזים, סכומים, שמות חברות ומוצרים, גרסאות, תאריכים, ציטוטים — הכניסו אותם לשקופיות התוכן.
@@ -553,7 +601,10 @@ const STORY_SYNTH_SYSTEM_INSTRUCTION = `אתה עורך תוכן טכנולוג�
 4. טקסט נקי בלבד: אסור לחלוטין להוסיף תוויות מסגור, כותרות-על או הערות עורך בתוך הטקסט — למשל "ההקשר:", "הקשר טכני:", "נא לשים לב", "כותרת:", "כמה נקודות מעבר לכתבה", "הידיעה שפורסמה תחת הכותרת ...". השקופית מכילה אך ורק פסקת נרטיב ישירה על החדשות/התובנה.
 5. אכיפת מיתוג: אסור להזכיר את שם הכותב/המחבר המקורי, "מאת", "נכתב ע\"י", כינויי משתמש (@), שמות רשתות חברתיות ("פוסט ב-LinkedIn", "X תגובות על LinkedIn", "via Twitter") או כל קרדיט חיצוני. אין לצטט את הכותרת המקורית מילה במילה. המותג היחיד הוא mrdaniel.co.il.
 
-פלט: JSON array בלבד, בלי טקסט מסביב. כל איבר: { "kind": "cover|body|takeaway|cta", "title": "...", "narrativeText": "..." } — כאשר title בשקופיות body/takeaway/cta הוא תמיד "".`;
+פלט: אובייקט JSON בלבד, בלי טקסט מסביב:
+{"hookOptions":[{"line":"...","visual":"...","pattern":"number|contrarian|risk|result|question|myth"}],"slides":[{ "kind": "cover|body|takeaway|cta", "title": "...", "narrativeText": "..." }]}
+- hookOptions: בדיוק 3 חלופות hook לשקופית השער, כל אחת בתבנית (pattern) אחרת. הראשונה זהה מילה במילה ל-title של שקופית השער. visual = משפט קצר בעברית: מה רואים בשנייה הראשונה (הפרעת הדפוס הוויזואלית שמתאימה לחלופה).
+- ב-slides: title בשקופיות body/takeaway/cta הוא תמיד "".`;
 
 function mapSynthKind(k: unknown): SynthesizedSlide['kind'] {
   const s = String(k || '').toLowerCase();
@@ -634,12 +685,57 @@ function dropRedundantLead(title: string, body: string): string {
   return overlap >= 0.6 ? parts.slice(1).join(' ').trim() : body;
 }
 
+const HOOK_PATTERNS: readonly HookPattern[] = ['number', 'contrarian', 'risk', 'result', 'question', 'myth'];
+
+/** A hook's pattern read off its wording, for when the model left the field empty or invented one. */
+function inferHookPattern(line: string): HookPattern {
+  if (/\d/.test(line)) return 'number';
+  if (/\?\s*$/.test(line)) return 'question';
+  if (/מיתוס|לא נכון|שקר/.test(line)) return 'myth';
+  if (/טעות|סיכון|נפרץ|פריצ|דליפ|חשוף|מסוכן|אזהרה/.test(line)) return 'risk';
+  if (/בפועל|רוב ה|כולם|במקום|אף אחד/.test(line)) return 'contrarian';
+  return 'result';
+}
+
+/**
+ * Normalises the model's hook alternatives: sanitised Hebrew, de-duplicated, pattern coerced onto
+ * the six the dashboard knows, capped at `max`. Never throws — a missing or malformed list yields
+ * [], and every caller treats hook options as an optional extra on top of an already-valid result.
+ */
+export function coerceHookOptions(raw: unknown, max = 3): HookOption[] {
+  if (!Array.isArray(raw)) return [];
+  const out: HookOption[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const rec = (item && typeof item === 'object' ? item : { line: item }) as Record<string, unknown>;
+    const line = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.line ?? rec.hook ?? rec.text ?? '').replace(/\s+/g, ' ').trim()))).slice(0, 140);
+    if (line.length < 4) continue;
+    const key = line.replace(/[^\p{L}\p{N}]/gu, '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const pattern = String(rec.pattern ?? '').toLowerCase().trim() as HookPattern;
+    out.push({
+      line,
+      visual: stripMetaFraming(sanitizeHebrewText(String(rec.visual ?? '').replace(/\s+/g, ' ').trim())).slice(0, 160),
+      pattern: HOOK_PATTERNS.includes(pattern) ? pattern : inferHookPattern(line),
+    });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+export interface SynthesizedStoryDeck {
+  slides: SynthesizedSlide[];
+  /** Three cover-hook alternatives, the first matching the cover. [] when the model skipped them. */
+  hookOptions: HookOption[];
+}
+
 export async function synthesizeStorySlides(input: {
   title: string;
   source: string;
   topic: string;
   articleText: string;
-}): Promise<SynthesizedSlide[]> {
+}): Promise<SynthesizedStoryDeck> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
   const { clean } = sanitizeInput(input.articleText.slice(0, 8000));
   if (clean.trim().length < 40) throw new Error('article text too thin to summarise');
@@ -663,6 +759,9 @@ export async function synthesizeStorySlides(input: {
   const parsed = parseJsonOrThrow(raw, 'synthesizeStorySlides') as unknown;
   const arr = Array.isArray(parsed) ? parsed : (parsed as { slides?: unknown[] })?.slides;
   if (!Array.isArray(arr)) throw new Error('model did not return a slide array');
+  // The object form carries the three cover-hook alternatives; a bare array (the pre-hook contract,
+  // which the model still occasionally returns) simply has none — the deck itself is unaffected.
+  const hookOptions = Array.isArray(parsed) ? [] : coerceHookOptions((parsed as { hookOptions?: unknown })?.hookOptions);
 
   const slides = arr
     .map((s): SynthesizedSlide => {
@@ -685,7 +784,7 @@ export async function synthesizeStorySlides(input: {
   // Need at least a cover + one real content slide + a cta; the dashboard splits a single rich
   // content slide into two so the rendered story is never fewer than 4.
   if (slides.length < 3 || bodyCount < 1) throw new Error('model returned too few usable content slides');
-  return slides;
+  return { slides, hookOptions };
 }
 
 // --- WEB3 Carousel Studio — long-form (10–14 slide) structured Hebrew deck synthesis ----------
@@ -728,8 +827,13 @@ ${BRAND_KNOWLEDGE_BASE}
 
 ${HEBREW_COPY_RULES}
 
+${HOOK_RETENTION_RULES}
+
+${SAVE_SHARE_RULES}
+
 מבנה הקרוסלה:
-1. שקופית פתיחה (role:"hook", layout:"hero") — כותרת שעוצרת גלילה ב-1-2 שניות + subhead שמייצר פער סקרנות + readingTime (למשל "3 דק׳ קריאה"). body ="" , bullets=[].
+1. שקופית פתיחה (role:"hook", layout:"hero") — כותרת שעוצרת גלילה ב-1-2 שניות לפי מנוע ה-Hook שלמעלה (עד 10 מילים, באחת התבניות) + subhead שפותח את הלולאה ומייצר פער סקרנות + readingTime (למשל "3 דק׳ קריאה"). body ="" , bullets=[].
+   שקופית הערך הראשונה אחרי ה-hero משלמת את ההבטחה מיד. לפחות אחת משקופיות הערך היא נכס לשמירה — "checklist", או "prompt" כשיש בתקציר חומר מתאים.
 2..N. שקופיות ערך (role:"value") — 8 עד 12 שקופיות. לכל שקופית בחר את ה-layout שמתאים לתוכן:
    • "value" — פסקת נרטיב אחת, 25–55 מילים, זורמת, בשדה body. headline קצר (עד 6 מילים).
    • "checklist" — headline + bullets: 3–5 פריטים קצרים ופעילים (לא משפטים ארוכים).
@@ -738,7 +842,7 @@ ${HEBREW_COPY_RULES}
    • "prompt" — headline + code: פרומפט מוכן-להעתקה או קטע קוד קצר (עד 6 שורות) שהקורא יכול להשתמש בו מיד. אם אין בתקציר חומר מתאים לפרומפט — אל תשתמש ב-layout הזה.
    • "quote" — quote: משפט מפתח חד וזכיר מהתוכן (עד 20 מילים) + body: שורת חיזוק קצרה.
    גיוון: אל תשתמש באותו layout יותר מ-3 פעמים. שלב לפחות 3 סוגים שונים. הראשונה אחרי ה-hero תהיה "value" או "checklist".
-אחרונה. שקופית סיום (role:"cta", layout:"cta") — headline: קריאה לפעולה אסטרטגית (לא מכירתית אגרסיבית) שמפנה ל-mrdaniel.co.il ולעקוב אחרי הפרופיל. body: משפט תמיכה קצר.
+אחרונה. שקופית סיום (role:"cta", layout:"cta") — headline: קריאה לפעולה אסטרטגית (לא מכירתית אגרסיבית) שמפנה ל-mrdaniel.co.il ולעקוב אחרי הפרופיל. body: משפט תמיכה קצר שמזמין לשמור את הקרוסלה או לשלוח אותה למי שזה רלוונטי עבורו.
 
 חוקים מחייבים:
 1. הסתמכות מוחלטת על התקציר: כל עובדה, מספר, שם מוצר או ציטוט חייב להופיע בטקסט המקור. אסור להמציא, אסור ידע כללי, אסור משפטי מדף גנריים.
@@ -1296,15 +1400,24 @@ ${BRAND_KNOWLEDGE_BASE}
 
 ${HEBREW_COPY_RULES}
 
-קיבלת טקסט מקור מלא. הפק תסריט רילס קצר (25–40 שניות, 4–6 סצנות) שמתמצת את הכתבה לפורמט וידאו קצר וקולט.
+${HOOK_RETENTION_RULES}
+
+${SAVE_SHARE_RULES}
+
+קיבלת טקסט מקור מלא. הפק תסריט רילס קצר (20–35 שניות, 4–6 סצנות) שמתמצת את הכתבה לפורמט וידאו קצר וקולט, בנוי לצפייה עד הסוף.
 
 מבנה מחייב:
-1. "hook" — משפט פתיחה של 1–2 שניות שעוצר גלילה מיידית: שאלה חדה, סטטמנט שנוגד אינטואיציה, או מספר/עובדה מפתיעה מהכתבה. לעולם לא "בעולם של היום" או פתיח קלישאתי.
-2. "scenes" — מערך של 4–6 סצנות, כל אחת עם:
-   - "onScreenText": שורת טקסט קצרה שתופיע על המסך (עד 8–10 מילים, לא משפט מלא ארוך).
+1. "hookOptions" — בדיוק 3 פתיחים חלופיים ל-3 השניות הראשונות, כל אחד בתבנית אחרת, החזק ביותר ראשון:
+   - "line": המשפט שנאמר ומופיע על המסך — עד 10 מילים, ספציפי לכתבה.
+   - "visual": הפרעת הדפוס הוויזואלית בשנייה 0–1, בעברית (מה רואים: תקריב, טקסט ענק, קאט חד, מסך מפוצל).
+   - "pattern": אחד מ-number | contrarian | risk | result | question | myth.
+   לעולם לא "בעולם של היום" או פתיח קלישאתי.
+2. "hook" — זהה מילה במילה ל-line של הפתיח הראשון ב-hookOptions.
+3. "scenes" — מערך של 4–6 סצנות (כ-3–6 שניות כל אחת). הסצנה הראשונה משלמת את הבטחת ה-hook תוך 3 שניות; אם המקור תומך — סצנה אחת היא סיכום לשמירה (צעדים או בדיקות ממוספרים); הסצנה האחרונה מתחברת חזרה ל-hook כך שהלולאה נסגרת וצפייה חוזרת מרגישה טבעית. כל סצנה עם:
+   - "onScreenText": שורת טקסט קצרה שתופיע על המסך (עד 8–10 מילים, לא משפט מלא ארוך). בסצנה הראשונה — כולל את מילת המפתח המרכזית של הנושא (אינסטגרם קורא טקסט מהמסך לחיפוש).
    - "voiceover": מה שנקרא בקול באותה סצנה — משפט או שניים, טבעי לדיבור (לא כתיבה פורמלית).
    - "mediaPrompt": פרומפט ויזואלי לג'נרטור תמונה/וידאו — **באנגלית**, ספציפי ופוטוריאליסטי (לא אבסטרקטי/קריקטורי/"AI art" גנרי): צילום אנטרפרייז IT/סייבר/AI אמיתי (server racks, SOC/NOC room, engineer at a workstation, data center, dashboard screens), עם ספק'ים טכניים (35mm, natural lighting, shallow depth of field, 8k) שמתאימים לתוכן הספציפי של הסצנה.
-3. "cta" — קריאה לפעולה קצרה לאינסטגרם: מפנה לעקוב / לפרופיל / ל-mrdaniel.co.il, לא מכירתית אגרסיבית.
+4. "cta" — קריאה לפעולה קצרה לאינסטגרם שדוחפת שמירה, שליחה לחבר או מעקב (לא "לייק"), ומפנה ל-mrdaniel.co.il. לא מכירתית אגרסיבית.
 
 חוקים מחייבים:
 - הסתמכות מוחלטת על הטקסט: כל עובדה/מספר/שם חייבים להופיע בטקסט המקור. אסור להמציא.
@@ -1313,7 +1426,7 @@ ${HEBREW_COPY_RULES}
 - אין תוויות מסגור ("הקשר:", "כותרת:") בתוך onScreenText/voiceover.
 
 פלט: JSON תקין בלבד, בלי markdown code fence:
-{"hook":"...","scenes":[{"onScreenText":"...","voiceover":"...","mediaPrompt":"..."}],"cta":"..."}`;
+{"hookOptions":[{"line":"...","visual":"...","pattern":"..."}],"hook":"...","scenes":[{"onScreenText":"...","voiceover":"...","mediaPrompt":"..."}],"cta":"..."}`;
 
 export async function synthesizeReelScript(input: {
   title: string;
@@ -1343,7 +1456,9 @@ export async function synthesizeReelScript(input: {
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow(raw, 'synthesizeReelScript') as Record<string, unknown>;
 
-  const hook = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(parsed.hook ?? '').trim()))).slice(0, 180);
+  const hookOptions = coerceHookOptions(parsed.hookOptions);
+  // `hook` is meant to be a copy of the strongest option; when the model left it empty, promote it.
+  const hook = (stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(parsed.hook ?? '').trim()))) || hookOptions[0]?.line || '').slice(0, 180);
   const cta = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(parsed.cta ?? '').trim()))).slice(0, 220);
   const scenesRaw = Array.isArray(parsed.scenes) ? parsed.scenes : [];
   const scenes: ReelScriptScene[] = scenesRaw
@@ -1361,6 +1476,7 @@ export async function synthesizeReelScript(input: {
 
   return {
     hook,
+    ...(hookOptions.length ? { hookOptions } : {}),
     scenes: scenes.slice(0, 7),
     cta: cta || 'עקבו לעוד תוכן על AI, סייבר ופיתוח — mrdaniel.co.il',
   };
