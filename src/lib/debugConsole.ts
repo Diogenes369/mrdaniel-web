@@ -13,8 +13,11 @@ export function isDebugMode(): boolean {
 export function initDebugConsoleIfRequested() {
   if (!isDebugMode()) return;
 
-  import('eruda').then(({ default: eruda }) => {
-    eruda.init();
-    console.info('[debug] eruda console initialized — open the floating button to inspect logs/network/elements.');
-  });
+  import('eruda')
+    .then(({ default: eruda }) => {
+      eruda.init();
+      console.info('[debug] eruda console initialized — open the floating button to inspect logs/network/elements.');
+    })
+    // A debug aid that fails to load is not worth an unhandled rejection in the page.
+    .catch((err) => console.warn('[debug] eruda failed to load:', err));
 }

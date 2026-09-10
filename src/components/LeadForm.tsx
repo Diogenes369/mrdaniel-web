@@ -25,12 +25,7 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 // Firebase (~200KB gzipped) is dynamically imported, not statically — same reasoning as App.tsx's
 // own `loadTracker`, kept out of this modal's bundle until a visitor actually interacts with it.
-type TrackerModule = typeof import('../lib/tracker');
-let trackerPromise: Promise<TrackerModule> | null = null;
-function loadTracker(): Promise<TrackerModule> {
-  if (!trackerPromise) trackerPromise = import('../lib/tracker');
-  return trackerPromise;
-}
+import { loadTracker } from '../lib/loadTracker';
 const trackField = (field: string, action: 'focus' | 'blur' | 'submit') =>
   loadTracker().then((t) => t.trackFormInteraction('LeadForm', field, action));
 

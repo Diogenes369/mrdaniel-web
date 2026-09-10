@@ -27,6 +27,7 @@ import ModalHeaderBanner from './ModalHeaderBanner';
 import { buildWhatsAppUrl } from './SocialLinks';
 import { AI_AGENTS, GOAL_LABEL, type AiAgent, type AgentGoal, type AgentAudience } from '../data/aiAgents';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { loadTracker } from '../lib/loadTracker';
 
 type BusinessType = 'solo' | 'smb' | 'startup' | 'enterprise';
 const BUSINESS_TYPE_OPTIONS: { id: BusinessType; label: string; icon: LucideIcon; audience: AgentAudience }[] = [
@@ -215,7 +216,7 @@ export default function AgentQualificationModal() {
     const businessLabel = BUSINESS_TYPE_OPTIONS.find((o) => o.id === businessType)?.label;
     const techLabel = TECH_STACK_OPTIONS.find((o) => o.id === techStack)?.label;
     const budgetLabel = BUDGET_OPTIONS.find((o) => o.id === budget)?.label;
-    import('../lib/tracker').then((t) =>
+    loadTracker().then((t) =>
       t.trackLead({
         name: 'לא נמסר (שאלון התאמה → WhatsApp)',
         email: 'לא נמסר',
@@ -355,7 +356,7 @@ export default function AgentQualificationModal() {
                           href={whatsappHref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={() => import('../lib/tracker').then((t) => t.trackConversion('Agent Qualification → WhatsApp'))}
+                          onClick={() => loadTracker().then((t) => t.trackConversion('Agent Qualification → WhatsApp'))}
                           className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-brand-500 text-black font-bold text-sm hover:bg-brand-400 transition-colors shadow-[0_0_20px_rgba(0,255,102,0.25)]"
                         >
                           <MessageCircle size={17} />

@@ -204,7 +204,12 @@ export default async function handler(req: any, res: any) {
         const w = welcomeEmailHtml(name);
         await sendOne({ to: email, subject: w.subject, html: w.html });
       }
-    } catch { /* auto-welcome is best-effort */ }
+    } catch (err) {
+      // Best-effort by design — the lead is already saved and the owner already notified, so this
+      // must not fail the request. Logged rather than discarded: a welcome email that silently
+      // stops going out otherwise looks exactly like one that was never enabled.
+      console.warn('[api/leads] auto-welcome email failed:', err);
+    }
 
     res.status(200).json({ ok: true });
   } catch (err) {

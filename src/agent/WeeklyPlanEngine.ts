@@ -1,9 +1,9 @@
-import { GoogleGenAI } from '@google/genai';
-import { BRAND_KNOWLEDGE_BASE, HEBREW_COPY_RULES, stripCodeFence, isEngineConfigured } from './SocialAgentEngine.js';
+import { genAI, generateContentWithRetry, requireText, stripCodeFence, parseJsonOrThrow, ModelOutputError } from './geminiClient.js';
+import { BRAND_KNOWLEDGE_BASE, HEBREW_COPY_RULES, isEngineConfigured } from './SocialAgentEngine.js';
 import { sanitizeOutput } from './AgentSecurityGuard.js';
 import type { SecurityCheckResult } from './types.js';
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+
 
 export { isEngineConfigured };
 
@@ -100,22 +100,22 @@ function normalizePlatform(value: unknown, fallbackIndex: number): WeeklyPlatfor
 export async function generateWeeklyPlan(): Promise<WeeklyPlan> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
 
-  const response = await genAI.models.generateContent({
+  const response = await generateContentWithRetry({
     model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: 'תכנן את השבוע הקרוב.' }] }],
     config: { systemInstruction: WEEKLY_PLAN_SYSTEM_INSTRUCTION, temperature: 0.9, topP: 0.95, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '{}');
-  let parsedDays: unknown[];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed.days)) throw new Error('missing days array');
-    parsedDays = parsed.days;
-  } catch (err) {
-    console.error('[weekly-plan] failed to parse Gemini JSON:', err, raw.slice(0, 500));
-    throw new Error('Failed to parse weekly plan response');
+  // requireText() rather than `|| '{}'`: an empty string means the answer was blocked by the
+  // safety filters or cut off at the token ceiling, and defaulting to '{}' turned both into the
+  // same "Failed to parse weekly plan response" - a message that named neither cause.
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow<{ days?: unknown }>(raw, 'weekly plan');
+  if (!Array.isArray(parsed.days)) {
+    console.error('[weekly-plan] Gemini JSON had no days array:', raw.slice(0, 500));
+    throw new ModelOutputError('weekly plan: model returned JSON without a days array');
   }
+  const parsedDays: unknown[] = parsed.days;
 
   const days: DailyContentPlan[] = Array.from({ length: 7 }, (_, dayIndex) => {
     const entry = (parsedDays[dayIndex] ?? {}) as Record<string, unknown>;

@@ -27,12 +27,7 @@ const Scene3D = lazy(() => import('./three/Scene3D'));
 // dynamic import rather than a static one, so it never bloats the main bundle that every visitor
 // downloads, matching how Scene3D is already lazy-loaded above. Cached so every call site (route
 // changes fire this often) reuses the same load rather than re-importing.
-type TrackerModule = typeof import('./lib/tracker');
-let trackerPromise: Promise<TrackerModule> | null = null;
-function loadTracker(): Promise<TrackerModule> {
-  if (!trackerPromise) trackerPromise = import('./lib/tracker');
-  return trackerPromise;
-}
+import { loadTracker } from './lib/loadTracker';
 import HomePage from './pages/HomePage';
 import AboutPage from './pages/AboutPage';
 import AIPage from './pages/AIPage';

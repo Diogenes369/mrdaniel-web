@@ -1,5 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
-import { stripCodeFence } from '../agent/SocialAgentEngine.js';
+import { genAI, generateContentWithRetry, requireText, stripCodeFence, parseJsonOrThrow, ModelOutputError } from '../agent/geminiClient.js';
 
 /**
  * AI email copywriter — Gemini generates a full, long-form, structured HTML email body (inner
@@ -7,7 +6,7 @@ import { stripCodeFence } from '../agent/SocialAgentEngine.js';
  * api/agent-generate.ts via `action: 'email-generate'`.
  */
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+
 
 export function isCopywriterConfigured(): boolean {
   return Boolean(genAI);
@@ -89,15 +88,16 @@ export async function generateEmailCampaign(input: EmailCopyInput): Promise<Emai
     .filter(Boolean)
     .join('\n');
 
-  const response = await genAI.models.generateContent({
+  const response = await generateContentWithRetry({
     model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: parts }] }],
     config: { systemInstruction: SYSTEM, temperature: 0.9, topP: 0.95, responseMimeType: 'application/json' },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '{}');
+  // See the note in WeeklyPlanEngine: `|| '{}'` hid a safety block behind "empty AI email result".
+  const raw = stripCodeFence(requireText(response));
   try {
-    const p = JSON.parse(raw);
+    const p = parseJsonOrThrow<Record<string, unknown>>(raw, 'email copy');
     const subjectOptions = (Array.isArray(p.subjectOptions) ? p.subjectOptions : [])
       .map((s: unknown) => String(s).trim())
       .filter(Boolean)

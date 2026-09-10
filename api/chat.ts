@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { genAI, generateContentWithRetry } from '../src/agent/geminiClient.js';
 import { AI_ASSISTANT_SYSTEM_INSTRUCTION } from '../src/server/aiSystemPrompt.js';
 
 // Vercel Serverless Function equivalent of server.ts's `/api/chat` route (Express only runs
@@ -6,7 +6,7 @@ import { AI_ASSISTANT_SYSTEM_INSTRUCTION } from '../src/server/aiSystemPrompt.js
 // with an explicit `.js` extension on the relative import for the same reason as api/news.ts:
 // Vercel only bundles a `.ts` entry's dependency graph, and native Node ESM (this repo has
 // `"type": "module"`) requires the literal extension in relative specifiers.
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -40,7 +40,7 @@ export default async function handler(req: any, res: any) {
       parts: [{ text: m.content }],
     }));
 
-    const response = await genAI.models.generateContent({
+    const response = await generateContentWithRetry({
       model: 'gemini-3.6-flash',
       contents,
       config: {

@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { genAI, generateContentWithRetry, requireText, stripCodeFence, parseJsonOrThrow } from '../agent/geminiClient.js';
 
 /**
  * Article-grounded technical analysis ("ניתוח טכנולוגי ומשמעויות" / MR. DANIEL Analysis) for the
@@ -12,7 +12,7 @@ import { GoogleGenAI } from '@google/genai';
  * simply hides the section rather than showing filler that isn't about this story.
  */
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+
 
 export function isInsightsConfigured(): boolean {
   return genAI !== null;
@@ -63,11 +63,6 @@ const SYSTEM_INSTRUCTION = `אתה דניאל בן ברוך — מומחה מע�
 
 החזר JSON תקני בלבד, בלי code fence:
 {"headline":"...","points":["...","...","..."]}`;
-
-/** Strips a ```json fence the model sometimes wraps JSON in despite responseMimeType. */
-function stripCodeFence(text: string): string {
-  return text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
-}
 
 /**
  * Normalizes one generated line: drops a leading bullet/hyphen the model may still emit (a raw
@@ -147,7 +142,7 @@ ${body || '(המקור סיפק כותרת בלבד — הסתמך עליה וע
 
 הפק את הניתוח לכתבה הספציפית הזאת בלבד.`;
 
-  const response = await genAI.models.generateContent({
+  const response = await generateContentWithRetry({
     model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: {
@@ -158,10 +153,10 @@ ${body || '(המקור סיפק כותרת בלבד — הסתמך עליה וע
     },
   });
 
-  const raw = stripCodeFence(response.text?.trim() || '');
-  if (!raw) throw new Error('model returned an empty analysis');
-
-  const parsed = JSON.parse(raw) as { headline?: unknown; points?: unknown };
+  // requireText() distinguishes a safety block from a truncated answer; the bare JSON.parse below
+  // it used to throw a raw SyntaxError ("Unexpected end of JSON input") straight to the endpoint.
+  const raw = stripCodeFence(requireText(response));
+  const parsed = parseJsonOrThrow<{ headline?: unknown; points?: unknown }>(raw, 'news insights');
   const headline = cleanLine(parsed.headline);
   const points = (Array.isArray(parsed.points) ? parsed.points : [])
     .map(cleanLine)
