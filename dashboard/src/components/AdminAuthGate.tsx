@@ -3,6 +3,7 @@ import {
   ADMIN_AUTH_FAILED_EVENT,
   clearAdminSecret,
   getAdminSecret,
+  inspectSecret,
   setAdminSecret,
   usingBuildSecret,
 } from '../lib/adminSecret';
@@ -22,7 +23,8 @@ export default function AdminAuthGate() {
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState('api');
   const [value, setValue] = useState('');
-  const [state, setState] = useState<'idle' | 'checking' | 'bad' | 'ok'>('idle');
+  const [state, setState] = useState<'idle' | 'checking' | 'bad' | 'unsendable' | 'ok'>('idle');
+  const [offenders, setOffenders] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -40,8 +42,19 @@ export default function AdminAuthGate() {
   }, [open]);
 
   const save = useCallback(async () => {
-    const secret = value.trim();
-    if (!secret) return;
+    // Repair paste artifacts and check the value can actually ride in a header BEFORE it reaches
+    // fetch(). Skipping this check is what let a mis-paste through: the probe below threw a
+    // ByteString TypeError, the catch treated it as a network blip, and the poisoned value was
+    // stored anyway — after which every API call in the dashboard crashed instead of 401ing.
+    const check = inspectSecret(value);
+    if (!check.value) {
+      if (check.unsendable) {
+        setOffenders(check.offenders);
+        setState('unsendable');
+      }
+      return;
+    }
+    const secret = check.value;
     setState('checking');
 
     // Probe with a deliberately invalid action: auth is checked before the action is dispatched,
@@ -58,9 +71,13 @@ export default function AdminAuthGate() {
       }
     } catch {
       // Network failure tells us nothing about the secret; accept it and let the real call decide.
+      // A header-encoding failure cannot land here any more — inspectSecret() ruled it out above.
     }
 
-    setAdminSecret(secret); // notifies every caller waiting on the shared re-auth promise
+    if (!setAdminSecret(secret)) {
+      setState('unsendable');
+      return;
+    }
     setState('ok');
     setValue('');
     setTimeout(() => setOpen(false), 900);
@@ -96,7 +113,7 @@ export default function AdminAuthGate() {
           value={value}
           onChange={(e) => {
             setValue(e.target.value);
-            if (state === 'bad') setState('idle');
+            if (state === 'bad' || state === 'unsendable') setState('idle');
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void save();
@@ -107,6 +124,13 @@ export default function AdminAuthGate() {
 
         {state === 'bad' && (
           <p className="mt-2 text-sm text-rose-400">המפתח הזה נדחה גם הוא (401). בדקו את הערך ב-Vercel.</p>
+        )}
+
+        {state === 'unsendable' && (
+          <p className="mt-2 text-sm text-rose-400">
+            המפתח מכיל תווים שאי אפשר לשלוח ב-header של HTTP ({offenders}) — לרוב עברית שנדבקה בטעות או
+            סימני כיווניות בלתי נראים שהועתקו יחד עם הערך. העתיקו שוב את הערך מ-Vercel, ישירות משדה הטקסט.
+          </p>
         )}
         {state === 'ok' && <p className="mt-2 text-sm text-emerald-400">המפתח אומת ונשמר. ממשיכים…</p>}
 

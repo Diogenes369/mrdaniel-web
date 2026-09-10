@@ -1,5 +1,6 @@
 import type { NewsItem, NewsTopic } from './newsAgentTypes';
 import { describeAiError } from './aiErrors';
+import { adminSecretHeader } from './adminSecret';
 
 /**
  * Universal slide-synthesis engine (text/data only — the canvas render lives in
@@ -416,7 +417,10 @@ async function requestSynthesis(
 
   const res = await postStorySynth(
     `${opts.apiBase.replace(/\/$/, '')}/api/agent-generate`,
-    { 'Content-Type': 'application/json', ...(opts.adminSecret ? { 'x-admin-secret': opts.adminSecret } : {}) },
+    // opts.adminSecret is an arbitrary caller-supplied string, so it is re-checked here rather
+    // than trusted: inspectSecret() strips paste artifacts and yields '' for anything fetch()
+    // would reject, keeping a bad value from throwing a ByteString TypeError mid-render.
+    { 'Content-Type': 'application/json', ...adminSecretHeader(opts.adminSecret) },
     JSON.stringify({ action: 'story-synthesize', title: src.title, source: src.source, topic: src.topic, articleText: src.bodyText })
   );
 

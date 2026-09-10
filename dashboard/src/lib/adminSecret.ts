@@ -14,6 +14,81 @@
 
 const ENV_SECRET = (import.meta.env.VITE_ADMIN_API_SECRET as string | undefined) || '';
 
+// ─── header safety ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * An HTTP header value is a ByteString: every code unit must be <= 0xFF. Hand `fetch()` a string
+ * with anything above that and it throws a synchronous TypeError ("Cannot convert argument to a
+ * ByteString...") before a request is ever made — which is not a rejected promise most call sites
+ * are built to catch, so it surfaced as an uncaught error and a dead dashboard rather than a 401.
+ *
+ * The realistic way a bad value gets in is a paste: copying ADMIN_API_SECRET out of a Hebrew/RTL
+ * admin panel or a chat message can carry invisible direction marks along with it, and pasting the
+ * wrong clipboard entry entirely puts real Hebrew in there.
+ */
+
+/**
+ * Invisible formatting characters that ride along on an RTL copy-paste — zero-width space/joiners,
+ * LRM/RLM and their siblings, word joiner, BOM. They carry no data and cannot be part of an
+ * intended secret, so they are stripped as a repair. Note U+200F and friends are above 0xFF, so
+ * a single stray direction mark is enough to crash fetch() on its own.
+ */
+const INVISIBLE_MARKS = /[​-‏⁠﻿]/g;
+
+/**
+ * Anything that still cannot ride in a header after the repair: code points above 0xFF, and the
+ * C0/DEL control characters browsers reject outright (a CR or LF would be header injection).
+ *
+ * Deliberately NOT rejected: 0x80-0xFF. `fetch()` accepts those, so a secret that contains one
+ * works today, and refusing it here would break a working install to guard a crash that cannot
+ * happen.
+ */
+const UNSENDABLE = /[^ -~ -ÿ]/;
+
+/** What a stored/pasted secret is, once repaired. */
+export interface SecretCheck {
+  /** Safe to put straight into a header. '' when the value cannot be sent at all. */
+  value: string;
+  ok: boolean;
+  /** True when the value is non-empty but unsendable — the case worth telling the operator about. */
+  unsendable: boolean;
+  /** The offending characters, as escapes, for an operator-facing message. */
+  offenders: string;
+}
+
+/** Repair the invisible artifacts, then report whether what is left can go in a header. */
+export function inspectSecret(raw: string): SecretCheck {
+  const value = (raw || '').replace(INVISIBLE_MARKS, '').trim();
+  if (!value) return { value: '', ok: false, unsendable: false, offenders: '' };
+
+  const bad = [...value].filter((ch) => UNSENDABLE.test(ch));
+  if (bad.length) {
+    const offenders = [...new Set(bad)]
+      .slice(0, 5)
+      .map((ch) => `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`)
+      .join(', ');
+    return { value: '', ok: false, unsendable: true, offenders };
+  }
+  return { value, ok: true, unsendable: false, offenders: '' };
+}
+
+// One warning per distinct bad value, not one per API call — a single deck generation fans out
+// into a dozen requests and they would all report the same thing.
+let warnedFor = '';
+
+function usableSecret(raw: string): string {
+  const check = inspectSecret(raw);
+  if (check.unsendable && raw !== warnedFor) {
+    warnedFor = raw;
+    console.warn(
+      `[adminSecret] the stored secret contains characters that cannot be sent in an HTTP header (${check.offenders}); ` +
+        'sending the request without it so the API answers 401 and the re-auth prompt can explain, ' +
+        'instead of crashing fetch(). Re-paste ADMIN_API_SECRET to fix.'
+    );
+  }
+  return check.value;
+}
+
 /** Fired when the API rejects our credentials, so the UI can prompt instead of failing silently. */
 export const ADMIN_AUTH_FAILED_EVENT = 'admin-auth-failed';
 /** Fired when a fresh secret has been stored, so pending callers can retry. */
@@ -22,16 +97,31 @@ export const ADMIN_AUTH_RESOLVED_EVENT = 'admin-auth-resolved';
 export function getAdminSecret(): string {
   try {
     const stored = localStorage.getItem('adminSecret');
-    if (stored && stored.trim()) return stored.trim();
+    if (stored && stored.trim()) {
+      // A stored value that cannot go in a header yields '' here, so the request goes out
+      // unauthenticated and comes back 401 — which the re-auth prompt already knows how to
+      // handle. That is strictly better than letting fetch() throw where nobody catches it.
+      const usable = usableSecret(stored);
+      if (usable) return usable;
+    }
   } catch {
     /* private mode / storage blocked — fall through to the build-time value */
   }
-  return ENV_SECRET;
+  return usableSecret(ENV_SECRET);
 }
 
-export function setAdminSecret(secret: string) {
+/**
+ * Store a secret, after repairing paste artifacts. Returns false without storing anything when the
+ * value cannot be sent in a header — persisting one of those poisons every later call, since the
+ * stored value wins over the build-time one.
+ */
+export function setAdminSecret(secret: string): boolean {
+  const check = inspectSecret(secret);
+  if (!check.ok) return false;
+
+  warnedFor = ''; // a new value deserves a fresh warning if it too turns out to be bad
   try {
-    localStorage.setItem('adminSecret', secret.trim());
+    localStorage.setItem('adminSecret', check.value);
   } catch {
     /* private mode — calls will keep 401ing until storage is available */
   }
@@ -40,6 +130,7 @@ export function setAdminSecret(secret: string) {
   } catch {
     /* non-browser context */
   }
+  return true;
 }
 
 export function clearAdminSecret() {
@@ -56,6 +147,15 @@ export function adminHeaders(): Record<string, string> {
   return secret ? { 'x-admin-secret': secret } : {};
 }
 
+/**
+ * Same, for the few helpers that take a secret as an argument instead of reading it themselves.
+ * Yields no header at all rather than an unsendable one, so the call 401s instead of throwing.
+ */
+export function adminSecretHeader(secret?: string): Record<string, string> {
+  const usable = secret ? usableSecret(secret) : '';
+  return usable ? { 'x-admin-secret': usable } : {};
+}
+
 /** True when a secret is available from either source — for UI status badges. */
 export function hasAdminSecret(): boolean {
   return Boolean(getAdminSecret());
@@ -65,11 +165,13 @@ export function hasAdminSecret(): boolean {
 export function usingBuildSecret(): boolean {
   try {
     const stored = localStorage.getItem('adminSecret');
-    if (stored && stored.trim()) return false;
+    // An unsendable stored value is not "the secret in use" — getAdminSecret() skips past it to
+    // the build-time one, and the prompt should describe whichever is actually being sent.
+    if (stored && usableSecret(stored)) return false;
   } catch {
     /* treat as build secret */
   }
-  return Boolean(ENV_SECRET);
+  return Boolean(usableSecret(ENV_SECRET));
 }
 
 // ─── re-auth coordination ───────────────────────────────────────────────────────────────────

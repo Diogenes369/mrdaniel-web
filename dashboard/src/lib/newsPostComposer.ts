@@ -1,5 +1,6 @@
 import { SITE_PROMO_FOOTER, type NewsItem, type NewsTopic, type SocialPlatform } from './newsAgentTypes';
 import { describeAiError } from './aiErrors';
+import { adminSecretHeader } from './adminSecret';
 import { stripMetaPhrases } from './storySlides';
 
 /**
@@ -369,7 +370,7 @@ export async function synthesizeNewsPost(
   const url = `${opts.apiBase.replace(/\/$/, '')}/api/agent-generate`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(opts.adminSecret ? { 'x-admin-secret': opts.adminSecret } : {}),
+    ...adminSecretHeader(opts.adminSecret),
   };
   const reqBody = JSON.stringify({
     action: 'post-synthesize',
