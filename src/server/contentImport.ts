@@ -3,13 +3,31 @@
  * used by /api/agent-generate · action:"import-url". Extracts headline, body text, a source
  * attribution and the lead image, so the dashboard's Content Repurposer can seed the AI synthesis.
  *
- * Strategy: a direct browser-UA fetch first (gets OG tags + inline <p> text for most sites), then
- * the Jina Reader proxy (`r.jina.ai`) as a fallback for origins that WAF-block datacenter IPs
- * (LinkedIn among them — for those we usually still recover title + image + whatever preview text
- * the login wall exposes, and the operator pastes the rest). Never throws.
+ * Strategy — a three-link fallback chain, each link only running when the previous one came back
+ * too thin (< MIN_BODY_CHARS):
+ *   1. DIRECT + STRUCTURED — browser-UA fetch, then the DOM-scoped zero-noise extractor in
+ *      articleExtract.ts (ads / nav / share bars / related rails / comments removed before any text
+ *      is read). This is the path that actually works on Israeli news portals.
+ *   2. JINA READER — `r.jina.ai`, for origins that WAF-block datacenter IPs (LinkedIn among them);
+ *      for those we usually still recover title + image + whatever the login wall exposes.
+ *   3. LOOSE DIRECT — the original `<article>` / `<p>`-union scrape of the already-fetched HTML, as
+ *      a last resort for markup the structured pass does not recognise at all.
+ * Whichever link produces the most text wins, so a partial result is never preferred to a full one.
+ * Never throws.
  */
 
 import { upscaleImageUrl } from './newsFeed.js';
+import { extractArticleFromHtml, extractLeadImage } from './articleExtract.js';
+
+/**
+ * Below this, a body is treated as a metadata shell (an OG description and nothing else) rather
+ * than an article, and the next link in the fallback chain runs. 200 is the threshold the brief
+ * calls for; in practice a real article clears it several times over.
+ */
+const MIN_BODY_CHARS = 200;
+
+/** Below this a body is "usable but suspiciously thin" — worth spending one more fetch to beat. */
+const GOOD_BODY_CHARS = 700;
 
 const JINA_KEY = process.env.JINA_API_KEY?.trim();
 
@@ -29,6 +47,8 @@ export interface ImportedContent {
   source: string;
   /** which path produced the content — surfaced in the UI so the operator knows how complete it is */
   via: 'direct' | 'jina' | 'none';
+  /** which extraction pass won, for diagnosing a thin import without re-running it by hand */
+  strategy?: 'json-ld' | 'dom' | 'jina' | 'loose' | 'none';
 }
 
 async function getText(url: string, timeoutMs: number, headers: Record<string, string>): Promise<string | undefined> {
@@ -215,7 +235,7 @@ export function cleanExtractedBody(rawBody: string, title: string): string {
       if (kept.length && kept[kept.length - 1] !== '') kept.push('');
       continue;
     }
-    if (NOISE_LINE.test(line) || BYLINE_LINE.test(line)) continue;
+    if (NOISE_LINE.test(line) || BYLINE_LINE.test(line) || PROMOTED_LINE.test(line)) continue;
     // drop a leading line that just repeats the headline
     if (kept.filter(Boolean).length === 0 && titleKey.length > 10) {
       const lk = normKey(line);
@@ -266,10 +286,31 @@ export function cleanExtractedBody(rawBody: string, title: string): string {
   return finalLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/**
+ * A line explicitly labelled as paid placement. Conservative enough to run on every extraction
+ * path: these markers are how Israeli publishers are legally required to mark commercial content,
+ * so they do not appear inside editorial prose.
+ */
+const PROMOTED_LINE = /(?:תוכן\s+מקודם|תוכן\s+שיווקי|בשיתוף\s+מסחרי|ממומן|בחסות\s|\bSponsored\b|\bPromoted\b|\bAdvertorial\b)/i;
+
+/**
+ * Content-recommendation rails (Taboola / Outbrain) that Jina Reader inlines as if they were prose.
+ * They are not `<p>` text on the page, so the structured pass never sees them — but Jina flattens
+ * the whole widget, and each entry ends in the same telltale "Sponsor | ממומן Learn More / Undo"
+ * shape. Aggressive by design, and applied to Jina output only.
+ */
+const SPONSORED_RAIL_LINE = new RegExp(
+  `${PROMOTED_LINE.source}|\\bLearn More\\b|^\\s*Undo\\s*$|^\\s*הכי נקראות|Read More about`,
+  'i'
+);
+
 /** Jina Reader returns clean markdown with `Title:` / `URL Source:` headers then the body. */
 function parseJina(md: string): { title: string; body: string } {
   const title = md.match(/^Title:\s*(.+)$/m)?.[1]?.trim() || '';
   const body = md
+    .split('\n')
+    .filter((line) => !SPONSORED_RAIL_LINE.test(line))
+    .join('\n')
     .replace(/^Title:.*$/m, '')
     .replace(/^URL Source:.*$/m, '')
     .replace(/^Published Time:.*$/m, '')
@@ -281,54 +322,107 @@ function parseJina(md: string): { title: string; body: string } {
   return { title, body };
 }
 
+/** One candidate body produced by a link in the fallback chain. */
+interface Candidate {
+  body: string;
+  via: ImportedContent['via'];
+  strategy: NonNullable<ImportedContent['strategy']>;
+}
+
+/**
+ * How trustworthy each extraction pass is, independent of how much text it returned.
+ *
+ * Length alone is the wrong ranking. Jina Reader's markdown regularly runs 2-3× longer than the
+ * structured read on the same page because it inlines the Taboola / Outbrain "ממומן … Learn More …
+ * Undo" rail and the "הכי נקראות" sidebar as if they were prose — exactly the noise this pipeline
+ * exists to remove. So a pass that scoped itself to the article container wins whenever it returned
+ * a real article, and length only breaks ties within the same tier.
+ */
+const STRATEGY_RANK: Record<NonNullable<ImportedContent['strategy']>, number> = {
+  'json-ld': 3,
+  dom: 3,
+  jina: 2,
+  loose: 1,
+  none: 0,
+};
+
+/**
+ * Pick the winning candidate, in three tiers — longest wins inside a tier, and an earlier tier
+ * always beats a later one:
+ *   A. a container-scoped pass (json-ld / dom) that returned a full article — zero noise, trusted
+ *      even when a noisier pass returned more text;
+ *   B. any pass that returned at least an article's worth of text;
+ *   C. whatever there is, so a stub still reaches the operator rather than nothing.
+ */
+function pickBest(candidates: Candidate[]): Candidate | undefined {
+  const longest = (list: Candidate[]): Candidate | undefined =>
+    list.reduce<Candidate | undefined>((a, c) => (!a || c.body.length > a.body.length ? c : a), undefined);
+
+  return (
+    longest(candidates.filter((c) => STRATEGY_RANK[c.strategy] >= 3 && c.body.length >= GOOD_BODY_CHARS)) ??
+    longest(candidates.filter((c) => c.body.length >= MIN_BODY_CHARS)) ??
+    longest(candidates)
+  );
+}
+
 export async function importUrlContent(rawUrl: string): Promise<ImportedContent> {
   let url = rawUrl.trim();
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
   const host = hostOf(url);
-  const base: ImportedContent = { ok: false, url, title: '', body: '', image: '', source: host, via: 'none' };
+  const base: ImportedContent = { ok: false, url, title: '', body: '', image: '', source: host, via: 'none', strategy: 'none' };
 
-  const direct = await getText(url, 6000, BROWSER_HEADERS);
+  const candidates: Candidate[] = [];
+  const best = (): Candidate | undefined => pickBest(candidates);
+
+  // ── link 1: direct fetch + structured, zero-noise DOM extraction ───────────────────────────
+  const direct = await getText(url, 8000, BROWSER_HEADERS);
   if (direct) {
-    const title = decodeEntities(
+    base.title = decodeEntities(
       meta(direct, 'og:title', 'twitter:title') || (direct.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? '').trim()
     );
-    const ogDesc = meta(direct, 'og:description', 'twitter:description', 'description');
-    const rawImage = meta(direct, 'og:image:secure_url', 'og:image', 'article:image', 'twitter:image');
-    const image = rawImage ? upscaleImageUrl(rawImage) : rawImage;
-    const body = cleanExtractedBody(
-      [ogDesc, extractBody(direct)].filter(Boolean).join('\n\n').slice(0, 14000),
-      title
-    ).slice(0, 12000);
-    if ((title && body.length > 60) || body.length > 200) {
-      return { ...base, ok: true, title, body, image, source: host, via: 'direct' };
-    }
-    // keep partials (title/image) to merge with the Jina attempt
-    base.title = title;
-    base.image = image;
-    if (body) base.body = body;
-  }
+    const rawImage =
+      meta(direct, 'og:image:secure_url', 'og:image', 'article:image', 'twitter:image') || extractLeadImage(direct);
+    base.image = rawImage ? upscaleImageUrl(rawImage) : rawImage;
 
-  const viaJina = await getText(
-    `https://r.jina.ai/${url}`,
-    9000,
-    JINA_KEY ? { Authorization: `Bearer ${JINA_KEY}` } : {}
-  );
-  if (viaJina) {
-    const { title, body } = parseJina(viaJina);
-    const resolvedTitle = base.title || title;
-    const cleaned = cleanExtractedBody(body, resolvedTitle);
-    const merged = cleaned.length > base.body.length ? cleaned : base.body;
-    if (merged.length > 60) {
-      return {
-        ...base,
-        ok: true,
-        title: resolvedTitle,
-        body: merged.slice(0, 12000),
-        source: host,
-        via: 'jina',
-      };
+    const structured = extractArticleFromHtml(direct);
+    if (structured.text) {
+      const cleaned = cleanExtractedBody(structured.text.slice(0, 20000), base.title).slice(0, 12000);
+      if (cleaned) candidates.push({ body: cleaned, via: 'direct', strategy: structured.strategy });
+    }
+
+    // The OG description is the publisher's own lede. It is only worth keeping when the structured
+    // pass found nothing — otherwise it just duplicates the article's first paragraph.
+    if (!candidates.length) {
+      const ogDesc = meta(direct, 'og:description', 'twitter:description', 'description');
+      if (ogDesc) candidates.push({ body: cleanExtractedBody(ogDesc, base.title), via: 'direct', strategy: 'none' });
     }
   }
 
-  return base.title || base.body ? { ...base, ok: true, via: base.body ? 'direct' : 'none' } : base;
+  // ── link 2: Jina Reader, when the direct pass came back thin or the origin blocked us ──────
+  if ((best()?.body.length ?? 0) < GOOD_BODY_CHARS) {
+    const viaJina = await getText(
+      `https://r.jina.ai/${url}`,
+      9000,
+      JINA_KEY ? { Authorization: `Bearer ${JINA_KEY}` } : {}
+    );
+    if (viaJina) {
+      const parsed = parseJina(viaJina);
+      if (!base.title) base.title = parsed.title;
+      const cleaned = cleanExtractedBody(parsed.body, base.title || parsed.title).slice(0, 12000);
+      if (cleaned) candidates.push({ body: cleaned, via: 'jina', strategy: 'jina' });
+    }
+  }
+
+  // ── link 3: loose scrape of the already-fetched HTML, for markup neither pass recognised ───
+  if (direct && (best()?.body.length ?? 0) < MIN_BODY_CHARS) {
+    const loose = cleanExtractedBody(extractBody(direct).slice(0, 14000), base.title).slice(0, 12000);
+    if (loose) candidates.push({ body: loose, via: 'direct', strategy: 'loose' });
+  }
+
+  const winner = best();
+  if (winner && ((base.title && winner.body.length > 60) || winner.body.length > MIN_BODY_CHARS)) {
+    return { ...base, ok: true, body: winner.body, via: winner.via, strategy: winner.strategy };
+  }
+  if (winner?.body) return { ...base, ok: true, body: winner.body, via: winner.via, strategy: winner.strategy };
+  return base.title ? { ...base, ok: true } : base;
 }

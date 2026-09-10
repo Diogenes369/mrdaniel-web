@@ -98,6 +98,9 @@ function cropToArticle(text: string): string {
   return lines.slice(start, end).join('\n');
 }
 
+/** A line explicitly labelled as paid placement — mirrors PROMOTED_LINE in src/server/contentImport.ts. */
+const PROMOTED_LINE = /(?:תוכן\s+מקודם|תוכן\s+שיווקי|בשיתוף\s+מסחרי|ממומן|בחסות\s|\bSponsored\b|\bPromoted\b|\bAdvertorial\b)/i;
+
 const BYLINE_LINE = /^\s*(?:מאת|נכתב(?:\s+על[- ]ידי)?|כתב[הת]?|קרדיט|by|written by|posted by|author|source|via)\s*[:\-–—]?\s*.{1,60}$/i;
 
 const TRAILING_AUTHOR = /[\s ]*[|｜]\s*[\p{L}][\p{L}'.\-֐-׿]{1,20}(?:\s+[\p{L}][\p{L}'.\-֐-׿]{1,20}){0,3}\s*$/u;
@@ -128,7 +131,7 @@ export function cleanExtractedBody(rawBody: string, title: string): string {
       if (kept.length && kept[kept.length - 1] !== '') kept.push('');
       continue;
     }
-    if (NOISE_LINE.test(line) || BYLINE_LINE.test(line)) continue;
+    if (NOISE_LINE.test(line) || BYLINE_LINE.test(line) || PROMOTED_LINE.test(line)) continue;
     if (kept.filter(Boolean).length === 0 && titleKey.length > 10) {
       const lk = normKey(line);
       if (lk === titleKey || (lk.length > 12 && (titleKey.includes(lk) || lk.includes(titleKey)))) continue;

@@ -61,6 +61,7 @@ import { SITE_ORIGIN } from '../lib/useDashboardRefresh';
 import CarouselStudioModal from './CarouselStudioModal';
 import type { ArticleInput } from '../lib/carouselBridge';
 import { getAdminSecret, reportAuthFailure } from '../lib/adminSecret';
+import { resolveArticleText } from '../lib/articleText';
 
 
 const CATEGORIES: NewsCategory[] = ['cyber', 'ai', 'tech', 'all'];
@@ -795,16 +796,21 @@ export default function NewsContentAgent() {
             {/* Hermes decides concept + palette + composition on its own from the article; the
                 whole run happens on the local carousel-bridge (Hermes and Pillow are local-only). */}
             <button
-              onClick={() =>
-                item &&
-                setCarouselArticle({
-                  title: item.title,
-                  source: item.source,
-                  topic: item.topic,
-                  link: item.link,
-                  articleText: (item.summary || item.excerpt || '').trim(),
-                })
-              }
+              onClick={() => {
+                if (!item) return;
+                const it = item;
+                // Resolve the full article body first — handing Hermes the RSS teaser produced
+                // slides built from one sentence. resolveArticleText caches and never throws.
+                void resolveArticleText(it).then(({ text }) =>
+                  setCarouselArticle({
+                    title: it.title,
+                    source: it.source,
+                    topic: it.topic,
+                    link: it.link,
+                    articleText: text,
+                  })
+                );
+              }}
               disabled={!item}
               title="Hermes בוחר קונספט ויזואלי ומייצר שקופיות נקיות, ואז מרונדרת עליהן עברית"
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-brand-500/40 text-brand-300 text-sm font-bold cursor-pointer disabled:opacity-50 hover:bg-brand-500/10"

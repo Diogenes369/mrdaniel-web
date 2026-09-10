@@ -2,6 +2,7 @@ import { SITE_PROMO_FOOTER, type NewsItem, type NewsTopic, type SocialPlatform }
 import { describeAiError } from './aiErrors';
 import { adminSecretHeader } from './adminSecret';
 import { stripMetaPhrases } from './storySlides';
+import { resolveArticleText } from './articleText';
 
 /**
  * Turns a news item into a rich, long-form, ready-to-publish social post — entirely client-side
@@ -360,11 +361,16 @@ export async function synthesizeNewsPost(
   platform: SocialPlatform,
   opts: { apiBase: string; adminSecret?: string }
 ): Promise<ComposedPost> {
-  const articleText = (item.summary || item.excerpt || '').trim();
+  // Fetches the real article body when the feed teaser is thin — without this the synthesis was
+  // fed an RSS <description> (58 characters on ice.co.il) and either tripped the floor below or
+  // wrote a whole post from one sentence. See dashboard/src/lib/articleText.ts.
+  const resolved = await resolveArticleText(item);
+  const articleText = resolved.text;
   // These messages are shown to the operator verbatim on the fallback badge, so they are Hebrew
   // and name the cause — not the internal English strings the catch block used to swallow.
   if (articleText.length < 60) {
-    throw new Error(`טקסט הכתבה קצר מדי לניסוח AI (${articleText.length} תווים, נדרשים 60) — פתחו את הכתבה המלאה`);
+    const why = resolved.note ? ` — ${resolved.note}` : ' — פתחו את הכתבה המלאה';
+    throw new Error(`טקסט הכתבה קצר מדי לניסוח AI (${articleText.length} תווים, נדרשים 60)${why}`);
   }
 
   const url = `${opts.apiBase.replace(/\/$/, '')}/api/agent-generate`;

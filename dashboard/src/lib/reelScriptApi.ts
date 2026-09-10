@@ -3,6 +3,7 @@ import type { NewsItem } from './newsAgentTypes';
 import type { ReelScript, ReelScriptScene } from './agentTypes';
 import { getAdminSecret } from './adminSecret';
 import { describeAiError } from './aiErrors';
+import { resolveArticleText } from './articleText';
 
 /**
  * Client lib for the "תסריט לרילס" (Reel Generator) mode in NewsContentAgent — article-grounded
@@ -91,9 +92,15 @@ export interface ReelResult {
 }
 
 export async function synthesizeReel(item: NewsItem): Promise<ReelResult> {
-  const articleText = (item.summary || item.excerpt || '').trim();
+  // Same fix as the post path: synthesise from the real article body, not the RSS teaser.
+  const resolved = await resolveArticleText(item);
+  const articleText = resolved.text;
   if (articleText.length < 40) {
-    return { reel: buildFallbackReel(item), synthesized: false, fallbackReason: 'הטקסט קצר מדי לסינתוז AI' };
+    return {
+      reel: buildFallbackReel(item),
+      synthesized: false,
+      fallbackReason: resolved.note ?? 'הטקסט קצר מדי לסינתוז AI',
+    };
   }
 
   try {

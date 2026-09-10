@@ -4,7 +4,7 @@ import { SITE_ORIGIN } from './useDashboardRefresh';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
 import { BRAND_GREEN, CHARCOAL, getLogo, loadFont, drawImageCover, wrapRtl, resolveNewsBackground } from './newsImageComposer';
 import { resolveSlidePhotoUrl, loadPhoto, hashSeed } from './pexelsBackground';
-import { fetchFullArticleBody } from './repurposeApi';
+import { resolveArticleText } from './articleText';
 import {
   buildSlides,
   synthesizeSlides,
@@ -490,34 +490,22 @@ export async function rerenderDeck(payload: StoryPayload, format: SlideFormat): 
   return { payload: rendered.payload, images: rendered.images, format };
 }
 
-/** Bound any promise; on timeout resolve `fallback` instead of hanging the pipeline. */
-function withDeadline<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return Promise.race([
-    p.catch(() => fallback),
-    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
-  ]);
-}
-
 /**
- * News item → rendered deck. Resolves the article photo, and — CRITICAL — when the feed only
- * carried a thin title/summary (< 150 chars) it DEEP-SCRAPES the full article body first
- * (Jina Reader via `import-url`) so slides are built from real content, not a 5-word headline.
- * Deep scrape is bounded (16s) and falls back to the summary; slide density is still enforced
- * downstream regardless.
+ * News item → rendered deck. Resolves the article photo, and — CRITICAL — DEEP-SCRAPES the full
+ * article body whenever the feed only carried a teaser, so slides are built from real content
+ * rather than a 5-word headline.
+ *
+ * The scrape now runs through resolveArticleText (shared with the post / reel / carousel paths):
+ * one bounded, cached fetch per link, so generating a post and a story for the same item costs a
+ * single request, and the threshold for "the teaser is enough" is the same everywhere. Slide
+ * density is still enforced downstream regardless.
  */
 export async function renderStoryForItem(item: NewsItem, format: SlideFormat = '9:16'): Promise<RenderedDeck> {
   const photo = await resolveStoryBg(item, format);
   const src = newsItemToSlideSource(item, item.image ? proxiedImageUrl(item.image) : '');
 
-  const summary = (item.summary || item.excerpt || '').trim();
-  const link = (item.link || '').trim();
-  const scrapable = /^https?:\/\//i.test(link) && !/(^|\.)news\.google\.com/i.test(link);
-  if (summary.length < 150 && scrapable) {
-    const full = await withDeadline(fetchFullArticleBody(link), 16000, '');
-    if (full && full.length > summary.length) src.bodyText = full;
-  } else if (summary) {
-    src.bodyText = summary;
-  }
+  const { text } = await resolveArticleText(item);
+  if (text) src.bodyText = text;
 
   return renderSlidesFromSource(src, { format, photo });
 }
