@@ -32,6 +32,19 @@ function setCors(res: any) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret');
 }
 
+/**
+ * Reject a request whose input is too thin to synthesise from.
+ *
+ * These 400s used to carry an English `error` only, so the dashboard could not tell them apart from
+ * any other 400 and the operator's fallback badge read "שרת ה-AI החזיר שגיאה 400". The client's
+ * describeAiError() prefers `message` when present and branches on `code`, so both are sent: the
+ * badge then says exactly what was missing, which is the one failure the operator can fix on the
+ * spot (paste more source text) rather than retry or re-key.
+ */
+function rejectThinInput(res: any, what: string, message: string) {
+  res.status(400).json({ ok: false, code: 'source_too_short', error: what, message });
+}
+
 function isAdminAuthorized(req: any): boolean {
   const configured = process.env.ADMIN_API_SECRET;
   // No secret configured yet — see .env.example. Fails OPEN only in that unconfigured state so a
@@ -309,7 +322,7 @@ export default async function handler(req: any, res: any) {
       }
       const { title, source, topic, articleText } = req.body ?? {};
       if (typeof articleText !== 'string' || articleText.trim().length < 40) {
-        res.status(400).json({ ok: false, error: 'articleText (>= 40 chars) required' });
+        rejectThinInput(res, 'articleText (>= 40 chars) required', 'טקסט הכתבה קצר מדי לסינתוז AI (נדרשים לפחות 40 תווים) — הדביקו את גוף הכתבה המלא');
         return;
       }
       const slides = await synthesizeStorySlides({
@@ -334,7 +347,7 @@ export default async function handler(req: any, res: any) {
       }
       const { title, source, topic, articleText } = req.body ?? {};
       if (typeof articleText !== 'string' || articleText.trim().length < 40) {
-        res.status(400).json({ ok: false, error: 'articleText (>= 40 chars) required' });
+        rejectThinInput(res, 'articleText (>= 40 chars) required', 'טקסט הכתבה קצר מדי לתסריט AI (נדרשים לפחות 40 תווים) — הדביקו את גוף הכתבה המלא');
         return;
       }
       const reel = await synthesizeReelScript({
@@ -360,7 +373,7 @@ export default async function handler(req: any, res: any) {
       }
       const { text, voiceName } = req.body ?? {};
       if (typeof text !== 'string' || !text.trim()) {
-        res.status(400).json({ ok: false, error: 'text required' });
+        rejectThinInput(res, 'text required', 'לא הועבר טקסט להקראה');
         return;
       }
       const speech = await synthesizeSpeech(text, typeof voiceName === 'string' && voiceName.trim() ? voiceName : undefined);
@@ -375,7 +388,7 @@ export default async function handler(req: any, res: any) {
       }
       const { topic, notes } = req.body ?? {};
       if (typeof topic !== 'string' || topic.trim().length < 8) {
-        res.status(400).json({ ok: false, error: 'topic (>= 8 chars) required' });
+        rejectThinInput(res, 'topic (>= 8 chars) required', 'הנושא קצר מדי לבניית דק (נדרשים לפחות 8 תווים)');
         return;
       }
       const deck = await synthesizeTechTipDeck({ topic, notes: typeof notes === 'string' ? notes : undefined });
@@ -400,7 +413,7 @@ export default async function handler(req: any, res: any) {
       const rawTarget = typeof url === 'string' ? url.trim() : '';
 
       if (!pastedText && !rawTarget) {
-        res.status(400).json({ ok: false, error: 'url or rawText required' });
+        rejectThinInput(res, 'url or rawText required', 'לא הועברה כתובת מקור ולא טקסט גולמי לייבוא');
         return;
       }
 
@@ -411,7 +424,7 @@ export default async function handler(req: any, res: any) {
           : null;
 
       if (!thread) {
-        res.status(400).json({ ok: false, error: 'valid threads.net / threads.com post url required' });
+        rejectThinInput(res, 'valid threads.net / threads.com post url required', 'הכתובת אינה קישור תקין לפוסט ב-Threads');
         return;
       }
 
@@ -432,7 +445,7 @@ export default async function handler(req: any, res: any) {
       const { posts, author, sourceUrl, notes } = req.body ?? {};
       const cleanPosts = (Array.isArray(posts) ? posts : []).map((p: unknown) => String(p ?? '').trim()).filter(Boolean);
       if (cleanPosts.join('\n').length < 40) {
-        res.status(400).json({ ok: false, error: 'posts (>= 40 chars total) required' });
+        rejectThinInput(res, 'posts (>= 40 chars total) required', 'טקסט השרשור קצר מדי לעיבוד AI (נדרשים לפחות 40 תווים) — הדביקו את הטקסט המלא');
         return;
       }
       const deck = await synthesizeThreadDeck({
@@ -460,7 +473,7 @@ export default async function handler(req: any, res: any) {
       }
       const { title, source, topic, platform, articleText, variant } = req.body ?? {};
       if (typeof articleText !== 'string' || articleText.trim().length < 40) {
-        res.status(400).json({ ok: false, error: 'articleText (>= 40 chars) required' });
+        rejectThinInput(res, 'articleText (>= 40 chars) required', 'טקסט הכתבה קצר מדי לניסוח פוסט (נדרשים לפחות 40 תווים) — הדביקו את גוף הכתבה המלא');
         return;
       }
       const post = await synthesizeNewsPost({
@@ -483,7 +496,7 @@ export default async function handler(req: any, res: any) {
     if (action === 'import-url') {
       const { url } = req.body ?? {};
       if (typeof url !== 'string' || !/^(https?:\/\/)?[\w.-]+\.[a-z]{2,}/i.test(url.trim())) {
-        res.status(400).json({ ok: false, error: 'valid url required' });
+        rejectThinInput(res, 'valid url required', 'הכתובת שהוזנה אינה כתובת אתר תקינה');
         return;
       }
       const imported = await importUrlContent(url.trim());
@@ -503,7 +516,7 @@ export default async function handler(req: any, res: any) {
       }
       const { title, source, topic, brief, takeaways } = req.body ?? {};
       if (typeof brief !== 'string' || brief.trim().length < 40) {
-        res.status(400).json({ ok: false, error: 'brief (>= 40 chars) required' });
+        rejectThinInput(res, 'brief (>= 40 chars) required', 'הבריף קצר מדי לבניית קרוסלה (נדרשים לפחות 40 תווים)');
         return;
       }
       const deck = await synthesizeCarouselDeck({
@@ -535,7 +548,7 @@ export default async function handler(req: any, res: any) {
         return;
       }
       if (!Array.isArray(slides) || slides.length < 2) {
-        res.status(400).json({ ok: false, error: 'slides array (>= 2) required' });
+        rejectThinInput(res, 'slides array (>= 2) required', 'אין מספיק שקופיות לעריכה (נדרשות לפחות 2)');
         return;
       }
       const edited = await editSlideDeck({ instruction, slides });
@@ -555,7 +568,7 @@ export default async function handler(req: any, res: any) {
       }
       const { items } = req.body ?? {};
       if (!Array.isArray(items) || items.length < 3) {
-        res.status(400).json({ ok: false, error: 'items array (>= 3) required' });
+        rejectThinInput(res, 'items array (>= 3) required', 'אין מספיק פריטי מקור לניתוח מגמות (נדרשים לפחות 3)');
         return;
       }
       const radar = await analyzeTrendRadar({
@@ -584,7 +597,7 @@ export default async function handler(req: any, res: any) {
       }
       const { postText, sourceUrl, lang } = req.body ?? {};
       if (typeof postText !== 'string' || postText.trim().length < 20) {
-        res.status(400).json({ ok: false, error: 'postText (>= 20 chars) required' });
+        rejectThinInput(res, 'postText (>= 20 chars) required', 'טקסט הפוסט קצר מדי לניסוח תגובות (נדרשים לפחות 20 תווים)');
         return;
       }
       const replies = await generateEngagementReplies({

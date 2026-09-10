@@ -11,8 +11,8 @@ import type {
   ReplyStyle,
 } from './igGrowthTypes';
 import { REPLY_META } from './igGrowthTypes';
-import { getAdminSecret, reportAuthFailure } from './adminSecret';
-
+import { getAdminSecret } from './adminSecret';
+import { describeAiError } from './aiErrors';
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
@@ -54,18 +54,6 @@ async function post(action: string, body: Record<string, unknown>, timeoutMs = 7
     }
     return res;
   }
-}
-
-function httpReason(status: number): string {
-  if (status === 429) return 'מכסת ה-API של Gemini לשעה זו מוצתה (429)';
-  if (status === 401) {
-    // Surface one actionable re-auth prompt — the usual cause is a build-time
-    // secret that went stale after ADMIN_API_SECRET was rotated on the site.
-    reportAuthFailure('agent-generate');
-    return 'אימות מול /api/agent-generate נכשל (401)';
-  }
-  if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת הריצה (503)';
-  return `שרת ה-AI החזיר שגיאה ${status}`;
 }
 
 // ─── 1. TREND & TOP-ACCOUNT RESEARCH ─────────────────────────────────────────────────────────
@@ -268,7 +256,7 @@ export async function fetchTrendRadar(sources: TrendSource[]): Promise<TrendRada
   }));
   try {
     const res = await post('trend-radar', { items: slim });
-    if (!res.ok) return buildTrendRadarLocal(sources, httpReason(res.status));
+    if (!res.ok) return buildTrendRadarLocal(sources, (await describeAiError(res)).message);
     const data = (await res.json()) as { ok?: boolean; blocked?: boolean; radar?: RawTrendRadar };
     if (data.blocked) return buildTrendRadarLocal(sources, 'פלט ה-AI נחסם ע"י מסנן התוכן.');
     if (!data.ok || !data.radar) return buildTrendRadarLocal(sources, 'מנוע ה-AI לא החזיר ניתוח תקין.');
@@ -358,7 +346,7 @@ export async function generateEngagementReplies(input: {
       sourceUrl: input.sourceUrl ?? '',
       lang: input.lang ?? 'he',
     });
-    if (!res.ok) return buildRepliesLocal(postText, httpReason(res.status), input.sourceUrl);
+    if (!res.ok) return buildRepliesLocal(postText, (await describeAiError(res)).message, input.sourceUrl);
     const data = (await res.json()) as { ok?: boolean; blocked?: boolean; replies?: unknown };
     if (data.blocked) return buildRepliesLocal(postText, 'פלט ה-AI נחסם ע"י מסנן התוכן.', input.sourceUrl);
     const replies = coerceReplies(data.replies);

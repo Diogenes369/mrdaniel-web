@@ -1,5 +1,5 @@
 import { SITE_PROMO_FOOTER, type NewsItem, type NewsTopic, type SocialPlatform } from './newsAgentTypes';
-import { reportAuthFailure } from './adminSecret';
+import { describeAiError } from './aiErrors';
 import { stripMetaPhrases } from './storySlides';
 
 /**
@@ -171,6 +171,10 @@ export interface ComposedPost {
   footer: string;
   /** true when the body was written by the adaptive LLM synthesis step; false = deterministic. */
   synthesized: boolean;
+  /** When `synthesized` is false: why the LLM path was skipped (stale secret, Gemini quota, thin
+   *  article text, network). Shown next to the "תבנית בסיס" badge so the operator can tell a
+   *  fixable failure from one worth retrying, instead of guessing at a silent downgrade. */
+  fallbackReason?: string;
   /** One-sentence Hebrew image description for screen readers + image SEO. Only the LLM path
    *  produces one; the deterministic template fallback leaves it empty. */
   altText?: string;
@@ -296,7 +300,7 @@ function postTail(item: NewsItem, platform: SocialPlatform, hashtags: string[]):
  * technical context as running paragraphs, one header-free takeaway cluster with a varied
  * lead-in, and the field note to close.
  */
-export function composeNewsPost(item: NewsItem, platform: SocialPlatform): ComposedPost {
+export function composeNewsPost(item: NewsItem, platform: SocialPlatform, reason?: string): ComposedPost {
   const topic = item.topic;
   const seed = seededInt(item.title);
   const isLinkedin = platform === 'linkedin';
@@ -321,7 +325,7 @@ export function composeNewsPost(item: NewsItem, platform: SocialPlatform): Compo
   );
 
   const fullText = [body, ...postTail(item, platform, hashtags)].join('\n\n');
-  return { fullText, hashtags, footer: SITE_PROMO_FOOTER, synthesized: false };
+  return { fullText, hashtags, footer: SITE_PROMO_FOOTER, synthesized: false, fallbackReason: reason };
 }
 
 /** Wraps an LLM-synthesised post body (adaptive structure, article-typed) with the standard
@@ -356,7 +360,11 @@ export async function synthesizeNewsPost(
   opts: { apiBase: string; adminSecret?: string }
 ): Promise<ComposedPost> {
   const articleText = (item.summary || item.excerpt || '').trim();
-  if (articleText.length < 60) throw new Error('article text too thin for synthesis');
+  // These messages are shown to the operator verbatim on the fallback badge, so they are Hebrew
+  // and name the cause — not the internal English strings the catch block used to swallow.
+  if (articleText.length < 60) {
+    throw new Error(`טקסט הכתבה קצר מדי לניסוח AI (${articleText.length} תווים, נדרשים 60) — פתחו את הכתבה המלאה`);
+  }
 
   const url = `${opts.apiBase.replace(/\/$/, '')}/api/agent-generate`;
   const headers: Record<string, string> = {
@@ -385,12 +393,8 @@ export async function synthesizeNewsPost(
     await new Promise((r) => setTimeout(r, waitMs));
     res = await fetch(url, { method: 'POST', headers, body: reqBody });
   }
-  if (res.status === 429) throw new Error('post-synthesize rate-limited (429) — Gemini free-tier hourly quota');
-  if (res.status === 401) {
-    reportAuthFailure('agent-generate'); // one shared prompt, not a raw toast per call
-    throw new Error('post-synthesize unauthorized (401) — x-admin-secret missing/mismatched');
-  }
-  if (!res.ok) throw new Error(`post-synthesize responded ${res.status}`);
+  // One classifier for every failure shape — it also raises the shared 401 re-auth prompt once.
+  if (!res.ok) throw new Error((await describeAiError(res)).message);
   const data = (await res.json()) as {
     ok?: boolean;
     blocked?: boolean;
@@ -403,7 +407,7 @@ export async function synthesizeNewsPost(
     typeof data.post.body !== 'string' ||
     data.post.body.trim().length < 120
   ) {
-    throw new Error('post-synthesize returned no usable body');
+    throw new Error(data.blocked ? 'הפלט נחסם ע"י מסנן התוכן' : 'מנוע ה-AI לא החזיר גוף פוסט שמיש');
   }
   return assembleComposedPost(item, platform, data.post.body, data.post.hashtags ?? [], data.post.altText);
 }

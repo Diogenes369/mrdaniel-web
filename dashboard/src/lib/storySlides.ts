@@ -1,5 +1,5 @@
 import type { NewsItem, NewsTopic } from './newsAgentTypes';
-import { reportAuthFailure } from './adminSecret';
+import { describeAiError } from './aiErrors';
 
 /**
  * Universal slide-synthesis engine (text/data only — the canvas render lives in
@@ -420,13 +420,11 @@ async function requestSynthesis(
     JSON.stringify({ action: 'story-synthesize', title: src.title, source: src.source, topic: src.topic, articleText: src.bodyText })
   );
 
-  if (res.status === 429) throw new Error('מכסת ה-API החינמית של Gemini לשעה זו מוצתה (429) — נסו שוב מאוחר יותר או שדרגו את המפתח');
-  if (res.status === 401) {
-    reportAuthFailure('agent-generate'); // one shared prompt, not a raw toast per call
-    throw new Error('אימות מול /api/agent-generate נכשל (401) — x-admin-secret חסר או לא תואם ל-ADMIN_API_SECRET באתר');
-  }
-  if (res.status === 503) throw new Error('GEMINI_API_KEY לא מוגדר בסביבת הריצה של האתר (503)');
-  if (!res.ok) throw new Error(`שרת ה-AI החזיר שגיאה ${res.status}`);
+  // Read the endpoint's own classification rather than guessing from the status: a 500 can be a
+  // revoked key, a Google outage or a safety block, and the operator's next move differs for each.
+  // describeAiError also raises the shared 401 re-auth prompt exactly once. The message it returns
+  // is what buildSlides() stamps into `fallbackReason`, so it is read verbatim off the deck badge.
+  if (!res.ok) throw new Error((await describeAiError(res)).message);
 
   const data = (await res.json()) as { ok?: boolean; slides?: SynthSlide[]; blocked?: boolean };
   if (data.blocked) throw new Error('פלט ה-AI נחסם ע"י מסנן התוכן');

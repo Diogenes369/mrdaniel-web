@@ -1,6 +1,6 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
-import { getAdminSecret, reportAuthFailure } from './adminSecret';
-
+import { getAdminSecret } from './adminSecret';
+import { describeAiError } from './aiErrors';
 
 /** Shared POST helper with one bounded 429 retry (Gemini free-tier hourly cap). */
 async function post(action: string, body: Record<string, unknown>): Promise<Response> {
@@ -23,18 +23,6 @@ async function post(action: string, body: Record<string, unknown>): Promise<Resp
     res = await fetch(url, { method: 'POST', headers, body: payload });
   }
   return res;
-}
-
-function explain(status: number): string {
-  if (status === 429) return 'מכסת ה-API החינמית של Gemini לשעה זו מוצתה (429) — נסו שוב מאוחר יותר.';
-  if (status === 401) {
-    // Surface one actionable re-auth prompt — the usual cause is a build-time
-    // secret that went stale after ADMIN_API_SECRET was rotated on the site.
-    reportAuthFailure('agent-generate');
-    return 'אימות מול /api/agent-generate נכשל (401) — בדקו את המפתח (localStorage.adminSecret או VITE_ADMIN_API_SECRET).';
-  }
-  if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת הריצה של האתר (503).';
-  return `שרת ה-AI החזיר שגיאה ${status}.`;
 }
 
 export interface ImportedContent {
@@ -218,7 +206,7 @@ export async function fetchFullArticleBody(url: string): Promise<string> {
 /** Server-side best-effort import of a pasted URL (LinkedIn post / article / blog). */
 export async function importUrl(url: string): Promise<ImportedContent> {
   const res = await post('import-url', { url });
-  if (!res.ok) throw new Error(explain(res.status));
+  if (!res.ok) throw new Error((await describeAiError(res)).message);
   const data = (await res.json()) as { ok?: boolean; blocked?: boolean; imported?: ImportedContent };
   if (data.blocked) throw new Error('התוכן שיובא נחסם ע"י מסנן התוכן.');
   if (!data.ok || !data.imported) throw new Error('לא הצלחנו לחלץ תוכן מהקישור — נסו להדביק את הטקסט ידנית.');
@@ -239,7 +227,7 @@ export async function synthesizeChannelPost(
     variant: input.variant,
     articleText: input.articleText,
   });
-  if (!res.ok) throw new Error(explain(res.status));
+  if (!res.ok) throw new Error((await describeAiError(res)).message);
   const data = (await res.json()) as {
     ok?: boolean;
     blocked?: boolean;

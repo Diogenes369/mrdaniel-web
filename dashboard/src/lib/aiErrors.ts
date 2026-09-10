@@ -19,6 +19,10 @@ export type AiErrorCode =
   | 'upstream_unavailable'
   | 'timeout'
   | 'not_configured'
+  // The request never reached the model: the source text was below the minimum the action needs.
+  // Distinct from every other cause because the fix is the operator's (paste more text), not a
+  // retry and not a re-key.
+  | 'source_too_short'
   | 'unknown';
 
 export interface AiError {

@@ -1,6 +1,7 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import type { NewsItem } from './newsAgentTypes';
-import { getAdminSecret, reportAuthFailure } from './adminSecret';
+import { getAdminSecret } from './adminSecret';
+import { describeAiError } from './aiErrors';
 
 /**
  * Tech Tips & Motion Studio — content layer.
@@ -49,7 +50,6 @@ export interface TechTipDeck {
   fallbackReason?: string;
   createdAt: number;
 }
-
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
@@ -146,18 +146,6 @@ async function post(body: Record<string, unknown>, timeoutMs = 90000): Promise<R
   }
 }
 
-function httpReason(status: number): string {
-  if (status === 429) return 'מכסת ה-API של Gemini לשעה זו מוצתה (429)';
-  if (status === 401) {
-    // Surface one actionable re-auth prompt — the usual cause is a build-time
-    // secret that went stale after ADMIN_API_SECRET was rotated on the site.
-    reportAuthFailure('agent-generate');
-    return 'אימות מול /api/agent-generate נכשל (401)';
-  }
-  if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת השרת (503)';
-  return `שרת ה-AI החזיר שגיאה ${status}`;
-}
-
 const VISUAL_BASE =
   'abstract dark cyber technology background, deep obsidian, subtle circuit and node grid geometry, neon green and cyan accents, no text, no people, cinematic depth';
 
@@ -188,7 +176,7 @@ export async function synthesizeTechTipDeck(topic: string, notes?: string): Prom
   if (topic.trim().length < 8) return buildFallbackDeck(topic || 'מדריך', 'הנושא קצר מדי לסינתוז AI');
   try {
     const res = await post({ topic, notes });
-    if (!res.ok) return buildFallbackDeck(topic, httpReason(res.status));
+    if (!res.ok) return buildFallbackDeck(topic, (await describeAiError(res)).message);
     const data = (await res.json()) as { ok?: boolean; blocked?: boolean; deck?: { title: string; slides: TechTipSlide[]; hashtags: string[] } };
     if (data.blocked) return buildFallbackDeck(topic, 'הפלט נחסם ע"י מסנן התוכן');
     if (!data.ok || !data.deck || !Array.isArray(data.deck.slides) || data.deck.slides.length < 5) {

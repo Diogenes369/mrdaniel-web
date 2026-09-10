@@ -2,7 +2,8 @@ import { SITE_ORIGIN } from './useDashboardRefresh';
 import { importUrl, parseRawText, stripAuthorNoise, cleanExtractedBody } from './repurposeApi';
 import type { NewsTopic } from './newsAgentTypes';
 import type { LayoutKind, ResearchBrief, SlideRole, StudioDeck, StudioPreset, StudioSlide, StudioTheme } from './carouselStudioTypes';
-import { getAdminSecret, reportAuthFailure } from './adminSecret';
+import { getAdminSecret } from './adminSecret';
+import { describeAiError } from './aiErrors';
 
 /**
  * Agents 1 & 2 of the WEB3 Carousel Studio.
@@ -14,7 +15,6 @@ import { getAdminSecret, reportAuthFailure } from './adminSecret';
  *                            failure (429 / 503 / network / thin output) falls back to a
  *                            deterministic local builder. NEVER throws.
  */
-
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
@@ -51,18 +51,6 @@ async function post(body: Record<string, unknown>, timeoutMs = 90000): Promise<R
     }
     return res;
   }
-}
-
-function httpReason(status: number): string {
-  if (status === 429) return 'מכסת ה-API של Gemini לשעה זו מוצתה (429)';
-  if (status === 401) {
-    // Surface one actionable re-auth prompt — the usual cause is a build-time
-    // secret that went stale after ADMIN_API_SECRET was rotated on the site.
-    reportAuthFailure('agent-generate');
-    return 'אימות מול /api/agent-generate נכשל (401)';
-  }
-  if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת השרת (503)';
-  return `שרת ה-AI החזיר שגיאה ${status}`;
 }
 
 // ─── sentence helpers ──────────────────────────────────────────────────────────────────────
@@ -340,7 +328,7 @@ export async function synthesizeStudioDeck(
       brief: brief.body,
       takeaways: brief.takeaways,
     });
-    if (!res.ok) return buildDeckFallback(brief, topic, httpReason(res.status), theme);
+    if (!res.ok) return buildDeckFallback(brief, topic, (await describeAiError(res)).message, theme);
     const data = (await res.json()) as { ok?: boolean; blocked?: boolean; deck?: ApiSlide[] };
     if (data.blocked) return buildDeckFallback(brief, topic, 'הפלט נחסם ע"י מסנן התוכן', theme);
     if (!data.ok || !Array.isArray(data.deck) || data.deck.length < 5) {

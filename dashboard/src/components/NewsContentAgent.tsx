@@ -275,8 +275,16 @@ export default function NewsContentAgent() {
             setPost(synth);
             postCache.current.set(pKey, synth);
           }
-        } catch {
-          /* keep the deterministic draft already shown */
+        } catch (err) {
+          // Keep the deterministic draft already on screen, but re-stamp it with WHY the AI path
+          // was skipped. Swallowing the error here made an AI post and a base-template post look
+          // identical apart from a grey "תבנית בסיס" label, so a stale admin secret or an exhausted
+          // Gemini quota read as "the AI just wrote it this way".
+          if (pSeq === postSeq.current) {
+            const reason = (err as Error)?.message || 'סינתזת ה-AI לא זמינה';
+            console.warn('[news-post] LLM synthesis unavailable, keeping base template:', reason);
+            setPost(composeNewsPost(it, platform, reason));
+          }
         } finally {
           if (pSeq === postSeq.current) setPosting(false);
         }
@@ -841,7 +849,14 @@ export default function NewsContentAgent() {
                       <Sparkles className="w-3 h-3" /> ניסוח AI מותאם
                     </span>
                   ) : post ? (
-                    <span className="text-[10px] text-zinc-500 normal-case tracking-normal">תבנית בסיס</span>
+                    <span
+                      className={`text-[10px] normal-case tracking-normal ${
+                        post.fallbackReason ? 'text-amber-400/80' : 'text-zinc-500'
+                      }`}
+                      title={post.fallbackReason}
+                    >
+                      תבנית בסיס{post.fallbackReason ? ` — ${post.fallbackReason}` : ''}
+                    </span>
                   ) : null}
                 </span>
                 <button

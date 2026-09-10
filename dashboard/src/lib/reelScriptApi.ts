@@ -1,7 +1,8 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import type { NewsItem } from './newsAgentTypes';
 import type { ReelScript, ReelScriptScene } from './agentTypes';
-import { getAdminSecret, reportAuthFailure } from './adminSecret';
+import { getAdminSecret } from './adminSecret';
+import { describeAiError } from './aiErrors';
 
 /**
  * Client lib for the "תסריט לרילס" (Reel Generator) mode in NewsContentAgent — article-grounded
@@ -9,7 +10,6 @@ import { getAdminSecret, reportAuthFailure } from './adminSecret';
  * output it falls back to a deterministic script built straight from the selected article's real
  * sentences, so the operator always gets a usable draft.
  */
-
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
@@ -46,18 +46,6 @@ async function post(body: Record<string, unknown>, timeoutMs = 75000): Promise<R
     }
     return res;
   }
-}
-
-function httpReason(status: number): string {
-  if (status === 429) return 'מכסת ה-API של Gemini לשעה זו מוצתה (429)';
-  if (status === 401) {
-    // Surface one actionable re-auth prompt — the usual cause is a build-time
-    // secret that went stale after ADMIN_API_SECRET was rotated on the site.
-    reportAuthFailure('agent-generate');
-    return 'אימות מול /api/agent-generate נכשל (401)';
-  }
-  if (status === 503) return 'GEMINI_API_KEY לא מוגדר בסביבת השרת (503)';
-  return `שרת ה-AI החזיר שגיאה ${status}`;
 }
 
 function splitSentences(text: string): string[] {
@@ -110,7 +98,7 @@ export async function synthesizeReel(item: NewsItem): Promise<ReelResult> {
 
   try {
     const res = await post({ title: item.title, source: item.source, topic: item.topic, articleText });
-    if (!res.ok) return { reel: buildFallbackReel(item), synthesized: false, fallbackReason: httpReason(res.status) };
+    if (!res.ok) return { reel: buildFallbackReel(item), synthesized: false, fallbackReason: (await describeAiError(res)).message };
     const data = (await res.json()) as { ok?: boolean; blocked?: boolean; reel?: ReelScript };
     if (data.blocked) return { reel: buildFallbackReel(item), synthesized: false, fallbackReason: 'הפלט נחסם ע"י מסנן התוכן' };
     if (!data.ok || !data.reel || !Array.isArray(data.reel.scenes) || data.reel.scenes.length < 3) {
