@@ -8,6 +8,7 @@ import {
   readEmailTemplate,
   recordEmailCampaign,
   upsertManychatLead,
+  pushSiteLead,
 } from '../src/agent/firebaseServer.js';
 import { sendOne, sendCampaign, welcomeEmailHtml, wrapBrandedEmail, isEmailConfigured } from '../src/server/emailEngine.js';
 import { findStaticGuide } from '../src/server/leadMagnets.js';
@@ -15,8 +16,13 @@ import { findStaticGuide } from '../src/server/leadMagnets.js';
 // Vercel Serverless Function — the site's lead endpoint AND the email engine (folded in here
 // rather than a new `/api/send-email` because Vercel Hobby caps a deployment at 12 functions).
 //
-//   • POST (no `action`)                 → the original: email the owner a new lead.
+//   • POST (no `action`)                 → a site lead: store it in `leads`, then email the owner.
+//   • POST { action: 'qualification' }    → the agent quiz result: store it in `leads`, no email.
 //   • POST { action: 'manychat-lead' }    → ManyChat External Request: save a Comment-to-DM lead.
+//
+// The site no longer writes `leads` from the browser, and the pending rules lock (PROJECT_STATE.md
+// §6) closes it to browsers, so this endpoint is the only way a visitor's lead reaches it. Every
+// site-lead field is typed and capped here before it is stored.
 //   • POST { action: 'newsletter-signup' } → write to `newsletter_signups`, optional auto-welcome.
 //   • POST { action: 'send-test' }        → admin: send one branded email.
 //   • POST { action: 'send-welcome' }     → admin: send the welcome template to one address.
@@ -37,6 +43,50 @@ function isAdminAuthorized(req: any): boolean {
 }
 
 const isEmail = (s: unknown): s is string => typeof s === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
+
+/** A site-form field as a trimmed, capped string; '' when absent or not a string. */
+function formText(v: unknown, max: number): string {
+  return typeof v === 'string' ? v.trim().slice(0, max) : '';
+}
+
+interface SiteLead {
+  name: string;
+  email: string;
+  phone?: string;
+  project?: string;
+  notes?: string;
+  sourceSection?: string;
+  selectedProduct?: string;
+  productCategory?: string;
+  userCompanySize?: string;
+  price?: number;
+}
+
+/**
+ * The only lead fields a site form may store, each typed and capped. Anything else in the body is
+ * dropped: the dashboard and the email engine both read `leads`, so a browser must not be able to
+ * plant arbitrary keys or oversized values there. Absent fields are left out rather than written
+ * as undefined, which RTDB rejects.
+ */
+function siteLeadFields(body: Record<string, unknown>): SiteLead {
+  const price =
+    typeof body.price === 'number' && Number.isFinite(body.price) && body.price >= 0 && body.price <= 10_000_000
+      ? body.price
+      : undefined;
+  const lead: SiteLead = {
+    name: formText(body.name, 120),
+    email: formText(body.email, 200).toLowerCase(),
+    phone: formText(body.phone, 40).replace(/[^\d+\-() ]/g, '').trim() || undefined,
+    project: formText(body.project, 200) || undefined,
+    notes: formText(body.notes, 10_000) || undefined,
+    sourceSection: formText(body.sourceSection, 80) || undefined,
+    selectedProduct: formText(body.selectedProduct, 120) || undefined,
+    productCategory: formText(body.productCategory, 60) || undefined,
+    userCompanySize: formText(body.userCompanySize, 80) || undefined,
+    price,
+  };
+  return Object.fromEntries(Object.entries(lead).filter(([, v]) => v !== undefined)) as SiteLead;
+}
 
 function getLeadTransporter() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
@@ -99,6 +149,20 @@ export default async function handler(req: any, res: any) {
       await sendOne({ to: email, subject, html });
     }
     res.status(200).json({ ok: true });
+    return;
+  }
+
+  // ---- Agent-quiz result (open; it carries no contact details, so nothing is emailed) --------
+  if (action === 'qualification') {
+    const leadId = await pushSiteLead({
+      ...siteLeadFields(body),
+      name: 'לא נמסר (שאלון התאמה → WhatsApp)',
+      email: 'לא נמסר',
+      productCategory: 'ai-agent',
+      sourceSection: 'Agent Qualification Modal',
+      ts: Date.now(),
+    });
+    res.status(leadId ? 200 : 500).json({ ok: Boolean(leadId) });
     return;
   }
 
@@ -179,17 +243,27 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  // ---- Original lead flow ------------------------------------------------------------------
-  const { name, email, phone, project, notes, sourceSection, selectedProduct, productCategory, price, userCompanySize } = body;
-  if (!name || !email) {
+  // ---- Site lead: store it for the dashboard, then email the owner --------------------------
+  const lead = siteLeadFields(body);
+  const { name, email, phone, project, notes, sourceSection, selectedProduct, productCategory, price, userCompanySize } = lead;
+  if (!name || !isEmail(email)) {
     res.status(400).json({ ok: false, error: 'missing name/email' });
     return;
   }
 
+  // Stored before the email is tried, and whatever happens to it, so a lead still reaches the
+  // dashboard when SMTP has a bad day. The browser used to write this copy itself.
+  const leadId = await pushSiteLead({ ...lead, ts: Date.now() });
+
   const transporter = getLeadTransporter();
   if (!transporter) {
-    console.error('[api/leads] SMTP not configured — lead not delivered:', { name, email, phone, project, sourceSection });
-    res.status(503).json({ ok: false, error: 'email delivery not configured' });
+    if (leadId) {
+      console.error('[api/leads] SMTP not configured — lead stored but not emailed:', leadId);
+      res.status(200).json({ ok: true, emailed: false });
+    } else {
+      console.error('[api/leads] SMTP not configured and the lead was not stored:', { name, email, phone, project, sourceSection });
+      res.status(503).json({ ok: false, error: 'lead not delivered' });
+    }
     return;
   }
 
@@ -221,10 +295,14 @@ export default async function handler(req: any, res: any) {
       console.warn('[api/leads] auto-welcome email failed:', err);
     }
 
+    if (!leadId) console.error('[api/leads] lead emailed but not stored in Firebase:', sourceSection);
     res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[api/leads] failed to send lead email:', err);
-    res.status(500).json({ ok: false, error: 'send failed' });
+    // A stored lead is not lost — the owner sees it in the dashboard — so the visitor is not told
+    // to try again.
+    if (leadId) res.status(200).json({ ok: true, emailed: false });
+    else res.status(500).json({ ok: false, error: 'send failed' });
   }
 }
 

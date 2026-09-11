@@ -395,13 +395,5 @@ export function trackChatQuery(message: string) {
   logEvent('chat_query', { label: message.trim().slice(0, 80) });
 }
 
-/** Writes a captured lead to Firebase as a second, dashboard-visible record of the same lead
- * `/api/leads` already emails — independent of email deliverability, so a lead is still visible
- * in the dashboard even if SMTP has a bad day. Requires a `leads` read/write rule (see
- * dashboard/README.md) — until that's added to the Firebase console, this fails silently (same
- * fire-and-forget contract as every other write in this file) and simply won't appear anywhere. */
-export function trackLead(lead: LeadPayload) {
-  const db = getDb();
-  if (!db) return;
-  push(ref(db, 'leads'), clean({ ...lead, ts: Date.now() })).catch(() => {});
-}
+// There is no trackLead here any more. `leads` holds visitor PII and is being closed to browsers
+// (PROJECT_STATE.md §6), so `/api/leads` validates each lead and writes it server-side.

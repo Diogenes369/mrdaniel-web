@@ -27,7 +27,7 @@ export interface ImportedThread {
   author: string;
   posts: string[];
   text: string;
-  via: 'direct' | 'oembed' | 'jina' | 'manual' | 'none';
+  via: 'direct' | 'meta' | 'jina' | 'manual' | 'none';
   note?: string;
 }
 
@@ -37,12 +37,29 @@ export const MIN_THREAD_CHARS = 60;
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
-const THREADS_URL =
-  /^https?:\/\/(?:www\.)?threads\.(?:net|com)\/(?:@[A-Za-z0-9._]+\/post\/[A-Za-z0-9_-]+|t\/[A-Za-z0-9_-]+)/i;
+/** Mirrors normalizeThreadsUrl in src/server/threadsImport.ts: the first threads.net / threads.com
+ *  post link anywhere in the input, so a pasted share text ("look at this https://…") validates. */
+const THREADS_LINK = /(?:https?:\/\/)?(?:www\.|m\.)?threads\.(?:net|com)\/[^\s<>"'`]+/i;
+const POST_PATH = /^\/(?:@([A-Za-z0-9._]+)\/post\/([A-Za-z0-9_-]+)|t\/([A-Za-z0-9_-]+))(?:\/(?:media|embed))?\/?$/i;
+
+/** The canonical post URL with share tracking (`?xmt=`, `?igshid=`, …) dropped, or null when the
+ *  input holds no Threads post link. */
+export function sanitizeThreadsUrl(raw: string): string | null {
+  const link = (raw || '').match(THREADS_LINK)?.[0];
+  if (!link) return null;
+  let path: string;
+  try {
+    path = new URL(/^https?:\/\//i.test(link) ? link : `https://${link}`).pathname;
+  } catch {
+    return null;
+  }
+  const m = POST_PATH.exec(path.replace(/%40/gi, '@').replace(/[).,;:!?]+$/, ''));
+  if (!m) return null;
+  return m[1] ? `https://www.threads.com/@${m[1]}/post/${m[2]}` : `https://www.threads.com/t/${m[3]}`;
+}
 
 export function isThreadsUrl(raw: string): boolean {
-  const url = (raw || '').trim();
-  return THREADS_URL.test(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+  return sanitizeThreadsUrl(raw) !== null;
 }
 
 /** Shared POST helper with one bounded 429 retry (Gemini free-tier hourly cap) and one 5xx retry. */
@@ -92,7 +109,7 @@ async function post(action: string, body: Record<string, unknown>, timeoutMs = 9
  * which is the documented fallback, not a failure.
  */
 export async function importThread(url: string): Promise<ImportedThread> {
-  const res = await post('parse-thread', { url }, 30000);
+  const res = await post('parse-thread', { url: sanitizeThreadsUrl(url) ?? url }, 30000);
   if (!res.ok) throw new Error((await describeAiError(res)).message);
   const data = (await res.json()) as { ok?: boolean; blocked?: boolean; thread?: ImportedThread; error?: string };
   if (data.blocked) throw new Error('התוכן שיובא נחסם ע"י מסנן התוכן.');
@@ -103,7 +120,7 @@ export async function importThread(url: string): Promise<ImportedThread> {
 /** Threads UI chrome that rides along when a post is copied out of the app. Mirrors the server's
  *  NOISE_LINE — a pasted post carries the same furniture a scraped one does. */
 const NOISE_LINE =
-  /^(?:\d[\d,.]*\s*(?:likes?|replies|reposts?|views?|comments?|לייקים|תגובות|צפיות)\b.*|(?:log in|sign up|התחבר(?:ות)?|הרשמה)\b.*|(?:translate|see translation|תרגם|הצג תרגום)\b.*|(?:more|see more|show more|עוד|הצג עוד)\s*$|(?:follow|following|עקוב|עוקב)\s*$|threads\s*$|instagram\s*$|(?:©|copyright)\s*\d{4}.*|meta platforms.*|(?:privacy|terms|cookies?)\s*(?:policy|notice)?\s*$|\d+\s*[hdwmy]\s*(?:ago)?\s*$|(?:just now|לפני רגע)\s*$)$/i;
+  /^(?:\d[\d,.]*\s*[km]?\s*(?:likes?|replies|reposts?|views?|comments?|followers?|threads|לייקים|תגובות|צפיות|עוקבים)\b.*|(?:log in|sign up|continue with instagram|התחבר(?:ות)?|הרשמה)\b.*|(?:translate|see translation|תרגם|הצג תרגום)\b.*|(?:more|see more|show more|עוד|הצג עוד)\s*$|(?:follow|following|עקוב|עוקב)\s*$|threads\s*$|instagram\s*$|(?:©|copyright)\s*\d{4}.*|meta platforms.*|(?:privacy|terms|cookies?)\s*(?:policy|notice)?\s*$|\d+\s*[hdwmy]\s*(?:ago)?\s*$|(?:just now|לפני רגע)\s*$|\d[\d,.]*\s*[km]?\s*$|[·•]?\s*author\s*$|edited\s*$|pinned\s*$|liked by (?:the )?original author\s*$|view activity\s*$)$/i;
 
 /** The header line a copied Threads post opens with: "username · 3h" (handle, then an age). */
 const PASTE_HEADER = /^\s*@?([A-Za-z0-9._]{2,30})\s*[·•|]\s*\d+\s*[hdwmy]\b.*$/;

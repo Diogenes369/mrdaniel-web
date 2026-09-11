@@ -171,7 +171,7 @@ Cron: header `Authorization: Bearer ${CRON_SECRET}`.
 | `presence/` | tracker (אתר) | דשבורד | `{ <sessionId>: { device, path, startedAt, lastSeen, browser, screen, lang, timezone, referrer, ip (ממוסך), countryCode, region, city } }`. `writePresence()` כותב את הרשומה המלאה ב-init, בכל route change, ב-heartbeat כל 25 שניות, וב-`visibilitychange` — וכל פעם מזיין מחדש `onDisconnect().remove()`. ה-IP והגאו נלכדים פעם אחת דרך `/api/health` (headers `x-vercel-ip-*`), ה-IP ממוסך. **הדשבורד סופר "פעיל" רק רשומה תקינה (device מוכר + startedAt מספרי) שה-`lastSeen`/`startedAt` שלה בטווח 60 שניות** (`dashboard/src/lib/presence.ts`) — כך הספירה הכוללת תמיד שווה לפירוט המכשירים, ורשומות "רפאים" (partial write ישן) או תקועות (onDisconnect שנכשל) נושרות תוך ≤5ש׳. |
 | `events/` | tracker (אתר) | דשבורד | אירועי גלישה/המרה |
 | `health/latest` | tracker | דשבורד | מדדי בריאות |
-| `leads/` | tracker (`push`) | דשבורד, `api/leads` (איסוף נמענים) | `{ <id>: { name, email, phone, sourceSection, status, ts } }` |
+| `leads/` | `api/leads` (טפסי האתר, שאלון ההתאמה, ManyChat) | דשבורד, `api/leads` (איסוף נמענים) | `{ <id>: { name, email, phone, sourceSection, status, ts } }` |
 | `newsletter_signups/` | `api/leads` (`action:newsletter-signup`) | דשבורד, `api/leads` | `{ <id>: { email, name, source, ts } }` |
 | `agent_config/` | דשבורד | `api/agent-generate` | `{ mode, webhooks, strategicContext, … }` |
 | `agent_queue/` | `api/agent-generate` | דשבורד | טיוטות תוכן/פנייה לאישור |
@@ -185,7 +185,7 @@ Cron: header `Authorization: Bearer ${CRON_SECRET}`.
 | `email_campaigns/` | `api/leads` (`action:send-campaign`) | דשבורד | `{ <id>: { subject, audience, total, sent, failed, status, ts } }` |
 
 ### 5.2 כללי אבטחה (Rules)
-צד השרת משתמש ב-**client SDK** של Firebase (לא firebase-admin), לכן כל path שהשרת כותב אליו
+צד השרת משתמש ב-**client SDK** של Firebase. החריגים הם `leads`, `newsletter_signups`, `email_config` ו-`email_templates`, שעוברים דרך `privilegedDb()` ב-`src/agent/firebaseServer.ts`: firebase-admin כש-`FIREBASE_SERVICE_ACCOUNT` מוגדר, וה-client SDK עד אז (עד נעילת הכללים, PROJECT_STATE.md §6). לכן כל path אחר שהשרת כותב אליו
 חייב כלל read/write שמאפשר זאת. תבנית מינימלית (להתאים לצרכים):
 
 ```json
@@ -240,7 +240,7 @@ helpers ב-`src/agent/firebaseServer.ts`. UI: `dashboard/src/components/EmailMan
 ### 6.2 זרימת לידים והרשמות
 1. **ליד מהאתר** — `LeadForm` / `AIAssistantWidget` שולחים `POST /api/leads` (name, email…).
    - השרת שולח התראת טקסט ל-`LEAD_EMAIL_TO`.
-   - במקביל, `src/lib/tracker.ts` כותב `push('leads', …)` ל-RTDB (ערוץ עצמאי).
+   - השרת שומר את הליד ב-`leads` לפני שליחת המייל, כך שליד נשמר גם כש-SMTP נופל. הדפדפן כבר לא כותב ל-`leads`.
    - `src/lib/leadWebhook.ts` יורה גם ל-Google Apps Script (גיבוי fire-and-forget).
    - אם `email_config.autoWelcome` פעיל — נשלח מייל "ברוכים הבאים" ממותג לכתובת הליד.
 2. **הרשמת ניוזלטר** — `POST /api/leads` עם `{ action: 'newsletter-signup', email, name?, source? }`.

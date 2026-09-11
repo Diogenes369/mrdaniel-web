@@ -207,27 +207,27 @@ export default function AgentQualificationModal() {
     return recommendAgent(goal, audience, budget);
   }, [businessType, techStack, budget, goal]);
 
-  // Records the completed qualification to Firebase (dashboard-visible) the instant a result is
-  // reached — deliberately Firebase-only, not `/api/leads`: this flow never collects a name/email,
-  // so there's nothing to send an email reply to. The WhatsApp handoff below is the actual contact
-  // channel; this is just so the qualification itself isn't invisible to the business owner.
+  // Records the completed qualification in the dashboard's `leads` list as soon as a result is
+  // reached. It goes through `/api/leads` because `leads` is being closed to browsers, but as its own
+  // action: this flow never collects a name or email, so there is no owner email and no welcome
+  // email to send. The WhatsApp handoff below is the actual contact channel. This record only
+  // keeps the qualification visible to the business owner, so it stays fire-and-forget.
   useEffect(() => {
     if (!result || !businessType || !techStack || !budget || !goal) return;
     const businessLabel = BUSINESS_TYPE_OPTIONS.find((o) => o.id === businessType)?.label;
     const techLabel = TECH_STACK_OPTIONS.find((o) => o.id === techStack)?.label;
     const budgetLabel = BUDGET_OPTIONS.find((o) => o.id === budget)?.label;
-    loadTracker().then((t) =>
-      t.trackLead({
-        name: 'לא נמסר (שאלון התאמה → WhatsApp)',
-        email: 'לא נמסר',
+    fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'qualification',
         selectedProduct: result.name,
-        productCategory: 'ai-agent',
         price: result.price,
         userCompanySize: businessLabel,
         notes: `מערכות קיימות: ${techLabel}\nתקציב: ${budgetLabel}\nמטרה: ${GOAL_LABEL[goal]}`,
-        sourceSection: 'Agent Qualification Modal',
-      })
-    );
+      }),
+    }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
 

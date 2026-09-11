@@ -188,21 +188,8 @@ export default function LeadForm() {
     });
 
     trackField('submit', 'submit');
-    loadTracker().then((t) =>
-      t.trackLead({
-        name: form.name,
-        email: form.email,
-        phone: form.phone,
-        project,
-        sourceSection,
-        selectedProduct: product?.name,
-        productCategory: product?.category,
-        price: product?.price,
-        userCompanySize: companySizeLabel,
-        notes,
-      })
-    );
 
+    // `/api/leads` both emails the lead and records it for the dashboard.
     try {
       const res = await fetch('/api/leads', {
         method: 'POST',

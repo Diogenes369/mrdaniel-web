@@ -56,7 +56,7 @@ const KIND_LABEL: Record<string, string> = {
 
 const VIA_LABEL: Record<ImportedThread['via'], string> = {
   direct: 'נמשך ישירות מ-Threads',
-  oembed: 'נמשך דרך oEmbed',
+  meta: 'נמשך מתגיות המטא של הפוסט',
   jina: 'נמשך דרך קורא חיצוני',
   manual: 'הודבק ידנית',
   none: 'לא נמשך תוכן',

@@ -233,16 +233,7 @@ export default function AIAssistantWidget() {
       inquiryTopic: leadData.project || 'שיחה עם עוזר ה-AI',
     });
 
-    loadTracker().then((t) =>
-      t.trackLead({
-        name: leadData.name,
-        email: leadData.email,
-        phone: leadData.phone,
-        project: leadData.project,
-        sourceSection: 'AI Assistant Chat',
-      })
-    );
-
+    // `/api/leads` both emails the lead and records it for the dashboard.
     try {
       await fetch('/api/leads', {
         method: 'POST',

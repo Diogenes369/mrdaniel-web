@@ -28,7 +28,6 @@ const NOOP_TRACKER: TrackerModule = {
   trackFormInteraction: () => {},
   trackChatOpen: () => {},
   trackChatQuery: () => {},
-  trackLead: () => {},
 } as unknown as TrackerModule;
 
 let trackerPromise: Promise<TrackerModule> | null = null;

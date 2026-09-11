@@ -34,9 +34,8 @@ Main site (src/lib/tracker.ts)  →  Firebase Realtime Database  →  This dashb
   Form-field and AI-chat events are tracked at their specific call sites (`LeadForm.tsx`,
   `AIAssistantWidget.tsx`). Every event carries the same shared context: `ts`, `sessionId`, `path`,
   `device`, `browser`, `screen`, `referrer`, `lang`, `timezone`.
-- **Leads** (`/leads/{pushId}`) — `trackLead()` writes a copy of every submitted lead here,
-  independent of email deliverability (see the rules section below — this path needs its own rule
-  added).
+- **Leads** (`/leads/{pushId}`) — `/api/leads` stores every submitted lead here before it emails
+  the owner, so a lead stays visible when SMTP fails. The browser no longer writes this path.
 - **Health** (`/health/latest`) is a client-measured round-trip time to the main site's
   `GET /api/health` endpoint, pinged every 30s.
 - This dashboard subscribes to all of the above with `onValue()` listeners — updates arrive
@@ -99,7 +98,7 @@ users only, so only you (logged into the dashboard) can see the live data. Paste
 
 `newsletter_signups` was added when the AI page's newsletter capture form shipped (`src/components/content/NewsletterCapture.tsx`) — it writes `{ email, source, ts }` the same way the tracker writes `events`. Same tradeoff as everywhere else in this doc: public write (visitors aren't logged in), read restricted to the authenticated dashboard.
 
-`leads` was added alongside the dashboard's "לידים וניוזלטר" tab — `src/lib/tracker.ts`'s `trackLead()` writes `{ name, email, phone?, project?, sourceSection?, ts }` here from `LeadForm.tsx` and `AIAssistantWidget.tsx`, as a second, dashboard-visible record of the same lead `/api/leads` already emails. **This rule must be added to the Firebase console for the Leads tab to show anything** — until then, both the write (from the site) and the read (from this dashboard) fail silently under the default "everything denied" rule, exactly like every other write in this pipeline.
+`leads` was added alongside the dashboard's "לידים וניוזלטר" tab. Since 2026-09-11 only `/api/leads` writes it (the site forms, the agent quiz and ManyChat), never the browser, so its `.write` no longer needs to be public. A rules lock that makes `leads`, `newsletter_signups`, `email_config` and `email_templates` admin-only is pending; see PROJECT_STATE.md §6.
 
 **Tradeoff to know about**: because writes are public, anyone who extracts the client config from
 the main site's bundle could technically write junk events into your database. That's inherent to

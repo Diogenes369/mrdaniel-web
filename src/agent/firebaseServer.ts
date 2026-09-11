@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, push, set, update, get, query as dbQuery, orderByKey, limitToLast, type Database } from 'firebase/database';
+import { getAdminDb } from './firebaseAdmin.js';
 
 const STRATEGIC_CONTEXT_LIMIT = 10;
 
@@ -35,8 +36,7 @@ function getServerDb(): Database | null {
   return dbInstance;
 }
 
-/** Requires an `agent_queue` read/write rule in the Firebase console (the same "you still need to
- * add this rule" step already needed for `/leads` — see dashboard README). Resolves to null
+/** Requires an `agent_queue` read/write rule in the live database rules. Resolves to null
  * silently rather than throwing so a missing rule degrades to "queue item not saved", not a 500. */
 export async function pushQueueItem(item: Record<string, unknown>): Promise<string | null> {
   const db = getServerDb();
@@ -328,10 +328,45 @@ export async function writeStoryDraft(newsId: string, payload: Record<string, un
 }
 
 // ---------------------------------------------------------------------------
-// Email engine (api/leads.ts email actions, src/server/emailEngine.ts)
-// RTDB: `newsletter_signups` (append-only), `email_config` + `email_templates`
-// (dashboard-owned). Same "add the rule in the Firebase console" caveat.
+// Leads + email engine (api/leads.ts, src/server/emailEngine.ts)
+// `leads`, `newsletter_signups`, `email_config` and `email_templates` hold PII or email settings
+// and are to become admin-only (the rules lock in PROJECT_STATE.md §6), so everything below except
+// recordEmailCampaign goes through privilegedDb().
 // ---------------------------------------------------------------------------
+
+/** The four operations the admin-only paths need, over whichever connection is available. */
+interface PrivilegedDb {
+  read(path: string): Promise<unknown>;
+  readLast(path: string, count: number): Promise<unknown>;
+  push(path: string, value: object): Promise<string | null>;
+  update(path: string, patch: object): Promise<void>;
+}
+
+/**
+ * The service-account connection (firebaseAdmin.ts) when FIREBASE_SERVICE_ACCOUNT is set. Until
+ * then it is the anonymous client above, which only works while the live rules still leave these
+ * paths open. That fallback is transitional: once the rules lock is deployed it is refused, so a
+ * missing service account fails closed instead of quietly reopening anything.
+ */
+function privilegedDb(): PrivilegedDb | null {
+  const admin = getAdminDb();
+  if (admin) {
+    return {
+      read: async (path) => (await admin.ref(path).once('value')).val(),
+      readLast: async (path, count) => (await admin.ref(path).orderByKey().limitToLast(count).once('value')).val(),
+      push: async (path, value) => (await admin.ref(path).push(value)).key,
+      update: (path, patch) => admin.ref(path).update(patch),
+    };
+  }
+  const db = getServerDb();
+  if (!db) return null;
+  return {
+    read: async (path) => (await get(ref(db, path))).val(),
+    readLast: async (path, count) => (await get(dbQuery(ref(db, path), orderByKey(), limitToLast(count)))).val(),
+    push: async (path, value) => (await push(ref(db, path), value)).key,
+    update: (path, patch) => update(ref(db, path), patch),
+  };
+}
 
 export interface EmailConfig {
   autoWelcome?: boolean;
@@ -340,11 +375,10 @@ export interface EmailConfig {
 }
 
 export async function pushNewsletterSignup(record: Record<string, unknown>): Promise<string | null> {
-  const db = getServerDb();
+  const db = privilegedDb();
   if (!db) return null;
   try {
-    const r = await push(ref(db, 'newsletter_signups'), record);
-    return r.key;
+    return await db.push('newsletter_signups', record);
   } catch (err) {
     console.error('[email] failed to push newsletter signup:', err);
     return null;
@@ -362,11 +396,10 @@ function collectEmails(node: unknown): string[] {
 }
 
 export async function readNewsletterEmails(): Promise<string[]> {
-  const db = getServerDb();
+  const db = privilegedDb();
   if (!db) return [];
   try {
-    const snap = await get(ref(db, 'newsletter_signups'));
-    return collectEmails(snap.val());
+    return collectEmails(await db.read('newsletter_signups'));
   } catch (err) {
     console.error('[email] failed to read newsletter_signups:', err);
     return [];
@@ -374,14 +407,26 @@ export async function readNewsletterEmails(): Promise<string[]> {
 }
 
 export async function readLeadEmails(): Promise<string[]> {
-  const db = getServerDb();
+  const db = privilegedDb();
   if (!db) return [];
   try {
-    const snap = await get(ref(db, 'leads'));
-    return collectEmails(snap.val());
+    return collectEmails(await db.read('leads'));
   } catch (err) {
     console.error('[email] failed to read leads:', err);
     return [];
+  }
+}
+
+/** Saves a lead from one of the site's own forms into `leads`. The caller has already validated and
+ *  capped every field. Returns the new key, or null when the write failed or is not configured. */
+export async function pushSiteLead(record: Record<string, unknown>): Promise<string | null> {
+  const db = privilegedDb();
+  if (!db) return null;
+  try {
+    return await db.push('leads', record);
+  } catch (err) {
+    console.error('[leads] failed to save site lead:', err);
+    return null;
   }
 }
 
@@ -406,25 +451,24 @@ export async function upsertManychatLead(
   mcKey: string,
   record: Record<string, string>
 ): Promise<{ id: string; deduped: boolean } | null> {
-  const db = getServerDb();
+  const db = privilegedDb();
   if (!db) return null;
   try {
     const now = Date.now();
-    const recent = await get(dbQuery(ref(db, 'leads'), orderByKey(), limitToLast(MANYCHAT_DEDUPE_WINDOW)));
-    const rows = (recent.val() ?? {}) as Record<string, Record<string, unknown>>;
+    const rows = ((await db.readLast('leads', MANYCHAT_DEDUPE_WINDOW)) ?? {}) as Record<string, Record<string, unknown>>;
     const hit = Object.entries(rows).find(([, row]) => row?.mcKey === mcKey);
     if (hit) {
       const [id, row] = hit;
       // Fill gaps (an email given on the second pass) — never blank out what the first pass stored.
       const patch: Record<string, unknown> = { lastTs: now, count: (Number(row.count) || 1) + 1 };
       for (const [k, v] of Object.entries(record)) if (v && !row[k]) patch[k] = v;
-      await update(ref(db, `leads/${id}`), patch);
+      await db.update(`leads/${id}`, patch);
       return { id, deduped: true };
     }
     // Empty fields are left out, except name/email: every lead reader expects those two to exist.
     const fields = Object.fromEntries(Object.entries(record).filter(([k, v]) => v || k === 'name' || k === 'email'));
-    const created = await push(ref(db, 'leads'), { ...fields, mcKey, ts: now, lastTs: now, count: 1 });
-    return { id: created.key as string, deduped: false };
+    const id = await db.push('leads', { ...fields, mcKey, ts: now, lastTs: now, count: 1 });
+    return id ? { id, deduped: false } : null;
   } catch (err) {
     console.error('[leads] failed to save ManyChat lead:', err);
     return null;
@@ -432,11 +476,10 @@ export async function upsertManychatLead(
 }
 
 export async function readEmailConfig(): Promise<EmailConfig> {
-  const db = getServerDb();
+  const db = privilegedDb();
   if (!db) return {};
   try {
-    const snap = await get(ref(db, 'email_config'));
-    return snap.exists() ? (snap.val() as EmailConfig) : {};
+    return ((await db.read('email_config')) ?? {}) as EmailConfig;
   } catch (err) {
     console.error('[email] failed to read email_config:', err);
     return {};
@@ -444,11 +487,11 @@ export async function readEmailConfig(): Promise<EmailConfig> {
 }
 
 export async function readEmailTemplate(id: string): Promise<{ subject?: string; html?: string; name?: string } | null> {
-  const db = getServerDb();
+  const db = privilegedDb();
   if (!db || !id) return null;
   try {
-    const snap = await get(ref(db, `email_templates/${id.replace(/[.#$\/[\]]/g, '_')}`));
-    return snap.exists() ? snap.val() : null;
+    const tpl = await db.read(`email_templates/${id.replace(/[.#$\/[\]]/g, '_')}`);
+    return (tpl ?? null) as { subject?: string; html?: string; name?: string } | null;
   } catch (err) {
     console.error('[email] failed to read email template:', err);
     return null;
