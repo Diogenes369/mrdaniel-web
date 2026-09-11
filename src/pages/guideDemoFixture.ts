@@ -1,14 +1,16 @@
 /**
- * Demo guide for reviewing the landing page's full editorial layout.
+ * Demo guides for reviewing the landing page's full editorial layout.
  *
- * Reachable at `/download?id=demo` (also `/download/demo`, `/g/demo`). It short-circuits the API
- * call entirely, so the whole page — hero, executive summary, every body section, interstitials,
- * spec table and both CTA blocks — can be reviewed in a browser without a live published guide,
- * without the bridge running, and without the tunnel being up.
+ * Reachable at `/download?id=demo` (also `/download/demo`, `/g/demo`) for the carousel layout, and
+ * `/g/demo-pdf` for the static-PDF layout. Both short-circuit the API call entirely, so the whole
+ * page — hero, executive summary, every body section, interstitials, spec table and both CTA blocks
+ * — can be reviewed in a browser without a live published guide, without the bridge running, and
+ * without the tunnel being up.
  *
  * The copy below is representative sample content written for layout review. It is NOT a real
  * guide: `isDemo` drives a visible banner so this can never be mistaken for a published artefact,
- * and the preview images fall back to the skeleton because no such guide exists on the bridge.
+ * the preview images fall back to the skeleton because no such guide exists on the bridge, and the
+ * download buttons do nothing.
  */
 
 export interface GuideSection {
@@ -20,18 +22,31 @@ export interface GuideSection {
 
 export interface GuideMeta {
   ok: boolean;
+  /** 'static' = a PDF from the CDN registry (src/server/leadMagnets.ts); 'bridge' = a carousel
+   *  published from the local bridge. Absent on responses that predate static guides → 'bridge'. */
+  kind?: 'bridge' | 'static';
   guideId: string;
   title: string;
+  /** Static guides only: one line under the title. */
+  subtitle?: string;
   slides: number;
+  /** Static guides only: page count, when the registry knows it. */
+  pages?: number | null;
   hasPdf: boolean;
   topics: string[];
   sections: GuideSection[];
   createdAt: number | null;
+  /** null = the link never expires — the default for every guide since 2026-09-11. */
   expiresAt: number | null;
+  /** Static guides only: cover image on the CDN. */
+  coverUrl?: string | null;
+  /** Static guides only: the PDF's CDN path, which the download button opens. */
+  downloadUrl?: string;
   isDemo?: boolean;
 }
 
 export const DEMO_IDS = new Set(['demo', 'preview', 'sample']);
+export const DEMO_STATIC_IDS = new Set(['demo-pdf']);
 
 export const DEMO_GUIDE: GuideMeta = {
   ok: true,
@@ -41,7 +56,7 @@ export const DEMO_GUIDE: GuideMeta = {
   hasPdf: true,
   topics: [],
   createdAt: Date.now() - 2 * 86_400_000,
-  expiresAt: Date.now() + 5 * 86_400_000,
+  expiresAt: null,
   isDemo: true,
   sections: [
     {
@@ -100,4 +115,19 @@ export const DEMO_GUIDE: GuideMeta = {
       ],
     },
   ],
+};
+
+/**
+ * The same demo laid out as a STATIC guide (a PDF from the CDN registry), at `/g/demo-pdf`: title-card
+ * cover, page count, one PDF button, no slide previews.
+ */
+export const DEMO_STATIC_GUIDE: GuideMeta = {
+  ...DEMO_GUIDE,
+  guideId: 'demo-pdf',
+  kind: 'static',
+  slides: 0,
+  pages: 12,
+  subtitle: 'צ׳קליסט מעשי ב-PDF — חמישה צעדים שאפשר להריץ על מערכת קיימת בלי לשכתב אותה.',
+  coverUrl: null,
+  downloadUrl: '',
 };

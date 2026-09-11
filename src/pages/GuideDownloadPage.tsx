@@ -5,10 +5,17 @@ import {
   Loader2, MessageSquare, Check, Lock, BookOpen, Quote, FlaskConical,
 } from 'lucide-react';
 import Seo from '../components/seo/Seo';
-import { DEMO_GUIDE, DEMO_IDS, type GuideMeta, type GuideSection } from './guideDemoFixture';
+import { loadTracker } from '../lib/loadTracker';
+import {
+  DEMO_GUIDE, DEMO_IDS, DEMO_STATIC_GUIDE, DEMO_STATIC_IDS, type GuideMeta, type GuideSection,
+} from './guideDemoFixture';
 
 /**
  * Public guide download landing page — `/download/:guideId`, `/download?id=…`, `/g/:guideId`.
+ *
+ * Two kinds of guide share it: a static PDF from the CDN registry (`/g/<slug>`, see
+ * src/server/leadMagnets.ts) and a carousel published from the bridge (`/g/<32-hex guideId>`). Both
+ * resolve through `/api/download/<id>?meta=1`, and `meta.kind` picks the layout.
  *
  * Structured as a full editorial article rather than a bare download card, following the reference
  * supplied for this design (financy.open-finance.ai): H2 sections with generous top margin, a
@@ -35,6 +42,8 @@ type State =
   | { kind: 'noid' };
 
 const GUIDE_ID_RE = /^[a-f0-9]{32}$/;
+/** Static-guide slug. Mirrors GUIDE_SLUG_RE in src/server/leadMagnets.ts — keep the two identical. */
+const GUIDE_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 /** Real anchor on the homepage — `#contact` does not exist, `<ContactPortal id="contact-portal">` does. */
 const CONSULT_HREF = '/#contact-portal';
 
@@ -75,6 +84,27 @@ function guideBadge(title: string): string {
   return 'מדריך מעשי';
 }
 
+/** "12 עמודים" / "PDF" for a static guide, "5 שקופיות" for a carousel. */
+function lengthLabel(meta: GuideMeta): string {
+  if (meta.kind === 'static') return meta.pages ? `${meta.pages} עמודים` : 'PDF';
+  return `${meta.slides} שקופיות`;
+}
+
+/** Length and format on one line, for the sticky bar. */
+function summaryLine(meta: GuideMeta): string {
+  if (meta.kind === 'static') return meta.pages ? `${meta.pages} עמודים · PDF` : 'PDF';
+  return `${meta.slides} שקופיות · ${meta.hasPdf ? 'ZIP + PDF' : 'ZIP'}`;
+}
+
+/**
+ * Campaign tags ManyChat appends to the DM link (withDmTracking in the dashboard). Bounded: they
+ * come straight off the URL and land in the analytics log.
+ */
+function campaignFrom(search: URLSearchParams) {
+  const pick = (key: string) => (search.get(key) || '').trim().slice(0, 60) || undefined;
+  return { utmSource: pick('utm_source'), utmMedium: pick('utm_medium'), utmCampaign: pick('utm_campaign'), keyword: pick('kw') };
+}
+
 export default function GuideDownloadPage() {
   const params = useParams();
   const [search] = useSearchParams();
@@ -88,8 +118,10 @@ export default function GuideDownloadPage() {
     // Demo short-circuits the API entirely so the full layout is reviewable with no live guide,
     // no bridge and no tunnel.
     if (DEMO_IDS.has(guideId)) return setState({ kind: 'ready', meta: DEMO_GUIDE });
+    if (DEMO_STATIC_IDS.has(guideId)) return setState({ kind: 'ready', meta: DEMO_STATIC_GUIDE });
 
-    if (!GUIDE_ID_RE.test(guideId)) return setState({ kind: 'missing' });
+    // A bridge guideId or a static-guide slug; anything else cannot be a guide.
+    if (!GUIDE_ID_RE.test(guideId) && !GUIDE_SLUG_RE.test(guideId)) return setState({ kind: 'missing' });
 
     let alive = true;
     setState({ kind: 'loading' });
@@ -98,7 +130,7 @@ export default function GuideDownloadPage() {
       try {
         const res = await fetch(apiUrl(guideId, '?meta=1'), { headers: { accept: 'application/json' } });
         if (!alive) return;
-        if (res.status === 404) return setState({ kind: 'missing' });
+        if (res.status === 404 || res.status === 400) return setState({ kind: 'missing' });
         if (res.status === 410) return setState({ kind: 'expired' });
         if (!res.ok) {
           // 503 means the download service is down, not that the guide is gone — "not found" here
@@ -120,13 +152,30 @@ export default function GuideDownloadPage() {
     };
   }, [guideId]);
 
+  const meta = state.kind === 'ready' ? state.meta : null;
+  const campaign = useMemo(() => campaignFrom(search), [search]);
+
   const download = useCallback(
     (variant?: 'pdf') => {
-      // Plain navigation, not fetch+blob: the API answers 302 and the bridge sends
+      // The demo has no file behind it (its banner says so), so its buttons stay inert.
+      if (!meta || meta.isDemo) return;
+      const isStatic = meta.kind === 'static';
+      // Static guides open the CDN file directly — only ever a /guides/ path, whatever the API said.
+      // Bridge guides use plain navigation, not fetch+blob: the API answers 302 and the bridge sends
       // Content-Disposition, so the browser saves natively and a 5MB ZIP never enters page memory.
-      window.location.href = apiUrl(guideId, variant === 'pdf' ? '?variant=pdf' : '');
+      const target = isStatic
+        ? meta.downloadUrl?.startsWith('/guides/') ? meta.downloadUrl : apiUrl(guideId, '?variant=pdf')
+        : apiUrl(guideId, variant === 'pdf' ? '?variant=pdf' : '');
+      loadTracker().then((t) =>
+        t.trackConversion('guide_download', { guide: guideId, action: isStatic || variant === 'pdf' ? 'pdf' : 'zip', ...campaign })
+      );
+      // A PDF opens in place of this page, which would cut the analytics write off mid-flight; a
+      // beat of delay lets it leave first. Imperceptible next to the file's own load.
+      window.setTimeout(() => {
+        window.location.href = target;
+      }, 150);
     },
-    [guideId]
+    [meta, guideId, campaign]
   );
 
   return (
@@ -185,6 +234,7 @@ function GuideArticle({
   const minutes = useMemo(() => readingMinutes(sections), [sections]);
   const published = formatDate(meta.createdAt);
   const expiry = formatExpiry(meta.expiresAt);
+  const isStatic = meta.kind === 'static';
 
   return (
     <article>
@@ -206,8 +256,9 @@ function GuideArticle({
       </h1>
 
       <p className="mt-4 text-[15px] leading-relaxed text-zinc-400 sm:text-base">
-        מדריך מעשי בפורמט קרוסלה — {meta.slides} שקופיות, {meta.hasPdf ? 'ZIP ו-PDF' : 'ZIP'}, מוכן
-        לקריאה במובייל ולשיתוף בצוות.
+        {isStatic
+          ? meta.subtitle || `מדריך PDF מעשי${meta.pages ? ` — ${meta.pages} עמודים` : ''}, מוכן לקריאה במובייל ולשיתוף בצוות.`
+          : `מדריך מעשי בפורמט קרוסלה — ${meta.slides} שקופיות, ${meta.hasPdf ? 'ZIP ו-PDF' : 'ZIP'}, מוכן לקריאה במובייל ולשיתוף בצוות.`}
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-zinc-500">
@@ -215,7 +266,7 @@ function GuideArticle({
         {published && (<><span aria-hidden>·</span><span>{published}</span></>)}
         {hasBody && (<><span aria-hidden>·</span><span>{minutes} דק׳ קריאה</span></>)}
         <span aria-hidden>·</span>
-        <span>{meta.slides} שקופיות</span>
+        <span>{lengthLabel(meta)}</span>
         {expiry && (
           <><span aria-hidden>·</span>
           <span className="inline-flex items-center gap-1 text-brand-400"><Clock className="h-3 w-3" />{expiry}</span></>
@@ -225,7 +276,11 @@ function GuideArticle({
       <hr className="my-8 border-white/[0.08]" />
 
       {/* COVER */}
-      <SlidePreview guideId={guideId} n={1} total={meta.slides} eager isDemo={meta.isDemo} />
+      {isStatic ? (
+        <StaticCover meta={meta} />
+      ) : (
+        <SlidePreview guideId={guideId} n={1} total={meta.slides} eager isDemo={meta.isDemo} />
+      )}
 
       {/* EXECUTIVE SUMMARY */}
       <section className="my-10 rounded-2xl border border-brand-500/25 bg-brand-500/[0.05] p-5 sm:p-6">
@@ -244,8 +299,8 @@ function GuideArticle({
           </ul>
         ) : (
           <p className="text-[14px] leading-relaxed text-zinc-300">
-            {meta.slides} שקופיות מרוכזות, שקופית לנושא — תוכן מעשי שאפשר ליישם בעסק כבר השבוע,
-            בפורמט שנוח לקרוא בנייד ולהעביר הלאה בצוות.
+            {isStatic ? 'מדריך PDF מרוכז' : `${meta.slides} שקופיות מרוכזות, שקופית לנושא`} — תוכן מעשי
+            שאפשר ליישם בעסק כבר השבוע, בפורמט שנוח לקרוא בנייד ולהעביר הלאה בצוות.
           </p>
         )}
       </section>
@@ -306,10 +361,14 @@ function GuideArticle({
       <section className="mt-12">
         <h2 className="mb-4 font-display text-lg font-bold text-white">מה בדיוק בקובץ</h2>
         <dl className="overflow-hidden rounded-xl border border-white/10">
-          <SpecRow label="פורמט" value={meta.hasPdf ? 'ZIP (תמונות) + PDF' : 'ZIP (תמונות)'} />
-          <SpecRow label="שקופיות" value={`${meta.slides}`} />
+          <SpecRow label="פורמט" value={isStatic ? 'PDF' : meta.hasPdf ? 'ZIP (תמונות) + PDF' : 'ZIP (תמונות)'} />
+          {isStatic ? (
+            meta.pages ? <SpecRow label="עמודים" value={`${meta.pages}`} /> : null
+          ) : (
+            <SpecRow label="שקופיות" value={`${meta.slides}`} />
+          )}
           <SpecRow label="שפה" value="עברית" />
-          <SpecRow label="הרשמה" value="לא נדרשת — הורדה ישירה" />
+          <SpecRow label="הרשמה" value="לא נדרשת — הורדה ישירה" last={!expiry} />
           {expiry && <SpecRow label="זמינות הקישור" value={expiry} last />}
         </dl>
       </section>
@@ -323,7 +382,9 @@ function GuideArticle({
         />
         <h2 className="mb-1.5 font-display text-lg font-extrabold text-white sm:text-xl">קחו את המדריך המלא</h2>
         <p className="mb-5 text-[13px] leading-relaxed text-zinc-400">
-          כל {meta.slides} השקופיות באיכות מלאה, מוכנות לשמירה ולשיתוף.
+          {isStatic
+            ? 'המדריך המלא כקובץ PDF — נפתח ישירות בנייד, מוכן לשמירה ולשיתוף.'
+            : `כל ${meta.slides} השקופיות באיכות מלאה, מוכנות לשמירה ולשיתוף.`}
         </p>
 
         <button
@@ -332,11 +393,11 @@ function GuideArticle({
           className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-brand-500 px-6 py-4 text-base font-extrabold text-carbon-950 transition-all hover:bg-brand-400 hover:shadow-[0_0_28px_-4px_rgba(0,255,102,0.6)] active:scale-[0.99] sm:text-lg"
         >
           <Download className="h-5 w-5" />
-          הורד מדריך מלא (ZIP{meta.hasPdf ? ' / PDF' : ''})
+          {isStatic ? 'הורד את המדריך (PDF)' : `הורד מדריך מלא (ZIP${meta.hasPdf ? ' / PDF' : ''})`}
         </button>
 
         <div className="mt-2.5 flex flex-col gap-2.5 sm:flex-row">
-          {meta.hasPdf && (
+          {!isStatic && meta.hasPdf && (
             <button
               type="button"
               onClick={() => onDownload('pdf')}
@@ -378,6 +439,44 @@ function SpecRow({ label, value, last = false }: { label: string; value: string;
     <div className={`flex items-center justify-between gap-4 px-4 py-3 ${last ? '' : 'border-b border-white/[0.07]'}`}>
       <dt className="text-[13px] text-zinc-500">{label}</dt>
       <dd className="text-[13px] font-semibold text-zinc-200">{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * Cover for a static guide. There are no rendered slides to preview, so it is either the cover image
+ * shipped beside the PDF or a typographic card built from the title — never a placeholder dressed up
+ * as a page of the guide.
+ */
+function StaticCover({ meta }: { meta: GuideMeta }) {
+  const [failed, setFailed] = useState(false);
+
+  if (meta.coverUrl && !failed) {
+    return (
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-carbon-800/50">
+        <img
+          src={meta.coverUrl}
+          alt={`כריכת המדריך: ${meta.title}`}
+          loading="eager"
+          onError={() => setFailed(true)}
+          className="block h-auto w-full"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-brand-500/25 bg-carbon-900/70 px-6 py-10 sm:px-10 sm:py-14">
+      <span
+        aria-hidden
+        className="absolute -top-24 -left-24 h-64 w-64 rounded-full opacity-30 blur-[80px]"
+        style={{ background: 'radial-gradient(circle, #76B900 0%, transparent 70%)' }}
+      />
+      <FileText className="relative mb-5 h-8 w-8 text-brand-400" />
+      <p className="relative font-display text-2xl leading-tight font-extrabold text-white sm:text-3xl">{meta.title}</p>
+      <p className="relative mt-5 font-cyber text-[10px] tracking-[0.25em] text-zinc-500 uppercase">
+        PDF{meta.pages ? ` · ${meta.pages} עמודים` : ''} · mrdaniel.co.il
+      </p>
     </div>
   );
 }
@@ -455,7 +554,7 @@ function StickyBar({ meta, onDownload }: { meta: GuideMeta; onDownload: (variant
       <div className="mx-auto flex w-full max-w-[46rem] items-center gap-3">
         <div className="hidden min-w-0 flex-1 sm:block">
           <p className="truncate text-[13px] font-semibold text-zinc-200">{meta.title}</p>
-          <p className="text-[11px] text-zinc-500">{meta.slides} שקופיות · {meta.hasPdf ? 'ZIP + PDF' : 'ZIP'}</p>
+          <p className="text-[11px] text-zinc-500">{summaryLine(meta)}</p>
         </div>
         <button
           type="button"

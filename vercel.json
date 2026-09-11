@@ -14,7 +14,16 @@
     { "source": "/api/generate-video", "destination": "/api/generate-video.ts" },
     { "source": "/api/pexels-search", "destination": "/api/pexels-search.ts" },
     { "source": "/api/img-proxy", "destination": "/api/img-proxy.ts" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!guides/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/guides/(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
   ],
   "crons": [
     { "path": "/api/agent-generate", "schedule": "0 8 * * *" }

@@ -115,11 +115,13 @@ There is no Spline, no Next.js, no Redux, no CSS-in-JS. Do not introduce them.
   findings lines; LinkedIn 250–350 words, prose, ≤3 emoji. Bullets are `•` or emoji, never `-`/`*`.
 - **Every dashboard content lib never throws.** On 429/503/network/thin output it returns a
   deterministic local deck built from the topic. Preserve that invariant in any new lib.
-- ManyChat funnel: bridge mints a 128-bit `guideId` on publish → public link is always
-  `https://mrdaniel.co.il/api/download/<guideId>`, never the tunnel hostname (quick tunnels re-mint
-  on every restart). Site route 302s to the bridge; bytes never traverse a Vercel function.
-  Public routes are unauthenticated capability tokens: `noindex`, 410-on-expired, rate-limited,
-  and **no caller-supplied string is ever joined onto a filesystem path**.
+- ManyChat funnel: the DM button links to the landing page `https://mrdaniel.co.il/g/<id>` — a
+  static-guide slug (PDF in `public/guides/`, registry `src/server/leadMagnets.ts`, served from the
+  CDN) or a bridge `guideId` (128-bit, minted on publish; never the tunnel hostname). Links never
+  expire by default. `/api/download/<id>` 302s to the file; bytes never traverse a Vercel function.
+  Leads come back through `POST /api/leads {action:'manychat-lead'}`, gated by
+  `MANYCHAT_WEBHOOK_SECRET` (fails closed). Public routes are unauthenticated capability tokens:
+  `noindex`, rate-limited, and **no caller-supplied string is ever joined onto a filesystem path**.
 
 ## 8. WHEN I ASK FOR CODE
 Give the diff or the file, not an essay. State the verification you ran and its actual output.

@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getDatabase, ref, push, set, update, get, type Database } from 'firebase/database';
+import { getDatabase, ref, push, set, update, get, query as dbQuery, orderByKey, limitToLast, type Database } from 'firebase/database';
 
 const STRATEGIC_CONTEXT_LIMIT = 10;
 
@@ -382,6 +382,52 @@ export async function readLeadEmails(): Promise<string[]> {
   } catch (err) {
     console.error('[email] failed to read leads:', err);
     return [];
+  }
+}
+
+/**
+ * How many of the most recent leads a repeat ManyChat lead is looked for in. Bounded so the check
+ * never downloads the whole `leads` node, and done in key order so it needs no `.indexOn` rule —
+ * that would be one more manual Firebase-console step, and a missing one would fail every request.
+ */
+const MANYCHAT_DEDUPE_WINDOW = 500;
+
+/**
+ * Saves a ManyChat lead into `leads` — the list the dashboard's Leads tab and the email engine
+ * already read — or updates the existing row when the same subscriber asked for the same guide
+ * recently. `mcKey` is the caller's hash of (subscriber, guide). Push keys keep the list in time
+ * order; a deterministic key per lead would sort every ManyChat row after all site leads and crowd
+ * those out of the dashboard's `limitToLast` views.
+ *
+ * Returns null when Firebase is unconfigured or the write fails, so the caller can answer non-2xx
+ * and ManyChat's test request shows the failure instead of a lead silently going nowhere.
+ */
+export async function upsertManychatLead(
+  mcKey: string,
+  record: Record<string, string>
+): Promise<{ id: string; deduped: boolean } | null> {
+  const db = getServerDb();
+  if (!db) return null;
+  try {
+    const now = Date.now();
+    const recent = await get(dbQuery(ref(db, 'leads'), orderByKey(), limitToLast(MANYCHAT_DEDUPE_WINDOW)));
+    const rows = (recent.val() ?? {}) as Record<string, Record<string, unknown>>;
+    const hit = Object.entries(rows).find(([, row]) => row?.mcKey === mcKey);
+    if (hit) {
+      const [id, row] = hit;
+      // Fill gaps (an email given on the second pass) — never blank out what the first pass stored.
+      const patch: Record<string, unknown> = { lastTs: now, count: (Number(row.count) || 1) + 1 };
+      for (const [k, v] of Object.entries(record)) if (v && !row[k]) patch[k] = v;
+      await update(ref(db, `leads/${id}`), patch);
+      return { id, deduped: true };
+    }
+    // Empty fields are left out, except name/email: every lead reader expects those two to exist.
+    const fields = Object.fromEntries(Object.entries(record).filter(([k, v]) => v || k === 'name' || k === 'email'));
+    const created = await push(ref(db, 'leads'), { ...fields, mcKey, ts: now, lastTs: now, count: 1 });
+    return { id: created.key as string, deduped: false };
+  } catch (err) {
+    console.error('[leads] failed to save ManyChat lead:', err);
+    return null;
   }
 }
 

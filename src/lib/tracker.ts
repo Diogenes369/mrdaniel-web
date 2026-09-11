@@ -38,7 +38,17 @@ interface TrackedEvent extends EventContext {
   field?: string;
   action?: string;
   fromPath?: string;
+  /** Guide landing page: which guide. A bridge guideId is cut to 8 hex — see `redactGuideIds`. */
+  guide?: string;
+  /** Campaign tags from the landing-page URL (ManyChat appends them to the DM link). */
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  keyword?: string;
 }
+
+/** Attribution a conversion can carry. */
+export type ConversionAttribution = Pick<TrackedEvent, 'guide' | 'action' | 'utmSource' | 'utmMedium' | 'utmCampaign' | 'keyword'>;
 
 export interface LeadPayload {
   name: string;
@@ -108,11 +118,11 @@ function writePresence(): void {
     clean({
       device: detectDevice(),
       browser: detectBrowser(),
-      path: window.location.pathname,
+      path: redactGuideIds(window.location.pathname),
       screen: `${window.screen.width}x${window.screen.height}`,
       lang: navigator.language || '',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-      referrer: document.referrer || '',
+      referrer: redactGuideIds(document.referrer || ''),
       startedAt: presenceStartedAt,
       lastSeen: Date.now(),
       ...geoExtra,
@@ -125,11 +135,11 @@ function baseContext(): EventContext {
   return {
     ts: Date.now(),
     sessionId,
-    path: window.location.pathname,
+    path: redactGuideIds(window.location.pathname),
     device: detectDevice(),
     browser: detectBrowser(),
     screen: `${window.screen.width}x${window.screen.height}`,
-    referrer: document.referrer || '',
+    referrer: redactGuideIds(document.referrer || ''),
     lang: navigator.language || '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
   };
@@ -139,6 +149,16 @@ function baseContext(): EventContext {
  * (the whole write fails), unlike `JSON.stringify` which just drops them. */
 function clean<T extends object>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+}
+
+/**
+ * Cuts every 32-hex guideId in a path or URL down to its first 8 characters. A bridge guideId IS the
+ * download capability for its guide (`/g/<id>`), and `events` / `presence` are world-readable under
+ * the Realtime Database rules in DOCUMENTATION.md — logging the full path would publish the key next
+ * to the lock. 8 hex still tells guides apart in analytics; 32 bits cannot fetch anything.
+ */
+function redactGuideIds(value: string): string {
+  return value.replace(/[a-f0-9]{32}/gi, (id) => `${id.slice(0, 8)}…`);
 }
 
 function logEvent(type: EventType, extra: Partial<Omit<TrackedEvent, keyof EventContext | 'type'>> = {}) {
@@ -349,12 +369,13 @@ export function trackPageview(path: string) {
   writePresence();
   scrolledMilestones.clear();
   logEvent('pageview', { fromPath: lastPath || undefined });
-  lastPath = path;
+  lastPath = redactGuideIds(path);
 }
 
-/** Call for conversion-intent actions — lead form opens, purchase clicks, downloads, etc. */
-export function trackConversion(label: string) {
-  logEvent('conversion', { label });
+/** Call for conversion-intent actions — lead form opens, purchase clicks, downloads, etc. `extra`
+ * carries attribution where a conversion has it (the guide page's guide + campaign tags). */
+export function trackConversion(label: string, extra: ConversionAttribution = {}) {
+  logEvent('conversion', { label, ...extra, guide: extra.guide ? redactGuideIds(extra.guide) : undefined });
 }
 
 /** Call when a form field is engaged with — focus/blur/submit — to see where in a multi-field

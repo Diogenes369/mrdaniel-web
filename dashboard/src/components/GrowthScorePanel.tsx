@@ -28,6 +28,7 @@ import {
 import { scoreGrowth } from '../lib/growthScore';
 import {
   DEFAULT_DM_LINK,
+  DM_LINK_PLACEHOLDER,
   composeGrowthCaption,
   effectiveLeadMagnet,
   isValidTriggerKeyword,
@@ -437,7 +438,7 @@ export default function GrowthScorePanel({ content, busy = false, onApplyHook, o
             <input
               value={trigger.link}
               onChange={(e) => setTrigger((t) => ({ ...t, link: e.target.value }))}
-              placeholder={DEFAULT_DM_LINK}
+              placeholder={DM_LINK_PLACEHOLDER}
               dir="ltr"
               className="bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-sm text-zinc-200"
             />

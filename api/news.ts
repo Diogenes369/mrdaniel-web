@@ -1,4 +1,5 @@
 import { getNewsItems } from '../src/server/newsFeed.js';
+import { findStaticGuide, staticGuideMeta, GUIDE_SLUG_RE, type StaticGuide } from '../src/server/leadMagnets.js';
 
 // Vercel Serverless Function. Written as `.ts` (not `.js`) deliberately: Vercel's Node builder
 // only bundles a function's dependency graph when the entry file itself is TypeScript — a plain
@@ -115,6 +116,9 @@ function safeParse(raw: string): Record<string, unknown> {
 /**
  * `GET /api/download/:guideId` — public, unauthenticated guide download.
  *
+ * Two kinds of id: a static-guide slug from src/server/leadMagnets.ts (a PDF on the CDN, answered
+ * without ever touching the bridge) or a bridge guideId (32 hex, resolved on the bridge below).
+ *
  * Lives inside this function rather than in `api/download.ts` because the Hobby plan caps a
  * deployment at 12 Serverless Functions and `api/` is already at exactly 12; a new file would fail
  * the build. Same reason `?action=analyze` is hosted here.
@@ -140,8 +144,19 @@ async function handleDownload(req: any, res: any) {
   }
 
   const guideId = String(req.query?.guideId || '').trim().toLowerCase();
+
+  // Static CDN guides first: a registry slug never touches the bridge, so it keeps answering while
+  // the laptop is asleep or the tunnel is down.
+  const staticGuide = findStaticGuide(guideId);
+  if (staticGuide) {
+    handleStaticGuide(req, res, staticGuide);
+    return;
+  }
+
   if (!/^[a-f0-9]{32}$/.test(guideId)) {
-    res.status(400).json({ ok: false, error: 'malformed guide id' });
+    // Slug-shaped but not in the registry is an unknown guide; anything else is malformed.
+    const slugShaped = GUIDE_SLUG_RE.test(guideId);
+    res.status(slugShaped ? 404 : 400).json({ ok: false, error: slugShaped ? 'guide not found' : 'malformed guide id' });
     return;
   }
 
@@ -213,6 +228,7 @@ async function handleDownload(req: any, res: any) {
     if (String(req.query?.meta || '') === '1') {
       res.status(200).json({
         ok: true,
+        kind: 'bridge',
         guideId,
         title: info.title || '',
         slides: info.slides || 0,
@@ -238,4 +254,24 @@ async function handleDownload(req: any, res: any) {
     console.error('[api/news?action=download] bridge unreachable:', err);
     res.status(503).json({ ok: false, error: 'download service is temporarily unavailable' });
   }
+}
+
+/**
+ * A registry guide (src/server/leadMagnets.ts): the PDF is a static file on the CDN, so this only
+ * answers metadata or points the browser at the file. Edge-cacheable — the registry changes only
+ * with a deploy, and every deploy starts with an empty cache.
+ */
+function handleStaticGuide(req: any, res: any, guide: StaticGuide) {
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=86400');
+  if (String(req.query?.meta || '') === '1') {
+    res.status(200).json(staticGuideMeta(guide));
+    return;
+  }
+  if (String(req.query?.variant || '').toLowerCase() === 'slide') {
+    res.status(404).json({ ok: false, error: 'this guide has no slide previews' });
+    return;
+  }
+  // The default (zip) and pdf variants both resolve to the one file a static guide has.
+  res.status(302).setHeader('Location', guide.file);
+  res.end();
 }

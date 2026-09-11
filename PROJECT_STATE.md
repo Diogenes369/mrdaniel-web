@@ -329,10 +329,11 @@ Publishing is token-gated; downloading is not.
 ### 5.2 Retention (task 1)
 
 - `OUTPUT_RETENTION_MS` — default **48 h**, sweeps unpublished job directories.
-- `GUIDE_TTL_MS` — default **7 days**. A published guide's directory is **exempt** from the 48 h
-  sweep until its guide expires. Without this the sweep would 404 a link already sent to a
-  subscriber. This is a deliberate widening of the "delete everything over 48 h" instruction; the
-  disk-bloat goal still holds because a guide's exemption is bounded and self-expiring.
+- `GUIDE_TTL_MS` — default **0 = never expires** (was 7 days until 2026-09-11: a lead-magnet link
+  lives in Instagram comments for months, and a 410 a week after posting broke every one of them).
+  A published guide's directory is **exempt** from the 48 h sweep while the guide is live, so with no
+  TTL the exemption lasts until the guide is unpublished — disk use now grows with the number of
+  published guides. `ttlHours` on publish still sets an explicit expiry.
 - `PRUNE_INTERVAL_MS` — default 1 h. Sweep also runs once at startup.
 - Age is read from **directory mtime**, not the job record: job status dies with the process while
   the artwork does not, so after a restart the filesystem is the only thing that knows the age.
@@ -422,10 +423,11 @@ clipboard automatically on publish.
 
 `carouselBridge.ts` gains `publishGuide()`, `unpublishGuide()`, `publicGuideUrl()` and `copyText()`.
 
-**The link always points at the site, never the tunnel:**
-`https://mrdaniel.co.il/api/download/<guideId>` (override via `VITE_PUBLIC_SITE_ORIGIN`). A link built
-from the tunnel hostname dies the next time cloudflared bounces; the site URL is stable and resolves
-the current tunnel server-side per request. This is the whole reason the site route exists.
+**The link always points at the site's landing page, never the tunnel:**
+`https://mrdaniel.co.il/g/<guideId>` (override via `VITE_PUBLIC_SITE_ORIGIN`). Until 2026-09-11 it was
+`/api/download/<guideId>`, which answers with the raw ZIP — bad in Instagram's in-app browser, and it
+skipped the preview and the PDF option. A link built from the tunnel hostname dies the next time
+cloudflared bounces; the site URL is stable and resolves the current tunnel server-side per request.
 
 `copyText()` falls back to a hidden `<textarea>` + `execCommand`: `navigator.clipboard` needs a
 secure context and rejects when the document is not focused — exactly the state a just-clicked
@@ -594,6 +596,56 @@ just this page's CTA.** Verified in-browser landing on ContactPortal.
 **Known:** cover slide is ~1.1 MB over the tunnel; a 4:5 skeleton reserves the space, but downscaled
 thumbnails at publish time would be the real fix.
 
+## 5C. Static CDN guides + ManyChat lead webhook (2026-09-11)
+
+### Static guides — `/g/<slug>`
+
+PDFs committed under `public/guides/`, registered in `src/server/leadMagnets.ts` (server-only, so the
+guide list is not in the SPA bundle). Vercel serves the file from the CDN — no function, bridge or
+tunnel in the path — so these keep working while the laptop sleeps.
+
+- `/api/download/<slug>?meta=1` answers the bridge contract plus `kind:'static'`, `subtitle`,
+  `pages`, `coverUrl`, `downloadUrl`; `expiresAt` is always null. Without `meta` it 302s to the PDF.
+  Edge-cached (`s-maxage=300`) — the registry only changes with a deploy.
+- Lookup order: registry slug → 32-hex bridge id → slug-shaped but unknown = 404 → anything else 400.
+- An invalid entry (slug shaped like a bridge id or a demo id, file outside `/guides/`) is refused at
+  lookup and logged, never served.
+- `vercel.json`: the SPA catch-all skips `/guides/`, so a missing PDF is a real 404 rather than the
+  homepage; `/guides/*` carries `X-Robots-Tag: noindex, nofollow`.
+- Landing page: `meta.kind` picks the layout — cover image or title card instead of slide previews,
+  page count, one PDF button. Demo: `/g/demo-pdf`.
+
+**Adding a guide:** file → `public/guides/<ascii-name>.pdf`, entry in `STATIC_GUIDES`, deploy, then
+open `/g/<slug>` on a phone and tap download before the post goes live.
+
+### ManyChat lead webhook — `POST /api/leads {action:'manychat-lead'}`
+
+Folded into `api/leads.ts` (12-function cap). Header `x-manychat-secret` (or `Authorization: Bearer`)
+must match `MANYCHAT_WEBHOOK_SECRET`; **fails closed** — unset = 503, nothing stored. Body:
+`{subscriberId, igUsername, name, email, phone, keyword, guideId}`; needs subscriberId or igUsername.
+
+- Writes to `leads` with a push key (time order, so the dashboard's `limitToLast` views are
+  unaffected), `sourceSection: 'ManyChat · <keyword>'`, `source: 'manychat'`.
+- Dedupe per (subscriber, guide) via a hashed `mcKey`, looked up in the last 500 leads by key order —
+  no `.indexOn` rule needed. A repeat bumps `count`/`lastTs` and fills empty fields only.
+- A bridge guideId is stored as its 8-hex prefix (`guide`): the full id is the download capability.
+- Answers `{ok, leadId, deduped, guideFound, guideUrl, guideTitle}`; 500 when Firebase refuses the
+  write, so ManyChat's "Test request" surfaces it.
+- Leads with an email join the email engine's `leads` audience.
+
+### Tracking
+
+`trackConversion('guide_download', {guide, action, utmSource, utmMedium, utmCampaign, keyword})` on
+every download tap. The dashboard's ManyChat setup sheet appends `utm_source=manychat&utm_medium=dm&kw=`
+to `/g/` links. The tracker now cuts 32-hex ids to 8 chars in every logged path and referrer —
+`events`/`presence` are world-readable under the DOCUMENTATION.md rules, and a full `/g/<guideId>`
+there published the capability.
+
+### Link expiry removed
+
+Bridge `GUIDE_TTL_MS` defaults to 0 (§5.2). The guide published on 2026-09-08 keeps its original
+2026-09-15 expiry — existing records are not migrated.
+
 ## 6. Open Items
 
 | Item | State |
@@ -603,20 +655,20 @@ thumbnails at publish time would be the real fix.
 | `THREADS_APP_SECRET` | Was pasted in plaintext in a chat session. **Should be rotated.** |
 | `INSTAGRAM_OEMBED_TOKEN` | Absent — IG links hit the login wall; paste-caption is the supported path. |
 | `/carousel/redesign` | Implemented, **never exercised end-to-end.** |
-| `output/` retention | **Implemented** — 48 h sweep + 7 day guide TTL. First sweep removes 18 dirs / ~29 MB. |
+| `output/` retention | **Implemented** — 48 h sweep; published guides are permanent by default since 2026-09-11 (§5.2). |
 | Dashboard `x-admin-secret` exposure | Structural; see §4.5. |
 | Gemini free tier | 429s after the hourly cap. Permanent fix = paid key. |
-| `CAROUSEL_BRIDGE_URL` on the **site** project | **Not set.** `/api/download/...` answers 503 until it is. |
-| ManyChat itself | Backend + UI ready; no ManyChat flow configured yet. |
+| `CAROUSEL_BRIDGE_URL` on the **site** project | Set. Bridge guides still 503 whenever cloudflared is down (it was not running on 2026-09-10). Static guides (§5C) do not depend on it. |
+| ManyChat itself | Webhook + static guides live (§5C); no ManyChat flow configured yet. |
 | Public-route rate limiting | **Implemented** (§5.6). Needs a bridge restart to go live. |
-| Dashboard publish button | **Implemented** (§5.5). Needs a dashboard redeploy. |
-| Site redeploy | **Required** — `/api/download/...` is undeployed, so it 404s today. |
+| Dashboard publish button | Deployed; the copied link is `/g/<guideId>` since 2026-09-11. |
+| Bridge restart (no-expiry) | **Pending** — the PM2 daemon runs elevated, so `pm2 restart carousel-bridge` must come from an admin shell. Until then new publishes still get the old 7-day TTL. |
+| Lead PII readability | DOCUMENTATION.md's rules template gives `leads` `.read: true`. If the live rules match, every lead's email and phone is world-readable — check before ManyChat traffic lands there. |
 | Tips & Guides publishing | Not possible yet — canvas-rendered, no bridge job. |
 | Bridge restart (2nd pending) | Slide previews now serve `inline` instead of `attachment` — on disk, not live. |
 | Cover thumbnails | Preview is the full ~1.1 MB slide; no downscaled variant exists. |
 | Topics on old guides | Guides published before headline capture show fallback value cards; re-publish to populate. |
 | Telegram CTA | No Telegram URL exists anywhere in the repo — secondary CTA is 'back to main site'. |
-| Uncommitted work | §4.4 auth changes + §5 download stack are in the working tree, not committed. |
 
 ### Declined on principle (do not re-attempt without new direction)
 - Instagram / Threads login-wall bypasses.

@@ -844,7 +844,8 @@ export default function CarouselStudioModal({
                 <div className="mb-4 rounded-lg border border-emerald-400/30 bg-emerald-500/[0.06] p-3">
                   <p className="mb-2 flex items-center gap-2 text-[12px] font-bold text-emerald-300">
                     <LinkIcon className="h-3.5 w-3.5" />
-                    קישור ציבורי פעיל · פג ב-{new Date(guide.expiresAt).toLocaleDateString('he-IL')}
+                    קישור ציבורי פעיל ·{' '}
+                    {guide.expiresAt ? `פג ב-${new Date(guide.expiresAt).toLocaleDateString('he-IL')}` : 'ללא תפוגה'}
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     {/* readOnly + dir=ltr: this is a URL, and RTL would scramble how it reads. */}
@@ -873,8 +874,9 @@ export default function CarouselStudioModal({
                     </button>
                   </div>
                   <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">
-                    כל מי שמחזיק בקישור יכול להוריד את הקובץ — אין צורך בהזדהות. הדביקו אותו בכפתור
-                    External Request ב-ManyChat.
+                    הקישור פותח את דף המדריך באתר — תצוגה מקדימה והורדה. ב-ManyChat הדביקו אותו בכפתור
+                    URL (Open website) בהודעת ה-DM, לא ב-External Request. כל מי שמחזיק בקישור יכול
+                    להוריד, בלי הזדהות.
                   </p>
                 </div>
               )}

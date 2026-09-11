@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'crypto';
 import nodemailer from 'nodemailer';
 import {
   pushNewsletterSignup,
@@ -6,13 +7,16 @@ import {
   readEmailConfig,
   readEmailTemplate,
   recordEmailCampaign,
+  upsertManychatLead,
 } from '../src/agent/firebaseServer.js';
 import { sendOne, sendCampaign, welcomeEmailHtml, wrapBrandedEmail, isEmailConfigured } from '../src/server/emailEngine.js';
+import { findStaticGuide } from '../src/server/leadMagnets.js';
 
 // Vercel Serverless Function — the site's lead endpoint AND the email engine (folded in here
 // rather than a new `/api/send-email` because Vercel Hobby caps a deployment at 12 functions).
 //
 //   • POST (no `action`)                 → the original: email the owner a new lead.
+//   • POST { action: 'manychat-lead' }    → ManyChat External Request: save a Comment-to-DM lead.
 //   • POST { action: 'newsletter-signup' } → write to `newsletter_signups`, optional auto-welcome.
 //   • POST { action: 'send-test' }        → admin: send one branded email.
 //   • POST { action: 'send-welcome' }     → admin: send the welcome template to one address.
@@ -58,6 +62,12 @@ export default async function handler(req: any, res: any) {
 
   const body = (typeof req.body === 'object' && req.body) || {};
   const action = body.action as string | undefined;
+
+  // ---- ManyChat Comment-to-DM lead (server-to-server, secret-gated) -------------------------
+  if (action === 'manychat-lead') {
+    await handleManychatLead(req, res, body);
+    return;
+  }
 
   // ---- Newsletter signup (open) --------------------------------------------------------------
   if (action === 'newsletter-signup') {
@@ -216,4 +226,117 @@ export default async function handler(req: any, res: any) {
     console.error('[api/leads] failed to send lead email:', err);
     res.status(500).json({ ok: false, error: 'send failed' });
   }
+}
+
+// ---- ManyChat -------------------------------------------------------------------------------
+
+const SITE_ORIGIN = (process.env.PUBLIC_SITE_ORIGIN || 'https://mrdaniel.co.il').replace(/\/$/, '');
+
+/** Constant-time secret check. Hashing both sides first gives equal-length buffers, so the compare
+ *  leaks neither the secret nor its length. */
+function secretMatches(supplied: string, configured: string): boolean {
+  const a = createHash('sha256').update(supplied).digest();
+  const b = createHash('sha256').update(configured).digest();
+  return timingSafeEqual(a, b);
+}
+
+/** The secret from `x-manychat-secret`, or from `Authorization: Bearer …` — a ManyChat External
+ *  Request can set either header. */
+function manychatSecret(req: any): string {
+  const direct = req.headers?.['x-manychat-secret'];
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  const auth = String(req.headers?.authorization ?? '');
+  return auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+}
+
+/**
+ * A ManyChat field as a bounded string. Contact ids arrive as numbers; an unfilled field arrives as
+ * '' — or, when a placeholder was typed by hand instead of inserted, as the literal `{{…}}` text,
+ * which is dropped rather than stored as someone's name or email.
+ */
+function mcField(v: unknown, max: number): string {
+  const s = typeof v === 'number' && Number.isFinite(v) ? String(v) : typeof v === 'string' ? v.trim() : '';
+  return /^\{\{.*\}\}$/.test(s) ? '' : s.slice(0, max);
+}
+
+/** The guide a lead asked for: a static slug (with its title) or a bridge guideId. */
+function resolveGuide(id: string): { guideId: string; ref: string; title: string; url: string } | null {
+  if (!id) return null;
+  const staticGuide = findStaticGuide(id);
+  if (staticGuide) {
+    return { guideId: staticGuide.slug, ref: staticGuide.slug, title: staticGuide.title, url: `${SITE_ORIGIN}/g/${staticGuide.slug}` };
+  }
+  // A bridge guideId IS the download capability, so only its first 8 hex are stored on the lead
+  // (`ref`) — enough to tell guides apart, useless for fetching one.
+  if (/^[a-f0-9]{32}$/.test(id)) return { guideId: id, ref: id.slice(0, 8), title: '', url: `${SITE_ORIGIN}/g/${id}` };
+  return null;
+}
+
+/**
+ * `POST { action: 'manychat-lead', subscriberId, igUsername, name, email, phone, keyword, guideId }`
+ * — called by a ManyChat External Request after a Comment-to-DM.
+ *
+ * Fails CLOSED, unlike the admin actions above: without MANYCHAT_WEBHOOK_SECRET it answers 503 and
+ * stores nothing. It writes to the `leads` list that email campaigns read, so an open instance
+ * would let anyone fill that list.
+ *
+ * Idempotent per (subscriber, guide): ManyChat re-runs the flow when someone comments twice, and a
+ * retried request repeats too, so a repeat updates the existing lead instead of adding a row.
+ * Answers `{ ok, leadId, deduped, guideFound, guideUrl, guideTitle }` — a flow can map `guideUrl`
+ * into a custom field and put it on the DM button.
+ */
+async function handleManychatLead(req: any, res: any, body: Record<string, unknown>) {
+  const configured = process.env.MANYCHAT_WEBHOOK_SECRET || '';
+  if (!configured) {
+    console.error('[api/leads] manychat-lead refused: MANYCHAT_WEBHOOK_SECRET is not set');
+    res.status(503).json({ ok: false, error: 'manychat webhook not configured' });
+    return;
+  }
+  if (!secretMatches(manychatSecret(req), configured)) {
+    res.status(401).json({ ok: false, error: 'unauthorized' });
+    return;
+  }
+
+  const subscriberId = mcField(body.subscriberId, 64);
+  const igUsername = mcField(body.igUsername, 64).replace(/^@+/, '');
+  if (!subscriberId && !igUsername) {
+    res.status(400).json({ ok: false, error: 'need subscriberId or igUsername' });
+    return;
+  }
+  const email = mcField(body.email, 200).toLowerCase();
+  const keyword = mcField(body.keyword, 40);
+  const requested = mcField(body.guideId, 64).toLowerCase();
+  const guide = resolveGuide(requested);
+  const campaign = keyword ? `ManyChat · ${keyword}` : 'ManyChat';
+
+  const identity = subscriberId || `@${igUsername.toLowerCase()}`;
+  const mcKey = createHash('sha256')
+    .update(`${identity}|${guide?.guideId || requested || keyword.toLowerCase()}`)
+    .digest('hex')
+    .slice(0, 24);
+
+  const saved = await upsertManychatLead(mcKey, {
+    name: mcField(body.name, 120) || (igUsername ? `@${igUsername}` : 'Instagram'),
+    email: isEmail(email) ? email : '',
+    phone: mcField(body.phone, 40).replace(/[^\d+\-() ]/g, '').trim(),
+    igUsername,
+    subscriberId,
+    keyword,
+    guide: guide?.ref ?? '',
+    project: guide?.title || campaign,
+    sourceSection: campaign,
+    source: 'manychat',
+  });
+  if (!saved) {
+    res.status(500).json({ ok: false, error: 'lead not saved' });
+    return;
+  }
+  res.status(200).json({
+    ok: true,
+    leadId: saved.id,
+    deduped: saved.deduped,
+    guideFound: Boolean(guide),
+    guideUrl: guide?.url ?? '',
+    guideTitle: guide?.title ?? '',
+  });
 }

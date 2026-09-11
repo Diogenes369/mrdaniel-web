@@ -45,8 +45,13 @@ const TOPIC_KEYWORD: Record<NewsTopic, string> = { ai: 'סוכן', cyber: 'הג�
 /** Same 3–5 ceiling the server caption rules use. */
 export const MAX_HASHTAGS = 5;
 
+const SITE_ORIGIN = 'https://mrdaniel.co.il';
+
 /** Where the DM button points when the operator has not pasted a ManyChat guide link. */
-export const DEFAULT_DM_LINK = 'https://mrdaniel.co.il';
+export const DEFAULT_DM_LINK = SITE_ORIGIN;
+
+/** Shape hint for the DM-link field: a guide landing page, static slug or published guideId. */
+export const DM_LINK_PLACEHOLDER = `${SITE_ORIGIN}/g/<slug>`;
 
 const COMMON_COMMENT_WORDS = new Set(['כן', 'לא', 'תודה', 'מעולה', 'וואו', 'אמן', 'יפה', 'אש', 'מדהים', 'נכון', 'yes', 'no', 'wow', 'nice', 'great', 'thanks']);
 
@@ -197,8 +202,37 @@ export function effectiveLeadMagnet(pack: GrowthPack | null, trigger: Engagement
   return { ...t, publicReplies: base.publicReplies.length ? base.publicReplies : t.publicReplies, dmButtonLabel: base.dmButtonLabel || t.dmButtonLabel };
 }
 
+const SITE_HOST = /(^|\.)mrdaniel\.co\.il$/i;
+const GUIDE_PATH = /^\/(?:g|download)\/([a-z0-9-]{2,64})\/?$/i;
+
+/** The guide slug / guideId a site guide link points at, or '' for any other link. */
+export function guideIdFromLink(link: string): string {
+  try {
+    const url = new URL(link.trim());
+    return SITE_HOST.test(url.hostname) ? (url.pathname.match(GUIDE_PATH)?.[1] ?? '').toLowerCase() : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Tags a site guide link with the ManyChat campaign, so the landing page's `guide_download` event
+ * records which keyword sent the visitor. Any other link, or one already tagged, passes through.
+ */
+export function withDmTracking(link: string, keyword: string): string {
+  const raw = link.trim();
+  if (!guideIdFromLink(raw)) return raw;
+  const url = new URL(raw);
+  if (url.searchParams.has('utm_source')) return raw;
+  url.searchParams.set('utm_source', 'manychat');
+  url.searchParams.set('utm_medium', 'dm');
+  if (keyword) url.searchParams.set('kw', keyword);
+  return url.toString();
+}
+
 /** Plain-text ManyChat setup sheet for this post — paste-ready for a Comment-to-DM flow. */
 export function manychatSetupText(lm: LeadMagnet, link: string): string {
+  const guideId = guideIdFromLink(link);
   return [
     'הגדרת ManyChat — Comment-to-DM לפוסט הזה',
     '',
@@ -210,7 +244,13 @@ export function manychatSetupText(lm: LeadMagnet, link: string): string {
     '',
     'הודעת DM (Private Reply):',
     lm.dmMessage,
-    `כפתור: ${lm.dmButtonLabel} → ${link.trim() || DEFAULT_DM_LINK}`,
+    `כפתור URL (Open website): ${lm.dmButtonLabel} → ${withDmTracking(link.trim() || DEFAULT_DM_LINK, lm.keyword)}`,
+    '',
+    'שמירת הליד (אופציונלי) — Action › External Request:',
+    `POST ${SITE_ORIGIN}/api/leads`,
+    'Header: x-manychat-secret = הערך של MANYCHAT_WEBHOOK_SECRET',
+    `Body (JSON): {"action":"manychat-lead","subscriberId":"<Contact Id>","igUsername":"<Instagram Username>","name":"<Full Name>","email":"<Email>","phone":"<Phone>","keyword":"${lm.keyword}","guideId":"${guideId || '<slug>'}"}`,
+    'את הערכים בסוגריים המשולשים משבצים דרך "+ Add Field" של ManyChat.',
     '',
     `CTA בכיתוב: ${lm.captionCta}`,
   ].join('\n');

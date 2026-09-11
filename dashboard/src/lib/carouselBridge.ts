@@ -316,26 +316,30 @@ export async function redesignCarousel(
 // --- public publishing (ManyChat) --------------------------------------------------------------
 
 /**
- * Canonical public host for a published guide.
+ * Canonical public link for a published guide: the landing page, `mrdaniel.co.il/g/<id>`.
  *
  * Always the site, never the bridge's own tunnel URL. The tunnel hostname is re-minted on every
  * cloudflared restart, so a link built from it dies the next time the tunnel bounces — and a link
- * handed to a ManyChat subscriber has to keep working. `mrdaniel.co.il/api/download/<id>` is stable
- * and resolves the current tunnel server-side on each request.
+ * handed to a ManyChat subscriber has to keep working. The page resolves the current tunnel
+ * server-side (through `/api/download/<id>`) on every visit.
+ *
+ * And the page, not `/api/download/<id>` itself: that route answers with the raw ZIP, which
+ * Instagram's in-app browser handles badly, and it skips the preview and the PDF option.
  */
 const PUBLIC_SITE = (import.meta.env.VITE_PUBLIC_SITE_ORIGIN || 'https://mrdaniel.co.il')
   .replace(/\/$/, '');
 
 export interface PublishedGuide {
   guideId: string;
-  expiresAt: number;
+  /** null = permanent, the bridge default. */
+  expiresAt: number | null;
   slides: number;
-  /** Public link to hand to ManyChat. */
+  /** Public link to hand to ManyChat — goes in a URL button, not an External Request. */
   publicUrl: string;
 }
 
 export function publicGuideUrl(guideId: string): string {
-  return `${PUBLIC_SITE}/api/download/${guideId}`;
+  return `${PUBLIC_SITE}/g/${guideId}`;
 }
 
 /**
@@ -357,7 +361,7 @@ export async function publishGuide(
   if (!res.ok || !data.ok) throw new Error(data.error || `bridge responded ${res.status}`);
   return {
     guideId: data.guideId,
-    expiresAt: data.expiresAt,
+    expiresAt: data.expiresAt ?? null,
     slides: data.slides,
     publicUrl: publicGuideUrl(data.guideId),
   };

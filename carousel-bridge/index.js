@@ -102,9 +102,13 @@ const BUNDLE_SCRIPT = path.join(REPO_ROOT, 'scripts', 'make_bundle.py');
 const REGISTRY_PATH = path.join(OUTPUT_ROOT, 'published.json');
 /** Unpublished job directories are swept after this long. 48h by default. */
 const OUTPUT_RETENTION_MS = Number(process.env.OUTPUT_RETENTION_MS) || 48 * 60 * 60 * 1000;
-/** A PUBLISHED guide's lifetime. Its job directory is exempt from the sweep until this expires —
- *  otherwise the 48h sweep would silently 404 a link already handed to a ManyChat subscriber. */
-const GUIDE_TTL_MS = Number(process.env.GUIDE_TTL_MS) || 7 * 24 * 60 * 60 * 1000;
+/** A PUBLISHED guide's lifetime. 0 — the default — means it never expires: a lead-magnet link sits
+ *  in Instagram comments and DMs for months, and a guide that 410s a week after the post breaks
+ *  every one of them. Set GUIDE_TTL_MS (or pass `ttlHours` on publish) for a link that should lapse.
+ *  A live guide's job directory is exempt from the sweep — otherwise the 48h sweep would silently
+ *  404 a link already handed to a ManyChat subscriber — so disk use grows with published guides
+ *  until one is unpublished. */
+const GUIDE_TTL_MS = Number(process.env.GUIDE_TTL_MS) || 0;
 /** How often the sweep runs while the process is alive. */
 const PRUNE_INTERVAL_MS = Number(process.env.PRUNE_INTERVAL_MS) || 60 * 60 * 1000;
 /** Public origin this bridge is reachable at (the tunnel), used to build absolute download URLs. */
@@ -156,10 +160,15 @@ function saveRegistry() {
   }
 }
 
+/** A guide with no `expiresAt` (null — the default, see GUIDE_TTL_MS) is permanent. */
+function isExpired(rec, now = Date.now()) {
+  return Boolean(rec.expiresAt) && rec.expiresAt <= now;
+}
+
 /** jobIds that must survive the sweep because a live public link points at them. */
 function protectedJobIds(now = Date.now()) {
   const keep = new Set();
-  for (const rec of published.values()) if (rec.expiresAt > now) keep.add(rec.jobId);
+  for (const rec of published.values()) if (!isExpired(rec, now)) keep.add(rec.jobId);
   return keep;
 }
 
@@ -176,7 +185,7 @@ function pruneOutput() {
   sweepRateBuckets(now); // same timer: a limiter map that only grows is its own denial of service
   let droppedGuides = 0;
   for (const [guideId, rec] of published) {
-    if (rec.expiresAt <= now) {
+    if (isExpired(rec, now)) {
       published.delete(guideId);
       droppedGuides++;
     }
@@ -1866,7 +1875,8 @@ app.post('/carousel/publish', async (req, res) => {
     slides: slideFiles,
     pdf: pdfFile,
     createdAt: Date.now(),
-    expiresAt: Date.now() + ttl,
+    // null = permanent: no ttlHours and no GUIDE_TTL_MS leaves ttl at 0.
+    expiresAt: ttl > 0 ? Date.now() + ttl : null,
   };
   published.set(guideId, record);
   saveRegistry();
@@ -1898,7 +1908,7 @@ app.get('/carousel/published', (_req, res) => {
   res.json({
     ok: true,
     guides: [...published.values()]
-      .filter((r) => r.expiresAt > now)
+      .filter((r) => !isExpired(r, now))
       .sort((a, b) => b.createdAt - a.createdAt)
       .map((r) => ({
         guideId: r.guideId, jobId: r.jobId, title: r.title, slides: r.slides.length,
@@ -1994,7 +2004,7 @@ function resolveGuide(req, res) {
     res.status(404).json({ ok: false, error: 'guide not found' });
     return null;
   }
-  if (rec.expiresAt <= Date.now()) {
+  if (isExpired(rec)) {
     published.delete(guideId);
     saveRegistry();
     res.status(410).json({ ok: false, error: 'guide expired' });
@@ -2042,7 +2052,7 @@ app.get('/public/guide/:guideId', (req, res) => {
     topics: rec.topics || [],
     sections: rec.sections || [],
     createdAt: rec.createdAt,
-    expiresAt: rec.expiresAt,
+    expiresAt: rec.expiresAt || null,
     zipPath: `/public/download/${rec.guideId}`,
   });
 });
