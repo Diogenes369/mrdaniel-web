@@ -618,6 +618,10 @@ tunnel in the path — so these keep working while the laptop sleeps.
 **Adding a guide:** file → `public/guides/<ascii-name>.pdf`, entry in `STATIC_GUIDES`, deploy, then
 open `/g/<slug>` on a phone and tap download before the post goes live.
 
+**Live guides (2026-09-11):** `ai-business-automations-2026` (88 pp) and `ai-learning-guide-2026`
+(104 pp). Page copy is verbatim from each PDF's cover and part-opener pages; the cover is page 1
+cropped to 4:5 WebP. No ManyChat keyword assigned yet.
+
 ### ManyChat lead webhook — `POST /api/leads {action:'manychat-lead'}`
 
 Folded into `api/leads.ts` (12-function cap). Header `x-manychat-secret` (or `Authorization: Bearer`)
