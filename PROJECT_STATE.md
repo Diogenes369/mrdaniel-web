@@ -663,7 +663,7 @@ Bridge `GUIDE_TTL_MS` defaults to 0 (§5.2). The guide published on 2026-09-08 k
 | Public-route rate limiting | **Implemented** (§5.6). Needs a bridge restart to go live. |
 | Dashboard publish button | Deployed; the copied link is `/g/<guideId>` since 2026-09-11. |
 | Bridge restart (no-expiry) | **Pending** — the PM2 daemon runs elevated, so `pm2 restart carousel-bridge` must come from an admin shell. Until then new publishes still get the old 7-day TTL. |
-| Lead PII readability | DOCUMENTATION.md's rules template gives `leads` `.read: true`. If the live rules match, every lead's email and phone is world-readable — check before ManyChat traffic lands there. |
+| Lead PII exposure | **Confirmed 2026-09-11:** an unauthenticated REST call (`<databaseURL>/leads/<id>.json`) can read AND delete a lead, and the database URL ships in the public bundle. Every lead's name/email/phone is world-readable and deletable. Fix: auth-gated rules for `leads` (the dashboard already signs in via Firebase Auth) plus authenticated server writes (Admin SDK / service account) for `api/leads.ts`. |
 | Tips & Guides publishing | Not possible yet — canvas-rendered, no bridge job. |
 | Bridge restart (2nd pending) | Slide previews now serve `inline` instead of `attachment` — on disk, not live. |
 | Cover thumbnails | Preview is the full ~1.1 MB slide; no downscaled variant exists. |
