@@ -309,7 +309,7 @@ export function extractPrompts(posts: string[]): string[] {
  * carousel whose last slide is a link overlay reads as an ad rather than as a piece of teaching.
  * The guide link lives in the caption (`threadDeckCaption`), where a reader can actually use it.
  */
-const CTA_COPY: Record<ThreadTheme, { title: string; body: string }> = {
+export const CTA_COPY: Record<ThreadTheme, { title: string; body: string }> = {
   ai: { title: 'זה כל התהליך', body: 'שמרו את הפוסט ותריצו את זה על המשימה הראשונה שלכם היום.' },
   automation: { title: 'עכשיו תורכם לבנות', body: 'קחו תהליך אחד שחוזר אצלכם כל שבוע, ותתחילו ממנו.' },
   security: { title: 'תריצו את זה בבטחה', body: 'בדקו את ההרשאות לפני שאתם מחברים מודל למערכת אמיתית.' },
@@ -343,10 +343,26 @@ export function stripSlideCta(text: string): string {
     // and stripping them would silently gut the very instruction the slide exists to give.
     .replace(/\bmrdaniel\.co\.il\b/gi, '')
     // "כתבו/הגיבו/שלחו <keyword> בתגובות / ב-DM" and its English twin.
-    .replace(/(?:כתבו|רשמו|הגיבו|תגיבו|שלחו|תשלחו)\s+(?:לי\s+)?[^\s,.!?]{1,24}\s*(?:בתגובות|בתגובה|בהודעה|ב-?DM|בדיאם)[^.!?\n]*/gi, '')
-    .replace(/\b(?:comment|dm|write)\s+["“']?\w{1,24}["”']?\s+(?:below|to get|for the)[^.!?\n]*/gi, '')
+    //
+    // Each of these consumes the rest of its sentence AND that sentence's closing punctuation
+    // (`[.!?]*`). Without the second part the period stayed behind, so removing a trailing bait
+    // sentence left the slide reading "…let it run nightly.." — the doubled stop being the only
+    // visible trace of the thing that was supposed to disappear cleanly.
+    .replace(/(?:כתבו|רשמו|הגיבו|תגיבו|שלחו|תשלחו)\s+(?:לי\s+)?[^\s,.!?]{1,24}\s*(?:בתגובות|בתגובה|בהודעה|ב-?DM|בדיאם)[^.!?\n]*[.!?]*/gi, '')
+    .replace(/\b(?:comment|dm|write)\s+["“']?\w{1,24}["”']?\s+(?:below|to get|for the)[^.!?\n]*[.!?]*/gi, '')
     // "הקישור בביו" and friends — the link is in the caption, not on the slide.
-    .replace(/\b(?:הקישור|קישור|לינק)\s+(?:נמצא\s+)?(?:בביו|בבio|בתגובה הראשונה|למטה)[^.!?\n]*/gi, '')
+    //
+    // The leading `\b` was removed on 2026-09-12: it is an ASCII word boundary, and Hebrew letters
+    // are not ASCII word characters, so `\bהקישור` asserts a boundary between two non-word
+    // positions and can never match. The rule had therefore never once fired. No anchor is needed
+    // in its place — "הקישורים בביו" still cannot match, because `\s+` must follow "הקישור".
+    .replace(/(?:הקישור|קישור|לינק)\s+(?:נמצא\s+)?(?:בביו|בבio|בתגובה הראשונה|למטה)[^.!?\n]*[.!?]*/gi, '')
+    // The English twin, added 2026-09-12: only the (dead) Hebrew form was covered, so "Link in bio
+    // for the full guide." survived onto a slide verbatim — a dead string painted into a PNG. It
+    // matters most for the Instagram importer, where that line is the house style of almost every
+    // source caption, but the gap was the same on the Threads path and is fixed for both here.
+    .replace(/\b(?:the\s+)?link'?s?\s+(?:is\s+)?in\s+(?:my\s+|the\s+)?bio[^.!?\n]*[.!?]*/gi, '')
+    .replace(/\b(?:swipe up|tap the link|check the link|link below)[^.!?\n]*[.!?]*/gi, '')
     // Whatever furniture the removals left behind.
     .replace(/\(\s*\)/g, '')
     .replace(/\s+([.,;:!?])/g, '$1')
@@ -357,14 +373,29 @@ export function stripSlideCta(text: string): string {
 }
 
 /**
+ * The parts of an imported source the layout pass actually reads.
+ *
+ * Structural, not nominal: `ImportedThread` satisfies it as-is, and so does an imported Instagram
+ * post once its caption paragraphs and frame images are named this way. That is the whole reason
+ * the layout below is shared rather than copied — the numbering, the prompt boxes, the click-path
+ * chips and the CTA rules are identical for both sources, and two copies would drift.
+ */
+export interface DeckSource {
+  /** the source's text, already split into the units a slide can be built from */
+  posts: string[];
+  /** every image the source published, same-origin-proxied and in order */
+  images: string[];
+}
+
+/**
  * Applies the visual layout to an adapted deck: theme, badges, step indicators, prompt boxes,
- * the thread's own images, and the CTA link.
+ * the source's own images, and the closing card.
  *
  * Runs over whatever the engine produced rather than asking the model to produce it, so the same
  * rules apply to the AI deck and to the local fallback below, and a model that ignores an
  * instruction cannot break the numbering.
  */
-function layOutDeck(deck: TechTipDeck, thread: ImportedThread, topic: ThreadTopicProfile): TechTipDeck {
+export function layOutDeck(deck: TechTipDeck, thread: DeckSource, topic: ThreadTopicProfile): TechTipDeck {
   const slides = deck.slides;
   if (!slides.length) return deck;
 

@@ -1874,8 +1874,31 @@ export async function synthesizeThreadDeck(input: {
     },
   });
 
-  const raw = stripCodeFence(requireText(response));
-  const parsed = parseJsonOrThrow(raw, 'synthesizeThreadDeck') as Record<string, unknown>;
+  return parseAdaptedDeck(stripCodeFence(requireText(response)), {
+    label: 'synthesizeThreadDeck',
+    defaultKicker: 'מהשרשור',
+    thinError: 'model returned too few usable thread slides',
+  });
+}
+
+/**
+ * Turn an adaptation model's JSON into a finished, contract-compliant deck.
+ *
+ * Shared by every "adapt someone else's published post into a Hebrew carousel" path — the Threads
+ * thread agent and the Instagram post agent — because the OUTPUT contract is identical for both:
+ * same slide type, same length caps, same sanitiser chain, same cover-first/CTA-last structure, same
+ * positional step renumbering. Only the SOURCE and its system instruction differ, and those stay
+ * with the caller. Duplicating this per source is how the two pipelines would quietly drift apart
+ * on a cap or a sanitiser and start producing visibly different decks from the same kind of input.
+ *
+ * Throws when the model's output is structurally unusable, which the callers' agents catch and
+ * answer with their deterministic source-faithful deck.
+ */
+function parseAdaptedDeck(
+  raw: string,
+  opts: { label: string; defaultKicker: string; thinError: string; minSlides?: number }
+): TechTipDeck {
+  const parsed = parseJsonOrThrow(raw, opts.label) as Record<string, unknown>;
   const slidesRaw = Array.isArray(parsed.slides) ? parsed.slides : [];
 
   const hebrew = (v: unknown, words: number): string =>
@@ -1891,7 +1914,7 @@ export async function synthesizeThreadDeck(input: {
       const lang = String(rec.codeLang ?? '').toLowerCase().trim();
       return {
         kind,
-        kicker: hebrew(rec.kicker, 3).slice(0, 40) || 'מהשרשור',
+        kicker: hebrew(rec.kicker, 3).slice(0, 40) || opts.defaultKicker,
         title: hebrew(rec.title, THREAD_DECK_LIMITS.titleWords).slice(0, 120),
         body: prose(rec.body, THREAD_DECK_LIMITS.bodyWords).slice(0, 420),
         bullets: Array.isArray(rec.bullets)
@@ -1910,8 +1933,8 @@ export async function synthesizeThreadDeck(input: {
     .filter((s) => s.title.length > 1 || s.body.length > 10 || s.code.length > 5 || s.bullets.length > 0);
 
   // A short deck means the adaptation failed, and padding it would mean inventing slides the
-  // thread never contained — so this throws and the client falls back to its source-faithful deck.
-  if (slides.length < 8) throw new Error('model returned too few usable thread slides');
+  // source never contained — so this throws and the caller falls back to its source-faithful deck.
+  if (slides.length < (opts.minSlides ?? 8)) throw new Error(opts.thinError);
 
   const deck = slides.slice(0, 12);
   // Structural contract: cover first, CTA last. The model gets this right most of the time; when
@@ -1940,4 +1963,123 @@ export async function synthesizeThreadDeck(input: {
     slides: deck,
     hashtags: hashtags.length ? hashtags : ['#AI', '#אוטומציה', '#עסקים', '#טכנולוגיה'],
   };
+}
+
+// --- Instagram post → Hebrew carousel ---------------------------------------------------------
+// Powers the dashboard's "יבוא מ-Instagram" tab. Same adaptation job as the Threads path, different
+// source shape: an Instagram post is ONE caption plus, on a carousel, the text printed on each
+// slide. That second channel is machine OCR of a designed graphic, so it arrives partially garbled
+// and gets a very specific instruction below — it is read for STRUCTURE and never quoted verbatim.
+
+const INSTAGRAM_DECK_SYSTEM_INSTRUCTION = `אתה מתרגם ומעבד תוכן עבור דניאל בן ברוך. קיבלת פוסט או קרוסלה שפורסמו באינסטגרם — בדרך כלל באנגלית — והמשימה שלך היא להפוך אותם לקרוסלת לימוד בעברית ישראלית טבעית.
+
+${BRAND_KNOWLEDGE_BASE}
+
+${HEBREW_COPY_RULES}
+
+${AUDIENCE_RULES}
+
+המשימה: תרגם והתאם את הפוסט לדק של 10 עד 12 שקופיות בעברית. זו לא תרגום מילולי — זו התאמה: אותו מסר, אותן עובדות, בעברית שנשמעת כאילו נכתבה מלכתחילה בעברית לקהל ישראלי.
+
+מבנה החומר שאתה מקבל — שני ערוצים, ולא שווים בערכם:
+א. "כיתוב הפוסט" — זה מקור האמת. כל עובדה, מספר, שם מוצר וטענה שייכנסו לדק חייבים להיות מבוססים עליו.
+ב. "טקסט מהשקופיות" (אופציונלי) — קריאת OCR אוטומטית של הגרפיקה שהמחבר עיצב. הוא מגיע משובש: מילים כפולות, אותיות שהתחלפו, שברי תפריטים. השתמש בו אך ורק כדי להבין את **מבנה** הקרוסלה — כמה שלבים היו, מה הכותרת של כל שלב, ובאיזה סדר. אסור בהחלט לצטט ממנו מחרוזת מילולית, ואסור לגזור ממנו מספר או שם מוצר שלא מופיע גם בכיתוב. אם ה-OCR והכיתוב סותרים זה את זה — הכיתוב מנצח, תמיד.
+
+מבנה חובה:
+1. השקופית הראשונה היא תמיד kind:"cover" — כותרת שמבטיחה את הערך של הפוסט. רק כותרת והבטחה, בלי גוף ארוך.
+2. השקופיות באמצע (8–10) עוקבות אחרי סדר הרעיונות במקור: kind:"concept" להסבר רעיון, kind:"step" לשלב בתהליך (עם stepNumber רץ 1,2,3…), kind:"tool" לרשימת כלים, kind:"code" רק אם המקור עצמו הכיל קוד או קובץ הגדרות, kind:"takeaway" לסיכום נקודות. אם המקור היה קרוסלה עם N שקופיות ממוספרות — שמור על אותו רצף ואותה חלוקה.
+3. השקופית האחרונה היא תמיד kind:"cta" — כרטיס סגירה, לא פרסומת: משפט סיכום אחד שמחזיר את הקורא לערך של הפוסט, ועד 3 bullets שמסכמים שלבים שכבר הופיעו בדק. אסור בה קישור, אסור כתובת אתר, אסור "כתבו X בתגובות" ואסור מילת טריגר — הקישור מופיע בכיתוב של הפוסט, לא על התמונה.
+
+מגבלות אורך — כלל אדום, נאכפות אוטומטית אחרי הפלט שלך (אם תחרוג, הטקסט ייחתך):
+- title: עד ${THREAD_DECK_LIMITS.titleWords} מילים. קצר, קונקרטי, בלי מילות קישור מיותרות.
+- body: עד ${THREAD_DECK_LIMITS.bodyWords} מילים. משפט אחד או שניים, לא פסקה.
+- bullets: עד ${THREAD_DECK_LIMITS.bullets} פריטים, כל פריט עד ${THREAD_DECK_LIMITS.bulletWords} מילים.
+- kicker: עד 3 מילים.
+
+סגנון הכתיבה — קול של יוצר תוכן טכנולוגי, לא של מתרגם:
+1. משפטים קצרים. נקודה במקום פסיק. אם אפשר לחתוך משפט לשניים — תחתוך.
+2. כותרת נפתחת בפועל או במספר, לא במילת קישור: "ככה מריצים את המודל מקומית", ולא "על האופן שבו ניתן להריץ".
+3. פנייה ישירה בגוף שני רבים ("תפתחו", "תדביקו", "שימו לב"). בלי סביל ובלי "המשתמש".
+4. אסורות מילות מילוי: "בעולם של היום", "חשוב לציין", "ניתן לומר", "בעידן ה-AI". מוחקים אותן, לא מחליפים במילה אחרת.
+5. מספרים נשארים ספרות (753B פרמטרים, 18 דולר לחודש) — הם מה שעוצר גלילה.
+6. שמות כלים, פריטי תפריט, דגלי CLI ונתיבי קבצים (Tools, Canvas, ~/.claude/settings.json, --model) נשארים באנגלית בדיוק כפי שהם מופיעים במוצר. אסור לתרגם או לתעתק אותם — הקורא צריך למצוא אותם על המסך שלו.
+7. אל תעתיק פרומפט ארוך לתוך שדה code: המערכת מחלצת פרומפטים מהמקור בעצמה ומציגה אותם בכרטיס ייעודי. ב-body רק הסבר קצר מה הפרומפט עושה.
+8. כל body הוא משפט שלם ותקני שנגמר בנקודה. אסור לסיים באמצע משפט, אסור לסיים במילת קישור ("ו", "של", "כדי", "עם"), ואסור להשאיר פסיק או מקף בסוף. אם הרעיון לא נכנס במגבלת המילים — כתבו רעיון קטן יותר, לא חצי משפט.
+9. דקדוק מלא: התאמת מין ומספר, סמיכות תקינה, זמנים עקביים. קראו כל משפט בקול לפני שאתם מחזירים אותו — אם הוא נשמע כמו תרגום מכונה, כתבו אותו מחדש מאפס בעברית.
+10. אסור להכניס כתובת אתר, דומיין, "הלינק בביו" או קריאה להגיב מילת מפתח — לא ב-title, לא ב-body ולא ב-bullets. המערכת מסירה אותם בכל מקרה, והתוצאה תהיה משפט קטוע.
+
+חוקי נאמנות למקור (קריטי):
+1. אסור להוסיף עובדה, מספר, שם כלי או טענה שלא מופיעים בכיתוב המקורי. אם הכיתוב לא אמר את זה — זה לא נכנס לדק.
+2. אסור להשמיט את הרעיון המרכזי של הפוסט או להפוך את משמעותו.
+3. מספרים, שמות מוצרים, שמות חברות ומונחים טכניים — מועתקים כמו שהם מהמקור, בלי "לעגל" ובלי לתרגם שמות מותג.
+4. אם המקור מכיל קוד, פקודת טרמינל או קובץ הגדרות — העתק אותו כמו שהוא לשדה code (בלי markdown fence), עם codeLang אחד מתוך: python | ts | js | bash | json. אל תמציא קוד שלא היה שם, ואל תשחזר קוד מתוך ה-OCR אם הוא מגיע משובש.
+5. הומור או סלנג אנגלי מותאם לעברית ישראלית מקבילה, לא מתורגם מילולית.
+6. אסור תוויות מסגור ("הקשר:", "כותרת:", "תרגום:") בתוך title או body.
+7. אסור לקרדט את מחבר הפוסט המקורי, אסור לאזכר את Instagram ואסור להעתיק את מילות הפתיחה שלו ("Follow for more", "Save this post", "Comment X"). שם המחבר ניתן לך כהקשר לטון בלבד — המותג היחיד שמופיע בפלט הוא mrdaniel.co.il.
+
+לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית בלבד**, נטול טקסט: רקע אבסטרקטי-טכני כהה שמתאים לתוכן השקופית (dark cyber, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent). חובה לכלול בסוף: "no text, no letters, no words, no logos, no watermark". אין אנשים, אין לוגואים.
+
+פלט: JSON תקין בלבד, בלי markdown code fence:
+{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"visualPrompt":"..."}]}
+שדות שאינם רלוונטיים ל-kind: "" או [] או 0.`;
+
+/**
+ * Adapt an imported Instagram post into a Hebrew carousel deck.
+ *
+ * `caption` is the source of truth. `slideTexts` — the OCR of a carousel's own graphics — is passed
+ * as clearly-labelled secondary structure, and the system instruction above forbids quoting it.
+ * Kept as separate parameters rather than one blob so that separation survives into the prompt; a
+ * concatenated source would let the model treat garbled OCR as quotable prose.
+ */
+export async function synthesizeInstagramDeck(input: {
+  caption: string;
+  slideTexts?: string[];
+  author?: string;
+  sourceUrl?: string;
+  notes?: string;
+}): Promise<TechTipDeck> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean } = sanitizeInput(String(input.caption ?? '').slice(0, 8000));
+  if (clean.trim().length < 40) throw new Error('caption too short to adapt');
+
+  const slideTexts = (input.slideTexts ?? [])
+    .map((t) => String(t ?? '').trim())
+    .filter(Boolean)
+    .slice(0, 20);
+  const slideBlock = slideTexts.length
+    ? `\n\nטקסט מהשקופיות (OCR אוטומטי — משובש חלקית, לקריאת מבנה בלבד, אסור לצטט ממנו):\n"""\n${
+        sanitizeInput(slideTexts.map((t, i) => `[שקופית ${i + 1}] ${t}`).join('\n').slice(0, 6000)).clean
+      }\n"""`
+    : '';
+
+  const context = [
+    input.author ? `מחבר הפוסט: ${input.author}` : '',
+    input.sourceUrl ? `מקור: ${input.sourceUrl}` : '',
+    slideTexts.length ? `מבנה המקור: קרוסלה בת ${slideTexts.length} שקופיות` : '',
+    input.notes ? `הנחיות המפעיל: ${String(input.notes).slice(0, 600)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: `${context ? `${context}\n\n` : ''}כיתוב הפוסט:\n"""\n${clean}\n"""${slideBlock}` }],
+      },
+    ],
+    config: {
+      systemInstruction: INSTAGRAM_DECK_SYSTEM_INSTRUCTION,
+      temperature: 0.55,
+      topP: 0.9,
+      responseMimeType: 'application/json',
+    },
+  });
+
+  return parseAdaptedDeck(stripCodeFence(requireText(response)), {
+    label: 'synthesizeInstagramDeck',
+    defaultKicker: 'מהפוסט',
+    thinError: 'model returned too few usable instagram slides',
+  });
 }

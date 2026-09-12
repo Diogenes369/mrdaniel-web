@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp, LayoutTemplate, GraduationCap, AtSign } from 'lucide-react';
+import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp, LayoutTemplate, GraduationCap, AtSign, Instagram } from 'lucide-react';
 import { useAuthUser, logout } from './lib/auth';
 import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
 import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
@@ -25,12 +25,13 @@ import CarouselStudio from './components/CarouselStudio';
 import IgGrowthAgent from './components/IgGrowthAgent';
 import TechTipsStudio from './components/TechTipsStudio';
 import ThreadsImporter from './components/ThreadsImporter';
+import InstagramImporter from './components/InstagramImporter';
 import EmailManagerPanel from './components/EmailManagerPanel';
 import WeeklyPlanCalendar from './components/WeeklyPlanCalendar';
 import ErrorBoundary from './components/ErrorBoundary';
 import AdminAuthGate from './components/AdminAuthGate';
 
-type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'repurpose' | 'carousel-studio' | 'tech-tips' | 'threads-import' | 'ig-growth' | 'auto-publisher' | 'email' | 'weekly-plan';
+type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'repurpose' | 'carousel-studio' | 'tech-tips' | 'threads-import' | 'instagram-import' | 'ig-growth' | 'auto-publisher' | 'email' | 'weekly-plan';
 
 /**
  * Tab groups. Sixteen equal-weight pills in one row read as a wall of options, so they are grouped
@@ -56,6 +57,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutGrid; group: GroupId }[
   { id: 'repurpose', label: 'יבוא ושכתוב תוכן', icon: Recycle, group: 'create' },
   { id: 'tech-tips', label: 'טיפים ומדריכים', icon: GraduationCap, group: 'create' },
   { id: 'threads-import', label: 'יבוא מ-Threads', icon: AtSign, group: 'create' },
+  { id: 'instagram-import', label: 'יבוא מ-Instagram', icon: Instagram, group: 'create' },
   { id: 'agent', label: 'סוכן AI חברתי', icon: Bot, group: 'growth' },
   { id: 'ig-growth', label: 'סוכן צמיחה באינסטגרם', icon: TrendingUp, group: 'growth' },
   { id: 'auto-publisher', label: 'אוטונומיה', icon: Rocket, group: 'growth' },
@@ -265,6 +267,12 @@ export default function App() {
         {tab === 'threads-import' && (
           <ErrorBoundary label="יבוא מ-Threads">
             <ThreadsImporter />
+          </ErrorBoundary>
+        )}
+
+        {tab === 'instagram-import' && (
+          <ErrorBoundary label="יבוא מ-Instagram">
+            <InstagramImporter />
           </ErrorBoundary>
         )}
 

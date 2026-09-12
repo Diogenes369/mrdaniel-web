@@ -108,8 +108,14 @@ export function isThreadsUrl(raw: string): boolean {
   return sanitizeThreadsUrl(raw) !== null;
 }
 
-/** Shared POST helper with one bounded 429 retry (Gemini free-tier hourly cap) and one 5xx retry. */
-async function post(action: string, body: Record<string, unknown>, timeoutMs = 90000): Promise<Response> {
+/**
+ * Shared POST helper with one bounded 429 retry (Gemini free-tier hourly cap) and one 5xx retry.
+ *
+ * Exported because the Instagram importer (`instagramImportApi.ts`) talks to the same endpoint with
+ * the same auth header and needs the same retry behaviour; a second copy would be one place for the
+ * 429 backoff to silently diverge.
+ */
+export async function postToAgent(action: string, body: Record<string, unknown>, timeoutMs = 90000): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
@@ -192,7 +198,7 @@ export function normalizeThread(raw: Partial<ImportedThread> | null | undefined)
  * which is the documented fallback, not a failure.
  */
 export async function importThread(url: string): Promise<ImportedThread> {
-  const res = await post('parse-thread', { url: sanitizeThreadsUrl(url) ?? url }, 30000);
+  const res = await postToAgent('parse-thread', { url: sanitizeThreadsUrl(url) ?? url }, 30000);
   if (!res.ok) throw new Error((await describeAiError(res)).message);
   const data = (await res.json()) as { ok?: boolean; blocked?: boolean; thread?: Partial<ImportedThread>; error?: string };
   if (data.blocked) throw new Error('התוכן שיובא נחסם ע"י מסנן התוכן.');
@@ -292,7 +298,7 @@ const LOCAL_THEMES: { theme: ThreadTheme; badge: string; re: RegExp }[] = [
   { theme: 'code', badge: 'Engineering', re: /\b(python|typescript|javascript|react|docker|kubernetes|api|git|npm)\b|קוד|פיתוח/i },
 ];
 
-function localTopic(text: string): ThreadTopicProfile {
+export function localTopic(text: string): ThreadTopicProfile {
   const hit = LOCAL_THEMES.find((t) => t.re.test(text));
   return {
     theme: hit?.theme ?? 'general',
@@ -324,17 +330,29 @@ function slide(partial: Partial<TechTipSlide> & Pick<TechTipSlide, 'kind'>): Tec
 }
 
 /**
- * Deterministic local deck built from the thread's own posts, used whenever the server is
+ * Deterministic local deck built from an imported source's own text, used whenever the server is
  * unreachable. Deliberately honest: it does NOT machine-translate and does NOT invent Hebrew copy
- * — it carries the source text through, one post per slide, so the operator can see exactly what
+ * — it carries the source text through, one segment per slide, so the operator can see exactly what
  * was imported and edit from there. `synthesized:false` drives the amber "גיבוי מקומי" badge.
+ *
+ * Source-agnostic: `segments` are the units a slide is built from (a thread's posts, an Instagram
+ * caption's paragraphs) and `images` are that source's own published images in the same order, with
+ * `images[0]` backing the cover and `images[i+1]` the i-th content slide. The Instagram importer
+ * calls this too — the failure mode and the honest-draft contract are identical, and a second copy
+ * would be one more place for the two tabs' offline decks to drift apart.
  */
-function buildFallbackDeck(thread: ImportedThread, reason: string): TechTipDeck {
-  const source = thread.posts.length ? thread.posts : [thread.text].filter(Boolean);
-  const topic = localTopic(thread.text || source.join(' '));
+export function buildLocalDeck(input: {
+  segments: string[];
+  images: string[];
+  reason: string;
+  /** cover title when the source yielded no usable first segment */
+  fallbackTitle: string;
+}): TechTipDeck {
+  const source = input.segments.filter(Boolean);
+  const topic = localTopic(source.join(' '));
   // Not run through sanitizeHebrewText: this text is the untranslated source (usually English),
   // and techTipRenderer already sanitises every string at draw time.
-  const cover = clampWords(source[0] ?? 'שרשור מ-Threads', MAX_TITLE_WORDS);
+  const cover = clampWords(source[0] ?? input.fallbackTitle, MAX_TITLE_WORDS) || input.fallbackTitle;
   const content = source.slice(1, 11);
   const body = content.map((p, i) =>
     slide({
@@ -345,7 +363,7 @@ function buildFallbackDeck(thread: ImportedThread, reason: string): TechTipDeck 
       theme: topic.theme,
       badge: topic.badge,
       stepLabel: `${i + 1} / ${content.length}`,
-      sourceImage: thread.items[i + 1]?.images[0],
+      sourceImage: input.images[i + 1],
     })
   );
 
@@ -360,7 +378,7 @@ function buildFallbackDeck(thread: ImportedThread, reason: string): TechTipDeck 
         body: 'טקסט המקור כפי שיובא — לעריכה ידנית לפני פרסום.',
         theme: topic.theme,
         badge: topic.badge,
-        sourceImage: thread.images[0],
+        sourceImage: input.images[0],
       }),
       ...body,
       slide({
@@ -374,10 +392,23 @@ function buildFallbackDeck(thread: ImportedThread, reason: string): TechTipDeck 
     ],
     hashtags: ['#AI', '#אוטומציה', '#עסקים', '#טכנולוגיה'],
     synthesized: false,
-    fallbackReason: reason,
+    fallbackReason: input.reason,
     topic,
     createdAt: Date.now(),
   };
+}
+
+function buildFallbackDeck(thread: ImportedThread, reason: string): TechTipDeck {
+  const segments = thread.posts.length ? thread.posts : [thread.text].filter(Boolean);
+  return buildLocalDeck({
+    segments,
+    // Index i must line up with segment i, so each post contributes its OWN first image. The cover
+    // is the exception and keeps the thread's first image overall: a thread whose root post carries
+    // no media but whose second post does should still open on that picture rather than on nothing.
+    images: segments.map((_p, i) => (i === 0 ? thread.images[0] : thread.items[i]?.images[0]) ?? ''),
+    reason,
+    fallbackTitle: 'שרשור מ-Threads',
+  });
 }
 
 /** Translate, adapt and lay out an imported thread into a themed Hebrew deck. Never throws. */
@@ -395,7 +426,7 @@ export async function synthesizeThreadDeck(thread: ImportedThread, notes?: strin
   try {
     // The whole thread goes over, images included, so the agent can place each post's own media on
     // the slide that post became.
-    const res = await post('thread-deck', {
+    const res = await postToAgent('thread-deck', {
       thread: {
         posts,
         items: thread.items,

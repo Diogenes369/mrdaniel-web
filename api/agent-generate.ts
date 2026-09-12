@@ -3,6 +3,17 @@ import { importUrlContent } from '../src/server/contentImport.js';
 import { optimizeForGrowth, flattenGrowthResult, GROWTH_OPS, type GrowthOp } from '../src/server/igGrowthStrategy.js';
 import { importThreadContent, parseThreadRawText, isThreadsUrl, type ImportedThread, type ThreadPost } from '../src/server/threadsThreadFetcher.js';
 import { buildThreadDeck } from '../src/server/agents/threadsThreadAgent.js';
+import {
+  importInstagramContent,
+  parseInstagramRawText,
+  isInstagramUrl,
+  captionWithoutHashtags,
+  captionLines,
+  extractHashtags,
+  type ImportedInstagramPost,
+  type InstagramSlide,
+} from '../src/server/instagramFetcher.js';
+import { buildInstagramDeck } from '../src/server/agents/instagramAgent.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
 import { pushQueueItem, readAgentMode, readAgentWebhooks, readStrategicContext, writeAutoPilotRunTimestamp, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
@@ -493,6 +504,114 @@ export default async function handler(req: any, res: any) {
       // Same carve-out as tech-tip-deck: the guard's heuristics flag ordinary source code as a
       // leak, so only the Hebrew prose is checked. The prompt box rides with the code exemption —
       // it is a verbatim quote of a model instruction, not generated prose.
+      const prose = result.deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
+      const security = sanitizeOutput(prose);
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({
+        ok: true,
+        deck: result.deck,
+        topic: result.topic,
+        synthesized: result.synthesized,
+        fallbackReason: result.fallbackReason,
+      });
+      return;
+    }
+
+    if (action === 'parse-instagram') {
+      // Instagram → carousel, step 1. Same contract as parse-thread: a gated or private post is
+      // never an error — it answers 200 with ok:false + a note, and the dashboard switches to the
+      // manual-paste path. `rawText` alone (no fetch at all) is a first-class input.
+      const { url, rawText } = req.body ?? {};
+      const pastedText = typeof rawText === 'string' ? rawText.trim() : '';
+      const rawTarget = typeof url === 'string' ? url.trim() : '';
+
+      if (!pastedText && !rawTarget) {
+        rejectThinInput(res, 'url or rawText required', 'לא הועברה כתובת מקור ולא טקסט גולמי לייבוא');
+        return;
+      }
+
+      const post = pastedText
+        ? parseInstagramRawText(pastedText, rawTarget)
+        : isInstagramUrl(rawTarget)
+          ? await importInstagramContent(rawTarget)
+          : null;
+
+      if (!post) {
+        rejectThinInput(res, 'valid instagram.com post url required', 'הכתובת אינה קישור תקין לפוסט באינסטגרם');
+        return;
+      }
+
+      // The frames' OCR text rides along in `slides` and is checked with the caption — it is
+      // model-visible content, so it goes through the same guard the caption does.
+      const security = sanitizeOutput(
+        [post.text, ...post.slides.map((s) => s.text)].join('\n').slice(0, 8000)
+      );
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, post });
+      return;
+    }
+
+    if (action === 'instagram-deck') {
+      // Instagram → carousel, step 2. Runs through the dedicated agent
+      // (src/server/agents/instagramAgent.ts), which assigns the theme, the topic badge, the step
+      // indicators, the prompt boxes and the CTA guide on top of the engine's Hebrew adaptation.
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
+        return;
+      }
+      const { post, notes, useSlideText } = req.body ?? {};
+      const src = (post && typeof post === 'object' ? post : {}) as Partial<ImportedInstagramPost>;
+      const caption = String(src.caption ?? src.text ?? '').slice(0, 8000).trim();
+      if (captionWithoutHashtags(caption).trim().length < 40) {
+        rejectThinInput(
+          res,
+          'caption (>= 40 chars) required',
+          'כיתוב הפוסט קצר מדי לעיבוד AI (נדרשים לפחות 40 תווים) — הדביקו את הכיתוב המלא'
+        );
+        return;
+      }
+      // Images must already be same-origin-proxied by the fetcher. Re-checking here rather than
+      // trusting the body means a crafted request cannot plant an arbitrary URL in a slide that the
+      // renderer would then fetch on the operator's behalf.
+      const slides: InstagramSlide[] = (Array.isArray(src.slides) ? src.slides : [])
+        .slice(0, 20)
+        .map((s) => {
+          const rec = (s && typeof s === 'object' ? s : {}) as Partial<InstagramSlide>;
+          const image = String(rec.image ?? '');
+          return {
+            text: String(rec.text ?? '').slice(0, 1200),
+            image: image.startsWith('https://mrdaniel.co.il/api/img-proxy?url=') ? image : '',
+          };
+        })
+        .filter((s) => s.text || s.image);
+      const body = captionWithoutHashtags(caption);
+      const normalized: ImportedInstagramPost = {
+        ok: true,
+        url: typeof src.url === 'string' ? src.url.slice(0, 300) : '',
+        code: typeof src.code === 'string' ? src.code.slice(0, 40) : '',
+        author: typeof src.author === 'string' ? src.author.slice(0, 60) : '',
+        caption,
+        lines: captionLines(body),
+        hashtags: extractHashtags(caption),
+        images: slides.map((s) => s.image).filter(Boolean),
+        slides,
+        isCarousel: slides.length > 1,
+        text: body,
+        via: typeof src.via === 'string' ? (src.via as ImportedInstagramPost['via']) : 'manual',
+      };
+      const result = await buildInstagramDeck({
+        post: normalized,
+        notes: typeof notes === 'string' ? notes.slice(0, 600) : undefined,
+        useSlideText: useSlideText !== false,
+      });
+      // Same carve-out as thread-deck: the guard's heuristics flag ordinary source code as a leak,
+      // so only the Hebrew prose is checked.
       const prose = result.deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
       const security = sanitizeOutput(prose);
       if (!security.passed) {
