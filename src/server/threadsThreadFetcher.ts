@@ -13,6 +13,11 @@ import * as cheerio from 'cheerio';
  * nothing it says so (`via:'none'`) rather than failing the request — the dashboard then asks the
  * operator to paste the thread text manually, which is a first-class path, not an error state.
  *
+ * A `/share/<token>` link is RESOLVED to its canonical post first (`resolveShortTarget`). The token
+ * in it is not a post code, and every path below matches on the post code, so skipping this step
+ * made share links — the form the Threads app actually copies — fail without exception and drop the
+ * operator into the manual-paste box.
+ *
  * The page is fetched twice — as a browser and as a self-identified link-preview client, which
  * Threads serves far more fully — alongside Jina Reader, all in parallel. The best source wins:
  *   1. The server-rendered `data-sjs` JSON, which carries the thread verbatim, images included. The
@@ -91,7 +96,7 @@ const THREADS_LINK = /(?:https?:\/\/)?(?:www\.|m\.)?threads\.(?:net|com)\/[^\s<>
 /** A post path: `/@user/post/CODE`, or the `/t/CODE` and `/share/CODE` short forms, optionally
  *  ending in `/media` or `/embed`. */
 const POST_PATH =
-  /^\/(?:@([A-Za-z0-9._]+)\/post\/([A-Za-z0-9_-]+)|(?:t|share|p)\/([A-Za-z0-9_-]+))(?:\/(?:media|embed))?\/?$/i;
+  /^\/(?:@([A-Za-z0-9._]+)\/post\/([A-Za-z0-9_-]+)|(t|share|p)\/([A-Za-z0-9_-]+))(?:\/(?:media|embed))?\/?$/i;
 
 export function isThreadsUrl(raw: string): boolean {
   return normalizeThreadsUrl(raw) !== null;
@@ -112,7 +117,18 @@ function withScheme(raw: string): string {
  * blocklist — they make the lookups miss. The host is never taken from the input, so this cannot
  * be used to fetch another site.
  */
-export function normalizeThreadsUrl(raw: string): { url: string; handle: string; code: string } | null {
+export interface ThreadsTarget {
+  /** the canonical post URL — or the short link exactly as pasted, when it still needs resolving */
+  url: string;
+  /** "@handle" when the URL names one, '' for a short link */
+  handle: string;
+  /** the post code — or, when `short`, the SHARE TOKEN, which is not a post code */
+  code: string;
+  /** true while `code` is only a share token: the real post code is known after `resolveShortTarget` */
+  short: boolean;
+}
+
+export function normalizeThreadsUrl(raw: string): ThreadsTarget | null {
   const link = (raw || '').match(THREADS_LINK)?.[0];
   if (!link) return null;
   let path: string;
@@ -125,24 +141,80 @@ export function normalizeThreadsUrl(raw: string): { url: string; handle: string;
   const m = POST_PATH.exec(path.replace(/%40/gi, '@').replace(/[).,;:!?]+$/, ''));
   if (!m) return null;
   const handle = m[1] ?? '';
-  const code = m[2] ?? m[3] ?? '';
-  const url = handle ? `https://www.threads.com/@${handle}/post/${code}` : `https://www.threads.com/t/${code}`;
-  return { url, handle: handle ? `@${handle}` : '', code };
+  if (handle) {
+    return { url: `https://www.threads.com/@${handle}/post/${m[2] ?? ''}`, handle: `@${handle}`, code: m[2] ?? '', short: false };
+  }
+  // A short link keeps its OWN path. Rewriting `/share/<token>` to `/t/<token>` looks equivalent and
+  // is not: only the `/share/` form redirects to the post. `/t/<token>` answers 200 with an empty app
+  // shell — no OG tags, no payload — so the token never resolves and every path downstream misses.
+  const kind = (m[3] ?? 't').toLowerCase();
+  const token = m[4] ?? '';
+  const url = kind === 'share' ? `https://www.threads.com/share/${token}/` : `https://www.threads.com/${kind}/${token}`;
+  return { url, handle: '', code: token, short: true };
 }
 
-async function getText(url: string, timeoutMs: number, headers: Record<string, string>): Promise<string | undefined> {
+/** A fetched page plus the URL it actually came from — which, with `redirect:'follow'`, is what a
+ *  short link resolved to. */
+async function getPage(
+  url: string,
+  timeoutMs: number,
+  headers: Record<string, string>
+): Promise<{ url: string; body: string } | undefined> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: controller.signal, redirect: 'follow', headers });
     if (!res.ok) return undefined;
     const body = await res.text();
-    return body.length > 2_000_000 ? body.slice(0, 2_000_000) : body;
+    return { url: res.url || url, body: body.length > 2_000_000 ? body.slice(0, 2_000_000) : body };
   } catch {
     return undefined;
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function getText(url: string, timeoutMs: number, headers: Record<string, string>): Promise<string | undefined> {
+  return (await getPage(url, timeoutMs, headers))?.body;
+}
+
+/** The page's own idea of its address: `og:url`, else the canonical link. Read through cheerio
+ *  because Threads HTML-escapes the handle in these tags (`&#064;iffikhans`), and the raw text
+ *  would not match a Threads URL at all. */
+function canonicalUrl(html: string): string {
+  const $ = cheerio.load(html);
+  return (
+    $('meta[property="og:url"], meta[name="og:url"]').first().attr('content')?.trim() ||
+    $('link[rel="canonical"]').attr('href')?.trim() ||
+    ''
+  );
+}
+
+/**
+ * The post a `/share/<token>` (or `/t/`, `/p/`) link stands for, plus the page that answered.
+ *
+ * This step exists because a share token is NOT a post code, and every extraction path below keys
+ * on the post code: `extractSjsThread` matches it against the payload, `readPageMeta` requires
+ * `og:url` to name it, and `readerThread` finds the block with it. Handed a token, all three miss
+ * and the import falls through to the manual-paste box — which is the bug this resolves.
+ *
+ * Only the link-preview identity is used. Verified against `/share/BAntyLO24K/` on 2026-09-12:
+ * a browser user agent gets 200 and an empty app shell with NO redirect at all, so
+ * `redirect:'follow'` alone resolves nothing; the self-identified preview client gets the 30x to
+ * `/@iffikhans/post/DdKjD6yiBbt` and the full server-rendered payload with it. A HEAD request is
+ * likewise answered 200 without a Location header, so it cannot be used either.
+ *
+ * The resolved page IS the post page, so it is handed back and reused rather than fetched twice.
+ */
+async function resolveShortTarget(short: ThreadsTarget): Promise<{ target: ThreadsTarget; html: string } | null> {
+  const page = await getPage(short.url, 10000, PREVIEW_HEADERS);
+  if (!page) return null;
+  // The redirect chain first, then the page's own canonical tag for a client-side resolution.
+  for (const candidate of [page.url, canonicalUrl(page.body)]) {
+    const resolved = candidate ? normalizeThreadsUrl(candidate) : null;
+    if (resolved && !resolved.short) return { target: resolved, html: page.body };
+  }
+  return null;
 }
 
 // ─── images ─────────────────────────────────────────────────────────────────────────────────
@@ -278,38 +350,81 @@ function sjsPost(node: unknown): SjsPost | null {
   };
 }
 
+/** The posts of one thread container, in reading order, or null when the node is not one. Both
+ *  shapes the payload uses are accepted: the object carries `thread_items` itself, or it is a
+ *  GraphQL edge wrapping one in `node`. */
+function threadItems(node: unknown): SjsPost[] | null {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return null;
+  const holder = node as { thread_items?: unknown; node?: { thread_items?: unknown } | null };
+  const raw = Array.isArray(holder.thread_items)
+    ? holder.thread_items
+    : Array.isArray(holder.node?.thread_items)
+      ? holder.node.thread_items
+      : null;
+  if (!raw) return null;
+  return raw
+    .map((item) => sjsPost((item as { post?: unknown } | null)?.post))
+    .filter((p): p is SjsPost => p !== null);
+}
+
+/**
+ * The author's own chain out of one list of thread containers: the container holding the requested
+ * post, then every following container that is still the same author's.
+ *
+ * Threads does not keep a self-reply chain inside the root post's `thread_items`. The root sits in
+ * its own container and the "1/, 2/, 3/" replies in the NEXT one, so reading a single container —
+ * what this did before 2026-09-12 — returns the root post alone and reports `replyCount:0` for a
+ * nine-post thread. Walking forward past it is what recovers the rest; the first container by
+ * anyone else is a reply from a stranger and ends the thread.
+ */
+function chainFrom(groups: SjsPost[][], code: string): SjsPost[] {
+  const at = groups.findIndex((g) => g.some((p) => p.code === code));
+  if (at < 0) return [];
+  const author = (groups[at].find((p) => p.code === code)?.user ?? '').toLowerCase();
+  if (!author) return groups[at];
+  const out: SjsPost[] = [];
+  const seen = new Set<string>();
+  for (let i = at; i < groups.length; i++) {
+    const own = groups[i].filter((p) => p.user.toLowerCase() === author);
+    if (i > at && own.length === 0) break;
+    for (const post of own) {
+      if (seen.has(post.code)) continue;
+      seen.add(post.code);
+      out.push(post);
+    }
+  }
+  return out;
+}
+
 /**
  * The requested post and its author's own continuation, from the server-rendered JSON.
  *
  * Threads inlines its GraphQL payload in `<script type="application/json" data-sjs>` blobs. Besides
- * the requested thread, that payload holds the post it quotes, every reply, the related-threads
- * rail and, behind a login wall, a feed of unrelated posts, all with captions. So captions are
- * never collected wholesale. The thread whose `thread_items` include the requested post code is
- * found, and only the items by that post's author are kept, in order — which is exactly the
- * "1/, 2/, 3/" self-reply chain. If the payload has the post but no thread around it, that one post
- * is returned; if it lacks the code, nothing is.
+ * the requested thread, that payload holds the post it quotes, every reply, a `relatedPosts` rail —
+ * which on this page included two NEAR-DUPLICATE earlier posts by the same author — and, behind a
+ * login wall, a feed of unrelated posts, all with captions. So captions are never collected
+ * wholesale, and "everything by this author" is never the rule either.
+ *
+ * Instead the ARRAY of thread containers that holds the requested post code is the page's own
+ * thread list, and only that array is walked. The related-posts rail does not contain the requested
+ * code, so it can never be chosen — no path or key name is hardcoded to exclude it. When more than
+ * one array qualifies, the one yielding the longest chain wins. If the payload has the post but no
+ * thread list around it, that one post is returned; if it lacks the code, nothing is.
  */
 function extractSjsThread(html: string, code: string): { posts: ThreadPost[]; author: string } | null {
-  const found: { chain: SjsPost[] | null; single: SjsPost | null } = { chain: null, single: null };
+  const candidates: SjsPost[][][] = [];
+  let single: SjsPost | null = null;
   const visit = (node: unknown): void => {
-    if (found.chain || !node || typeof node !== 'object') return;
+    if (!node || typeof node !== 'object') return;
     if (Array.isArray(node)) {
+      const groups = node.map(threadItems);
+      if (groups.some((g) => g?.some((p) => p.code === code))) candidates.push(groups.map((g) => g ?? []));
       for (const item of node) visit(item);
       return;
     }
     const o = node as Record<string, unknown>;
-    if (Array.isArray(o.thread_items)) {
-      const items = o.thread_items
-        .map((item) => sjsPost((item as { post?: unknown } | null)?.post))
-        .filter((p): p is SjsPost => p !== null);
-      const target = items.find((p) => p.code === code);
-      if (target) {
-        found.chain = items.filter((p) => p.user.toLowerCase() === target.user.toLowerCase());
-        return;
-      }
-    }
     const post = sjsPost(o);
-    if (post?.code === code && !found.single) found.single = post;
+    if (post?.code === code && !single) single = post;
     for (const value of Object.values(o)) visit(value);
   };
   for (const m of html.matchAll(/<script type="application\/json"[^>]*data-sjs[^>]*>([\s\S]*?)<\/script>/g)) {
@@ -319,7 +434,10 @@ function extractSjsThread(html: string, code: string): { posts: ThreadPost[]; au
       // one unparseable blob does not invalidate the others
     }
   }
-  const chain = found.chain ?? (found.single ? [found.single] : []);
+  const best = candidates
+    .map((groups) => chainFrom(groups, code))
+    .sort((a, b) => b.length - a.length)[0];
+  const chain = best?.length ? best : single ? [single] : [];
   const posts = tidyChain(chain.map((p) => ({ text: p.text, images: p.images })));
   return posts.length ? { posts, author: chain[0].user ? `@${chain[0].user}` : '' } : null;
 }
@@ -635,26 +753,35 @@ function finish(
   };
 }
 
+/** The shape every unsuccessful return here starts from. */
+function emptyThread(url: string, author: string, note: string): ImportedThread {
+  return { ok: false, url, author, posts: [], items: [], images: [], replyCount: 0, text: '', via: 'none', note };
+}
+
+const FAILED_NOTE = 'לא הצלחנו למשוך את התוכן מ-Threads — הדביקו את טקסט השרשור ידנית.';
+
 export async function importThreadContent(rawUrl: string): Promise<ImportedThread> {
   const normalized = normalizeThreadsUrl(rawUrl);
-  const base: ImportedThread = {
-    ok: false,
-    url: normalized?.url ?? withScheme(rawUrl),
-    author: normalized?.handle ?? '',
-    posts: [],
-    items: [],
-    images: [],
-    replyCount: 0,
-    text: '',
-    via: 'none',
-    note: 'לא הצלחנו למשוך את התוכן מ-Threads — הדביקו את טקסט השרשור ידנית.',
-  };
-  if (!normalized) return { ...base, note: 'הקישור אינו קישור לפוסט ב-Threads.' };
-  const { url, code } = normalized;
+  if (!normalized) return emptyThread(withScheme(rawUrl), '', 'הקישור אינו קישור לפוסט ב-Threads.');
+
+  // A share link carries a token, not a post code. Resolve it before anything reads the page:
+  // every extraction path below matches on the post code, so a token makes all of them miss.
+  const resolved = normalized.short ? await resolveShortTarget(normalized) : null;
+  if (normalized.short && !resolved) {
+    return emptyThread(
+      normalized.url,
+      '',
+      'לא הצלחנו לפענח את הקישור המקוצר של Threads — פתחו את הפוסט והעתיקו את הקישור המלא, או הדביקו את הטקסט ידנית.'
+    );
+  }
+  const { url, code, handle } = resolved?.target ?? normalized;
+  const base = emptyThread(url, handle, FAILED_NOTE);
 
   const [browserHtml, previewHtml, readerMd] = await Promise.all([
     getText(url, 8000, BROWSER_HEADERS),
-    getText(url, 8000, PREVIEW_HEADERS),
+    // Resolving a short link already fetched the post page as the preview client — that IS this
+    // request, so it is reused instead of being made a second time.
+    resolved ? Promise.resolve(resolved.html) : getText(url, 8000, PREVIEW_HEADERS),
     getText(`https://r.jina.ai/${url}`, 12000, JINA_KEY ? { Authorization: `Bearer ${JINA_KEY}` } : {}),
   ]);
 

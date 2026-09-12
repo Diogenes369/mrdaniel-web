@@ -77,11 +77,17 @@ const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
  *  validates. */
 const THREADS_LINK = /(?:https?:\/\/)?(?:www\.|m\.)?threads\.(?:net|com)\/[^\s<>"'`]+/i;
 const POST_PATH =
-  /^\/(?:@([A-Za-z0-9._]+)\/post\/([A-Za-z0-9_-]+)|(?:t|share|p)\/([A-Za-z0-9_-]+))(?:\/(?:media|embed))?\/?$/i;
+  /^\/(?:@([A-Za-z0-9._]+)\/post\/([A-Za-z0-9_-]+)|(t|share|p)\/([A-Za-z0-9_-]+))(?:\/(?:media|embed))?\/?$/i;
 
 /** The canonical post URL with share tracking (`?xmt=`, `?igshid=`, …) dropped, or null when the
  *  input holds no Threads post link. Only the path survives, so tracking is removed by
- *  construction rather than by a blocklist. */
+ *  construction rather than by a blocklist.
+ *
+ *  A SHORT link keeps its own path. This used to rewrite `/share/<token>` to `/t/<token>` before
+ *  sending it on, which silently broke every share link the operator pasted: only the `/share/`
+ *  form redirects to the post, so the server received a URL that could never resolve and the import
+ *  always fell back to manual paste. The server resolves the short form itself — see
+ *  `resolveShortTarget` in src/server/threadsThreadFetcher.ts. */
 export function sanitizeThreadsUrl(raw: string): string | null {
   const link = (raw || '').match(THREADS_LINK)?.[0];
   if (!link) return null;
@@ -93,7 +99,9 @@ export function sanitizeThreadsUrl(raw: string): string | null {
   }
   const m = POST_PATH.exec(path.replace(/%40/gi, '@').replace(/[).,;:!?]+$/, ''));
   if (!m) return null;
-  return m[1] ? `https://www.threads.com/@${m[1]}/post/${m[2]}` : `https://www.threads.com/t/${m[3]}`;
+  if (m[1]) return `https://www.threads.com/@${m[1]}/post/${m[2]}`;
+  const kind = (m[3] ?? 't').toLowerCase();
+  return kind === 'share' ? `https://www.threads.com/share/${m[4]}/` : `https://www.threads.com/${kind}/${m[4]}`;
 }
 
 export function isThreadsUrl(raw: string): boolean {
