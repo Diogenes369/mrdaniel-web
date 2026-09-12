@@ -234,11 +234,21 @@ export function extractSkill(text: string): SkillExtract {
 }
 
 /**
- * Attaches each content slide's own slash command / install block, consumed in carousel order
- * across the deck's content slides — the same "consumed as a queue" pattern `layOutDeck` already
- * uses for `images` and `prompts`, so slide N tends to carry the command that came from roughly
- * that point in the source carousel. A slide the extraction found nothing for simply renders
- * without an install box; nothing is invented to fill the gap.
+ * Attaches each content slide's own slash command / install block.
+ *
+ * Matched by CONTENT first: the adapted Hebrew title routinely names its own command verbatim
+ * ("פקודת /tdd: פיתוח מונחה בדיקות" — brand names and commands stay Latin under the source-fidelity
+ * rules), so a slide whose title or body literally contains an extracted command gets that exact
+ * extract. This is what a naive "consume the extracts in carousel order" queue gets wrong the
+ * moment the model inserts one extra slide the source carousel didn't have a frame for — an intro
+ * slide before the first skill, say — which shifts every later slide onto the WRONG command's
+ * install box. That drift is invisible to a positional queue but is exactly what a content match
+ * catches.
+ *
+ * Extracts no slide's copy names (or a deck whose copy never echoes the command at all) fall back
+ * to the same "consume the remaining extracts in carousel order" queue as `layOutDeck` already uses
+ * for `images` and `prompts` — a slide the extraction found nothing for simply renders without an
+ * install box; nothing is invented to fill the gap.
  *
  * Harmless to call for every Instagram deck regardless of the chosen visual preset: the dark
  * presets' painter never reads `slashCommand` or `install`, so this only has a visible effect once
@@ -246,16 +256,33 @@ export function extractSkill(text: string): SkillExtract {
  * synthesized under a different preset, with no need to re-run the model.
  */
 export function attachSkillExtras(deck: TechTipDeck, post: ImportedInstagramPost): TechTipDeck {
-  const queue = post.slides.map((s) => extractSkill(s.text)).filter((e) => e.slashCommand || e.install);
-  if (!queue.length || deck.slides.length < 3) return deck;
+  const extracts = post.slides.map((s) => extractSkill(s.text)).filter((e) => e.slashCommand || e.install);
+  if (!extracts.length || deck.slides.length < 3) return deck;
   const firstContent = 1;
   const lastContent = deck.slides.length - 2;
-  deck.slides.forEach((slide, i) => {
-    if (i < firstContent || i > lastContent || !queue.length) return;
-    const found = queue.shift()!;
+  const contentSlides = deck.slides.filter((_s, i) => i >= firstContent && i <= lastContent);
+
+  const pool = [...extracts];
+  const unmatched: TechTipSlide[] = [];
+  for (const slide of contentSlides) {
+    const haystack = `${slide.title} ${slide.body}`.toLowerCase();
+    const at = pool.findIndex((e) => e.slashCommand && haystack.includes(e.slashCommand.toLowerCase()));
+    if (at >= 0) {
+      const [found] = pool.splice(at, 1);
+      if (!slide.slashCommand && found.slashCommand) slide.slashCommand = found.slashCommand;
+      if (!slide.install && found.install) slide.install = found.install;
+    } else {
+      unmatched.push(slide);
+    }
+  }
+  // Whatever is left — extracts no slide named, and slides no extract named — is consumed as a
+  // positional queue, in the order each side already appears in.
+  for (const slide of unmatched) {
+    if (!pool.length) break;
+    const found = pool.shift()!;
     if (!slide.slashCommand && found.slashCommand) slide.slashCommand = found.slashCommand;
     if (!slide.install && found.install) slide.install = found.install;
-  });
+  }
   return deck;
 }
 
