@@ -9,8 +9,14 @@ import {
   type ThreadTopicProfile,
   type DeckSource,
 } from './threadsThreadAgent.js';
-import type { TechTipDeck, TechTipSlide } from '../../agent/types.js';
+import type { InstallBlock, TechTipDeck, TechTipSlide } from '../../agent/types.js';
 import type { ImportedInstagramPost } from '../instagramFetcher.js';
+
+/** The two cream & terracotta presets, plus the existing dark 'creator' default. Threaded from the
+ *  dashboard's style picker through to both the model prompt (see synthesizeInstagramDeck's
+ *  `visualPreset`) and the renderer (dashboard/src/lib/techTipRenderer.ts's `TipStyle`) — the two
+ *  enums are kept in sync by hand since they live in different packages. */
+export type InstagramVisualPreset = 'creator' | 'cream-skill' | 'cream-workflow';
 
 /**
  * Instagram post → contextual Hebrew carousel. The agent half of the pipeline whose other half is
@@ -178,6 +184,81 @@ function liveGuide(slug: string): string {
   return STATIC_GUIDES.some((g) => g.slug === slug) ? slug : '';
 }
 
+// ─── skill-card structural extraction (deterministic, OCR-sourced) ─────────────────────────
+//
+// A skill card's install block ("save as .claude/commands/tdd.md", "then run /tdd") is a LITERAL
+// string a reader has to type — the one place on the whole slide where a wrong character actually
+// breaks something, rather than just reading a little awkward. So unlike the deck's prose, it is
+// never trusted to the model (which never even sees the raw per-frame screenshot it came from):
+// it is read straight off the carousel frame's own OCR text, the same way `extractPrompts` and
+// `extractWorkflowPaths` read literal strings off a Threads post in threadsThreadAgent.ts.
+
+/**
+ * "save as <path>" — tolerant of the noise real OCR introduces around it (case, spacing, the
+ * occasional garbled middle segment: "conmands" for "commands"), but the path token itself is kept
+ * verbatim. There is no cleaner source for it than the frame's own screenshot, so an OCR misread
+ * here is a known limitation of the pipeline, not a translation error — it is exactly what the
+ * dashboard's OCR review panel exists to catch before the operator publishes.
+ */
+const SAVE_AS_RE = /save\s*as[:\s]+([./][^\s,;]{2,90}?\.[a-z0-9]{1,6})\b/i;
+
+/** "then run <command>" / "run <command>" — the slash command that follows the install step. */
+const RUN_RE = /\b(?:then\s+)?run[:\s]+(\/[^\s,;.!?]{1,60})/i;
+
+/** A bare slash command with no "run" framing around it — the headline command a skill card
+ *  names ("/tdd"). Requires a following boundary (space, quote or end of string) so a command
+ *  embedded in a longer path never matches: ".claude/commands/tdd.md" has no "/tdd" that is
+ *  followed by a boundary, because a "." comes right after it. */
+const BARE_SLASH_RE = /(?:^|[\s"'])\/([a-z][a-z0-9-]{1,24})(?=[\s"'.,!?]|$)/i;
+
+/** The install block one OCR text names, or undefined when it names neither line. */
+function installFromText(text: string): InstallBlock | undefined {
+  const saveAs = text.match(SAVE_AS_RE)?.[1]?.trim();
+  const run = text.match(RUN_RE)?.[1]?.trim();
+  return saveAs || run ? { saveAs, run } : undefined;
+}
+
+/** One carousel frame's install data: the slash command it teaches plus its install block. */
+export interface SkillExtract {
+  slashCommand: string;
+  install?: InstallBlock;
+}
+
+/** Reads one OCR text for both fields at once — the install block's own `run` value doubles as
+ *  the slide's headline command when present, so the two are never allowed to disagree. */
+export function extractSkill(text: string): SkillExtract {
+  const install = installFromText(text);
+  const bare = text.match(BARE_SLASH_RE)?.[1];
+  const slashCommand = install?.run || (bare ? `/${bare}` : '');
+  return { slashCommand, install };
+}
+
+/**
+ * Attaches each content slide's own slash command / install block, consumed in carousel order
+ * across the deck's content slides — the same "consumed as a queue" pattern `layOutDeck` already
+ * uses for `images` and `prompts`, so slide N tends to carry the command that came from roughly
+ * that point in the source carousel. A slide the extraction found nothing for simply renders
+ * without an install box; nothing is invented to fill the gap.
+ *
+ * Harmless to call for every Instagram deck regardless of the chosen visual preset: the dark
+ * presets' painter never reads `slashCommand` or `install`, so this only has a visible effect once
+ * the operator switches to the cream-skill preset — including on a deck that was already
+ * synthesized under a different preset, with no need to re-run the model.
+ */
+export function attachSkillExtras(deck: TechTipDeck, post: ImportedInstagramPost): TechTipDeck {
+  const queue = post.slides.map((s) => extractSkill(s.text)).filter((e) => e.slashCommand || e.install);
+  if (!queue.length || deck.slides.length < 3) return deck;
+  const firstContent = 1;
+  const lastContent = deck.slides.length - 2;
+  deck.slides.forEach((slide, i) => {
+    if (i < firstContent || i > lastContent || !queue.length) return;
+    const found = queue.shift()!;
+    if (!slide.slashCommand && found.slashCommand) slide.slashCommand = found.slashCommand;
+    if (!slide.install && found.install) slide.install = found.install;
+  });
+  return deck;
+}
+
 // ─── deterministic fallback ─────────────────────────────────────────────────────────────────
 
 const NEUTRAL_VISUAL =
@@ -273,6 +354,10 @@ export async function buildInstagramDeck(input: {
   /** false to ignore the carousel frames' OCR text entirely — the operator's escape hatch for a
    *  post whose graphics read as noise. Defaults to true. */
   useSlideText?: boolean;
+  /** The visual preset the dashboard has selected. Only changes what is ASKED of the model (see
+   *  the two addenda in SocialAgentEngine.ts) — defaults to the existing dark 'creator' preset, so
+   *  a caller that never passes this gets exactly the behaviour it always had. */
+  visualPreset?: InstagramVisualPreset;
 }): Promise<InstagramDeckResult> {
   const { post, notes } = input;
   const topic = analyzeInstagramTopic(post);
@@ -285,13 +370,15 @@ export async function buildInstagramDeck(input: {
       author: post.author || undefined,
       sourceUrl: post.url || undefined,
       notes: notes?.trim() || undefined,
+      visualPreset: input.visualPreset,
     });
-    return { deck: layOutDeck(raw, source, topic), topic, synthesized: true };
+    const deck = attachSkillExtras(layOutDeck(raw, source, topic), post);
+    return { deck, topic, synthesized: true };
   } catch (err) {
     if (!isModelOutputFailure(err)) throw err;
     console.warn('[instagramAgent] model output unusable, serving source-faithful deck:', (err as Error).message);
     return {
-      deck: buildLocalInstagramDeck(post, topic),
+      deck: attachSkillExtras(buildLocalInstagramDeck(post, topic), post),
       topic,
       synthesized: false,
       fallbackReason: 'מנוע ה-AI לא החזיר דק שמיש — מוצג טקסט המקור לעריכה',

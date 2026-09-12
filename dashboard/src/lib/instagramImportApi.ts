@@ -261,11 +261,17 @@ function buildFallbackDeck(post: ImportedInstagramPost, reason: string): TechTip
 }
 
 /** Translate, adapt and lay out an imported post into a themed Hebrew deck. Never throws. */
+/** The two cream & terracotta presets, plus the existing dark 'creator' default. Mirrors
+ *  InstagramVisualPreset in src/server/agents/instagramAgent.ts — kept in sync by hand since the
+ *  two live in different packages. */
+export type InstagramVisualPreset = 'creator' | 'cream-skill' | 'cream-workflow';
+
 export async function synthesizeInstagramDeck(
   post: ImportedInstagramPost,
   notes?: string,
-  useSlideText = true
+  opts: { useSlideText?: boolean; visualPreset?: InstagramVisualPreset } = {}
 ): Promise<TechTipDeck> {
+  const useSlideText = opts.useSlideText ?? true;
   // Mirrors MIN_CAPTION_CHARS on the server. Below it there is not enough source text for a deck,
   // and calling the model anyway just spends quota to get this same fallback back.
   const sourceChars = captionWithoutHashtags(post.caption || post.text).trim().length;
@@ -290,6 +296,7 @@ export async function synthesizeInstagramDeck(
       },
       notes: notes?.trim() || undefined,
       useSlideText,
+      visualPreset: opts.visualPreset ?? 'creator',
     });
     if (!res.ok) return buildFallbackDeck(post, (await describeAiError(res)).message);
     const data = (await res.json()) as {
@@ -358,6 +365,8 @@ export interface PersistedInstagramState {
   deck: TechTipDeck | null;
   url: string;
   notes: string;
+  /** Absent on a session written before the cream presets shipped — restored as 'creator'. */
+  visualPreset?: InstagramVisualPreset;
   savedAt: number;
 }
 
@@ -376,7 +385,10 @@ export function loadInstagramState(): PersistedInstagramState | null {
     const parsed = JSON.parse(raw) as PersistedInstagramState;
     if (!parsed?.post) return null;
     if (parsed.deck && !Array.isArray(parsed.deck.slides)) parsed.deck = null;
-    return { ...parsed, post: normalizePost(parsed.post) };
+    const preset = parsed.visualPreset;
+    const visualPreset: InstagramVisualPreset =
+      preset === 'cream-skill' || preset === 'cream-workflow' ? preset : 'creator';
+    return { ...parsed, post: normalizePost(parsed.post), visualPreset };
   } catch {
     return null;
   }

@@ -565,7 +565,7 @@ export default async function handler(req: any, res: any) {
         res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
-      const { post, notes, useSlideText } = req.body ?? {};
+      const { post, notes, useSlideText, visualPreset } = req.body ?? {};
       const src = (post && typeof post === 'object' ? post : {}) as Partial<ImportedInstagramPost>;
       const caption = String(src.caption ?? src.text ?? '').slice(0, 8000).trim();
       if (captionWithoutHashtags(caption).trim().length < 40) {
@@ -605,10 +605,13 @@ export default async function handler(req: any, res: any) {
         text: body,
         via: typeof src.via === 'string' ? (src.via as ImportedInstagramPost['via']) : 'manual',
       };
+      const preset: 'creator' | 'cream-skill' | 'cream-workflow' =
+        visualPreset === 'cream-skill' || visualPreset === 'cream-workflow' ? visualPreset : 'creator';
       const result = await buildInstagramDeck({
         post: normalized,
         notes: typeof notes === 'string' ? notes.slice(0, 600) : undefined,
         useSlideText: useSlideText !== false,
+        visualPreset: preset,
       });
       // Same carve-out as thread-deck: the guard's heuristics flag ordinary source code as a leak,
       // so only the Hebrew prose is checked.

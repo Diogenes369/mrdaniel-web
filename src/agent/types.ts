@@ -248,10 +248,62 @@ export type ToolBrand =
   | 'copilot'
   | 'workspace'
   | 'veo'
-  | 'midjourney';
+  | 'midjourney'
+  | 'glm';
 
 /** Hand-drawn accent painted over the slide — the creator-deck signature. */
 export type ScribbleKind = 'underline' | 'circle' | 'arrow' | 'none';
+
+/**
+ * A service a workflow node stands for. Deliberately a closed set: each one has a vector mark and a
+ * brand colour in the renderer's NODE_STYLE table, so a diagram is drawn entirely from paths and
+ * never fetches a logo — an external image would taint the export canvas.
+ */
+export type NodeIcon =
+  | 'webhook'
+  | 'openai'
+  | 'gmail'
+  | 'calendar'
+  | 'apify'
+  | 'crm'
+  | 'make'
+  | 'n8n'
+  | 'filter'
+  | 'router'
+  | 'scheduler'
+  | 'chat'
+  | 'phone'
+  | 'globe'
+  | 'doc'
+  | 'sheet'
+  | 'db';
+
+/**
+ * One node in a workflow diagram.
+ *
+ * `label` is the step in Hebrew and is drawn RTL. `sublabel` is the SERVICE — "OpenAI Realtime",
+ * "Email (Gmail)" — and is drawn LTR and never translated: it names a product the reader has to
+ * find in their own automation tool.
+ */
+export interface WorkflowNode {
+  label: string;
+  sublabel?: string;
+  icon: NodeIcon;
+  /**
+   * Which row the node sits in. 0 (or absent) is the trunk, running left to right. 1 and up are
+   * fan-out branches that all start after the LAST trunk node — which is the shape a real
+   * automation diagram has: a trigger and an agent, then several parallel outcomes.
+   */
+  lane?: number;
+}
+
+/** The dark "HOW TO INSTALL" container at the foot of a cream-preset slide. */
+export interface InstallBlock {
+  /** The path the file is saved to, e.g. `.claude/commands/tdd.md`. Drawn LTR, verbatim. */
+  saveAs?: string;
+  /** The command that runs it, e.g. `/tdd`. Drawn LTR, verbatim. */
+  run?: string;
+}
 
 export interface TechTipSlide {
   kind: TipSlideKind;
@@ -312,6 +364,25 @@ export interface TechTipSlide {
    * An image the thread itself published is NOT a stock photo and still renders.
    */
   noPhoto?: boolean;
+
+  // --- cream & terracotta preset --------------------------------------------------------------
+  // Also optional and additive: a deck that sets none of them renders exactly as before, and the
+  // dark presets ignore them entirely.
+
+  /**
+   * The slash command, CLI invocation or file the slide teaches — `/tdd`, `npm run build`.
+   *
+   * Kept OUT of `title` on purpose. It is drawn as its own oversized LTR headline in a mono face,
+   * and a Hebrew title string carrying a Latin command in the middle gets bidi-reordered on the
+   * canvas, which is exactly how "/tdd" ends up rendering as "tdd/".
+   */
+  slashCommand?: string;
+  /** One short Hebrew line between the headline and the body, drawn in the accent colour. */
+  subtitle?: string;
+  /** The dark install container. Rendered only when at least one of its fields is set. */
+  install?: InstallBlock;
+  /** The node flowchart this slide is about. Drives the `workflow-nodes` preset. */
+  workflow?: WorkflowNode[];
 }
 
 export interface TechTipDeck {

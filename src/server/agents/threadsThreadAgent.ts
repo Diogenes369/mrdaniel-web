@@ -95,6 +95,10 @@ const THEME_RULES: ThemeRule[] = [
  */
 const BRAND_BADGES: { re: RegExp; label: string }[] = [
   { re: /\bgemini\b/i, label: 'Gemini AI' },
+  // Tested before the generic Claude AI badge: a post that teaches "point Claude Code at GLM-5.2"
+  // mentions Claude too, but the model actually being taught is GLM. detectTool below is scored, not
+  // first-match, so this rule's own weight is what decides it — see TOOL_RULES for the same fix.
+  { re: /\bglm-?5(?:\.\d)?\b|\bz\.ai\b|\bzhipu\b/i, label: 'GLM' },
   { re: /\bclaude\b/i, label: 'Claude AI' },
   { re: /\b(chatgpt|gpt-?[45](?:\.\d)?|openai)\b/i, label: 'OpenAI GPT' },
   { re: /\b(copilot|github copilot)\b/i, label: 'GitHub Copilot' },
@@ -127,6 +131,11 @@ const TOOL_RULES: { tool: ToolBrand; re: RegExp }[] = [
   { tool: 'veo', re: /\bveo\s?[0-9]?\b/i },
   { tool: 'gemini', re: /\bgemini\b|\bgoogle ai studio\b|\bnano\s?banana\b|\bgems?\b(?=\s*(?:->|→|›|»|>|:))/i },
   { tool: 'chatgpt', re: /\bchat\s?gpt\b|\bopenai\b|\bgpt-?[45](?:\.\d)?\b|\bsora\b|\bdall-?e\b/i },
+  // GLM / Z.ai, tested before Claude: a post teaching "point Claude Code at GLM-5.2" is a GLM deck,
+  // even though it also names Claude as the client. Scored like every other rule here — this wins
+  // only when GLM's own mentions genuinely outnumber Claude's, exactly like the security-vs-AI tie
+  // rule above.
+  { tool: 'glm', re: /\bglm-?5(?:\.\d)?\b|\bz\.ai\b|\bzhipu\b/i },
   { tool: 'claude', re: /\bclaude\b|\banthropic\b/i },
   { tool: 'canva', re: /\bcanva\b/i },
   { tool: 'make', re: /\bmake\.com\b|\bintegromat\b/i },
@@ -418,6 +427,11 @@ export function layOutDeck(deck: TechTipDeck, thread: DeckSource, topic: ThreadT
     slide.title = stripSlideCta(slide.title);
     slide.body = stripSlideCta(slide.body);
     slide.bullets = slide.bullets.map((b) => stripSlideCta(b)).filter((b) => b.length > 1);
+    // The cream preset's tagline is prose like any other field the model wrote, and just as
+    // capable of carrying a stray "link in bio" through from the source caption. Optional and a
+    // no-op for every deck that never sets it (Threads decks, and Instagram decks outside the
+    // cream-skill preset).
+    if (slide.subtitle) slide.subtitle = stripSlideCta(slide.subtitle);
     // A slide that names its own tool wins over the deck's — a round-up thread walks through
     // several, and each of those slides should wear the mark it is actually talking about. Brand
     // names survive the Hebrew adaptation as Latin text (source-fidelity rule 3), so this reads the

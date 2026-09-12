@@ -33,10 +33,47 @@ export type ToolBrand =
   | 'copilot'
   | 'workspace'
   | 'veo'
-  | 'midjourney';
+  | 'midjourney'
+  | 'glm';
 
 /** Hand-drawn accent painted over the slide — the creator-deck signature. */
 export type ScribbleKind = 'underline' | 'circle' | 'arrow' | 'none';
+
+/** A service a workflow node stands for. Closed set: each has a vector mark and brand colour in
+ *  NODE_STYLE (designAssets.ts), so a diagram never fetches a logo and cannot taint the canvas. */
+export type NodeIcon =
+  | 'webhook'
+  | 'openai'
+  | 'gmail'
+  | 'calendar'
+  | 'apify'
+  | 'crm'
+  | 'make'
+  | 'n8n'
+  | 'filter'
+  | 'router'
+  | 'scheduler'
+  | 'chat'
+  | 'phone'
+  | 'globe'
+  | 'doc'
+  | 'sheet'
+  | 'db';
+
+/** One node in a workflow diagram. `label` is Hebrew (RTL); `sublabel` names the service and stays
+ *  LTR and untranslated. `lane` 0 is the trunk, 1+ are fan-out branches. Mirrors src/agent/types.ts. */
+export interface WorkflowNode {
+  label: string;
+  sublabel?: string;
+  icon: NodeIcon;
+  lane?: number;
+}
+
+/** The dark "HOW TO INSTALL" container at the foot of a cream-preset slide. Both fields LTR. */
+export interface InstallBlock {
+  saveAs?: string;
+  run?: string;
+}
 
 export interface TechTipSlide {
   kind: TipSlideKind;
@@ -74,6 +111,17 @@ export interface TechTipSlide {
   /** Forbids a searched/generated photo here — technical slides keep the procedural backdrop.
    *  An image the thread itself published still renders; it is not stock. */
   noPhoto?: boolean;
+
+  // Cream & terracotta preset — optional and additive; the dark presets ignore them.
+  /** The slash command / CLI invocation the slide teaches (`/tdd`). Drawn LTR in its own mono
+   *  headline, kept out of `title` so bidi can't reorder it into "tdd/". */
+  slashCommand?: string;
+  /** One short Hebrew line under the headline, drawn in the accent colour. */
+  subtitle?: string;
+  /** The dark "HOW TO INSTALL" container. Drawn only when a field is set. */
+  install?: InstallBlock;
+  /** The node flowchart this slide is about — drives the `workflow-nodes` preset. */
+  workflow?: WorkflowNode[];
 }
 
 /**

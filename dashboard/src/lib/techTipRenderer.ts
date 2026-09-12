@@ -27,7 +27,25 @@ import {
   doodleArrow,
   paintSlateBackdrop,
   hexToRgba,
+  TERRACOTTA,
+  TERRACOTTA_WASH,
+  CREAM_INK,
+  CREAM_BODY,
+  CREAM_MUTED,
+  paintCreamBackdrop,
+  drawAvatarLockup,
+  drawEyebrow,
+  drawInstallBox,
+  installBoxHeight,
+  drawProgressRail,
+  drawStarburst,
+  drawLoopGlyph,
+  drawNumberTile,
+  drawNodeIcon,
+  drawNodeLink,
+  drawPaperCard,
 } from './designAssets';
+import type { WorkflowNode } from './techTipsApi';
 
 /**
  * Tech Tips slide painter — deep-slate teaching slides, drawn on <canvas> so the SAME painter
@@ -120,7 +138,14 @@ function brandVisualsFor(text: string): string[] {
  * reference aesthetic actually is — a stock photo behind a prompt card is the thing it avoids.
  * It is the only mode the Threads importer offers.
  */
-export type TipStyle = 'creator' | 'photoreal' | 'enterprise' | 'dark-minimal' | 'sketchnote';
+export type TipStyle =
+  | 'creator'
+  | 'photoreal'
+  | 'enterprise'
+  | 'dark-minimal'
+  | 'sketchnote'
+  | 'cream-skill'
+  | 'cream-workflow';
 
 /** Extra search terms per style, appended to the slide's own contextual query. */
 const STYLE_TONE: Record<TipStyle, string> = {
@@ -129,7 +154,16 @@ const STYLE_TONE: Record<TipStyle, string> = {
   enterprise: 'bright clean corporate office technology',
   'dark-minimal': 'dark moody minimal technology',
   sketchnote: '',
+  'cream-skill': '',
+  'cream-workflow': '',
 };
+
+/** Whether a style paints its own procedural backdrop and never fetches a photo. Both cream
+ *  presets are paper, not photography — a searched or generated image behind an install box or a
+ *  node diagram is exactly the "assembled, not made" tell the creator preset already avoids. */
+function isProceduralStyle(style: TipStyle): boolean {
+  return style === 'creator' || style === 'cream-skill' || style === 'cream-workflow';
+}
 
 export async function resolveTipBackgrounds(
   deck: TechTipDeck,
@@ -154,11 +188,10 @@ export async function resolveTipBackgrounds(
         // relay by the fetcher, so it draws to canvas without tainting it. A failure yields null
         // and the slide falls back to the procedural backdrop, same as every other source here.
         out[i] = await loadPhoto(slide.sourceImage, 12000);
-      } else if (style === 'creator' || slide.noPhoto) {
+      } else if (isProceduralStyle(style) || slide.noPhoto) {
         // Zero stock imagery. `noPhoto` marks the slides carrying something the reader is meant to
-        // copy, run or click; `creator` applies the same rule to the whole deck. Either way the
-        // slide keeps the procedural backdrop, lit in its own tool's colours — which is the point,
-        // not a fallback.
+        // copy, run or click; the procedural styles apply the same rule to the whole deck. Either
+        // way the slide keeps its own painted backdrop — which is the point, not a fallback.
         out[i] = null;
       } else if (style === 'sketchnote') {
         // Illustrated art: keep the existing Pollinations path driven by the slide's visualPrompt.
@@ -818,6 +851,326 @@ function drawStepBadge(
   return y + size + b.m.gap;
 }
 
+// ─── cream & terracotta preset ──────────────────────────────────────────────────────────────
+//
+// A second, entirely separate visual family alongside the dark slate one above. Where the slate
+// preset carries a tool's identity through coloured light on a near-black ground, this one is
+// paper: one hot terracotta accent and one near-black install container on a warm cream ground.
+// It does not share layout code with the slate preset beyond the primitives both draw with
+// (`roundRectPath`, `wrapRtl`) — the composition itself (avatar lockup, eyebrow counter, oversized
+// LTR command headline, dark install box, thin progress rail) is its own thing end to end.
+
+/** LTR auto-fit for a single short token — a slash command, a CLI invocation. Never wraps: a
+ *  command broken onto a second line stops reading as one literal string to type. Mirrors
+ *  `autoFit` above, which does the RTL, multi-line equivalent for prose. */
+function autoFitLtr(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxW: number,
+  startPx: number,
+  minPx: number,
+  set: (c: CanvasRenderingContext2D, px: number) => void
+): number {
+  let px = startPx;
+  for (let i = 0; i < 24; i++) {
+    set(ctx, px);
+    if (ctx.measureText(text).width <= maxW || px <= minPx) break;
+    px = Math.max(minPx, px * 0.93);
+  }
+  return px;
+}
+
+/** The Hebrew headline on a cream slide — solid ink, not the slate preset's white-to-accent
+ *  gradient, which would wash out against a light ground. Reuses `autoFit`'s wrap/shrink loop. */
+function drawCreamTitle(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, title: string, startPx: number, maxLines: number): number {
+  if (!title) return r.y;
+  const { lines, px } = autoFit(ctx, sanitizeHebrewText(title), r.w, startPx, b.W * 0.036, maxLines, (c, p) => setDisplay(c, p, 800));
+  setDisplay(ctx, px, 800);
+  ctx.direction = 'rtl';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = CREAM_INK;
+  let y = r.y + px;
+  for (const line of lines) {
+    ctx.fillText(line, r.x + r.w, y);
+    y += px * 1.16;
+  }
+  return y;
+}
+
+/** Plain wrapped body prose on cream — no card panel behind it, matching the reference decks,
+ *  where the paragraph just sits on the paper. */
+function drawCreamParagraph(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, text: string, top: number, maxLines: number): number {
+  if (!text) return top;
+  const { lines, px } = autoFit(ctx, sanitizeHebrewText(text), r.w, b.W * 0.032, b.W * 0.02, maxLines, (c, p) => setBody(c, p, 400));
+  setBody(ctx, px, 400);
+  ctx.direction = 'rtl';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = CREAM_BODY;
+  let y = top + px;
+  for (const line of lines) {
+    ctx.fillText(line, r.x + r.w, y);
+    y += px * 1.5;
+  }
+  return y;
+}
+
+/** The takeaway / tool bullet list on cream — a plain check row, no card, matching the paper look. */
+function drawCreamBulletList(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, items: string[], top: number, accent: string): number {
+  const rows = items.filter((t) => t.trim()).slice(0, 5);
+  if (!rows.length) return top;
+  const fs = b.W * 0.03;
+  const rowH = fs * 1.9;
+  ctx.save();
+  ctx.direction = 'rtl';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  setBody(ctx, fs, 500);
+  let y = top + rowH / 2;
+  for (const raw of rows) {
+    const dotX = r.x + r.w - fs * 0.18;
+    ctx.beginPath();
+    ctx.arc(dotX, y, fs * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = accent;
+    ctx.fill();
+    ctx.fillStyle = CREAM_INK;
+    const label = sanitizeHebrewText(raw);
+    const maxW = r.w - fs * 0.7;
+    let fitted = label;
+    while (fitted.length > 4 && ctx.measureText(fitted).width > maxW) fitted = fitted.slice(0, -2);
+    ctx.fillText(fitted === label ? label : `${fitted}…`, dotX - fs * 0.55, y);
+    y += rowH;
+  }
+  ctx.restore();
+  return y;
+}
+
+/**
+ * The node flowchart: a trunk of nodes running left to right, optionally fanning out into parallel
+ * branch rows after the last trunk node — the exact shape the reference diagrams use (a webhook
+ * into an agent, which then forks into several handled outcomes).
+ *
+ * Column position is what keeps the fan-out readable: every node's column is its position within
+ * ITS OWN row (trunk or branch), offset by the trunk's length for a branch row, so a branch's first
+ * node always lines up directly after the point it forked from, whatever row it is drawn in.
+ */
+function drawWorkflowDiagram(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, nodes: WorkflowNode[], top: number, maxH: number, accent: string): number {
+  if (!nodes.length) return top;
+  const trunk = nodes.filter((n) => !n.lane);
+  const branchLanes = new Map<number, WorkflowNode[]>();
+  for (const n of nodes) {
+    if (!n.lane) continue;
+    if (!branchLanes.has(n.lane)) branchLanes.set(n.lane, []);
+    branchLanes.get(n.lane)!.push(n);
+  }
+  const lanes = [...branchLanes.keys()].sort((a, b2) => a - b2);
+  const cols = Math.max(trunk.length, trunk.length + Math.max(0, ...lanes.map((l) => branchLanes.get(l)!.length)));
+  const rows = 1 + lanes.length;
+
+  // Node size respects BOTH constraints — how many columns must fit across, and how many rows must
+  // fit down to `maxH` — so a wide trunk and a tall fan-out both shrink the same node grid rather
+  // than one of them silently overflowing its axis.
+  const pad = b.W * 0.05;
+  const labelFs = b.W * 0.019;
+  const labelSpace = labelFs * 2.7; // room for a node's two-line label beneath it
+  const byWidth = (r.w - pad * 2) / Math.max(1, cols) - b.W * 0.03;
+  const byHeight = (maxH - pad * 2 - Math.max(0, rows - 1) * labelSpace) / rows;
+  const nodeSize = Math.max(b.W * 0.045, Math.min(b.W * 0.1, byWidth, byHeight));
+  const colGap = cols > 1 ? (r.w - pad * 2 - cols * nodeSize) / (cols - 1) : 0;
+  const rowGap = rows > 1 ? Math.max(nodeSize * 0.3, labelSpace) : 0;
+  // The card's own height is the content it actually holds, clamped to what the caller granted —
+  // never the full `maxH`, which used to leave a mostly-empty white box under a short diagram.
+  const cardH = Math.min(maxH, pad * 2 + rows * nodeSize + Math.max(0, rows - 1) * rowGap);
+  drawPaperCard(ctx, r.x, top, r.w, cardH, b.m.radiusLg);
+
+  const colX = (col: number) => r.x + pad + col * (nodeSize + colGap) + nodeSize / 2;
+  const rowY = (row: number) => top + pad + row * (nodeSize + rowGap) + nodeSize / 2;
+
+  const drawLabel = (cx: number, cy: number, node: WorkflowNode) => {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const ly = cy + nodeSize / 2 + labelFs * 0.7;
+    if (node.label) {
+      ctx.direction = 'rtl';
+      setBody(ctx, labelFs, 700);
+      ctx.fillStyle = CREAM_INK;
+      ctx.fillText(node.label, cx, ly);
+    }
+    if (node.sublabel) {
+      ctx.direction = 'ltr';
+      setBody(ctx, labelFs * 0.86, 400);
+      ctx.fillStyle = CREAM_MUTED;
+      ctx.fillText(node.sublabel, cx, ly + labelFs * 1.3);
+    }
+    ctx.restore();
+  };
+
+  // Trunk row, connected in sequence.
+  const trunkY = rowY(0);
+  trunk.forEach((node, i) => {
+    const cx = colX(i);
+    drawNodeIcon(ctx, node.icon, cx, trunkY, nodeSize);
+    drawLabel(cx, trunkY, node);
+    if (i > 0) drawNodeLink(ctx, colX(i - 1) + nodeSize / 2, trunkY, cx - nodeSize / 2, trunkY, accent, b.W);
+  });
+
+  // Branch rows: each starts right after the trunk and forks from its last node.
+  const lastTrunkX = trunk.length ? colX(trunk.length - 1) : r.x + pad + nodeSize / 2;
+  lanes.forEach((lane, li) => {
+    const laneNodes = branchLanes.get(lane)!;
+    const laneY = rowY(li + 1);
+    laneNodes.forEach((node, i) => {
+      const cx = colX(trunk.length + i);
+      drawNodeIcon(ctx, node.icon, cx, laneY, nodeSize);
+      drawLabel(cx, laneY, node);
+      if (i === 0) {
+        drawNodeLink(ctx, lastTrunkX + nodeSize / 2, trunkY, cx - nodeSize / 2, laneY, accent, b.W);
+      } else {
+        drawNodeLink(ctx, colX(trunk.length + i - 1) + nodeSize / 2, laneY, cx - nodeSize / 2, laneY, accent, b.W);
+      }
+    });
+  });
+
+  return top + cardH;
+}
+
+/**
+ * Paints one slide in the cream & terracotta family — either the "skill card" composition
+ * (avatar, eyebrow counter, command headline, install box) or, when the slide carries workflow
+ * nodes and the deck is in `cream-workflow` mode, the node-diagram composition instead.
+ */
+function drawCreamSlide(
+  ctx: CanvasRenderingContext2D,
+  b: SlideBox,
+  slide: TechTipSlide,
+  index: number,
+  total: number,
+  logo: HTMLImageElement | null,
+  anim: SlideAnim,
+  style: TipStyle
+) {
+  const accent = TERRACOTTA;
+  ctx.clearRect(0, 0, b.W, b.H);
+  paintCreamBackdrop(ctx, b.W, b.H, index, style === 'cream-workflow' ? 'workflow' : 'skill');
+
+  const alpha = Math.max(0, Math.min(1, anim.intro)) * (1 - Math.max(0, Math.min(1, anim.outro)));
+  const rise = (1 - Math.min(1, anim.intro)) * b.W * 0.02;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(0, rise);
+
+  const pad = b.PAD;
+  let y = b.H * 0.058;
+  y = drawAvatarLockup(ctx, pad, y, b.W, logo) + b.W * 0.026;
+
+  const railY = b.H - b.PAD * 0.62;
+  const r: Region = { x: pad, y, w: b.W - pad * 2, h: railY - b.W * 0.05 - y };
+
+  if (style === 'cream-workflow' && slide.workflow?.length) {
+    // Number-tile heading: the section ordinal plus the slide's own title/subtitle beside it.
+    const tileSize = b.W * 0.1;
+    drawNumberTile(ctx, r.x, y, tileSize, b.m, index + 1);
+    const headX = r.x + tileSize + b.W * 0.03;
+    const headW = r.w - tileSize - b.W * 0.03;
+    ctx.save();
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    const { lines: tLines, px: tPx } = autoFit(ctx, sanitizeHebrewText(slide.title), headW, b.W * 0.05, b.W * 0.03, 2, (c, p) => setDisplay(c, p, 800));
+    setDisplay(ctx, tPx, 800);
+    ctx.fillStyle = CREAM_INK;
+    let ty = y + tileSize * 0.42;
+    for (const line of tLines) {
+      ctx.fillText(line, r.x + r.w, ty);
+      ty += tPx * 1.1;
+    }
+    ctx.restore();
+    let headBottom = Math.max(y + tileSize, ty + b.W * 0.014);
+    if (slide.subtitle?.trim()) {
+      headBottom = drawCreamParagraph(ctx, b, { ...r, x: headX, w: headW }, slide.subtitle, headBottom, 2);
+    }
+    const diagramTop = headBottom + b.W * 0.03;
+    drawWorkflowDiagram(ctx, b, r, slide.workflow, diagramTop, railY - b.W * 0.05 - diagramTop, accent);
+  } else {
+    // Eyebrow: an English counter chip — "SKILL 1 / 6" — kept Latin end to end so the manual
+    // letterspacing in `drawEyebrow` (built for Latin glyph order) is never handed Hebrew.
+    const label = (slide.badge || slide.kicker || 'SKILL').toUpperCase();
+    const count = slide.stepLabel?.trim() || `${index + 1} / ${total}`;
+    y = drawEyebrow(ctx, r.x, y + b.W * 0.014, r.w, b.W, `${label} ${count}`, accent) + b.W * 0.036;
+
+    if (slide.slashCommand?.trim()) {
+      const px = autoFitLtr(ctx, slide.slashCommand, r.w * 0.66, b.W * 0.088, b.W * 0.05, (c, p) => setDisplay(c, p, 800));
+      setDisplay(ctx, px, 800);
+      ctx.save();
+      ctx.direction = 'ltr';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = CREAM_INK;
+      ctx.fillText(slide.slashCommand, r.x, y + px * 0.86);
+      ctx.restore();
+      // The circular-arrow glyph — a decorative motif for a "loop" step. Drawn only when the
+      // slide's own scribble says so, so it means something (a TDD-style repeat) rather than
+      // decorating every command headline identically.
+      if (slide.scribble === 'circle' || slide.scribble === 'arrow') {
+        drawLoopGlyph(ctx, r.x + r.w - px * 0.4, y + px * 0.32, px * 0.34, accent);
+      }
+      y += px * 1.3;
+    } else {
+      y = drawCreamTitle(ctx, b, r, slide.title, b.W * 0.062, 3) + b.W * 0.01;
+    }
+
+    if (slide.subtitle?.trim()) {
+      ctx.save();
+      ctx.direction = 'rtl';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'alphabetic';
+      setBody(ctx, b.W * 0.03, 700);
+      ctx.fillStyle = accent;
+      const subPx = b.W * 0.03;
+      y += subPx * 0.2;
+      for (const line of wrapRtl(ctx, sanitizeHebrewText(slide.subtitle), r.w).slice(0, 2)) {
+        y += subPx;
+        ctx.fillText(line, r.x + r.w, y);
+      }
+      ctx.restore();
+      y += b.W * 0.018;
+    }
+
+    // Reserve space for the install box (if any) and the progress rail before laying out the body,
+    // so the paragraph never overlaps either — the box is drawn anchored to the bottom, last.
+    const installRows: { leader: string; value: string }[] = [];
+    if (slide.install?.saveAs) installRows.push({ leader: 'save as', value: slide.install.saveAs });
+    if (slide.install?.run) installRows.push({ leader: 'then run', value: slide.install.run });
+    const installH = installRows.length ? installBoxHeight(b.W, installRows.length) : 0;
+    const bodyBottom = railY - b.W * 0.05 - (installH ? installH + b.W * 0.035 : 0);
+    const bodyMaxLines = Math.max(2, Math.floor((bodyBottom - y) / (b.W * 0.048)));
+
+    if (slide.code.trim()) {
+      drawCodeBlock(ctx, b, { ...r, y, h: bodyBottom - y }, slide, y + b.W * 0.02, bodyBottom - y - b.W * 0.02);
+    } else if (slide.promptBox?.trim()) {
+      drawPromptBox(ctx, b, { ...r, y, h: bodyBottom - y }, slide.promptBox, y + b.W * 0.02, bodyBottom - y - b.W * 0.02, accent);
+    } else if ((slide.kind === 'tool' || slide.kind === 'takeaway' || slide.kind === 'cta') && slide.bullets.length) {
+      drawCreamBulletList(ctx, b, r, slide.bullets, y + b.W * 0.01, accent);
+    } else {
+      const bodyY = drawCreamParagraph(ctx, b, r, slide.body, y, bodyMaxLines);
+      // A starburst fills genuinely empty space between the paragraph and the install box — never
+      // forced in, and never drawn low enough to collide with the box.
+      if (installH && bodyBottom - bodyY > b.W * 0.14) {
+        drawStarburst(ctx, r.x + r.w * 0.14, (bodyY + bodyBottom - installH * 0.3) / 2, b.W * 0.05, TERRACOTTA_WASH, index * 7 + 3);
+      }
+    }
+
+    if (installRows.length) {
+      drawInstallBox(ctx, r.x, railY - b.W * 0.05 - installH, r.w, b.W, b.m, installRows, { accent });
+    }
+  }
+
+  drawProgressRail(ctx, pad, railY, b.W - pad * 2, b.W, index, total, accent);
+  ctx.restore();
+}
+
 // ─── main painter ───────────────────────────────────────────────────────────────────────────
 
 export interface SlideAnim {
@@ -835,8 +1188,16 @@ export function drawTipSlide(
   total: number,
   bg: HTMLImageElement | null,
   logo: HTMLImageElement | null,
-  anim: SlideAnim = { intro: 1, outro: 0 }
+  anim: SlideAnim = { intro: 1, outro: 0 },
+  style: TipStyle = 'creator'
 ) {
+  // The cream & terracotta family is a completely separate painter — different palette, different
+  // chrome, no shared layout beyond the primitives both draw with — so it branches off before any
+  // of the slate-specific drawing below runs, rather than threading an if/else through every block.
+  if (style === 'cream-skill' || style === 'cream-workflow') {
+    drawCreamSlide(ctx, b, slide, index, total, logo, anim, style);
+    return;
+  }
   ctx.clearRect(0, 0, b.W, b.H);
   const accent = accentFor(slide);
   // The backdrop is lit in the slide's own brand pair, so a photo-free technical slide still
@@ -1033,7 +1394,7 @@ export function drawTipSlide(
 
 export async function renderTipDeckImages(
   deck: TechTipDeck,
-  opts: { width?: number; height?: number; backgrounds?: (HTMLImageElement | null)[] } = {},
+  opts: { width?: number; height?: number; backgrounds?: (HTMLImageElement | null)[]; style?: TipStyle } = {},
   onProgress?: (done: number, total: number) => void
 ): Promise<string[]> {
   const width = opts.width ?? 1080;
@@ -1051,7 +1412,7 @@ export async function renderTipDeckImages(
     if (!ctx) throw new Error('canvas 2d context unavailable');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    drawTipSlide(ctx, b, deck.slides[i], i, deck.slides.length, opts.backgrounds?.[i] ?? null, logo);
+    drawTipSlide(ctx, b, deck.slides[i], i, deck.slides.length, opts.backgrounds?.[i] ?? null, logo, undefined, opts.style ?? 'creator');
     out.push(canvas.toDataURL('image/png'));
     onProgress?.(i + 1, deck.slides.length);
   }

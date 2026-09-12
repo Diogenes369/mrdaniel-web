@@ -1,6 +1,6 @@
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import { getLogo } from './newsImageComposer';
-import { drawTipSlide, boxFor } from './techTipRenderer';
+import { drawTipSlide, boxFor, type TipStyle } from './techTipRenderer';
 import { ensureDeckFonts } from './designAssets';
 import type { TechTipDeck } from './techTipsApi';
 
@@ -32,6 +32,8 @@ export interface MotionOptions {
   /** Include the procedural ambient audio bed. */
   music?: boolean;
   backgrounds?: (HTMLImageElement | null)[];
+  /** The deck's visual family — slate (default) or one of the cream & terracotta presets. */
+  style?: TipStyle;
 }
 
 export interface MotionResult {
@@ -169,7 +171,7 @@ export async function renderTipDeckVideo(
     // `transition` of the scene — the slide chrome itself stays put so the deck reads continuous.
     const intro = Math.min(1, local / transition);
     const outro = idx === deck.slides.length - 1 ? 0 : Math.max(0, (local - (perSlide - transition)) / transition);
-    drawTipSlide(ctx, b, deck.slides[idx], idx, deck.slides.length, opts.backgrounds?.[idx] ?? null, logo, { intro, outro });
+    drawTipSlide(ctx, b, deck.slides[idx], idx, deck.slides.length, opts.backgrounds?.[idx] ?? null, logo, { intro, outro }, opts.style ?? 'creator');
 
     const frame = new VideoFrame(canvas, { timestamp: Math.round(t * 1e6), duration: Math.round(1e6 / FPS) });
     videoEncoder.encode(frame, { keyFrame: f % (FPS * 2) === 0 });

@@ -1,4 +1,4 @@
-import type { ThreadTheme, ToolBrand } from './techTipsApi';
+import type { NodeIcon, ThreadTheme, ToolBrand } from './techTipsApi';
 
 /**
  * Design asset engine — the single source of truth for how a generated slide LOOKS.
@@ -79,6 +79,62 @@ export const TOOL_STYLE: Record<ToolBrand, { label: string; accent: string; glow
   workspace: { label: 'Workspace', accent: '#7AAEFF', glow: '#34D399' },
   veo: { label: 'Veo', accent: '#7AAEFF', glow: '#A78BFA' },
   midjourney: { label: 'Midjourney', accent: '#E2E8F0', glow: '#94A3B8' },
+  glm: { label: 'GLM', accent: '#5B8DEF', glow: '#22D3EE' },
+};
+
+// ─── cream & terracotta preset ──────────────────────────────────────────────────────────────
+
+/**
+ * The warm editorial palette — the second of the two looks a deck can wear.
+ *
+ * It is not a recolour of the slate theme. The slate theme carries a tool's identity through
+ * coloured light on a near-black ground; this one is paper. Contrast comes from one hot accent and
+ * one near-black container against a warm off-white, which is why the install box below is the
+ * loudest thing on the slide and reads as the payload before a word is parsed.
+ */
+export const CREAM_BG = '#FAF6F0';
+/** The slightly cooler, greener cream the workflow preset sits on, so the two presets are
+ *  distinguishable at thumbnail size rather than looking like one theme with different content. */
+export const CREAM_BG_ALT = '#F7F4EB';
+export const TERRACOTTA = '#D96B52';
+/** The pale wash used for decorative marks and the unfilled half of a progress rail. */
+export const TERRACOTTA_WASH = '#F0C9BC';
+/** Near-black, warm rather than blue — a pure #000 reads as a hole on a cream ground. */
+export const CREAM_INK = '#1C1917';
+export const CREAM_BODY = '#57534E';
+export const CREAM_MUTED = '#A8A29E';
+/** The dark install container. Zinc-950 rather than black, so its rounded corners stay visible. */
+export const INSTALL_BG = '#18181B';
+/** The tan fill behind a step numeral in the workflow preset. */
+export const TILE_FILL = '#EADFCD';
+/** The white card a workflow diagram is drawn on, lifted off the cream ground. */
+export const NODE_CARD = '#FFFDFA';
+
+/**
+ * Per-service node identity: the brand colour its disc is filled with.
+ *
+ * These are the products' own colours, because a diagram's whole job is to be recognised at a
+ * glance — an OpenAI node that is not green and a Gmail node that is not red cost the reader the
+ * one thing the picture was for. The mark itself is always drawn white on top.
+ */
+export const NODE_STYLE: Record<NodeIcon, { fill: string; label: string }> = {
+  webhook: { fill: '#EC4899', label: 'Webhook' },
+  openai: { fill: '#10A37F', label: 'OpenAI' },
+  gmail: { fill: '#3B82F6', label: 'Gmail' },
+  calendar: { fill: '#22A565', label: 'Calendar' },
+  apify: { fill: '#7C6CF6', label: 'Apify' },
+  crm: { fill: '#8B5CF6', label: 'CRM' },
+  make: { fill: '#6D28D9', label: 'Make' },
+  n8n: { fill: '#EA4B71', label: 'n8n' },
+  filter: { fill: '#3B82F6', label: 'Filter' },
+  router: { fill: '#F97316', label: 'Router' },
+  scheduler: { fill: '#4CAF50', label: 'Scheduler' },
+  chat: { fill: '#A855F7', label: 'Chat' },
+  phone: { fill: '#E4467E', label: 'Phone' },
+  globe: { fill: '#6366F1', label: 'Web' },
+  doc: { fill: '#2563EB', label: 'Docs' },
+  sheet: { fill: '#16A34A', label: 'Sheets' },
+  db: { fill: '#0EA5E9', label: 'Database' },
 };
 
 export function hexToRgba(hex: string, a: number): string {
@@ -587,6 +643,29 @@ const TOOL_MARKS: Record<ToolBrand, (ctx: CanvasRenderingContext2D, colour: stri
       ctx.stroke();
     }
   },
+  // Open-weights mark: a stacked lattice of three bars breaking out of a bracket, for GLM / Z.ai.
+  glm: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 8;
+    // The bracket — "open" weights.
+    ctx.beginPath();
+    ctx.moveTo(38, 14);
+    ctx.lineTo(16, 14);
+    ctx.lineTo(16, 86);
+    ctx.lineTo(38, 86);
+    ctx.stroke();
+    // Three descending bars, the widest at the bottom: a model's layer stack.
+    ctx.beginPath();
+    ctx.moveTo(38, 32);
+    ctx.lineTo(66, 32);
+    ctx.moveTo(38, 50);
+    ctx.lineTo(78, 50);
+    ctx.moveTo(38, 68);
+    ctx.lineTo(90, 68);
+    ctx.stroke();
+  },
   // Open ring in the shape of a C.
   canva: (ctx, c) => {
     ctx.strokeStyle = c;
@@ -826,4 +905,725 @@ export function paintSlateBackdrop(
   vig.addColorStop(1, 'rgba(0,0,0,0.55)');
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, W, H);
+}
+
+// ─── cream preset · surfaces ────────────────────────────────────────────────────────────────
+
+/**
+ * The warm paper backdrop.
+ *
+ * A flat fill of #FAF6F0 photographs as grey — the warmth only reads when there is somewhere for
+ * the eye to see it change. So the ground carries one very wide diagonal gradient into a slightly
+ * deeper cream plus a single soft terracotta bloom in a corner, both far too subtle to compete with
+ * the content. `variant` picks the cooler ground the workflow preset uses, so the two warm presets
+ * are distinguishable at thumbnail size.
+ */
+export function paintCreamBackdrop(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  seed: number,
+  variant: 'skill' | 'workflow' = 'skill'
+) {
+  const base = variant === 'workflow' ? CREAM_BG_ALT : CREAM_BG;
+  const g = ctx.createLinearGradient(0, 0, W * 0.7, H);
+  g.addColorStop(0, '#FFFCF8');
+  g.addColorStop(0.55, base);
+  g.addColorStop(1, variant === 'workflow' ? '#F2ECDD' : '#F6EDE4');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // One warm bloom, its corner seeded off the slide index so consecutive slides differ without it
+  // ever moving between the carousel PNG and the reel frames drawn from the same index.
+  const cx = W * (seed % 2 === 0 ? 0.86 : 0.14);
+  const cy = H * (seed % 3 === 0 ? 0.12 : 0.88);
+  const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.72);
+  rg.addColorStop(0, hexToRgba(TERRACOTTA, 0.09));
+  rg.addColorStop(0.6, hexToRgba(TERRACOTTA, 0.02));
+  rg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/**
+ * The avatar lockup: a circular portrait and the handle, top-left.
+ *
+ * This is the rebrand made visible. The source posts put the original creator's avatar and handle
+ * in exactly this position on every slide, so leaving it empty would read as a missing element —
+ * the slot is kept and OUR mark goes in it. When the site logo has not loaded, the disc falls back
+ * to a terracotta monogram rather than to a grey placeholder.
+ *
+ * Returns the y coordinate directly beneath the lockup.
+ */
+export function drawAvatarLockup(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  W: number,
+  logo: HTMLImageElement | null,
+  opts: { size?: number; ink?: string } = {}
+): number {
+  const d = opts.size ?? W * 0.082;
+  const cx = x + d / 2;
+  const cy = y + d / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, d / 2, 0, Math.PI * 2);
+  ctx.fillStyle = TERRACOTTA;
+  ctx.fill();
+  if (logo) {
+    // Cover-fit inside the circle: the logo is not square, and letterboxing it inside a round
+    // avatar looks like a bug rather than like a crop.
+    ctx.save();
+    ctx.clip();
+    const iw = logo.naturalWidth || 1;
+    const ih = logo.naturalHeight || 1;
+    const scale = Math.max(d / iw, d / ih);
+    ctx.drawImage(logo, cx - (iw * scale) / 2, cy - (ih * scale) / 2, iw * scale, ih * scale);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#FFF8F4';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.direction = 'ltr';
+    setDisplay(ctx, d * 0.46, 800);
+    ctx.fillText('D', cx, cy + d * 0.02);
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = opts.ink ?? CREAM_INK;
+  setDisplay(ctx, W * 0.032, 700);
+  ctx.fillText(BRAND_HANDLE.replace(/^@/, ''), x + d + W * 0.022, cy + 1);
+  ctx.restore();
+
+  return y + d;
+}
+
+/**
+ * A section eyebrow — "SKILL 1 / 6" in the accent colour, followed by a hairline rule that runs to
+ * the end of the content column. Letterspaced by hand: canvas has no `letter-spacing`, and an
+ * un-spaced small-caps eyebrow at this size reads as a cramped word rather than as a label.
+ */
+export function drawEyebrow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  W: number,
+  text: string,
+  colour: string,
+  rtl = false
+): number {
+  const fs = W * 0.024;
+  ctx.save();
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = colour;
+  setBody(ctx, fs, 700);
+  const track = fs * 0.16;
+  const label = rtl ? text : text.toUpperCase();
+  let cursor = x;
+  for (const ch of label) {
+    ctx.fillText(ch, cursor, y);
+    cursor += ctx.measureText(ch).width + track;
+  }
+  const ruleX = cursor + W * 0.018;
+  if (ruleX < x + w) {
+    ctx.strokeStyle = hexToRgba(colour, 0.3);
+    ctx.lineWidth = Math.max(1, W * 0.0016);
+    ctx.beginPath();
+    ctx.moveTo(ruleX, y);
+    ctx.lineTo(x + w, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+  return y + fs;
+}
+
+/**
+ * The dark "HOW TO INSTALL" container.
+ *
+ * The one high-contrast object on a cream slide, and deliberately so: it holds the only thing on
+ * the slide the reader is meant to physically copy, so it should be findable with the text blurred
+ * out. Paths and commands are drawn in mono, LTR, verbatim — `.claude/commands/tdd.md` reordered by
+ * bidi is not a path any more — while the dim `save as` / `then run` leaders are what make the two
+ * rows parse as instructions rather than as two unrelated strings.
+ */
+/**
+ * The install box's own height for `rowCount` rows, at canvas width `W`.
+ *
+ * Exposed so a caller can reserve the right amount of vertical space for the box BEFORE drawing
+ * whatever sits above it — the renderer lays a slide out top to bottom but the box is easiest to
+ * draw anchored to the bottom edge, so its height has to be known in advance. Kept as the single
+ * source of truth for these constants: `drawInstallBox` computes its own `h` by calling this
+ * rather than repeating the formula, so the two can never drift apart and silently overlap or leave
+ * a gap.
+ */
+export function installBoxHeight(W: number, rowCount: number): number {
+  const pad = W * 0.036;
+  const titleFs = W * 0.024;
+  const rowFs = W * 0.028;
+  const rowGap = rowFs * 1.62;
+  return pad * 2 + titleFs + W * 0.028 + rowCount * rowGap;
+}
+
+export function drawInstallBox(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  W: number,
+  m: Metrics,
+  rows: { leader: string; value: string }[],
+  opts: { title?: string; accent?: string } = {}
+): number {
+  const accent = opts.accent ?? TERRACOTTA;
+  const pad = W * 0.036;
+  const titleFs = W * 0.024;
+  const rowFs = W * 0.028;
+  const rowGap = rowFs * 1.62;
+  const h = installBoxHeight(W, rows.length);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(28,25,23,0.18)';
+  ctx.shadowBlur = W * 0.03;
+  ctx.shadowOffsetY = W * 0.008;
+  roundRectPath(ctx, x, y, w, h, m.radiusLg);
+  ctx.fillStyle = INSTALL_BG;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+
+  // Download glyph — a stem, a chevron and the tray beneath it.
+  const gy = y + pad + titleFs * 0.5;
+  const gs = titleFs * 0.92;
+  const gx = x + pad;
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = Math.max(1.6, W * 0.0026);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(gx + gs / 2, gy - gs * 0.5);
+  ctx.lineTo(gx + gs / 2, gy + gs * 0.22);
+  ctx.moveTo(gx + gs * 0.18, gy - gs * 0.1);
+  ctx.lineTo(gx + gs / 2, gy + gs * 0.24);
+  ctx.lineTo(gx + gs * 0.82, gy - gs * 0.1);
+  ctx.moveTo(gx, gy + gs * 0.52);
+  ctx.lineTo(gx + gs, gy + gs * 0.52);
+  ctx.stroke();
+
+  ctx.fillStyle = accent;
+  setBody(ctx, titleFs, 700);
+  const track = titleFs * 0.18;
+  let cursor = gx + gs + W * 0.018;
+  for (const ch of (opts.title ?? 'HOW TO INSTALL').toUpperCase()) {
+    ctx.fillText(ch, cursor, gy);
+    cursor += ctx.measureText(ch).width + track;
+  }
+
+  let ry = y + pad + titleFs + W * 0.028 + rowGap * 0.42;
+  for (const row of rows) {
+    let rx = x + pad;
+    if (row.leader) {
+      setMono(ctx, rowFs, 400);
+      ctx.fillStyle = 'rgba(250,246,240,0.42)';
+      ctx.fillText(row.leader, rx, ry);
+      rx += ctx.measureText(`${row.leader} `).width;
+    }
+    setMono(ctx, rowFs, 600);
+    ctx.fillStyle = '#FAF6F0';
+    // The value is the one thing here that must never be clipped silently, so it shrinks to fit.
+    let fs = rowFs;
+    while (fs > rowFs * 0.6 && rx + ctx.measureText(row.value).width > x + w - pad) {
+      fs *= 0.94;
+      setMono(ctx, fs, 600);
+    }
+    ctx.fillText(row.value, rx, ry);
+    ry += rowGap;
+  }
+  ctx.restore();
+  return y + h;
+}
+
+/**
+ * The bottom progress rail: a filled terracotta run over a pale track, with "n/total" to its right.
+ * Mirrors the reference decks, where it is the only thing telling the reader how much is left.
+ */
+export function drawProgressRail(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  W: number,
+  index: number,
+  total: number,
+  colour = TERRACOTTA
+) {
+  const fs = W * 0.026;
+  ctx.save();
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  setBody(ctx, fs, 600);
+  const label = `${index + 1}/${total}`;
+  const labelW = ctx.measureText(label).width;
+  const railW = Math.max(0, w - labelW - W * 0.03);
+  const railH = Math.max(3, W * 0.0075);
+
+  roundRectPath(ctx, x, y - railH / 2, railW, railH, railH / 2);
+  ctx.fillStyle = hexToRgba(colour, 0.18);
+  ctx.fill();
+
+  const frac = total > 1 ? (index + 1) / total : 1;
+  roundRectPath(ctx, x, y - railH / 2, Math.max(railH, railW * frac), railH, railH / 2);
+  ctx.fillStyle = colour;
+  ctx.fill();
+
+  ctx.fillStyle = CREAM_MUTED;
+  ctx.fillText(label, x + w, y + 1);
+  ctx.restore();
+}
+
+/** The pale radiating asterisk the reference decks use as breathing room between the body and the
+ *  install box. Seeded, so it is identical in the PNG and in every reel frame of the same slide. */
+export function drawStarburst(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  colour: string,
+  seed: number
+) {
+  const rnd = (() => {
+    let s = (seed >>> 0) || 1;
+    return () => ((s = (s * 1664525 + 1013904223) >>> 0), s / 4294967296);
+  })();
+  ctx.save();
+  ctx.strokeStyle = colour;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(2, r * 0.11);
+  const spokes = 12;
+  for (let i = 0; i < spokes; i++) {
+    const a = (i / spokes) * Math.PI * 2 + 0.2;
+    const len = r * (0.66 + rnd() * 0.34);
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r * 0.12, cy + Math.sin(a) * r * 0.12);
+    ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** The circular-arrow-with-two-dots glyph the reference deck sets opposite its headline — a loop
+ *  that never quite closes, which is the red-green-refactor idea in one mark. */
+export function drawLoopGlyph(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, colour: string) {
+  ctx.save();
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = Math.max(2.5, r * 0.13);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI * 0.62, Math.PI * 0.28);
+  ctx.stroke();
+  // Arrowhead at the open end.
+  const a = Math.PI * 0.28;
+  const hx = cx + Math.cos(a) * r;
+  const hy = cy + Math.sin(a) * r;
+  ctx.beginPath();
+  ctx.moveTo(hx - r * 0.26, hy - r * 0.2);
+  ctx.lineTo(hx, hy);
+  ctx.lineTo(hx + r * 0.08, hy - r * 0.3);
+  ctx.stroke();
+  // The red/green pair inside — failing test, passing test.
+  ctx.fillStyle = colour;
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.26, cy + r * 0.3, r * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#4CAF50';
+  ctx.beginPath();
+  ctx.arc(cx + r * 0.12, cy + r * 0.32, r * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** A rounded tan tile carrying a step numeral — the workflow preset's section marker. */
+export function drawNumberTile(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  m: Metrics,
+  n: number
+) {
+  ctx.save();
+  roundRectPath(ctx, x, y, size, size, m.radiusMd);
+  ctx.fillStyle = TILE_FILL;
+  ctx.fill();
+  ctx.fillStyle = CREAM_INK;
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  setDisplay(ctx, size * 0.58, 800);
+  ctx.fillText(String(n), x + size / 2, y + size / 2 + size * 0.02);
+  ctx.restore();
+}
+
+/**
+ * The white diagram frame a workflow's node chain is drawn inside — lifted off the cream backdrop
+ * by a soft shadow, the light-preset counterpart of `glassCard`. A translucent white fill (what
+ * `glassCard` draws) all but disappears on a backdrop that is already near-white, so this is a
+ * solid, slightly warmer white with a real shadow to read as a lifted card.
+ */
+export function drawPaperCard(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(120,95,70,0.14)';
+  ctx.shadowBlur = Math.max(8, w * 0.02);
+  ctx.shadowOffsetY = w * 0.006;
+  roundRectPath(ctx, x, y, w, h, r);
+  ctx.fillStyle = NODE_CARD;
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  roundRectPath(ctx, x, y, w, h, r);
+  ctx.strokeStyle = 'rgba(28,25,23,0.06)';
+  ctx.lineWidth = Math.max(1, w * 0.0012);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ─── workflow preset · node marks ───────────────────────────────────────────────────────────
+
+/**
+ * The service marks, each drawn white inside a 100×100 box that the caller has already filled with
+ * the service's brand colour.
+ *
+ * Vector paths rather than fetched logos, for the same reason as TOOL_MARKS: the export canvas must
+ * stay untainted for `toDataURL`, and an <img> from a CDN would taint it. They are recognisable
+ * silhouettes, not exact trademarks.
+ */
+const NODE_MARKS: Record<NodeIcon, (ctx: CanvasRenderingContext2D) => void> = {
+  // Lightning bolt.
+  webhook: (ctx) => {
+    ctx.fill(new Path2D('M56 8 26 56h20l-6 36 32-50H50l6-34Z'));
+  },
+  // The interlocking-loops knot, reused from the tool marks at node scale.
+  openai: (ctx) => {
+    ctx.lineWidth = 9;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(50, 50, 40, 19, (i * Math.PI) / 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  },
+  // Envelope with the M fold.
+  gmail: (ctx) => {
+    ctx.lineWidth = 8;
+    ctx.lineJoin = 'round';
+    roundRectPath(ctx, 14, 26, 72, 48, 8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(16, 30);
+    ctx.lineTo(50, 56);
+    ctx.lineTo(84, 30);
+    ctx.stroke();
+  },
+  // Calendar with a marked day.
+  calendar: (ctx) => {
+    ctx.lineWidth = 8;
+    roundRectPath(ctx, 16, 22, 68, 62, 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(16, 40);
+    ctx.lineTo(84, 40);
+    ctx.moveTo(34, 12);
+    ctx.lineTo(34, 28);
+    ctx.moveTo(66, 12);
+    ctx.lineTo(66, 28);
+    ctx.stroke();
+    roundRectPath(ctx, 58, 54, 16, 16, 4);
+    ctx.fill();
+  },
+  // Spider/crawler: a body with radiating legs.
+  apify: (ctx) => {
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(50, 50, 18, 0, Math.PI * 2);
+    ctx.fill();
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + 0.3;
+      ctx.beginPath();
+      ctx.moveTo(50 + Math.cos(a) * 22, 50 + Math.sin(a) * 22);
+      ctx.lineTo(50 + Math.cos(a) * 42, 50 + Math.sin(a) * 42);
+      ctx.stroke();
+    }
+  },
+  // Person in a card — a contact record.
+  crm: (ctx) => {
+    ctx.beginPath();
+    ctx.arc(50, 38, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(22, 84);
+    ctx.arc(50, 84, 28, Math.PI, Math.PI * 2);
+    ctx.fill();
+  },
+  // The Make chevron stack.
+  make: (ctx) => {
+    ctx.lineWidth = 9;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(20, 74);
+    ctx.lineTo(36, 26);
+    ctx.lineTo(50, 74);
+    ctx.lineTo(64, 26);
+    ctx.lineTo(80, 74);
+    ctx.stroke();
+  },
+  // n8n: three connected nodes.
+  n8n: (ctx) => {
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(28, 50);
+    ctx.lineTo(50, 50);
+    ctx.lineTo(72, 30);
+    ctx.moveTo(50, 50);
+    ctx.lineTo(72, 70);
+    ctx.stroke();
+    for (const [x, y] of [
+      [24, 50],
+      [76, 30],
+      [76, 70],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(x, y, 11, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  // Funnel.
+  filter: (ctx) => {
+    ctx.beginPath();
+    ctx.moveTo(16, 20);
+    ctx.lineTo(84, 20);
+    ctx.lineTo(58, 52);
+    ctx.lineTo(58, 86);
+    ctx.lineTo(42, 76);
+    ctx.lineTo(42, 52);
+    ctx.closePath();
+    ctx.fill();
+  },
+  // Branching arrows.
+  router: (ctx) => {
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(22, 50);
+    ctx.lineTo(48, 50);
+    ctx.lineTo(74, 26);
+    ctx.moveTo(48, 50);
+    ctx.lineTo(74, 74);
+    ctx.stroke();
+    for (const [x, y] of [
+      [20, 50],
+      [78, 24],
+      [78, 76],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  // Clock.
+  scheduler: (ctx) => {
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(50, 50, 34, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(50, 50);
+    ctx.lineTo(50, 30);
+    ctx.moveTo(50, 50);
+    ctx.lineTo(66, 58);
+    ctx.stroke();
+  },
+  // Speech bubble with dots.
+  chat: (ctx) => {
+    roundRectPath(ctx, 14, 20, 72, 52, 14);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(34, 70);
+    ctx.lineTo(34, 88);
+    ctx.lineTo(52, 70);
+    ctx.closePath();
+    ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    for (const x of [34, 50, 66]) {
+      ctx.beginPath();
+      ctx.arc(x, 46, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+  // Handset.
+  phone: (ctx) => {
+    ctx.fill(
+      new Path2D(
+        'M30 14c-8 0-16 8-16 18 0 30 24 54 54 54 10 0 18-8 18-16 0-4-2-6-5-7l-13-5c-3-1-6 0-8 2l-5 6c-9-5-16-12-21-21l6-5c2-2 3-5 2-8l-5-13c-1-3-3-5-7-5Z'
+      )
+    );
+  },
+  // Globe with meridians.
+  globe: (ctx) => {
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(50, 50, 34, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(50, 50, 15, 34, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(18, 50);
+    ctx.lineTo(82, 50);
+    ctx.stroke();
+  },
+  // Document with ruled lines.
+  doc: (ctx) => {
+    ctx.lineWidth = 8;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(26, 14);
+    ctx.lineTo(60, 14);
+    ctx.lineTo(76, 32);
+    ctx.lineTo(76, 86);
+    ctx.lineTo(26, 86);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    for (const y of [46, 60, 74]) {
+      ctx.moveTo(38, y);
+      ctx.lineTo(64, y);
+    }
+    ctx.stroke();
+  },
+  // Grid/table.
+  sheet: (ctx) => {
+    ctx.lineWidth = 8;
+    roundRectPath(ctx, 16, 18, 68, 64, 8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(16, 40);
+    ctx.lineTo(84, 40);
+    ctx.moveTo(50, 40);
+    ctx.lineTo(50, 82);
+    ctx.stroke();
+  },
+  // Stacked cylinders.
+  db: (ctx) => {
+    ctx.lineWidth = 8;
+    for (const y of [30, 50, 70]) {
+      ctx.beginPath();
+      ctx.ellipse(50, y, 30, 11, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(20, 30);
+    ctx.lineTo(20, 70);
+    ctx.moveTo(80, 30);
+    ctx.lineTo(80, 70);
+    ctx.stroke();
+  },
+};
+
+/** Paints a service node: a brand-coloured disc of diameter `size` at (cx, cy), its mark in white. */
+export function drawNodeIcon(ctx: CanvasRenderingContext2D, icon: NodeIcon, cx: number, cy: number, size: number) {
+  const style = NODE_STYLE[icon] ?? NODE_STYLE.globe;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+  ctx.fillStyle = style.fill;
+  ctx.shadowColor = hexToRgba(style.fill, 0.42);
+  ctx.shadowBlur = size * 0.26;
+  ctx.shadowOffsetY = size * 0.07;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(cx - size * 0.29, cy - size * 0.29);
+  ctx.scale((size * 0.58) / 100, (size * 0.58) / 100);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineCap = 'round';
+  (NODE_MARKS[icon] ?? NODE_MARKS.globe)(ctx);
+  ctx.restore();
+}
+
+/**
+ * The dashed connector between two nodes: a run of dashes with a travelling dot at its midpoint and
+ * a small arrowhead where it meets the target.
+ *
+ * Drawn as an explicit dash run rather than with `setLineDash`, because the dot and the arrowhead
+ * have to sit at known fractions along the path and a dashed stroke gives no handle on that.
+ */
+export function drawNodeLink(
+  ctx: CanvasRenderingContext2D,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  colour: string,
+  W: number
+) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return;
+  const ux = dx / len;
+  const uy = dy / len;
+
+  ctx.save();
+  ctx.strokeStyle = hexToRgba(colour, 0.45);
+  ctx.lineWidth = Math.max(2, W * 0.0034);
+  ctx.lineCap = 'round';
+  ctx.setLineDash([W * 0.009, W * 0.011]);
+  ctx.beginPath();
+  // A curved connector when the two nodes are on different rows — the fan-out in the reference
+  // diagram bends out of the trunk rather than cutting diagonally across it.
+  if (Math.abs(dy) > W * 0.01) {
+    ctx.moveTo(x1, y1);
+    ctx.bezierCurveTo(x1 + dx * 0.45, y1, x2 - dx * 0.45, y2, x2, y2);
+  } else {
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Midpoint bead.
+  ctx.fillStyle = hexToRgba(colour, 0.75);
+  ctx.beginPath();
+  ctx.arc(x1 + dx * 0.5, y1 + dy * 0.5, W * 0.0055, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Arrowhead, aimed along the last leg of the path.
+  const ax = x2 - ux * W * 0.004;
+  const ay = y2 - uy * W * 0.004;
+  const head = W * 0.011;
+  ctx.fillStyle = hexToRgba(colour, 0.75);
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(ax - ux * head + uy * head * 0.55, ay - uy * head - ux * head * 0.55);
+  ctx.lineTo(ax - ux * head - uy * head * 0.55, ay - uy * head + ux * head * 0.55);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }

@@ -34,24 +34,30 @@ import {
   MIN_CAPTION_CHARS,
   EMPTY_POST,
   type ImportedInstagramPost,
+  type InstagramVisualPreset,
 } from '../lib/instagramImportApi';
 import type { TechTipDeck } from '../lib/techTipsApi';
-import { renderTipDeckImages, exportTipDeckZip, resolveTipBackgrounds, type TipStyle } from '../lib/techTipRenderer';
+import { renderTipDeckImages, exportTipDeckZip, resolveTipBackgrounds } from '../lib/techTipRenderer';
 import { renderTipDeckVideo, isMotionSupported } from '../lib/motionStudioService';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
 
 /**
- * The adapted deck is rendered in ONE mode, and the style picker the Tech Tips studio offers is
- * deliberately not repeated here — same reasoning as the Threads importer.
+ * The three visual presets this tab offers — no photographic styles: an Instagram post walking a
+ * reader through a tool or an automation is a technical deck, and a searched stock photo behind an
+ * install box or a node diagram is the single loudest "assembled, not made" tell there is.
  *
- * An Instagram post walking a reader through a tool is a technical deck: a searched stock photo
- * behind its prompt card is the single loudest "assembled, not made" tell there is, and every one of
- * the photographic styles produces exactly that. Creator mode fetches nothing — the slide is painted
- * on the deep-slate backdrop lit by the tool's own colours — with one exception the renderer makes
- * on its own: an image the POST published is evidence, not stock, and still renders.
+ * `creator` (the original dark preset) fetches nothing at all — the slide is painted on the deep
+ * slate backdrop lit by the tool's own colours. `cream-skill` and `cream-workflow` are the warm
+ * paper family: same zero-stock rule, different palette and composition (see designAssets.ts /
+ * techTipRenderer.ts's `drawCreamSlide`). All three share one exception the renderer makes on its
+ * own: an image the POST published is evidence, not stock, and still renders.
  */
-const DECK_STYLE: TipStyle = 'creator';
+const PRESET_OPTIONS: { id: InstagramVisualPreset; label: string; hint: string }[] = [
+  { id: 'creator', label: 'קריאייטור (כהה)', hint: 'רקע סלייט כהה עם זוהר בצבעי הכלי — בלי סטוק' },
+  { id: 'cream-skill', label: 'קרם וטרקוטה', hint: 'כרטיס מיומנות בהיר: פקודה, תיאור קצר וקופסת התקנה כהה' },
+  { id: 'cream-workflow', label: 'דיאגרמת תהליך', hint: 'כרטיס בהיר עם שרשרת צמתי אוטומציה מחוברים' },
+];
 
 const KIND_LABEL: Record<string, string> = {
   cover: 'שער',
@@ -106,6 +112,7 @@ export default function InstagramImporter() {
 
   const [notes, setNotes] = useState('');
   const [useSlideText, setUseSlideText] = useState(true);
+  const [visualPreset, setVisualPreset] = useState<InstagramVisualPreset>('creator');
   const [deck, setDeck] = useState<TechTipDeck | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,13 +144,14 @@ export default function InstagramImporter() {
     setDeck(saved.deck);
     setUrl(saved.url);
     setNotes(saved.notes);
+    if (saved.visualPreset) setVisualPreset(saved.visualPreset);
   }, []);
 
   useEffect(() => {
     if (!restored.current) return;
     if (!post.text && !deck) return;
-    saveInstagramState({ post, deck, url, notes, savedAt: Date.now() });
-  }, [post, deck, url, notes]);
+    saveInstagramState({ post, deck, url, notes, visualPreset, savedAt: Date.now() });
+  }, [post, deck, url, notes, visualPreset]);
 
   useEffect(() => {
     return () => {
@@ -204,12 +212,12 @@ export default function InstagramImporter() {
     // Still called in creator mode even though it fetches no stock: this is the pass that loads the
     // post's OWN carousel frames onto the slides they came from.
     setBgProgress({ done: 0, total: d.slides.length });
-    const bgs = await resolveTipBackgrounds(d, 1080, 1350, (done, total) => setBgProgress({ done, total }), DECK_STYLE);
+    const bgs = await resolveTipBackgrounds(d, 1080, 1350, (done, total) => setBgProgress({ done, total }), visualPreset);
     setBgProgress(null);
     setRenderProgress({ done: 0, total: d.slides.length });
-    const imgs = await renderTipDeckImages(d, { backgrounds: bgs }, (done, total) => setRenderProgress({ done, total }));
+    const imgs = await renderTipDeckImages(d, { backgrounds: bgs, style: visualPreset }, (done, total) => setRenderProgress({ done, total }));
     setImages(imgs);
-  }, []);
+  }, [visualPreset]);
 
   /** Stage 2 — translate & adapt, then render. */
   const generate = useCallback(async () => {
@@ -229,7 +237,7 @@ export default function InstagramImporter() {
     setError(null);
     resetOutputs();
     try {
-      const d = await synthesizeInstagramDeck(source, notes, useSlideText);
+      const d = await synthesizeInstagramDeck(source, notes, { useSlideText, visualPreset });
       setDeck(d);
       await renderDeck(d);
     } catch (e) {
@@ -239,7 +247,7 @@ export default function InstagramImporter() {
       setBgProgress(null);
       setBusy(false);
     }
-  }, [post, rawText, url, notes, useSlideText, resetOutputs, renderDeck]);
+  }, [post, rawText, url, notes, useSlideText, visualPreset, resetOutputs, renderDeck]);
 
   /** Swap backgrounds and re-render — the adapted copy is untouched. */
   const redesign = useCallback(async () => {
@@ -272,8 +280,8 @@ export default function InstagramImporter() {
     try {
       // The reel is 9:16, so the post's own frames are re-fetched at the vertical aspect.
       setVideoStage(null);
-      const bgs = await resolveTipBackgrounds(deck, 1080, 1920, undefined, DECK_STYLE);
-      const { blob } = await renderTipDeckVideo(deck, { backgrounds: bgs, music: withMusic }, (pct, stage) => {
+      const bgs = await resolveTipBackgrounds(deck, 1080, 1920, undefined, visualPreset);
+      const { blob } = await renderTipDeckVideo(deck, { backgrounds: bgs, music: withMusic, style: visualPreset }, (pct, stage) => {
         setVideoPct(pct);
         setVideoStage(stage);
       });
@@ -288,7 +296,7 @@ export default function InstagramImporter() {
       setVideoBusy(false);
       setVideoStage(null);
     }
-  }, [deck, motionSupported, withMusic]);
+  }, [deck, motionSupported, withMusic, visualPreset]);
 
   const downloadVideo = useCallback(() => {
     if (!videoBlob || !deck) return;
@@ -322,6 +330,7 @@ export default function InstagramImporter() {
     setRawText('');
     setUrl('');
     setNotes('');
+    setVisualPreset('creator');
     setImportError(null);
     setError(null);
     resetOutputs();
@@ -500,6 +509,19 @@ export default function InstagramImporter() {
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             צור קרוסלה בעברית (10–12 שקופיות)
           </button>
+          <label className="flex items-center gap-2 text-xs text-zinc-300">
+            <Palette className="w-3.5 h-3.5 text-brand-400" />
+            עיצוב
+            <select
+              value={visualPreset}
+              onChange={(e) => setVisualPreset(e.target.value as InstagramVisualPreset)}
+              className="cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-white"
+            >
+              {PRESET_OPTIONS.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </label>
           {/* The frames' OCR is read for STRUCTURE only (see the agent), but a post whose graphics
               are pure decoration produces noise — so the operator can switch that channel off. */}
           {ocrFrames > 0 && (
@@ -521,8 +543,7 @@ export default function InstagramImporter() {
 
         <p className="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-500">
           <Wand2 className="w-3.5 h-3.5 shrink-0 text-brand-400" />
-          עיצוב קריאייטור: רקע סלייט עמוק עם זוהר כפול בצבעי הכלי, כרטיסי זכוכית, מסגרות טרמינל לפרומפטים
-          וסימון בכתב יד — אפס תמונות סטוק.
+          {PRESET_OPTIONS.find((p) => p.id === visualPreset)?.hint} — אפס תמונות סטוק.
         </p>
         {bgProgress && (
           <p className="mt-3 text-[11px] text-sky-400/90">
@@ -586,6 +607,16 @@ export default function InstagramImporter() {
                   {redesigning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
                   עיצוב מחדש
                 </button>
+                <select
+                  value={visualPreset}
+                  onChange={(e) => setVisualPreset(e.target.value as InstagramVisualPreset)}
+                  title="שינוי הסגנון דורש 'עיצוב מחדש'. אם הדק סונתז תחת סגנון אחר, כותרות-משנה ודיאגרמות תהליך יופיעו רק אחרי יצירה מחדש."
+                  className="cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-white"
+                >
+                  {PRESET_OPTIONS.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
                 <button
                   onClick={() => void exportZip()}
                   disabled={!images.length || busy}

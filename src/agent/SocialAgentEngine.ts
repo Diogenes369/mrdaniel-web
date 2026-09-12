@@ -22,7 +22,7 @@ export { stripCodeFence, requireText, parseJsonOrThrow, ModelOutputError };
 export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
-import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern } from './types.js';
+import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode } from './types.js';
 
 
 // --- Brand knowledge base ------------------------------------------------------------------
@@ -1881,6 +1881,45 @@ export async function synthesizeThreadDeck(input: {
   });
 }
 
+/** The closed vocabulary a workflow node's icon must come from — mirrors NodeIcon in types.ts.
+ *  A value the model invents outside this set falls back to 'globe' rather than being dropped,
+ *  since a wrong-but-present icon is a smaller failure than an empty slot in the diagram. */
+const NODE_ICONS = new Set<NodeIcon>([
+  'webhook', 'openai', 'gmail', 'calendar', 'apify', 'crm', 'make', 'n8n',
+  'filter', 'router', 'scheduler', 'chat', 'phone', 'globe', 'doc', 'sheet', 'db',
+]);
+
+/**
+ * A slide's workflow node chain, or undefined when the field is absent or empty.
+ *
+ * Only reached for the `cream-workflow` preset's addendum (see `synthesizeInstagramDeck`), so a
+ * Threads deck or a plain creator-preset Instagram deck never has this field populated in the first
+ * place and this simply returns undefined for them. `label` is the translated Hebrew step name and
+ * IS sanitised like any other Hebrew field; `sublabel` is the literal service name the reader has to
+ * recognise in their own automation tool, so it is trimmed but never run through the Hebrew
+ * sanitiser or otherwise rewritten.
+ */
+function parseWorkflowNodes(raw: unknown): WorkflowNode[] | undefined {
+  if (!Array.isArray(raw) || !raw.length) return undefined;
+  const nodes = raw
+    .map((n): WorkflowNode | null => {
+      const rec = (n && typeof n === 'object' ? n : {}) as Record<string, unknown>;
+      const label = sanitizeHebrewText(stripMetaFraming(String(rec.label ?? '').trim())).slice(0, 24);
+      if (!label) return null;
+      const iconRaw = String(rec.icon ?? '').toLowerCase().trim() as NodeIcon;
+      const lane = Number.isFinite(Number(rec.lane)) ? Math.max(0, Math.min(6, Math.round(Number(rec.lane)))) : 0;
+      return {
+        label,
+        sublabel: String(rec.sublabel ?? '').trim().slice(0, 30) || undefined,
+        icon: NODE_ICONS.has(iconRaw) ? iconRaw : 'globe',
+        lane: lane || undefined,
+      };
+    })
+    .filter((n): n is WorkflowNode => n !== null)
+    .slice(0, 9);
+  return nodes.length ? nodes : undefined;
+}
+
 /**
  * Turn an adaptation model's JSON into a finished, contract-compliant deck.
  *
@@ -1928,6 +1967,14 @@ function parseAdaptedDeck(
         codeLang: VALID_CODE_LANGS.has(lang) ? lang : kind === 'code' ? 'python' : '',
         stepNumber: Number.isFinite(Number(rec.stepNumber)) ? Math.max(0, Math.min(20, Number(rec.stepNumber))) : 0,
         visualPrompt: normalizeVisualPrompt(String(rec.visualPrompt ?? '')),
+        // Cream-preset extras. Both optional and both harmless for a deck the dark presets render —
+        // `drawTipSlide`'s slate path never reads either field. `subtitle` is genuinely the model's
+        // job (a translated tagline); `slashCommand` and `install` are NOT read here on purpose —
+        // those are literal strings a reader has to type, so they are extracted deterministically
+        // from the source's own OCR text (see instagramAgent.ts's `attachSkillExtras`) rather than
+        // trusted to the model, which never sees the raw per-frame screenshot they came from.
+        subtitle: rec.subtitle ? hebrew(rec.subtitle, 6).slice(0, 60) : undefined,
+        workflow: parseWorkflowNodes(rec.workflow),
       };
     })
     .filter((s) => s.title.length > 1 || s.body.length > 10 || s.code.length > 5 || s.bullets.length > 0);
@@ -2024,12 +2071,39 @@ ${AUDIENCE_RULES}
 שדות שאינם רלוונטיים ל-kind: "" או [] או 0.`;
 
 /**
+ * Appended to the base instruction ONLY when the operator picked the "קרם וטרקוטה" preset — the
+ * default creator-preset prompt above is completely unchanged for every other run, so this adds
+ * zero regression risk to the path already verified in production. `subtitle` is a translated
+ * tagline (the model's job); `slashCommand` and `install` are deliberately NOT requested here —
+ * those are literal strings a reader has to type, and are extracted from the source's own per-frame
+ * OCR text in code (see instagramAgent.ts's `attachSkillExtras`), never trusted to the model.
+ */
+const CREAM_SKILL_ADDENDUM = `
+
+תוספת מבנה לעיצוב "קרם וטרקוטה": לכל שקופית תוכן (לא שער ולא סיכום) שיש לה רעיון-על ברור, הוסף שדה "subtitle" — כותרת-משנה קצרה מאוד בעברית (עד 5 מילים) שמסכמת את הרעיון במשפט אחד קליט (למשל "משמעת בדיקות תחילה"). אם אין רעיון-על ברור — השאירו את השדה ריק ("").`;
+
+/**
+ * Appended only for the "דיאגרמת תהליך" (workflow node) preset. Unlike everything else on the
+ * slide, the node chain IS a model-structured field, not a translation — a caption describing an
+ * automation in prose has no literal "A -> B -> C" text for code to extract, so turning it into a
+ * chain of named services is the same kind of interpretive structuring the base instruction already
+ * asks for when it splits a post into cover/step/takeaway slides. The guard is the same source-
+ * fidelity rule as everywhere else: no service that is not in the caption may appear.
+ */
+const CREAM_WORKFLOW_ADDENDUM = `
+
+תוספת מבנה לעיצוב "דיאגרמת תהליך": הפוסט מתאר תהליך אוטומציה. לכל שקופית תוכן, אם ורק אם הכיתוב מתאר במפורש שרשרת שירותים/כלים (למשל webhook, סוכן AI, שליחת מייל, יומן, CRM, Make, n8n) — הוסף שדה "workflow": מערך צמתים בסדר הקריאה, כל אחד {"label":"עברית, עד 2 מילים","sublabel":"שם השירות באנגלית בדיוק כפי שהופיע במקור","icon":"אחד מתוך: webhook|openai|gmail|calendar|apify|crm|make|n8n|filter|router|scheduler|chat|phone|globe|doc|sheet|db","lane":0}. lane=0 (או השמטה) לצמתי הגזע הראשי, שרצים לפי סדר הקריאה; lane=1,2,3... לכל ענף מקביל שמתחיל אחרי צומת הגזע האחרון (בדיוק כמו בדוגמה: webhook -> סוכן, ואז כמה ענפים מקבילים שכל אחד מסתיים בפעולה אחרת). אסור להמציא שירות שלא הוזכר בכיתוב במפורש — אם התהליך לא פורט בכיתוב, השאירו workflow ריק ([]) והשקופית תיראה ככרטיס טקסט רגיל.`;
+
+/**
  * Adapt an imported Instagram post into a Hebrew carousel deck.
  *
  * `caption` is the source of truth. `slideTexts` — the OCR of a carousel's own graphics — is passed
  * as clearly-labelled secondary structure, and the system instruction above forbids quoting it.
  * Kept as separate parameters rather than one blob so that separation survives into the prompt; a
  * concatenated source would let the model treat garbled OCR as quotable prose.
+ *
+ * `visualPreset` only changes what is ASKED FOR (see the two addenda above) — the base instruction,
+ * the length caps and the source-fidelity rules are identical across every preset.
  */
 export async function synthesizeInstagramDeck(input: {
   caption: string;
@@ -2037,6 +2111,7 @@ export async function synthesizeInstagramDeck(input: {
   author?: string;
   sourceUrl?: string;
   notes?: string;
+  visualPreset?: 'creator' | 'cream-skill' | 'cream-workflow';
 }): Promise<TechTipDeck> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
   const { clean } = sanitizeInput(String(input.caption ?? '').slice(0, 8000));
@@ -2061,6 +2136,13 @@ export async function synthesizeInstagramDeck(input: {
     .filter(Boolean)
     .join('\n');
 
+  const addendum =
+    input.visualPreset === 'cream-skill'
+      ? CREAM_SKILL_ADDENDUM
+      : input.visualPreset === 'cream-workflow'
+        ? CREAM_WORKFLOW_ADDENDUM
+        : '';
+
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,
     contents: [
@@ -2070,7 +2152,7 @@ export async function synthesizeInstagramDeck(input: {
       },
     ],
     config: {
-      systemInstruction: INSTAGRAM_DECK_SYSTEM_INSTRUCTION,
+      systemInstruction: `${INSTAGRAM_DECK_SYSTEM_INSTRUCTION}${addendum}`,
       temperature: 0.55,
       topP: 0.9,
       responseMimeType: 'application/json',
