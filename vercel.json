@@ -31,6 +31,6 @@
   "functions": {
     "api/generate-video.ts": { "maxDuration": 60 },
     "api/news.ts": { "maxDuration": 30 },
-    "api/agent-generate.ts": { "maxDuration": 60 }
+    "api/agent-generate.ts": { "maxDuration": 120 }
   }
 }

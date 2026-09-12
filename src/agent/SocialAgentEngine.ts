@@ -22,7 +22,7 @@ export { stripCodeFence, requireText, parseJsonOrThrow, ModelOutputError };
 export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
-import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode } from './types.js';
+import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode, PromptCard } from './types.js';
 
 
 // --- Brand knowledge base ------------------------------------------------------------------
@@ -2164,4 +2164,156 @@ export async function synthesizeInstagramDeck(input: {
     defaultKicker: 'מהפוסט',
     thinError: 'model returned too few usable instagram slides',
   });
+}
+
+// --- Instagram dense on-slide prompt-library decks (vision OCR) ------------------------------
+// A distinct source shape from the caption-driven path above: the whole teaching content is
+// PRINTED ON the carousel frames themselves — numbered prompt cards, one or two per frame, each
+// with a short "why I use this" rationale underneath — and the caption is often just a one-line
+// pitch. Instagram's own accessibility alt-text OCR only reads a minority of such frames reliably
+// (verified against @sifuyik's /p/DcqzolvATkZ/ on 2026-09-12: 4 of 16 frames carried any quoted
+// text at all), so this path sends the frame IMAGES to Gemini as vision input in a single request.
+// One call reads every frame's printed text AND translates it — cheaper and more consistent than
+// round-tripping a separate OCR pass and a separate translation pass per frame.
+
+/** One prompt card as the model read and translated it off a frame image. */
+export interface PromptLibraryCard {
+  index: string;
+  body: string;
+  whyIUseThis: string;
+}
+
+/** One carousel frame's extracted, translated content. `role` is read from what the frame
+ *  actually shows (a feature grid, prompt cards, or a sign-off) rather than assumed from
+ *  position, so a source that omits a cover or closer frame degrades gracefully. */
+export interface PromptLibraryFrame {
+  role: 'cover' | 'content' | 'closer';
+  /** The prompt cards' shared category label on this frame, e.g. "Reels Scripts" — translated. */
+  categoryTitle: string;
+  /** One short translated line under the category, when the source prints one. */
+  subtitle: string;
+  promptCards: PromptLibraryCard[];
+  /** Free text for a cover's headline or a closer's sign-off line — unused on a content frame. */
+  text: string;
+}
+
+export interface PromptLibraryExtraction {
+  coverTitle: string;
+  /** Up to 10 translated feature-grid tile labels from the cover frame. */
+  coverTiles: string[];
+  /** One entry per frame image sent, in the same order. */
+  frames: PromptLibraryFrame[];
+}
+
+const PROMPT_LIBRARY_SYSTEM_INSTRUCTION = `אתה מתרגם ומעצב תוכן עבור דניאל בן ברוך. קיבלת קרוסלת אינסטגרם שבה כל התוכן מודפס ישירות על גבי התמונות עצמן — כרטיסי פרומפט ממוספרים, כל אחד עם גוף פרומפט ושורת "Why I use this" מתחתיו — ולא בכיתוב הפוסט. המשימה שלך: לקרוא בעיון את הטקסט המודפס על כל שקופית, שקופית אחר שקופית, ולתרגם ולהתאים אותו לעברית ישראלית טבעית מבלי לשנות את המבנה או להמציא תוכן.
+
+${BRAND_KNOWLEDGE_BASE}
+
+${HEBREW_COPY_RULES}
+
+זיהוי מבנה, שקופית אחר שקופית:
+1. שער: שקופית שמציגה כותרת גדולה ולרוב רשת של כ-8–10 קטגוריות/תגיות (למשל "Reels Scripts", "YouTube Scripts", "UGC"). סמנו role:"cover", מלאו coverTitle (תרגום הכותרת) ו-coverTiles (מערך תוויות קצרות בעברית, עד 4 מילים כל אחת, לפי סדר הופעתן ברשת — עד 10 תגיות).
+2. סגירה: שקופית חתימה בסוף הקרוסלה. סמנו role:"closer" ומלאו text — משפט סיכום אחד קצר וטבעי בעברית שמסכם את הערך (למשל "בחרו פרומפט אחד, הריצו אותו היום"). אסור בהחלט לכלול בו קריאה להגיב מילת מפתח, "עקבו אחרי", "כתבו X בתגובות", "אני אשלח ב-DM" או כל בקשת אינגייג'מנט אחרת — גם אם זה בדיוק מה שכתוב על התמונה. השמיטו את זה לחלוטין; המשפט צריך לעמוד גם בלעדיו.
+3. כל שאר השקופיות מכילות כרטיס פרומפט אחד או שניים כל אחת, ולפעמים כותרת קטגוריה. סמנו role:"content" ומלאו: categoryTitle (תרגום שם הקטגוריה אם היא מופיעה על השקופית הזו — אחרת השאירו ריק, אל תמציאו), subtitle (תרגום קו המשנה של הקטגוריה אם יש כזה — אחרת ריק), ו-promptCards — מערך של כרטיס אחד או שניים בדיוק לפי מה שמופיע בפועל על השקופית, כל כרטיס: {"index":"המספר הסידורי, ספרות בלבד, כמו 053","body":"תרגום גוף הפרומפט לעברית, משפט שלם","whyIUseThis":"תרגום שורת ה-Why I use this / use this:, בלי התווית עצמה"}.
+
+חוקים קריטיים:
+1. משתנים בסוגריים מרובעים כמו [topic], [niche], [audience], [service], [paste] מתורגמים אך נשארים בסוגריים מרובעים: [נושא], [נישה], [קהל יעד], [שירות], [הדבקה] וכדומה. לעולם אל תמחקו את הסוגריים ואל תשאירו את תוכנם באנגלית.
+2. אם טקסט השקופית משובש, חלקי או לא קריא — אל תמציאו תוכן כדי למלא את השדה. השאירו promptCards ריק ([]) לאותה שקופית, או categoryTitle/subtitle ריקים.
+3. זהו תרגום נאמן של מה שכתוב בתמונה, לא כתיבה מחדש: אסור להוסיף עובדה, מספר, שם כלי או דוגמה שלא מופיעים בתמונה עצמה.
+4. שדה whyIUseThis מכיל רק את ההסבר עצמו, בלי המילים "Why I use this" או "use this" או תרגומן — התווית מצוירת בנפרד בקוד.
+5. כיתוב הפוסט שמצורף הוא הקשר בלבד (טון, נושא כללי) — לא המקור לתוכן הכרטיסים.
+
+פלט: JSON תקין בלבד, בלי markdown code fence, במבנה הבא בדיוק:
+{"coverTitle":"...","coverTiles":["...","..."],"frames":[{"role":"cover|content|closer","categoryTitle":"...","subtitle":"...","promptCards":[{"index":"...","body":"...","whyIUseThis":"..."}],"text":"..."}]}
+מערך "frames" חייב להכיל בדיוק שקופית אחת לכל תמונה שקיבלתם, באותו סדר שקיבלתם אותן. שדות שאינם רלוונטיים לתפקיד השקופית: "" או [].`;
+
+/**
+ * Read every carousel frame's printed text via Gemini vision, translated to Hebrew in the same
+ * call. `frames` must be in the post's own reading order — the model is told to answer with
+ * exactly one entry per image, in that order, but ROLE (cover/content/closer) is read from what
+ * each frame actually shows rather than assumed from position.
+ */
+export async function extractInstagramPromptLibrary(input: {
+  caption: string;
+  frames: { mimeType: string; data: string }[];
+  author?: string;
+  notes?: string;
+}): Promise<PromptLibraryExtraction> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  if (!input.frames.length) throw new Error('no frame images to read');
+  const { clean } = sanitizeInput(String(input.caption ?? '').slice(0, 4000));
+
+  const context = [
+    input.author ? `מחבר הפוסט: ${input.author}` : '',
+    `מספר שקופיות בקרוסלה: ${input.frames.length}`,
+    input.notes ? `הנחיות המפעיל: ${String(input.notes).slice(0, 600)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+    {
+      text: `${context ? `${context}\n\n` : ''}כיתוב הפוסט (הקשר בלבד, לא מקור התוכן):\n"""\n${clean}\n"""\n\nלהלן ${input.frames.length} תמונות שקופיות הקרוסלה, לפי הסדר. קראו את הטקסט המודפס על כל אחת מהן.`,
+    },
+  ];
+  input.frames.forEach((f, i) => {
+    parts.push({ text: `[שקופית ${i + 1}]` });
+    parts.push({ inlineData: { mimeType: f.mimeType, data: f.data } });
+  });
+
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
+    contents: [{ role: 'user', parts }],
+    config: {
+      systemInstruction: PROMPT_LIBRARY_SYSTEM_INSTRUCTION,
+      temperature: 0.4,
+      topP: 0.9,
+      responseMimeType: 'application/json',
+    },
+  });
+
+  return parsePromptLibraryResponse(stripCodeFence(requireText(response)), input.frames.length);
+}
+
+function parsePromptLibraryResponse(raw: string, frameCount: number): PromptLibraryExtraction {
+  const parsed = parseJsonOrThrow(raw, 'extractInstagramPromptLibrary') as Record<string, unknown>;
+  const hebrew = (v: unknown, words: number): string =>
+    sanitizeHebrewText(clampProse(stripMetaFraming(stripSourceCredits(String(v ?? '').trim())), words));
+
+  const framesRaw = Array.isArray(parsed.frames) ? parsed.frames : [];
+  const frames: PromptLibraryFrame[] = framesRaw.slice(0, Math.max(frameCount, 1)).map((f): PromptLibraryFrame => {
+    const rec = (f && typeof f === 'object' ? f : {}) as Record<string, unknown>;
+    const role = rec.role === 'cover' || rec.role === 'closer' ? rec.role : 'content';
+    const cardsRaw = Array.isArray(rec.promptCards) ? rec.promptCards : [];
+    const promptCards: PromptCard[] = cardsRaw
+      .slice(0, 2)
+      .map((c): PromptCard => {
+        const cr = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>;
+        return {
+          index: String(cr.index ?? '').replace(/[^\d]/g, '').slice(0, 4),
+          body: hebrew(cr.body, 90),
+          whyIUseThis: hebrew(cr.whyIUseThis, 40),
+        };
+      })
+      .filter((c) => c.body.length > 4);
+    return {
+      role,
+      categoryTitle: hebrew(rec.categoryTitle, 6).slice(0, 60),
+      subtitle: hebrew(rec.subtitle, 12).slice(0, 90),
+      promptCards,
+      text: hebrew(rec.text, 60).slice(0, 300),
+    };
+  });
+
+  if (!frames.some((f) => f.promptCards.length)) {
+    throw new ModelOutputError('too few usable prompt cards extracted from carousel frames');
+  }
+
+  return {
+    coverTitle: hebrew(parsed.coverTitle, 12).slice(0, 90),
+    coverTiles: Array.isArray(parsed.coverTiles)
+      ? parsed.coverTiles.map((t) => hebrew(t, 4).slice(0, 30)).filter(Boolean).slice(0, 10)
+      : [],
+    frames,
+  };
 }

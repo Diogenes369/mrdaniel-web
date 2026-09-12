@@ -122,6 +122,23 @@ export interface TechTipSlide {
   install?: InstallBlock;
   /** The node flowchart this slide is about — drives the `workflow-nodes` preset. */
   workflow?: WorkflowNode[];
+
+  // Cream prompt-library preset — optional and additive; every other preset ignores them. Mirrors
+  // src/agent/types.ts. Source shape: a dense-text carousel whose teaching content is printed
+  // directly on the images (numbered prompt cards, 1-2 per frame) rather than carried in the caption.
+  /** 1 or 2 dense on-slide prompt cards read (and translated) off this frame by vision OCR. */
+  promptCards?: PromptCard[];
+  /** Feature-grid tile labels for a prompt-library cover slide, e.g. 10 category names. */
+  coverTiles?: string[];
+}
+
+/** One numbered prompt card recovered by vision OCR from a dense-text carousel frame. `index` is
+ *  digits only; `body` preserves the source's bracket placeholders, translated; `whyIUseThis` is
+ *  the rationale line the source prints under the prompt, translated without its label. */
+export interface PromptCard {
+  index: string;
+  body: string;
+  whyIUseThis: string;
 }
 
 /**

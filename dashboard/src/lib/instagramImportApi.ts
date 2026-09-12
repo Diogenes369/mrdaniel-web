@@ -261,10 +261,10 @@ function buildFallbackDeck(post: ImportedInstagramPost, reason: string): TechTip
 }
 
 /** Translate, adapt and lay out an imported post into a themed Hebrew deck. Never throws. */
-/** The two cream & terracotta presets, plus the existing dark 'creator' default. Mirrors
+/** The three cream & terracotta presets, plus the existing dark 'creator' default. Mirrors
  *  InstagramVisualPreset in src/server/agents/instagramAgent.ts — kept in sync by hand since the
  *  two live in different packages. */
-export type InstagramVisualPreset = 'creator' | 'cream-skill' | 'cream-workflow';
+export type InstagramVisualPreset = 'creator' | 'cream-skill' | 'cream-workflow' | 'cream-prompt-library';
 
 export async function synthesizeInstagramDeck(
   post: ImportedInstagramPost,
@@ -273,13 +273,19 @@ export async function synthesizeInstagramDeck(
 ): Promise<TechTipDeck> {
   const useSlideText = opts.useSlideText ?? true;
   // Mirrors MIN_CAPTION_CHARS on the server. Below it there is not enough source text for a deck,
-  // and calling the model anyway just spends quota to get this same fallback back.
+  // and calling the model anyway just spends quota to get this same fallback back. Does NOT apply
+  // to the prompt-library preset: its content is printed on the carousel frames, not the caption
+  // (the real target post's caption is 57 chars), so a frame image is what it needs instead.
   const sourceChars = captionWithoutHashtags(post.caption || post.text).trim().length;
-  if (sourceChars < MIN_CAPTION_CHARS) {
+  const isPromptLibrary = opts.visualPreset === 'cream-prompt-library';
+  if (!isPromptLibrary && sourceChars < MIN_CAPTION_CHARS) {
     return buildFallbackDeck(
       post,
       `כיתוב הפוסט קצר מדי לעיבוד AI (${sourceChars} תווים, נדרשים ${MIN_CAPTION_CHARS}) — הדביקו את הכיתוב המלא`
     );
+  }
+  if (isPromptLibrary && !post.slides.some((s) => s.image)) {
+    return buildFallbackDeck(post, 'לא נמצאו תמונות שקופיות לקריאה חזותית — עיצוב "ספריית פרומפטים" דורש קרוסלה עם תמונות');
   }
   try {
     // The whole post goes over, frames included, so the agent can place each frame's own image on
@@ -387,7 +393,7 @@ export function loadInstagramState(): PersistedInstagramState | null {
     if (parsed.deck && !Array.isArray(parsed.deck.slides)) parsed.deck = null;
     const preset = parsed.visualPreset;
     const visualPreset: InstagramVisualPreset =
-      preset === 'cream-skill' || preset === 'cream-workflow' ? preset : 'creator';
+      preset === 'cream-skill' || preset === 'cream-workflow' || preset === 'cream-prompt-library' ? preset : 'creator';
     return { ...parsed, post: normalizePost(parsed.post), visualPreset };
   } catch {
     return null;

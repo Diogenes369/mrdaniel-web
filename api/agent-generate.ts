@@ -568,7 +568,13 @@ export default async function handler(req: any, res: any) {
       const { post, notes, useSlideText, visualPreset } = req.body ?? {};
       const src = (post && typeof post === 'object' ? post : {}) as Partial<ImportedInstagramPost>;
       const caption = String(src.caption ?? src.text ?? '').slice(0, 8000).trim();
-      if (captionWithoutHashtags(caption).trim().length < 40) {
+      const rawSlides = Array.isArray(src.slides) ? src.slides : [];
+      // The prompt-library preset reads its content off the carousel FRAMES via vision OCR — the
+      // caption is context only and is often just a one-line pitch (the real target post's is 57
+      // chars) — so the usual "caption must carry the source material" floor does not apply to it,
+      // as long as there is at least one frame image to actually read.
+      const isPromptLibrary = visualPreset === 'cream-prompt-library';
+      if (!isPromptLibrary && captionWithoutHashtags(caption).trim().length < 40) {
         rejectThinInput(
           res,
           'caption (>= 40 chars) required',
@@ -576,10 +582,18 @@ export default async function handler(req: any, res: any) {
         );
         return;
       }
+      if (isPromptLibrary && !rawSlides.length) {
+        rejectThinInput(
+          res,
+          'at least one carousel frame image required for prompt-library preset',
+          'לא נמצאו תמונות שקופיות לקריאה חזותית — עיצוב "ספריית פרומפטים" דורש קרוסלה עם תמונות'
+        );
+        return;
+      }
       // Images must already be same-origin-proxied by the fetcher. Re-checking here rather than
       // trusting the body means a crafted request cannot plant an arbitrary URL in a slide that the
       // renderer would then fetch on the operator's behalf.
-      const slides: InstagramSlide[] = (Array.isArray(src.slides) ? src.slides : [])
+      const slides: InstagramSlide[] = rawSlides
         .slice(0, 20)
         .map((s) => {
           const rec = (s && typeof s === 'object' ? s : {}) as Partial<InstagramSlide>;
@@ -605,8 +619,10 @@ export default async function handler(req: any, res: any) {
         text: body,
         via: typeof src.via === 'string' ? (src.via as ImportedInstagramPost['via']) : 'manual',
       };
-      const preset: 'creator' | 'cream-skill' | 'cream-workflow' =
-        visualPreset === 'cream-skill' || visualPreset === 'cream-workflow' ? visualPreset : 'creator';
+      const preset: 'creator' | 'cream-skill' | 'cream-workflow' | 'cream-prompt-library' =
+        visualPreset === 'cream-skill' || visualPreset === 'cream-workflow' || visualPreset === 'cream-prompt-library'
+          ? visualPreset
+          : 'creator';
       const result = await buildInstagramDeck({
         post: normalized,
         notes: typeof notes === 'string' ? notes.slice(0, 600) : undefined,
@@ -614,8 +630,11 @@ export default async function handler(req: any, res: any) {
         visualPreset: preset,
       });
       // Same carve-out as thread-deck: the guard's heuristics flag ordinary source code as a leak,
-      // so only the Hebrew prose is checked.
-      const prose = result.deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
+      // so only the Hebrew prose is checked. Prompt-library slides carry their visible copy in
+      // `promptCards`, not `title`/`body`, so those are folded in too.
+      const prose = result.deck.slides
+        .map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}\n${(s.promptCards ?? []).map((c) => `${c.body}\n${c.whyIUseThis}`).join('\n')}`)
+        .join('\n\n');
       const security = sanitizeOutput(prose);
       if (!security.passed) {
         res.status(200).json({ ok: true, blocked: true, security });

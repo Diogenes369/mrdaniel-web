@@ -1,4 +1,10 @@
-import { synthesizeInstagramDeck, ModelOutputError, stripSourceCredits } from '../../agent/SocialAgentEngine.js';
+import {
+  synthesizeInstagramDeck,
+  extractInstagramPromptLibrary,
+  ModelOutputError,
+  stripSourceCredits,
+  type PromptLibraryExtraction,
+} from '../../agent/SocialAgentEngine.js';
 import { sanitizeHebrewText } from '../../agent/hebrewTextSanitizer.js';
 import { STATIC_GUIDES } from '../leadMagnets.js';
 import {
@@ -16,7 +22,7 @@ import type { ImportedInstagramPost } from '../instagramFetcher.js';
  *  dashboard's style picker through to both the model prompt (see synthesizeInstagramDeck's
  *  `visualPreset`) and the renderer (dashboard/src/lib/techTipRenderer.ts's `TipStyle`) — the two
  *  enums are kept in sync by hand since they live in different packages. */
-export type InstagramVisualPreset = 'creator' | 'cream-skill' | 'cream-workflow';
+export type InstagramVisualPreset = 'creator' | 'cream-skill' | 'cream-workflow' | 'cream-prompt-library';
 
 /**
  * Instagram post → contextual Hebrew carousel. The agent half of the pipeline whose other half is
@@ -386,6 +392,13 @@ export async function buildInstagramDeck(input: {
    *  a caller that never passes this gets exactly the behaviour it always had. */
   visualPreset?: InstagramVisualPreset;
 }): Promise<InstagramDeckResult> {
+  // The prompt-library preset's source shape (content printed on the images, not the caption) is
+  // different enough — vision OCR instead of a caption adaptation, one slide per frame instead of
+  // 10-12 invented concept slides — that it is its own build path end to end. See
+  // `buildPromptLibraryDeck` below.
+  if (input.visualPreset === 'cream-prompt-library') {
+    return buildPromptLibraryDeck(input);
+  }
   const { post, notes } = input;
   const topic = analyzeInstagramTopic(post);
   const source = deckSource(post);
@@ -410,6 +423,148 @@ export async function buildInstagramDeck(input: {
       synthesized: false,
       fallbackReason: 'מנוע ה-AI לא החזיר דק שמיש — מוצג טקסט המקור לעריכה',
     };
+  }
+}
+
+// ─── prompt-library build path (vision OCR) ────────────────────────────────────────────────
+
+/**
+ * One carousel frame's image, fetched server-side and base64-encoded for Gemini vision input.
+ * `slide.image` is already same-origin-proxied (see `proxiedImage` in threadsThreadFetcher.ts),
+ * so this is a plain HTTPS fetch — no extra allow-listing needed on top of what produced that URL.
+ * Never throws: a single frame the CDN 404s or times out on is dropped, not fatal to the whole
+ * carousel — `buildPromptLibraryDeck` proceeds with whatever frames did come back.
+ */
+async function fetchFrameImageBase64(url: string): Promise<{ mimeType: string; data: string } | null> {
+  if (!url) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    // A guard against an unexpectedly huge response, not a real-world limit: a 1440px-wide carousel
+    // frame is a few hundred KB at most.
+    if (!buf.length || buf.length > 6_000_000) return null;
+    const mimeType = (res.headers.get('content-type') || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
+    return { mimeType, data: buf.toString('base64') };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Turn the vision extraction into a finished deck: one slide per frame the model actually
+ * answered for, cover coerced first and closer coerced last (the model reads role from content,
+ * which is usually but not always right), category numbering assigned in code so it is stable
+ * regardless of what the model did or didn't repeat per frame.
+ */
+function promptLibraryToDeck(ext: PromptLibraryExtraction): TechTipDeck {
+  const categorySeq = new Map<string, number>();
+  const numberFor = (category: string): number => {
+    if (!category) return 0;
+    if (!categorySeq.has(category)) categorySeq.set(category, categorySeq.size + 1);
+    return categorySeq.get(category)!;
+  };
+
+  const slides: TechTipSlide[] = ext.frames.map((f, i): TechTipSlide => {
+    if (f.role === 'cover') {
+      return blankSlide({
+        kind: 'cover',
+        kicker: 'ספריית פרומפטים',
+        title: stripSlideCta(ext.coverTitle || f.text) || 'ספריית פרומפטים',
+        body: '',
+        coverTiles: ext.coverTiles,
+      });
+    }
+    if (f.role === 'closer') {
+      return blankSlide({
+        kind: 'cta',
+        kicker: 'סיכום',
+        title: 'עכשיו תריצו אחד',
+        body: stripSlideCta(f.text) || 'בחרו פרומפט אחד מהרשימה והריצו אותו היום.',
+      });
+    }
+    // The model sometimes echoes the source's own leading ordinal in categoryTitle ("01 Reels
+    // Scripts" -> "01 תסריטי Reels") despite the instruction not to — stripped here so the number
+    // this code assigns is never doubled ("✴ 01 01 תסריטי Reels").
+    const category = f.categoryTitle.replace(/^\s*\d{1,3}\s+/, '').trim();
+    const num = numberFor(category);
+    return blankSlide({
+      kind: 'concept',
+      kicker: `שקופית ${i + 1}`,
+      title: '',
+      body: '',
+      badge: category ? `✴ ${String(num).padStart(2, '0')} ${category}` : undefined,
+      subtitle: f.subtitle ? stripSlideCta(f.subtitle) : undefined,
+      promptCards: f.promptCards
+        .map((c) => ({ ...c, body: stripSlideCta(c.body), whyIUseThis: stripSlideCta(c.whyIUseThis) }))
+        .filter((c) => c.body.trim()),
+    });
+  });
+
+  const usable = slides.filter((s) => s.kind === 'cover' || s.kind === 'cta' || (s.promptCards?.length ?? 0) > 0);
+  if (usable.filter((s) => s.kind === 'concept').length < 1) {
+    throw new ModelOutputError('too few usable prompt-library slides after layout');
+  }
+
+  // Structural contract, same as `parseAdaptedDeck`: cover first, cta last. The model gets this
+  // right from content most of the time; when it doesn't, coercing the kind is enough.
+  usable[0].kind = 'cover';
+  usable[usable.length - 1].kind = 'cta';
+
+  return {
+    title: ext.coverTitle || 'ספריית פרומפטים',
+    slides: usable.slice(0, 20),
+    hashtags: ['#AI', '#פרומפטים', '#קלוד', '#תוכן'],
+  };
+}
+
+/**
+ * The prompt-library build path: fetch every carousel frame's image, read and translate its
+ * printed text in one Gemini vision call, and lay the result out one slide per frame. Falls back
+ * to the same deterministic source-faithful deck as the caption-driven path when the model's
+ * output is unusable or no frame could be fetched — the prompt-library painter's own defensive
+ * branch (see `drawPromptLibrarySlide`) renders a plain title+paragraph for a slide with no
+ * `promptCards`, so that fallback still reads as a deck rather than a blank canvas.
+ */
+async function buildPromptLibraryDeck(input: {
+  post: ImportedInstagramPost;
+  notes?: string;
+}): Promise<InstagramDeckResult> {
+  const { post, notes } = input;
+  const topic = analyzeInstagramTopic(post);
+
+  const localFallback = (reason: string): InstagramDeckResult => ({
+    deck: attachSkillExtras(buildLocalInstagramDeck(post, topic), post),
+    topic,
+    synthesized: false,
+    fallbackReason: reason,
+  });
+
+  if (!post.slides.length) {
+    return localFallback('לא נמצאו תמונות שקופיות לקריאה חזותית — מוצג טקסט המקור לעריכה');
+  }
+
+  try {
+    const fetched = await Promise.all(post.slides.slice(0, 20).map((s) => fetchFrameImageBase64(s.image)));
+    const frames = fetched.filter((f): f is { mimeType: string; data: string } => f !== null);
+    if (!frames.length) throw new ModelOutputError('no frame images could be fetched for vision OCR');
+
+    const extraction = await extractInstagramPromptLibrary({
+      caption: stripCaptionBait(post.text || post.caption),
+      frames,
+      author: post.author || undefined,
+      notes: notes?.trim() || undefined,
+    });
+    const deck = promptLibraryToDeck(extraction);
+    return { deck, topic, synthesized: true };
+  } catch (err) {
+    if (!isModelOutputFailure(err)) throw err;
+    console.warn('[instagramAgent] prompt-library vision OCR unusable, serving source-faithful deck:', (err as Error).message);
+    return localFallback('מנוע ה-AI לא הצליח לקרוא את השקופיות — מוצג טקסט המקור לעריכה');
   }
 }
 

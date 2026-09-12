@@ -29,6 +29,7 @@ import {
   hexToRgba,
   TERRACOTTA,
   TERRACOTTA_WASH,
+  PROMPT_WHY_BG,
   CREAM_INK,
   CREAM_BODY,
   CREAM_MUTED,
@@ -145,7 +146,8 @@ export type TipStyle =
   | 'dark-minimal'
   | 'sketchnote'
   | 'cream-skill'
-  | 'cream-workflow';
+  | 'cream-workflow'
+  | 'cream-prompt-library';
 
 /** Extra search terms per style, appended to the slide's own contextual query. */
 const STYLE_TONE: Record<TipStyle, string> = {
@@ -156,13 +158,15 @@ const STYLE_TONE: Record<TipStyle, string> = {
   sketchnote: '',
   'cream-skill': '',
   'cream-workflow': '',
+  'cream-prompt-library': '',
 };
 
-/** Whether a style paints its own procedural backdrop and never fetches a photo. Both cream
- *  presets are paper, not photography — a searched or generated image behind an install box or a
- *  node diagram is exactly the "assembled, not made" tell the creator preset already avoids. */
+/** Whether a style paints its own procedural backdrop and never fetches a photo. All three cream
+ *  presets are paper, not photography — a searched or generated image behind an install box, a
+ *  node diagram or a prompt card is exactly the "assembled, not made" tell the creator preset
+ *  already avoids. */
 function isProceduralStyle(style: TipStyle): boolean {
-  return style === 'creator' || style === 'cream-skill' || style === 'cream-workflow';
+  return style === 'creator' || style === 'cream-skill' || style === 'cream-workflow' || style === 'cream-prompt-library';
 }
 
 export async function resolveTipBackgrounds(
@@ -1171,6 +1175,212 @@ function drawCreamSlide(
   ctx.restore();
 }
 
+// ─── cream prompt-library preset ────────────────────────────────────────────────────────────
+//
+// A third cream family, for a source shape neither of the two above handles: a dense-text
+// carousel where the teaching content is PRINTED ON the images themselves — numbered prompt
+// cards, one or two per frame, each with a "why I use this" rationale underneath. Instagram's own
+// accessibility OCR reads only a minority of such frames reliably, so the deck this preset renders
+// comes from a dedicated vision-OCR extraction (see instagramAgent.ts's `buildPromptLibraryDeck`)
+// rather than the caption-driven adaptation the other two presets consume. Shares the cream
+// palette and the avatar/progress-rail chrome with `drawCreamSlide` but is its own composition:
+// stacked white prompt cards instead of an install box or a node diagram.
+
+/** One prompt card: a white rounded panel with a large index numeral, the prompt body, and a
+ *  "why I use this" callout pinned to the card's own bottom edge. Measures the why-box first
+ *  (its copy is always short) and gives the prompt body whatever room is left above it — the same
+ *  "reserve the fixed piece, autofit the rest" split `drawCreamSlide` uses for its install box. */
+function drawPromptLibraryCard(
+  ctx: CanvasRenderingContext2D,
+  b: SlideBox,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  card: { index: string; body: string; whyIUseThis: string },
+  accent: string
+) {
+  drawPaperCard(ctx, x, y, w, h, b.m.radiusLg);
+  const pad = b.W * 0.032;
+
+  // Index numeral — oversized, LTR digits, anchored to the card's leading (right, in RTL) corner.
+  const numFs = b.W * 0.052;
+  ctx.save();
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  setDisplay(ctx, numFs, 800);
+  ctx.fillStyle = accent;
+  ctx.fillText(card.index.padStart(3, '0'), x + w - pad, y + pad + numFs * 0.82);
+  ctx.restore();
+
+  const whyText = card.whyIUseThis.trim();
+  const whyFs = b.W * 0.021;
+  const whyLabelFs = whyFs * 0.98;
+  const whyPad = b.W * 0.022;
+  const innerW = w - pad * 2;
+  let whyLines: string[] = [];
+  let whyH = 0;
+  if (whyText) {
+    setBody(ctx, whyFs, 500);
+    whyLines = wrapRtl(ctx, sanitizeHebrewText(whyText), innerW - whyPad * 2).slice(0, 3);
+    whyH = whyPad * 2 + whyLabelFs * 1.3 + whyLines.length * whyFs * 1.4;
+  }
+
+  const bodyTop = y + pad + numFs * 1.05;
+  const bodyBottom = y + h - pad - (whyH ? whyH + b.W * 0.018 : 0);
+  const bodyMaxH = Math.max(0, bodyBottom - bodyTop);
+  if (bodyMaxH > whyFs * 2) {
+    const { lines, px } = autoFit(
+      ctx,
+      sanitizeHebrewText(card.body),
+      innerW,
+      b.W * 0.026,
+      b.W * 0.016,
+      Math.max(2, Math.floor(bodyMaxH / (b.W * 0.026 * 1.5))),
+      (c, p) => setBody(c, p, 500)
+    );
+    setBody(ctx, px, 500);
+    ctx.save();
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = CREAM_INK;
+    let ly = bodyTop + px;
+    for (const line of lines) {
+      if (ly > bodyBottom) break;
+      ctx.fillText(line, x + w - pad, ly);
+      ly += px * 1.5;
+    }
+    ctx.restore();
+  }
+
+  if (whyText && whyLines.length) {
+    const boxY = y + h - pad - whyH;
+    roundRectPath(ctx, x + pad, boxY, innerW, whyH, b.m.radiusMd);
+    ctx.fillStyle = PROMPT_WHY_BG;
+    ctx.fill();
+    ctx.save();
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    setBody(ctx, whyLabelFs, 800);
+    ctx.fillStyle = accent;
+    let wy = boxY + whyPad + whyLabelFs * 0.9;
+    ctx.fillText('למה אני משתמש בזה:', x + w - pad - whyPad, wy);
+    wy += whyLabelFs * 1.3;
+    setBody(ctx, whyFs, 500);
+    ctx.fillStyle = CREAM_BODY;
+    for (const line of whyLines) {
+      ctx.fillText(line, x + w - pad - whyPad, wy);
+      wy += whyFs * 1.4;
+    }
+    ctx.restore();
+  }
+}
+
+/** The cover slide's feature grid — up to 10 category tiles, two per row, beneath the headline. */
+function drawPromptLibraryTileGrid(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, tiles: string[], top: number, bottom: number, accent: string) {
+  const items = tiles.filter((t) => t.trim()).slice(0, 10);
+  if (!items.length) return;
+  const cols = 2;
+  const rows = Math.ceil(items.length / cols);
+  const gap = b.W * 0.022;
+  const tileH = Math.min(b.W * 0.1, (bottom - top - gap * (rows - 1)) / rows);
+  const tileW = (r.w - gap) / cols;
+  const fs = b.W * 0.023;
+  ctx.save();
+  ctx.direction = 'rtl';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  items.forEach((label, i) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    // Column 0 sits on the RIGHT in an RTL grid.
+    const x = r.x + r.w - tileW - col * (tileW + gap);
+    const y = top + row * (tileH + gap);
+    roundRectPath(ctx, x, y, tileW, tileH, b.m.radiusMd);
+    ctx.fillStyle = TERRACOTTA_WASH;
+    ctx.globalAlpha = 0.55;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    const { lines, px } = autoFit(ctx, sanitizeHebrewText(label), tileW - b.W * 0.03, fs, b.W * 0.014, 2, (c, p) => setBody(c, p, 700));
+    setBody(ctx, px, 700);
+    ctx.fillStyle = accent;
+    const cy = y + tileH / 2 - ((lines.length - 1) * px * 1.15) / 2;
+    lines.forEach((line, li) => ctx.fillText(line, x + tileW / 2, cy + li * px * 1.15));
+  });
+  ctx.restore();
+}
+
+/**
+ * Paints one slide of the prompt-library preset: the cover's headline + feature grid, a closer's
+ * plain sign-off, or — the common case — one or two stacked prompt cards read off this frame.
+ */
+function drawPromptLibrarySlide(
+  ctx: CanvasRenderingContext2D,
+  b: SlideBox,
+  slide: TechTipSlide,
+  index: number,
+  total: number,
+  logo: HTMLImageElement | null,
+  anim: SlideAnim
+) {
+  const accent = TERRACOTTA;
+  ctx.clearRect(0, 0, b.W, b.H);
+  paintCreamBackdrop(ctx, b.W, b.H, index, 'skill');
+
+  const alpha = Math.max(0, Math.min(1, anim.intro)) * (1 - Math.max(0, Math.min(1, anim.outro)));
+  const rise = (1 - Math.min(1, anim.intro)) * b.W * 0.02;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(0, rise);
+
+  const pad = b.PAD;
+  let y = b.H * 0.058;
+  y = drawAvatarLockup(ctx, pad, y, b.W, logo) + b.W * 0.03;
+
+  const railY = b.H - b.PAD * 0.62;
+  const r: Region = { x: pad, y, w: b.W - pad * 2, h: railY - b.W * 0.05 - y };
+
+  const cards = (slide.promptCards ?? []).filter((c) => c.body.trim());
+
+  if (slide.kind === 'cover') {
+    y = drawCreamTitle(ctx, b, r, slide.title, b.W * 0.064, 3) + b.W * 0.026;
+    drawPromptLibraryTileGrid(ctx, b, r, slide.coverTiles ?? [], y, railY - b.W * 0.05, accent);
+  } else if (cards.length) {
+    if (slide.badge?.trim()) {
+      ctx.save();
+      ctx.direction = 'rtl';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'alphabetic';
+      const fs = b.W * 0.03;
+      setDisplay(ctx, fs, 800);
+      ctx.fillStyle = accent;
+      ctx.fillText(sanitizeHebrewText(slide.badge), r.x + r.w, y + fs);
+      y += fs * 1.15;
+      ctx.restore();
+      if (slide.subtitle?.trim()) {
+        y = drawCreamParagraph(ctx, b, r, slide.subtitle, y, 1) + b.W * 0.006;
+      }
+      y += b.W * 0.014;
+    }
+    const gap = b.W * 0.024;
+    const slotH = (railY - b.W * 0.05 - y - gap * (cards.length - 1)) / cards.length;
+    cards.forEach((card, i) => {
+      drawPromptLibraryCard(ctx, b, r.x, y + i * (slotH + gap), r.w, slotH, card, accent);
+    });
+  } else {
+    // No cards recovered for this frame (a vision miss, or the deterministic local fallback) — a
+    // plain cream title + paragraph so the slide still reads as content rather than a blank card.
+    y = drawCreamTitle(ctx, b, r, slide.title, b.W * 0.05, 2) + b.W * 0.014;
+    drawCreamParagraph(ctx, b, r, slide.body, y, 8);
+  }
+
+  drawProgressRail(ctx, pad, railY, b.W - pad * 2, b.W, index, total, accent);
+  ctx.restore();
+}
+
 // ─── main painter ───────────────────────────────────────────────────────────────────────────
 
 export interface SlideAnim {
@@ -1196,6 +1406,10 @@ export function drawTipSlide(
   // of the slate-specific drawing below runs, rather than threading an if/else through every block.
   if (style === 'cream-skill' || style === 'cream-workflow') {
     drawCreamSlide(ctx, b, slide, index, total, logo, anim, style);
+    return;
+  }
+  if (style === 'cream-prompt-library') {
+    drawPromptLibrarySlide(ctx, b, slide, index, total, logo, anim);
     return;
   }
   ctx.clearRect(0, 0, b.W, b.H);

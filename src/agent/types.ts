@@ -383,6 +383,26 @@ export interface TechTipSlide {
   install?: InstallBlock;
   /** The node flowchart this slide is about. Drives the `workflow-nodes` preset. */
   workflow?: WorkflowNode[];
+
+  // --- cream prompt-library preset ------------------------------------------------------------
+  // Also optional and additive. Source shape: a dense-text carousel where the teaching content is
+  // printed directly on the images (numbered prompt cards, 1-2 per frame) rather than carried in
+  // the caption — see instagramAgent.ts's `buildPromptLibraryDeck` and the vision-OCR extraction
+  // in SocialAgentEngine.ts. Every other preset ignores these fields entirely.
+  /** 1 or 2 dense on-slide prompt cards read (and translated) off this frame by vision OCR. */
+  promptCards?: PromptCard[];
+  /** Feature-grid tile labels for a prompt-library cover slide, e.g. 10 category names. */
+  coverTiles?: string[];
+}
+
+/** One numbered prompt card recovered by vision OCR from a dense-text carousel frame — see
+ *  `TechTipSlide.promptCards`. `index` is digits only ("001"); `body` preserves the source's
+ *  bracket placeholders, translated ("[topic]" -> "[נושא]"); `whyIUseThis` is the rationale line
+ *  the source prints under the prompt, translated without its "Why I use this:" label. */
+export interface PromptCard {
+  index: string;
+  body: string;
+  whyIUseThis: string;
 }
 
 export interface TechTipDeck {

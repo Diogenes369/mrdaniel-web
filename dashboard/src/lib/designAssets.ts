@@ -107,6 +107,9 @@ export const CREAM_MUTED = '#A8A29E';
 export const INSTALL_BG = '#18181B';
 /** The tan fill behind a step numeral in the workflow preset. */
 export const TILE_FILL = '#EADFCD';
+/** The light coral/beige callout a prompt-library card's "why I use this" line sits on — paler
+ *  than TERRACOTTA_WASH so CREAM_INK body text stays comfortably readable on top of it. */
+export const PROMPT_WHY_BG = '#F7E7DF';
 /** The white card a workflow diagram is drawn on, lifted off the cream ground. */
 export const NODE_CARD = '#FFFDFA';
 

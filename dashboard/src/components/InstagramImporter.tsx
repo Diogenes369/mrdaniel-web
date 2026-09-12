@@ -57,6 +57,11 @@ const PRESET_OPTIONS: { id: InstagramVisualPreset; label: string; hint: string }
   { id: 'creator', label: 'קריאייטור (כהה)', hint: 'רקע סלייט כהה עם זוהר בצבעי הכלי — בלי סטוק' },
   { id: 'cream-skill', label: 'קרם וטרקוטה', hint: 'כרטיס מיומנות בהיר: פקודה, תיאור קצר וקופסת התקנה כהה' },
   { id: 'cream-workflow', label: 'דיאגרמת תהליך', hint: 'כרטיס בהיר עם שרשרת צמתי אוטומציה מחוברים' },
+  {
+    id: 'cream-prompt-library',
+    label: 'ספריית פרומפטים',
+    hint: 'קורא את הטקסט המודפס על השקופיות עצמן (OCR חזותי) ומציג עד 2 כרטיסי פרומפט לשקופית',
+  },
 ];
 
 const KIND_LABEL: Record<string, string> = {
@@ -223,12 +228,15 @@ export default function InstagramImporter() {
   const generate = useCallback(async () => {
     const source = post.text.trim() ? post : parseInstagramRawText(rawText, url);
     const sourceChars = captionWithoutHashtags(source.caption || source.text).trim().length;
-    if (sourceChars < MIN_CAPTION_CHARS) {
-      // Same floor the server and the client lib use, so the operator is told what is missing
-      // rather than watching the run come back as an unexplained local-mode deck.
+    // The prompt-library preset reads its content off the carousel frames (vision OCR), not the
+    // caption — so a short caption is not a blocker there as long as a frame image came through.
+    const hasFrames = source.slides.some((s) => s.image);
+    if (visualPreset === 'cream-prompt-library' ? !hasFrames : sourceChars < MIN_CAPTION_CHARS) {
       setShowPaste(true);
       setError(
-        `אין מספיק טקסט מקור (${sourceChars} תווים, נדרשים ${MIN_CAPTION_CHARS}) — הדביקו את כיתוב הפוסט המלא בתיבה למטה.`
+        visualPreset === 'cream-prompt-library'
+          ? 'עיצוב "ספריית פרומפטים" דורש קרוסלה עם תמונות שקופיות — משכו מחדש קישור לפוסט קרוסלה.'
+          : `אין מספיק טקסט מקור (${sourceChars} תווים, נדרשים ${MIN_CAPTION_CHARS}) — הדביקו את כיתוב הפוסט המלא בתיבה למטה.`
       );
       return;
     }
@@ -339,6 +347,13 @@ export default function InstagramImporter() {
   const activeSlide = deck?.slides[Math.min(active, deck.slides.length - 1)];
   const sourceChars = captionWithoutHashtags(post.caption || post.text).trim().length;
   const ocrFrames = post.slides.filter((s) => s.text.trim().length > 12).length;
+  // The generate button's own readiness check — mirrors the gate inside `generate()` above. The
+  // prompt-library preset needs a carousel frame image, not caption length; every other preset
+  // keeps the original "enough source text, imported or pasted" rule.
+  const canGenerate =
+    visualPreset === 'cream-prompt-library'
+      ? post.slides.some((s) => s.image)
+      : sourceChars >= MIN_CAPTION_CHARS || rawText.trim().length >= MIN_CAPTION_CHARS;
 
   return (
     <div className="space-y-5">
@@ -503,7 +518,7 @@ export default function InstagramImporter() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => void generate()}
-            disabled={busy || (sourceChars < MIN_CAPTION_CHARS && rawText.trim().length < MIN_CAPTION_CHARS)}
+            disabled={busy || !canGenerate}
             className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-black cursor-pointer disabled:opacity-40"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -707,8 +722,24 @@ export default function InstagramImporter() {
                     {activeSlide.stepNumber > 0 && <span>· שלב {activeSlide.stepNumber}</span>}
                     {activeSlide.codeLang && <span>· {activeSlide.codeLang}</span>}
                   </div>
+                  {activeSlide.badge && <p dir="ltr" className="text-xs font-bold text-brand-400">{activeSlide.badge}</p>}
                   <p className="text-base font-bold leading-snug text-white">{activeSlide.title}</p>
                   {activeSlide.body && <p className="text-sm leading-relaxed text-zinc-300">{activeSlide.body}</p>}
+                  {(activeSlide.promptCards?.length ?? 0) > 0 && (
+                    <div className="space-y-2">
+                      {activeSlide.promptCards!.map((c, i) => (
+                        <div key={i} className="rounded-lg border border-white/10 bg-black/30 p-2.5">
+                          <p className="mb-1 font-mono text-[11px] text-brand-400">#{c.index}</p>
+                          <p className="text-sm leading-relaxed text-zinc-300">{c.body}</p>
+                          {c.whyIUseThis && (
+                            <p className="mt-1.5 text-[12px] leading-relaxed text-amber-200/80">
+                              למה אני משתמש בזה: {c.whyIUseThis}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {activeSlide.bullets.length > 0 && (
                     <ul className="space-y-1.5">
                       {activeSlide.bullets.map((bl, i) => (
