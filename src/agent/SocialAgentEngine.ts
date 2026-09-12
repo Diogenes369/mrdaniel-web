@@ -1728,6 +1728,47 @@ function clampWords(text: string, max: number): string {
     .trim();
 }
 
+/**
+ * Trim prose to a word budget WITHOUT cutting a sentence in half.
+ *
+ * `clampWords` is right for a title or a bullet — those are fragments, and losing the tail of one
+ * reads as terseness. It is wrong for a body paragraph: a slide that ends mid-clause ("תפתחו את
+ * ההגדרות ואז") is the single most obvious "a machine wrote this" tell on a carousel, and no amount
+ * of prompt instruction stops it, because the cut happens after the model is done.
+ *
+ * So sentences are kept whole. Whole sentences are accumulated while they fit; a first sentence
+ * that is itself slightly over budget is kept anyway (up to 1.4×), because a complete sentence
+ * forty words long looks far better on a slide than a truncated thirty-word one — and the renderer
+ * auto-fits the type size to whatever it is given. Only a genuinely runaway opener falls back to a
+ * word cut, and even then the result is closed off cleanly.
+ */
+export function clampProse(text: string, maxWords: number): string {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  const count = (s: string) => s.split(/\s+/).filter(Boolean).length;
+  if (count(clean) <= maxWords) return clean;
+
+  const sentences = clean.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [clean];
+  let out = '';
+  for (const raw of sentences) {
+    const sentence = raw.trim();
+    if (!sentence) continue;
+    const next = out ? `${out} ${sentence}` : sentence;
+    // The first sentence is allowed to overrun; every later one must fit inside the budget.
+    const ceiling = out ? maxWords : Math.round(maxWords * 1.4);
+    if (count(next) > ceiling && out) break;
+    out = next;
+    if (count(out) >= maxWords) break;
+  }
+  if (!out) out = clean.split(/\s+/).slice(0, maxWords).join(' ');
+
+  out = out.replace(/[,;:\-–—״"'\s]+$/, '').trim();
+  // A body that lost its terminal punctuation to the trim above gets it back, so the slide never
+  // shows a sentence that looks like it was interrupted.
+  if (out && !/[.!?…]$/.test(out)) out += '.';
+  return out;
+}
+
 const THREAD_DECK_SYSTEM_INSTRUCTION = `אתה מתרגם ומעבד תוכן עבור דניאל בן ברוך. קיבלת שרשור (thread) שפורסם ב-Threads — בדרך כלל באנגלית — והמשימה שלך היא להפוך אותו לקרוסלת לימוד בעברית ישראלית טבעית.
 
 ${BRAND_KNOWLEDGE_BASE}
@@ -1741,7 +1782,7 @@ ${AUDIENCE_RULES}
 מבנה חובה:
 1. השקופית הראשונה היא תמיד kind:"cover" — כותרת שמבטיחה את הערך של השרשור.
 2. השקופיות באמצע (8–10) עוקבות אחרי סדר הרעיונות בשרשור: kind:"concept" להסבר רעיון, kind:"step" לשלב בתהליך (עם stepNumber רץ 1,2,3…), kind:"tool" לרשימת כלים, kind:"code" רק אם השרשור עצמו הכיל קוד, kind:"takeaway" לסיכום נקודות.
-3. השקופית האחרונה היא תמיד kind:"cta" — הפניה ל-mrdaniel.co.il ולעקוב, לא מכירתי אגרסיבי.
+3. השקופית האחרונה היא תמיד kind:"cta" — כרטיס סגירה, לא פרסומת: משפט סיכום אחד שמחזיר את הקורא לערך של השרשור, ועד 3 bullets שמסכמים שלבים שכבר הופיעו בדק. אסור בה קישור, אסור כתובת אתר, אסור "כתבו X בתגובות" ואסור מילת טריגר — הקישור מופיע בכיתוב של הפוסט, לא על התמונה.
 
 מגבלות אורך — כלל אדום, נאכפות אוטומטית אחרי הפלט שלך (אם תחרוג, הטקסט ייחתך):
 - title: עד ${THREAD_DECK_LIMITS.titleWords} מילים. קצר, קונקרטי, בלי מילות קישור מיותרות.
@@ -1757,6 +1798,9 @@ ${AUDIENCE_RULES}
 5. מספרים נשארים ספרות (4 שלבים, 30 שניות) — הם מה שעוצר גלילה.
 6. שמות כלים, פריטי תפריט ונתיבי ממשק (Tools, Canvas, Gems, Create New) נשארים באנגלית בדיוק כפי שהם מופיעים במוצר. אסור לתרגם או לתעתק אותם — הקורא צריך למצוא אותם על המסך שלו.
 7. אל תעתיק פרומפט ארוך לתוך שדה code: המערכת מחלצת פרומפטים מהמקור בעצמה ומציגה אותם בכרטיס ייעודי. ב-body רק הסבר קצר מה הפרומפט עושה.
+8. כל body הוא משפט שלם ותקני שנגמר בנקודה. אסור לסיים באמצע משפט, אסור לסיים במילת קישור ("ו", "של", "כדי", "עם"), ואסור להשאיר פסיק או מקף בסוף. אם הרעיון לא נכנס במגבלת המילים — כתבו רעיון קטן יותר, לא חצי משפט.
+9. דקדוק מלא: התאמת מין ומספר, סמיכות תקינה, זמנים עקביים. קראו כל משפט בקול לפני שאתם מחזירים אותו — אם הוא נשמע כמו תרגום מכונה, כתבו אותו מחדש מאפס בעברית.
+10. אסור להכניס כתובת אתר, דומיין, "הלינק בביו" או קריאה להגיב מילת מפתח — לא ב-title, לא ב-body ולא ב-bullets. המערכת מסירה אותם בכל מקרה, והתוצאה תהיה משפט קטוע.
 
 חוקי נאמנות למקור (קריטי):
 1. אסור להוסיף עובדה, מספר, שם כלי או טענה שלא מופיעים בשרשור המקורי. אם השרשור לא אמר את זה — זה לא נכנס לדק.
@@ -1836,6 +1880,9 @@ export async function synthesizeThreadDeck(input: {
 
   const hebrew = (v: unknown, words: number): string =>
     sanitizeHebrewText(clampWords(stripMetaFraming(stripSourceCredits(String(v ?? '').trim())), words));
+  /** Body copy only — see `clampProse`: a paragraph is trimmed at a sentence break, never mid-clause. */
+  const prose = (v: unknown, words: number): string =>
+    sanitizeHebrewText(clampProse(stripMetaFraming(stripSourceCredits(String(v ?? '').trim())), words));
 
   const slides: TechTipSlide[] = slidesRaw
     .map((s): TechTipSlide => {
@@ -1846,7 +1893,7 @@ export async function synthesizeThreadDeck(input: {
         kind,
         kicker: hebrew(rec.kicker, 3).slice(0, 40) || 'מהשרשור',
         title: hebrew(rec.title, THREAD_DECK_LIMITS.titleWords).slice(0, 120),
-        body: hebrew(rec.body, THREAD_DECK_LIMITS.bodyWords).slice(0, 300),
+        body: prose(rec.body, THREAD_DECK_LIMITS.bodyWords).slice(0, 420),
         bullets: Array.isArray(rec.bullets)
           ? rec.bullets
               .map((b) => hebrew(b, THREAD_DECK_LIMITS.bulletWords).slice(0, 90))

@@ -87,6 +87,16 @@ tips, code tricks, model integration and dev tools. One `TechTipDeck` feeds **tw
   `synthesizeTechTipDeck` in the engine; falls back to a deterministic local deck, never throws).
 - `syntaxHighlight.ts` — a canvas-targeted lexer. Prism/Shiki emit DOM; the slide target is
   `ctx.fillText`, so this returns `{ text, color }` runs instead. Cosmetic-only by design.
+- `designAssets.ts` — the deck **design system**: deep-slate palette (`#08090E`), per-theme and
+  per-tool accent/glow pairs, the Hebrew type stack (Rubik display / Assistant body / JetBrains Mono
+  literals, warmed together by `ensureDeckFonts()` so slide 1 can't ship in a different face than
+  slide 12), the `metricsFor()` spacing scale, and the surface primitives — `glassCard()`,
+  `terminalFrame()` (window dots + label + copy glyph), `drawBrandBadge()`, `paintSlateBackdrop()`,
+  the vector `TOOL_MARKS` and the hand-drawn scribbles. `techTipRenderer.ts` owns layout only and
+  asks this module what things look like. **Deliberately a local module, not an MCP/asset service**:
+  these are consumed by `ctx.fill*` on a canvas that must stay untainted for `toDataURL`, so an
+  out-of-process source would have to return bytes that taint it — the exact failure the vector
+  marks exist to avoid. Fonts are the one real external asset, and the browser already fetches those.
 - `techTipRenderer.ts` — `drawTipSlide()` paints one slide at **any** size, so the same painter
   serves the 1080×1350 carousel and the 1080×1920 video frames. `resolveTipBackgrounds()` pulls
   optional free backdrops from **Pollinations** (keyless, `Access-Control-Allow-Origin: *`, so the
@@ -118,8 +128,28 @@ a *different* feature (publishing **to** Threads) and share nothing with it.
   Scores the thread against `THEME_RULES` → `{theme, badge, guideSlug}`, calls the engine for the
   Hebrew adaptation, then lays the result out **in code, not in the prompt**: theme accent, topic
   badge, `n / N` sub-post indicators, prompts isolated into their own boxes, the thread's own images
-  placed on the slides they came from, and a CTA pointed at the matching live `/g/<slug>` guide
-  (validated against `STATIC_GUIDES`, so a renamed guide can't ship a dead link).
+  placed on the slides they came from, and a closing card that summarises the deck with the deck's
+  own step headlines.
+
+**No link or comment-trigger is ever painted onto a slide.** `stripSlideCta()` removes URLs,
+www-hosts, bare `mrdaniel.co.il`, "link in bio" and "write X in the comments" from every slide's
+title/body/bullets on every run — the model is *told* not to write them, but the source thread
+usually ends with exactly that and a faithful adaptation carries it through. `code` is exempt (a URL
+there is part of the snippet). A bare third-party domain is also kept: `make.com` and `n8n.io` are
+tool names the reader needs. The matched `/g/<slug>` guide still rides in the **caption**
+(`threadDeckCaption`, validated against `STATIC_GUIDES`), which is where a link is actually tappable
+— a URL rendered into a PNG is dead pixels. `TechTipSlide.ctaUrl` is therefore cleared on Threads
+decks and no longer drawn by the renderer; the field survives only so a session persisted by an
+older build deserialises.
+
+Body copy is trimmed by `clampProse()` (`SocialAgentEngine.ts`), **not** `clampWords`: a paragraph
+is cut at a sentence break, and a first sentence slightly over budget is kept whole rather than
+truncated. A slide ending mid-clause is the loudest "a machine wrote this" tell on a carousel, and
+the cut happens after the model is done, so no prompt instruction can prevent it.
+
+The importer renders in **one** mode (`creator`) with no style picker: every photographic style
+puts a stock photo behind a prompt card, which is the thing the format exists to avoid. An image
+the *thread itself* published is evidence, not stock, and still renders.
 
 Division of labour is deliberate: **language is the model's job, structure is the agent's.** Asking
 the model for numbering/themes produced a deck that drifted every run.

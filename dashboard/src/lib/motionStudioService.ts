@@ -1,6 +1,7 @@
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
-import { getLogo, loadFont } from './newsImageComposer';
+import { getLogo } from './newsImageComposer';
 import { drawTipSlide, boxFor } from './techTipRenderer';
+import { ensureDeckFonts } from './designAssets';
 import type { TechTipDeck } from './techTipsApi';
 
 /**
@@ -101,14 +102,9 @@ export async function renderTipDeckVideo(
 
   const b = boxFor(W, H);
   const logo = await getLogo();
-  await Promise.all([
-    loadFont('800 90px Rubik'),
-    loadFont('800 56px Rubik'),
-    loadFont('400 40px Heebo'),
-    loadFont('500 32px Heebo'),
-    loadFont("500 28px 'JetBrains Mono'"),
-    loadFont("700 20px 'JetBrains Mono'"),
-  ]);
+  // Same warm-up the still export runs — every frame of the reel is painted by drawTipSlide, so a
+  // face that has not loaded yet would ship the wrong type into the video, not just one PNG.
+  await ensureDeckFonts();
 
   const totalDurationSec = deck.slides.length * perSlide;
   const totalFrames = Math.max(1, Math.ceil(totalDurationSec * FPS));

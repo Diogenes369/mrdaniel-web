@@ -302,18 +302,59 @@ export function extractPrompts(posts: string[]): string[] {
 
 // ─── slide layout ───────────────────────────────────────────────────────────────────────────
 
-/** The CTA copy, per theme. Promises only what the linked guide actually delivers. */
+/**
+ * The closing slide's copy, per theme.
+ *
+ * Deliberately carries no link and no keyword: a URL painted into a PNG is not tappable, and a
+ * carousel whose last slide is a link overlay reads as an ad rather than as a piece of teaching.
+ * The guide link lives in the caption (`threadDeckCaption`), where a reader can actually use it.
+ */
 const CTA_COPY: Record<ThreadTheme, { title: string; body: string }> = {
-  ai: { title: 'רוצים להעמיק?', body: 'המדריך המלא ללימוד ויישום בינה מלאכותית — להורדה חינם.' },
-  automation: { title: 'רוצים לבנות את זה בעסק?', body: 'המדריך המלא לאוטומציות AI ובניית סוכנים — להורדה חינם.' },
-  security: { title: 'רוצים לעשות את זה בבטחה?', body: 'המדריך המלא לאוטומציה עם פרק שלם על אבטחה ו-Prompt Injection.' },
-  code: { title: 'רוצים את זה בקוד?', body: 'המדריך המלא לבניית סוכנים וחיבור מערכות — להורדה חינם.' },
-  data: { title: 'רוצים להעמיק בנתונים?', body: 'המדריך המלא ל-RAG, חיפוש סמנטי וחיבור ידע למודל.' },
-  web3: { title: 'רוצים ללמוד עוד?', body: 'המדריך המלא לבינה מלאכותית ולטכנולוגיות שמאחוריה.' },
-  general: { title: 'רוצים את המדריך המלא?', body: 'עוד מדריכים, כלים ודוגמאות מעשיות — להורדה חינם.' },
+  ai: { title: 'זה כל התהליך', body: 'שמרו את הפוסט ותריצו את זה על המשימה הראשונה שלכם היום.' },
+  automation: { title: 'עכשיו תורכם לבנות', body: 'קחו תהליך אחד שחוזר אצלכם כל שבוע, ותתחילו ממנו.' },
+  security: { title: 'תריצו את זה בבטחה', body: 'בדקו את ההרשאות לפני שאתם מחברים מודל למערכת אמיתית.' },
+  code: { title: 'זה הקוד, זה הרעיון', body: 'העתיקו, תריצו, ותשנו פרמטר אחד כדי להבין מה באמת קורה שם.' },
+  data: { title: 'ככה הנתונים מתחברים', body: 'התחילו ממקור ידע אחד קטן לפני שאתם מחברים את כל הארגון.' },
+  web3: { title: 'זה הבסיס להמשך', body: 'תתנסו בסביבת בדיקות לפני שאתם נוגעים במשהו אמיתי.' },
+  general: { title: 'זה הסיכום', body: 'שמרו את הפוסט, ותחזרו אליו ברגע שתתחילו ליישם.' },
 };
 
 const SITE = 'https://mrdaniel.co.il';
+
+/**
+ * Strips link overlays and comment-bait out of slide copy.
+ *
+ * Two separate jobs that happen to have the same fix. The model is told not to write a URL or a
+ * "write X in the comments" line into a slide, but an instruction is not an enforcement: the source
+ * thread often ends with exactly that, and an adaptation faithful to the source will carry it
+ * through. A printed URL is dead pixels in a PNG, and comment-bait is against the repo's
+ * no-engagement-bait rule, so both are removed in code, on every slide, every run.
+ *
+ * Applied to prose only — never to `code`, where a URL can be a real part of the snippet.
+ */
+export function stripSlideCta(text: string): string {
+  return String(text || '')
+    // Absolute URLs, www-prefixed hosts, and any bare domain carrying a path.
+    .replace(/\bhttps?:\/\/[^\s)"'\]]+/gi, '')
+    .replace(/\bwww\.[^\s)"'\]]+/gi, '')
+    .replace(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|co\.il|io|net|org|ai|dev|app)\/[^\s)"'\]]*/gi, '')
+    // Our own domain is removed even bare — it is the one the model is most likely to volunteer.
+    // A bare third-party domain is NOT: "make.com" and "n8n.io" are tool names the reader needs,
+    // and stripping them would silently gut the very instruction the slide exists to give.
+    .replace(/\bmrdaniel\.co\.il\b/gi, '')
+    // "כתבו/הגיבו/שלחו <keyword> בתגובות / ב-DM" and its English twin.
+    .replace(/(?:כתבו|רשמו|הגיבו|תגיבו|שלחו|תשלחו)\s+(?:לי\s+)?[^\s,.!?]{1,24}\s*(?:בתגובות|בתגובה|בהודעה|ב-?DM|בדיאם)[^.!?\n]*/gi, '')
+    .replace(/\b(?:comment|dm|write)\s+["“']?\w{1,24}["”']?\s+(?:below|to get|for the)[^.!?\n]*/gi, '')
+    // "הקישור בביו" and friends — the link is in the caption, not on the slide.
+    .replace(/\b(?:הקישור|קישור|לינק)\s+(?:נמצא\s+)?(?:בביו|בבio|בתגובה הראשונה|למטה)[^.!?\n]*/gi, '')
+    // Whatever furniture the removals left behind.
+    .replace(/\(\s*\)/g, '')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/^[\s,;:.\-–—]+/, '')
+    .replace(/[\s,;:\-–—]+$/, '')
+    .trim();
+}
 
 /**
  * Applies the visual layout to an adapted deck: theme, badges, step indicators, prompt boxes,
@@ -337,11 +378,15 @@ function layOutDeck(deck: TechTipDeck, thread: ImportedThread, topic: ThreadTopi
   const images = [...thread.images];
   const prompts = extractPrompts(thread.posts);
   const paths = extractWorkflowPaths(thread.posts);
-  const ctaUrl = topic.guideSlug ? `${SITE}/g/${topic.guideSlug}` : SITE;
 
   slides.forEach((slide, i) => {
     slide.theme = topic.theme;
     slide.badge = topic.badge;
+    // Link overlays and comment-bait never reach a slide, whatever the source thread ended with.
+    // `code` is exempt on purpose — a URL inside a snippet is part of what the reader has to run.
+    slide.title = stripSlideCta(slide.title);
+    slide.body = stripSlideCta(slide.body);
+    slide.bullets = slide.bullets.map((b) => stripSlideCta(b)).filter((b) => b.length > 1);
     // A slide that names its own tool wins over the deck's — a round-up thread walks through
     // several, and each of those slides should wear the mark it is actually talking about. Brand
     // names survive the Hebrew adaptation as Latin text (source-fidelity rule 3), so this reads the
@@ -388,10 +433,22 @@ function layOutDeck(deck: TechTipDeck, thread: ImportedThread, topic: ThreadTopi
   const cta = slides[slides.length - 1];
   if (cta.kind === 'cta') {
     const copy = CTA_COPY[topic.theme];
-    cta.ctaUrl = ctaUrl;
+    // No link on the closing slide. Cleared rather than merely left unset, so a deck restored from
+    // a session written by an earlier build cannot re-draw the pill this build removed.
+    cta.ctaUrl = undefined;
     cta.stepLabel = undefined;
+    cta.noPhoto = true;
     if (!cta.title.trim()) cta.title = copy.title;
     if (!cta.body.trim()) cta.body = copy.body;
+    // The closing card summarises the deck with the deck's OWN step headlines rather than with
+    // invented marketing lines — every item on it was already a slide the reader just swiped past.
+    if (!cta.bullets.length && contentCount > 0) {
+      cta.bullets = slides
+        .slice(firstContent, lastContent + 1)
+        .map((s) => s.title.trim())
+        .filter(Boolean)
+        .slice(0, 3);
+    }
   }
 
   return { ...deck, slides };

@@ -40,18 +40,16 @@ import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
 
 /**
- * Background styles offered for the adapted deck — same shelf as the Tech Tips studio, plus the
- * creator mode this tab defaults to: a thread walking a reader through a tool is a technical deck,
- * and a searched stock photo behind its prompt card is the single loudest "assembled, not made"
- * tell. Creator mode fetches nothing and lets the tool's own colours carry the slide.
+ * The adapted deck is rendered in ONE mode, and the style picker the Tech Tips studio offers is
+ * deliberately not repeated here.
+ *
+ * A thread walking a reader through a tool is a technical deck: a searched stock photo behind its
+ * prompt card is the single loudest "assembled, not made" tell there is, and every one of the
+ * photographic styles produces exactly that. Creator mode fetches nothing — the slide is painted on
+ * the deep-slate backdrop lit by the tool's own colours — with one exception the renderer makes on
+ * its own: an image the THREAD published is evidence, not stock, and still renders.
  */
-const TIP_STYLES: { id: TipStyle; label: string; hint: string }[] = [
-  { id: 'creator', label: 'קריאייטור (ללא תמונות)', hint: 'רקע כהה עם זוהר בצבעי הכלי, לוגו וקשקושים — בלי סטוק' },
-  { id: 'photoreal', label: 'תמונות קונטקסטואליות', hint: 'תצלום אמיתי תואם לתוכן כל שקופית' },
-  { id: 'enterprise', label: 'הייטק / עסקי נקי', hint: 'בהיר, מקצועי, ניגודיות חדה' },
-  { id: 'dark-minimal', label: 'כהה מינימליסטי', hint: 'רקע כהה ומאופק' },
-  { id: 'sketchnote', label: 'איור אמנותי (AI)', hint: 'איור נוצר לפי תיאור השקופית' },
-];
+const DECK_STYLE: TipStyle = 'creator';
 
 const KIND_LABEL: Record<string, string> = {
   cover: 'שער',
@@ -112,12 +110,8 @@ export default function ThreadsImporter() {
   const [images, setImages] = useState<string[]>([]);
   const [renderProgress, setRenderProgress] = useState<{ done: number; total: number } | null>(null);
   const [bgProgress, setBgProgress] = useState<{ done: number; total: number } | null>(null);
-  const [backgrounds, setBackgrounds] = useState<(HTMLImageElement | null)[]>([]);
   const [active, setActive] = useState(0);
   const [copied, setCopied] = useState(false);
-
-  const [style, setStyle] = useState<TipStyle>('creator');
-  const [useAiBg, setUseAiBg] = useState(true);
   const [redesigning, setRedesigning] = useState(false);
 
   const [videoBusy, setVideoBusy] = useState(false);
@@ -157,7 +151,6 @@ export default function ThreadsImporter() {
   const resetOutputs = useCallback(() => {
     setImages([]);
     setActive(0);
-    setBackgrounds([]);
     setVideoUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
@@ -204,21 +197,16 @@ export default function ThreadsImporter() {
     setImportError(parsed.ok ? null : (parsed.note ?? 'לא נמצא טקסט שמיש בהדבקה.'));
   }, [rawText, url]);
 
-  const renderDeck = useCallback(
-    async (d: TechTipDeck) => {
-      let bgs: (HTMLImageElement | null)[] = [];
-      if (useAiBg) {
-        setBgProgress({ done: 0, total: d.slides.length });
-        bgs = await resolveTipBackgrounds(d, 1080, 1350, (done, total) => setBgProgress({ done, total }), style);
-        setBackgrounds(bgs);
-        setBgProgress(null);
-      }
-      setRenderProgress({ done: 0, total: d.slides.length });
-      const imgs = await renderTipDeckImages(d, { backgrounds: bgs }, (done, total) => setRenderProgress({ done, total }));
-      setImages(imgs);
-    },
-    [style, useAiBg]
-  );
+  const renderDeck = useCallback(async (d: TechTipDeck) => {
+    // Still called in creator mode even though it fetches no stock: this is the pass that loads the
+    // thread's OWN screenshots onto the slides they came from.
+    setBgProgress({ done: 0, total: d.slides.length });
+    const bgs = await resolveTipBackgrounds(d, 1080, 1350, (done, total) => setBgProgress({ done, total }), DECK_STYLE);
+    setBgProgress(null);
+    setRenderProgress({ done: 0, total: d.slides.length });
+    const imgs = await renderTipDeckImages(d, { backgrounds: bgs }, (done, total) => setRenderProgress({ done, total }));
+    setImages(imgs);
+  }, []);
 
   /** Stage 2 — translate & adapt, then render. */
   const generate = useCallback(async () => {
@@ -279,12 +267,9 @@ export default function ThreadsImporter() {
     setVideoError(null);
     setVideoPct(0);
     try {
-      // The reel is 9:16, so 4:5 carousel backdrops are re-fetched at the vertical aspect.
-      let bgs = backgrounds;
-      if (useAiBg) {
-        setVideoStage(null);
-        bgs = await resolveTipBackgrounds(deck, 1080, 1920, undefined, style);
-      }
+      // The reel is 9:16, so the thread's own images are re-fetched at the vertical aspect.
+      setVideoStage(null);
+      const bgs = await resolveTipBackgrounds(deck, 1080, 1920, undefined, DECK_STYLE);
       const { blob } = await renderTipDeckVideo(deck, { backgrounds: bgs, music: withMusic }, (pct, stage) => {
         setVideoPct(pct);
         setVideoStage(stage);
@@ -300,7 +285,7 @@ export default function ThreadsImporter() {
       setVideoBusy(false);
       setVideoStage(null);
     }
-  }, [deck, motionSupported, backgrounds, useAiBg, withMusic, style]);
+  }, [deck, motionSupported, withMusic]);
 
   const downloadVideo = useCallback(() => {
     if (!videoBlob || !deck) return;
@@ -477,29 +462,16 @@ export default function ThreadsImporter() {
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             צור קרוסלה בעברית (10–12 שקופיות)
           </button>
-          <label className="flex items-center gap-2 text-xs text-zinc-300">
-            <Wand2 className="w-3.5 h-3.5 text-brand-400" />
-            סגנון עיצוב
-            <select
-              value={style}
-              onChange={(e) => setStyle(e.target.value as TipStyle)}
-              className="cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-white"
-            >
-              {TIP_STYLES.map((st) => (
-                <option key={st.id} value={st.id}>{st.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-300">
-            <input type="checkbox" checked={useAiBg} onChange={(e) => setUseAiBg(e.target.checked)} className="accent-brand-500 w-4 h-4" />
-            רקעים מאוירים/מצולמים
-          </label>
         </div>
 
-        <p className="mt-2 text-[11px] text-zinc-500">{TIP_STYLES.find((st) => st.id === style)?.hint}</p>
+        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <Wand2 className="w-3.5 h-3.5 shrink-0 text-brand-400" />
+          עיצוב קריאייטור: רקע סלייט עמוק עם זוהר כפול בצבעי הכלי, כרטיסי זכוכית, מסגרות טרמינל לפרומפטים
+          וסימון בכתב יד — אפס תמונות סטוק.
+        </p>
         {bgProgress && (
           <p className="mt-3 text-[11px] text-sky-400/90">
-            {style === 'sketchnote' ? 'מייצר איורים…' : 'מאתר תמונות תואמות לכל שקופית…'} {bgProgress.done}/{bgProgress.total}
+            מכין נכסים לשקופיות… {bgProgress.done}/{bgProgress.total}
           </p>
         )}
         {renderProgress && (
