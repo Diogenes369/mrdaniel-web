@@ -19,6 +19,25 @@ export type TipSlideKind = 'cover' | 'concept' | 'code' | 'step' | 'tool' | 'tak
  *  (src/server/agents/threadsThreadAgent.ts); drives the accent colour and the topic badge. */
 export type ThreadTheme = 'ai' | 'automation' | 'security' | 'code' | 'data' | 'web3' | 'general';
 
+/** A tool the slide is about, detected server-side from the thread's own words. Drives the vector
+ *  logo mark drawn on the slide and the colour of the backdrop glow. Mirrors src/agent/types.ts. */
+export type ToolBrand =
+  | 'gemini'
+  | 'chatgpt'
+  | 'claude'
+  | 'canva'
+  | 'notebooklm'
+  | 'make'
+  | 'n8n'
+  | 'perplexity'
+  | 'copilot'
+  | 'workspace'
+  | 'veo'
+  | 'midjourney';
+
+/** Hand-drawn accent painted over the slide — the creator-deck signature. */
+export type ScribbleKind = 'underline' | 'circle' | 'arrow' | 'none';
+
 export interface TechTipSlide {
   kind: TipSlideKind;
   kicker: string;
@@ -44,6 +63,17 @@ export interface TechTipSlide {
   sourceImage?: string;
   /** Absolute link the CTA slide promotes, e.g. `https://mrdaniel.co.il/g/<slug>`. */
   ctaUrl?: string;
+
+  // Creator design engine — see src/agent/types.ts for the full contract.
+  /** The tool this slide is about. Paints its vector mark and tints the backdrop glow. */
+  tool?: ToolBrand;
+  /** The exact UI path the thread named, split into steps: `['Tools','Canvas']`. Drawn LTR. */
+  workflowPath?: string[];
+  /** Hand-drawn accent for this slide. */
+  scribble?: ScribbleKind;
+  /** Forbids a searched/generated photo here — technical slides keep the procedural backdrop.
+   *  An image the thread itself published still renders; it is not stock. */
+  noPhoto?: boolean;
 }
 
 /**

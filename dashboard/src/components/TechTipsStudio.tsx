@@ -27,6 +27,7 @@ import { renderTipDeckImages, exportTipDeckZip, resolveTipBackgrounds, type TipS
 
 /** Background styles offered for a guide. Photoreal contextual is the default. */
 const TIP_STYLES: { id: TipStyle; label: string; hint: string }[] = [
+  { id: 'creator', label: 'קריאייטור (ללא תמונות)', hint: 'רקע כהה עם זוהר בצבעי הכלי, לוגו וקשקושים — בלי סטוק' },
   { id: 'photoreal', label: 'תמונות קונטקסטואליות', hint: 'תצלום אמיתי תואם לתוכן כל שקופית' },
   { id: 'enterprise', label: 'הייטק / עסקי נקי', hint: 'בהיר, מקצועי, ניגודיות חדה' },
   { id: 'dark-minimal', label: 'כהה מינימליסטי', hint: 'רקע כהה ומאופק' },

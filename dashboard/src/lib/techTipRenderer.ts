@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { loadImage, getLogo, loadFont, wrapRtl, BRAND_GREEN } from './newsImageComposer';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
 import { highlightCode, TOKEN_PALETTE } from './syntaxHighlight';
-import type { TechTipDeck, TechTipSlide, ThreadTheme } from './techTipsApi';
+import type { TechTipDeck, TechTipSlide, ThreadTheme, ToolBrand } from './techTipsApi';
 import { resolveSlidePhotoUrl, loadPhoto } from './pexelsBackground';
 
 /**
@@ -17,11 +17,15 @@ import { resolveSlidePhotoUrl, loadPhoto } from './pexelsBackground';
  * whenever generation is disabled, slow, or fails.
  */
 
-const OBSIDIAN_TOP = '#06080D';
-const OBSIDIAN_BOTTOM = '#0B0F17';
+const OBSIDIAN_TOP = '#09090B';
+const OBSIDIAN_BOTTOM = '#0B0C10';
 const CYBER_CYAN = '#22D3EE';
 const SILVER = '#E2E8F0';
 const DOMAIN = 'mrdaniel.co.il';
+
+/** Card surfaces, matching the zinc ramp the rest of the dashboard is built on. */
+const ZINC_900 = 'rgba(24,24,27,0.82)';
+const ZINC_800 = 'rgba(63,63,70,0.9)';
 
 /**
  * Accent per subject family, assigned by the Threads agent.
@@ -45,8 +49,40 @@ const THEME_ACCENT: Record<ThreadTheme, string> = {
   general: BRAND_GREEN,
 };
 
+/**
+ * Per-tool identity: the wordmark, the accent the slide's chrome is tinted with, and the second
+ * colour of the backdrop's glow.
+ *
+ * A deck about Gemini and a deck about ChatGPT should be distinguishable with the text blurred out,
+ * which is exactly how they are seen in a feed. The tool's accent overrides the subject-family
+ * accent whenever one was detected, because the tool is the more specific fact about the slide.
+ * Every accent here clears 4.5:1 against the obsidian backdrop.
+ */
+const TOOL_STYLE: Record<ToolBrand, { label: string; accent: string; glow: string }> = {
+  gemini: { label: 'Gemini', accent: '#A78BFA', glow: '#22D3EE' },
+  chatgpt: { label: 'ChatGPT', accent: '#10D492', glow: '#34D399' },
+  claude: { label: 'Claude', accent: '#E08A63', glow: '#F0A882' },
+  canva: { label: 'Canva', accent: '#22D3EE', glow: '#A78BFA' },
+  notebooklm: { label: 'NotebookLM', accent: '#7AAEFF', glow: '#A78BFA' },
+  make: { label: 'Make', accent: '#B98CFF', glow: '#7C3AED' },
+  n8n: { label: 'n8n', accent: '#F4708F', glow: '#FB7185' },
+  perplexity: { label: 'Perplexity', accent: '#2DD4BF', glow: '#5EEAD4' },
+  copilot: { label: 'Copilot', accent: '#A78BFA', glow: '#60A5FA' },
+  workspace: { label: 'Workspace', accent: '#7AAEFF', glow: '#34D399' },
+  veo: { label: 'Veo', accent: '#7AAEFF', glow: '#A78BFA' },
+  midjourney: { label: 'Midjourney', accent: '#E2E8F0', glow: '#94A3B8' },
+};
+
+/** The slide's accent: its tool's colour when one was detected, else its subject family's. */
 function accentFor(slide: TechTipSlide): string {
-  return THEME_ACCENT[slide.theme ?? 'general'] ?? BRAND_GREEN;
+  const tool = slide.tool ? TOOL_STYLE[slide.tool] : undefined;
+  return tool?.accent ?? THEME_ACCENT[slide.theme ?? 'general'] ?? BRAND_GREEN;
+}
+
+/** The second colour of the backdrop glow — the tool's, else a cool counterpoint to the accent. */
+function glowFor(slide: TechTipSlide): string {
+  const tool = slide.tool ? TOOL_STYLE[slide.tool] : undefined;
+  return tool?.glow ?? CYBER_CYAN;
 }
 
 export interface SlideBox {
@@ -66,7 +102,13 @@ function hexToRgba(hex: string, a: number): string {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
-function paintProceduralBackground(ctx: CanvasRenderingContext2D, b: SlideBox, seed: number) {
+function paintProceduralBackground(
+  ctx: CanvasRenderingContext2D,
+  b: SlideBox,
+  seed: number,
+  accent: string = BRAND_GREEN,
+  glow: string = CYBER_CYAN
+) {
   const g = ctx.createLinearGradient(0, 0, b.W * 0.4, b.H);
   g.addColorStop(0, OBSIDIAN_TOP);
   g.addColorStop(1, OBSIDIAN_BOTTOM);
@@ -92,14 +134,370 @@ function paintProceduralBackground(ctx: CanvasRenderingContext2D, b: SlideBox, s
   }
   ctx.restore();
 
-  // ambient accent glow, seeded so consecutive slides differ
-  const cx = b.W * (0.3 + ((seed * 37) % 40) / 100);
-  const cy = b.H * (0.25 + ((seed * 53) % 45) / 100);
-  const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, b.W * 0.75);
-  rg.addColorStop(0, hexToRgba(seed % 2 === 0 ? BRAND_GREEN : CYBER_CYAN, 0.14));
-  rg.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = rg;
-  ctx.fillRect(0, 0, b.W, b.H);
+  // Two ambient glows in the slide's own brand pair, seeded so consecutive slides differ. This is
+  // what carries the tool's identity on a photo-free technical slide: a Gemini slide reads
+  // purple-into-cyan, a ChatGPT slide emerald, with nothing but the backdrop doing the work.
+  const pairs: [string, number, number, number][] = [
+    [accent, 0.3 + ((seed * 37) % 40) / 100, 0.24 + ((seed * 53) % 45) / 100, 0.16],
+    [glow, 0.72 - ((seed * 29) % 35) / 100, 0.74 - ((seed * 41) % 30) / 100, 0.1],
+  ];
+  for (const [colour, fx, fy, alpha] of pairs) {
+    const cx = b.W * fx;
+    const cy = b.H * fy;
+    const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, b.W * 0.78);
+    rg.addColorStop(0, hexToRgba(colour, alpha));
+    rg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, b.W, b.H);
+  }
+}
+
+// ─── hand-drawn accents ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Seeded PRNG. The wobble that makes a stroke read as hand-drawn has to be STABLE: the same slide
+ * is painted once for the carousel PNG and again for every frame of the reel, and a random jitter
+ * would make the underline crawl across the video.
+ */
+function rand(seed: number): () => number {
+  let s = (seed >>> 0) || 1;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+/** Strokes a point list as a smooth polyline (midpoint quadratics), so jitter reads as a drawn
+ *  line rather than as a jagged one. */
+function strokeWobble(ctx: CanvasRenderingContext2D, pts: [number, number][]) {
+  if (pts.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [x, y] = pts[i];
+    const [nx, ny] = pts[i + 1];
+    ctx.quadraticCurveTo(x, y, (x + nx) / 2, (y + ny) / 2);
+  }
+  ctx.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+  ctx.stroke();
+}
+
+/** Marker underline beneath a run of text — two passes, the second lighter and offset, which is
+ *  what makes a real marker stroke look like one rather than like a border-bottom. */
+function scribbleUnderline(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  colour: string,
+  seed: number
+) {
+  if (w <= 0) return;
+  const rnd = rand(seed);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = colour;
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.globalAlpha = pass === 0 ? 0.92 : 0.4;
+    ctx.lineWidth = Math.max(2, w * (pass === 0 ? 0.016 : 0.009));
+    const pts: [number, number][] = [];
+    const steps = 9;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      // A drawn underline sags in the middle and overshoots slightly at both ends.
+      const sag = Math.sin(t * Math.PI) * w * 0.012;
+      pts.push([
+        x - w * 0.015 + w * 1.03 * t,
+        y + pass * w * 0.016 + sag + (rnd() - 0.5) * w * 0.012,
+      ]);
+    }
+    strokeWobble(ctx, pts);
+  }
+  ctx.restore();
+}
+
+/** Open circle drawn around something — slightly over a full turn, with the overshoot a hand
+ *  leaves behind. Used to ring a step numeral. */
+function scribbleCircle(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  colour: string,
+  seed: number
+) {
+  const rnd = rand(seed);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = colour;
+  ctx.globalAlpha = 0.85;
+  ctx.lineWidth = Math.max(2, rx * 0.075);
+  const start = -0.7;
+  const end = Math.PI * 2 * 1.13 - 0.7;
+  const steps = 40;
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = start + (end - start) * (i / steps);
+    const j = 1 + (rnd() - 0.5) * 0.07;
+    pts.push([cx + Math.cos(a) * rx * j, cy + Math.sin(a) * ry * j]);
+  }
+  strokeWobble(ctx, pts);
+  ctx.restore();
+}
+
+/** Doodle arrow — a curved shaft with a two-stroke head, the kind drawn over a screenshot to say
+ *  "this bit". Bows sideways so it never reads as a straight connector. */
+function doodleArrow(
+  ctx: CanvasRenderingContext2D,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  colour: string,
+  seed: number
+) {
+  const rnd = rand(seed);
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 4) return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = colour;
+  ctx.globalAlpha = 0.9;
+  ctx.lineWidth = Math.max(2, len * 0.035);
+
+  // Shaft: bowed perpendicular to the run, plus a little jitter along it.
+  const bow = len * 0.22;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const pts: [number, number][] = [];
+  const steps = 10;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const arc = Math.sin(t * Math.PI) * bow;
+    pts.push([
+      x1 + dx * t + nx * arc + (rnd() - 0.5) * len * 0.02,
+      y1 + dy * t + ny * arc + (rnd() - 0.5) * len * 0.02,
+    ]);
+  }
+  strokeWobble(ctx, pts);
+
+  // Head: two strokes off the true tip, angled against the shaft's final direction.
+  const [px, py] = pts[pts.length - 2];
+  const a = Math.atan2(y2 - py, x2 - px);
+  const hl = len * 0.3;
+  for (const spread of [2.5, -2.5]) {
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 + Math.cos(a + spread) * hl, y2 + Math.sin(a + spread) * hl);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ─── tool marks ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Vector marks for the tools a deck can be about, each drawn into a 0..100 box.
+ *
+ * Drawn as canvas paths rather than fetched as SVG/PNG on purpose: an external image taints the
+ * export canvas and `toDataURL` then throws at the last step of a render that already cost a minute.
+ * These are geometric identity marks in each product's own shape language — not reproductions of a
+ * trademark — which is also why each one sits next to its wordmark rather than standing alone.
+ */
+const TOOL_MARKS: Record<ToolBrand, (ctx: CanvasRenderingContext2D, colour: string) => void> = {
+  // Four-point sparkle.
+  gemini: (ctx, c) => {
+    ctx.fillStyle = c;
+    ctx.fill(
+      new Path2D(
+        'M50 2C50 28 28 50 2 50C28 50 50 72 50 98C50 72 72 50 98 50C72 50 50 28 50 2Z'
+      )
+    );
+  },
+  // Interlocking loops — three stroked ellipses at 60° to each other.
+  chatgpt: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineWidth = 8;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(50, 50, 46, 22, (i * Math.PI) / 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  },
+  // Radiating burst.
+  claude: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 8;
+    for (let i = 0; i < 11; i++) {
+      const a = (i / 11) * Math.PI * 2;
+      const inner = 14;
+      const outer = i % 2 === 0 ? 47 : 38;
+      ctx.beginPath();
+      ctx.moveTo(50 + Math.cos(a) * inner, 50 + Math.sin(a) * inner);
+      ctx.lineTo(50 + Math.cos(a) * outer, 50 + Math.sin(a) * outer);
+      ctx.stroke();
+    }
+  },
+  // Open ring in the shape of a C.
+  canva: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 13;
+    ctx.beginPath();
+    ctx.arc(50, 50, 38, Math.PI * 0.35, Math.PI * 1.68);
+    ctx.stroke();
+  },
+  // Notebook with a spark.
+  notebooklm: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 8;
+    roundRectPath(ctx, 14, 10, 62, 80, 12);
+    ctx.stroke();
+    ctx.beginPath();
+    for (const y of [34, 50]) {
+      ctx.moveTo(30, y);
+      ctx.lineTo(60, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = c;
+    ctx.fill(new Path2D('M76 44C76 56 68 64 56 64C68 64 76 72 76 84C76 72 84 64 96 64C84 64 76 56 76 44Z'));
+  },
+  // Two chevrons forming an M.
+  make: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 11;
+    ctx.beginPath();
+    ctx.moveTo(14, 78);
+    ctx.lineTo(32, 22);
+    ctx.lineTo(50, 62);
+    ctx.lineTo(68, 22);
+    ctx.lineTo(86, 78);
+    ctx.stroke();
+  },
+  // Connected nodes — one source fanning into two.
+  n8n: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(26, 50);
+    ctx.lineTo(52, 50);
+    ctx.moveTo(52, 50);
+    ctx.lineTo(74, 26);
+    ctx.moveTo(52, 50);
+    ctx.lineTo(74, 74);
+    ctx.stroke();
+    ctx.fillStyle = c;
+    for (const [x, y, r] of [
+      [20, 50, 12],
+      [78, 24, 10],
+      [78, 76, 10],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  // Branching search glyph.
+  perplexity: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(50, 10);
+    ctx.lineTo(50, 90);
+    ctx.moveTo(50, 30);
+    ctx.lineTo(18, 30);
+    ctx.lineTo(18, 62);
+    ctx.moveTo(50, 30);
+    ctx.lineTo(82, 30);
+    ctx.lineTo(82, 62);
+    ctx.stroke();
+  },
+  // Goggled mark.
+  copilot: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineWidth = 8;
+    roundRectPath(ctx, 10, 28, 80, 46, 23);
+    ctx.stroke();
+    ctx.fillStyle = c;
+    for (const x of [36, 64]) {
+      ctx.beginPath();
+      ctx.ellipse(x, 51, 9, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  // Four-arc ring, the Google family device.
+  workspace: (ctx, c) => {
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = 13;
+    const arcs: [string, number, number][] = [
+      ['#4285F4', -0.35, 1.2],
+      ['#EA4335', 1.3, 2.7],
+      ['#FBBC05', 2.8, 4.2],
+      ['#34A853', 4.3, 5.85],
+    ];
+    for (const [colour, a0, a1] of arcs) {
+      ctx.strokeStyle = colour || c;
+      ctx.beginPath();
+      ctx.arc(50, 50, 38, a0, a1);
+      ctx.stroke();
+    }
+  },
+  // Play glyph with a spark.
+  veo: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineWidth = 8;
+    roundRectPath(ctx, 8, 20, 72, 60, 16);
+    ctx.stroke();
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.moveTo(36, 34);
+    ctx.lineTo(64, 50);
+    ctx.lineTo(36, 66);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fill(new Path2D('M84 8C84 18 78 24 68 24C78 24 84 30 84 40C84 30 90 24 100 24C90 24 84 18 84 8Z'));
+  },
+  // Sail over a hull.
+  midjourney: (ctx, c) => {
+    ctx.strokeStyle = c;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(50, 12);
+    ctx.lineTo(50, 66);
+    ctx.moveTo(50, 20);
+    ctx.lineTo(84, 66);
+    ctx.lineTo(50, 66);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(16, 74);
+    ctx.quadraticCurveTo(50, 96, 88, 74);
+    ctx.stroke();
+  },
+};
+
+/** Paints a tool's mark into a `size`×`size` box at (x, y). */
+function drawToolMark(ctx: CanvasRenderingContext2D, tool: ToolBrand, x: number, y: number, size: number, colour: string) {
+  const mark = TOOL_MARKS[tool];
+  if (!mark) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 100, size / 100);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  mark(ctx, colour);
+  ctx.restore();
 }
 
 /** Pollinations: free + keyless + `Access-Control-Allow-Origin: *` (verified), so the generated
@@ -145,11 +543,18 @@ function brandVisualsFor(text: string): string[] {
   return BRAND_TERMS.filter((t) => t.re.test(text)).map((t) => t.visual).slice(0, 3);
 }
 
-/** Background sources offered in the Tips & Guides control bar. */
-export type TipStyle = 'photoreal' | 'enterprise' | 'dark-minimal' | 'sketchnote';
+/**
+ * Background sources offered in the Tips & Guides control bar.
+ *
+ * `creator` is the odd one out and deliberately so: it fetches nothing at all. The deck is painted
+ * on the procedural obsidian backdrop lit by the slide's own tool colours, which is what the
+ * reference aesthetic actually is — a stock photo behind a prompt card is the thing it avoids.
+ */
+export type TipStyle = 'creator' | 'photoreal' | 'enterprise' | 'dark-minimal' | 'sketchnote';
 
 /** Extra search terms per style, appended to the slide's own contextual query. */
 const STYLE_TONE: Record<TipStyle, string> = {
+  creator: '',
   photoreal: 'professional photography',
   enterprise: 'bright clean corporate office technology',
   'dark-minimal': 'dark moody minimal technology',
@@ -179,6 +584,12 @@ export async function resolveTipBackgrounds(
         // relay by the fetcher, so it draws to canvas without tainting it. A failure yields null
         // and the slide falls back to the procedural backdrop, same as every other source here.
         out[i] = await loadPhoto(slide.sourceImage, 12000);
+      } else if (style === 'creator' || slide.noPhoto) {
+        // Zero stock imagery. `noPhoto` marks the slides carrying something the reader is meant to
+        // copy, run or click; `creator` applies the same rule to the whole deck. Either way the
+        // slide keeps the procedural backdrop, lit in its own tool's colours — which is the point,
+        // not a fallback.
+        out[i] = null;
       } else if (style === 'sketchnote') {
         // Illustrated art: keep the existing Pollinations path driven by the slide's visualPrompt.
         const subject = [slide.title, slide.body, slide.code].filter(Boolean).join(' ');
@@ -337,8 +748,13 @@ function drawTopBar(
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     setMono(ctx, b.W * 0.0165, 700);
-    const bw = ctx.measureText(badge).width + b.W * 0.03;
     const bh = b.W * 0.034;
+    // The tool's mark rides inside the topic chip as a leading glyph rather than claiming a lane of
+    // its own — the top bar already carries a counter, the chip and the site logo, and a fourth
+    // element there crowds the slide at thumbnail size.
+    const markS = slide.tool ? bh * 0.74 : 0;
+    const markGap = slide.tool ? b.W * 0.009 : 0;
+    const bw = ctx.measureText(badge).width + b.W * 0.03 + markS + markGap;
     const bx = b.PAD + progressW + b.W * 0.022;
     roundRectPath(ctx, bx, y - bh / 2, bw, bh, bh * 0.3);
     ctx.fillStyle = hexToRgba(accent, 0.14);
@@ -346,8 +762,9 @@ function drawTopBar(
     ctx.strokeStyle = hexToRgba(accent, 0.5);
     ctx.lineWidth = 1;
     ctx.stroke();
+    if (slide.tool) drawToolMark(ctx, slide.tool, bx + b.W * 0.013, y - markS / 2, markS, accent);
     ctx.fillStyle = accent;
-    ctx.fillText(badge, bx + b.W * 0.015, y + 1);
+    ctx.fillText(badge, bx + b.W * 0.015 + markS + markGap, y + 1);
     ctx.restore();
   }
 
@@ -640,18 +1057,57 @@ function drawPromptBox(
   if (!clean || maxH <= 0) return;
   const rtl = /[֐-׿]/.test(clean.slice(0, 80));
 
+  // The card is MEASURED before it is drawn: a prompt that needs four lines gets a four-line card,
+  // not one stretched to the bottom of the slide. Sizing it to the region left short prompts
+  // floating in a half-empty slab, which reads as a rendering fault rather than as a design.
+  const headPad = b.W * 0.034;
+  const gapBelowHead = b.W * 0.032;
+  const bottomPad = b.W * 0.026;
+  const chromeH = headPad + gapBelowHead + bottomPad;
+  const innerW = r.w - b.W * 0.06;
+  const budget = maxH - chromeH;
+  if (budget <= 0) return;
+
+  let px = b.W * 0.026;
+  const minPx = b.W * 0.015;
+  let lines: string[] = [];
+  for (let i = 0; i < 24; i++) {
+    setMono(ctx, px, 400);
+    lines = rtl ? wrapRtl(ctx, sanitizeHebrewText(clean), innerW) : wrapLtr(ctx, clean, innerW);
+    if (lines.length * px * 1.5 <= budget || px <= minPx) break;
+    px = Math.max(minPx, px * 0.94);
+  }
+  setMono(ctx, px, 400);
+  // A prompt too long even at the floor size is clipped, not allowed to grow the card past maxH.
+  const textH = Math.min(budget, lines.length * px * 1.5);
+  const panelH = chromeH + textH;
+
+  // Glassmorphic dark card: a zinc-900 slab on a zinc-800 hairline, lifted off the backdrop by its
+  // own drop shadow, with the accent reserved for the top edge and the PROMPT tag. The card used to
+  // be outlined entirely in the accent, which made every prompt shout as loudly as the title.
+  const radius = b.W * 0.024;
   ctx.save();
-  roundRectPath(ctx, r.x, top, r.w, maxH, b.W * 0.024);
-  ctx.fillStyle = 'rgba(2,4,8,0.74)';
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 20;
+  roundRectPath(ctx, r.x, top, r.w, panelH, radius);
+  ctx.fillStyle = ZINC_900;
   ctx.fill();
-  roundRectPath(ctx, r.x, top, r.w, maxH, b.W * 0.024);
-  ctx.strokeStyle = hexToRgba(accent, 0.45);
+  ctx.restore();
+  ctx.save();
+  roundRectPath(ctx, r.x, top, r.w, panelH, radius);
+  ctx.strokeStyle = ZINC_800;
   ctx.lineWidth = 1.5;
   ctx.stroke();
+  // Accent hairline along the top edge, clipped to the card so it follows the corner radius.
+  roundRectPath(ctx, r.x, top, r.w, panelH, radius);
+  ctx.clip();
+  ctx.fillStyle = hexToRgba(accent, 0.75);
+  ctx.fillRect(r.x, top, r.w, Math.max(2, b.W * 0.0028));
   ctx.restore();
 
   // header: the PROMPT tag, plus the two-offset-squares mark that reads universally as "copy"
-  const headY = top + b.W * 0.034;
+  const headY = top + headPad;
   ctx.save();
   ctx.direction = 'ltr';
   ctx.textBaseline = 'middle';
@@ -671,26 +1127,12 @@ function drawPromptBox(
   ctx.stroke();
   ctx.restore();
 
-  const innerTop = headY + b.W * 0.032;
-  const innerH = top + maxH - innerTop - b.W * 0.026;
-  const innerW = r.w - b.W * 0.06;
-  if (innerH <= 0) return;
-
-  let px = b.W * 0.026;
-  const minPx = b.W * 0.015;
-  let lines: string[] = [];
-  for (let i = 0; i < 24; i++) {
-    setMono(ctx, px, 400);
-    lines = rtl ? wrapRtl(ctx, sanitizeHebrewText(clean), innerW) : wrapLtr(ctx, clean, innerW);
-    if (lines.length * px * 1.5 <= innerH || px <= minPx) break;
-    px = Math.max(minPx, px * 0.94);
-  }
-  setMono(ctx, px, 400);
+  const innerTop = headY + gapBelowHead;
 
   ctx.save();
   // Hard clip to the slab interior, so an over-long prompt truncates instead of bleeding out.
   ctx.beginPath();
-  ctx.rect(r.x + b.W * 0.02, innerTop - px, r.w - b.W * 0.04, innerH + px);
+  ctx.rect(r.x + b.W * 0.02, innerTop - px, r.w - b.W * 0.04, textH + px);
   ctx.clip();
   ctx.direction = rtl ? 'rtl' : 'ltr';
   ctx.textAlign = rtl ? 'right' : 'left';
@@ -699,7 +1141,7 @@ function drawPromptBox(
   const x = rtl ? r.x + r.w - b.W * 0.03 : r.x + b.W * 0.03;
   let y = innerTop + px;
   for (const line of lines) {
-    if (y > innerTop + innerH) break;
+    if (y > innerTop + textH) break;
     ctx.fillText(line, x, y);
     y += px * 1.5;
   }
@@ -755,7 +1197,76 @@ function drawBulletList(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, b
   }
 }
 
-function drawStepBadge(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, n: number, accent: string): number {
+/**
+ * The UI path the thread told the reader to walk, as an LTR breadcrumb of chips.
+ *
+ * Menu labels are never translated — a reader following along needs the literal string printed in
+ * the product — so the row is drawn left-to-right and right-aligned as a block into the RTL column,
+ * which is where the eye lands first in Hebrew. Returns the y the next element may start at.
+ */
+function drawWorkflowPath(
+  ctx: CanvasRenderingContext2D,
+  b: SlideBox,
+  r: Region,
+  segs: string[],
+  top: number,
+  accent: string
+): number {
+  const steps = segs.map((s) => s.trim()).filter(Boolean).slice(0, 4);
+  if (!steps.length) return top;
+
+  const h = b.W * 0.05;
+  const padX = b.W * 0.019;
+  const gap = b.W * 0.028;
+  let px = b.W * 0.02;
+  const width = () => {
+    setMono(ctx, px, 700);
+    return steps.reduce((w, s) => w + ctx.measureText(s).width + padX * 2, 0) + gap * (steps.length - 1);
+  };
+  // Shrink rather than wrap: a path broken across two lines stops reading as one journey.
+  let total = width();
+  while (total > r.w && px > b.W * 0.012) {
+    px *= 0.94;
+    total = width();
+  }
+
+  ctx.save();
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const midY = top + h / 2;
+  let x = r.x + r.w - total;
+  steps.forEach((step, i) => {
+    const w = ctx.measureText(step).width + padX * 2;
+    roundRectPath(ctx, x, top, w, h, h * 0.32);
+    ctx.fillStyle = ZINC_900;
+    ctx.fill();
+    ctx.strokeStyle = ZINC_800;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(226,232,240,0.95)';
+    ctx.fillText(step, x + padX, midY + 1);
+    x += w;
+    if (i < steps.length - 1) {
+      ctx.fillStyle = accent;
+      ctx.textAlign = 'center';
+      ctx.fillText('›', x + gap / 2, midY);
+      ctx.textAlign = 'left';
+      x += gap;
+    }
+  });
+  ctx.restore();
+  return top + h + b.W * 0.026;
+}
+
+function drawStepBadge(
+  ctx: CanvasRenderingContext2D,
+  b: SlideBox,
+  r: Region,
+  n: number,
+  accent: string,
+  ring = false
+): number {
   const size = b.W * 0.115;
   const x = r.x + r.w - size;
   const y = r.y;
@@ -782,6 +1293,11 @@ function drawStepBadge(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, n:
   ctx.globalAlpha = 1;
   ctx.fillText(String(n), x + size / 2, y + size / 2 + 2);
   ctx.restore();
+  // The circled numeral — seeded off the step number so the same step is ringed identically in the
+  // carousel PNG and in every frame of the reel.
+  if (ring) {
+    scribbleCircle(ctx, x + size / 2, y + size / 2, size * 0.74, size * 0.68, accent, n * 313 + 5);
+  }
   return y + size + b.W * 0.03;
 }
 
@@ -805,10 +1321,11 @@ export function drawTipSlide(
   anim: SlideAnim = { intro: 1, outro: 0 }
 ) {
   ctx.clearRect(0, 0, b.W, b.H);
-  paintProceduralBackground(ctx, b, index);
-  if (bg) drawBackgroundImage(ctx, b, bg);
-
   const accent = accentFor(slide);
+  // The backdrop is lit in the slide's own brand pair, so a photo-free technical slide still
+  // carries the tool's identity before a single word is read.
+  paintProceduralBackground(ctx, b, index, accent, glowFor(slide));
+  if (bg) drawBackgroundImage(ctx, b, bg);
   drawTopBar(ctx, b, slide, index, total, logo, accent);
   drawBottomBar(ctx, b, index, total, accent);
 
@@ -824,19 +1341,41 @@ export function drawTipSlide(
   let cursorY = region.y;
 
   if (slide.kind === 'step' && slide.stepNumber > 0) {
-    cursorY = drawStepBadge(ctx, b, region, slide.stepNumber, accent);
+    cursorY = drawStepBadge(ctx, b, region, slide.stepNumber, accent, slide.scribble === 'circle');
     region.y = cursorY;
     region.h = r.y + r.h - cursorY;
   }
 
   if (slide.kind === 'cover' || slide.kind === 'cta') {
     // Centred, oversized title + supporting line.
+    // Tool lockup above the headline — mark plus wordmark, centred. The cover of a creator deck
+    // names its subject before the title does, which is what makes it identifiable in a grid.
+    if (slide.kind === 'cover' && slide.tool) {
+      const t = TOOL_STYLE[slide.tool];
+      const ms = b.W * 0.072;
+      const lockGap = b.W * 0.018;
+      ctx.save();
+      ctx.direction = 'ltr';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      setMono(ctx, b.W * 0.026, 700);
+      const lockW = ms + lockGap + ctx.measureText(t.label).width;
+      const lx = b.W / 2 - lockW / 2;
+      const ly = region.y + region.h * 0.1;
+      drawToolMark(ctx, slide.tool, lx, ly - ms / 2, ms, t.accent);
+      ctx.fillStyle = 'rgba(226,232,240,0.92)';
+      ctx.fillText(t.label, lx + ms + lockGap, ly + 1);
+      ctx.restore();
+    }
+
     const { lines, px } = autoFit(ctx, sanitizeHebrewText(slide.title), region.w, b.W * 0.085, b.W * 0.042, 5, (c, p) => setDisplay(c, p, 800));
     setDisplay(ctx, px, 800);
     ctx.direction = 'rtl';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     let y = region.y + region.h * 0.3 - ((lines.length - 1) * px * 1.18) / 2;
+    let lastBaseline = y;
+    let lastWidth = 0;
     for (const line of lines) {
       const grad = ctx.createLinearGradient(region.x + region.w, 0, region.x, 0);
       grad.addColorStop(0, '#FFFFFF');
@@ -844,7 +1383,15 @@ export function drawTipSlide(
       grad.addColorStop(1, accent);
       ctx.fillStyle = grad;
       ctx.fillText(line, b.W / 2, y);
+      lastBaseline = y;
+      lastWidth = ctx.measureText(line).width;
       y += px * 1.18;
+    }
+    // Marker underline beneath the closing line of the headline — the one hand-drawn mark on a
+    // cover. Measured off the line actually painted, so it tracks the auto-fitted type size.
+    if (slide.scribble === 'underline' && lastWidth > 0) {
+      const uw = Math.min(lastWidth, region.w * 0.9);
+      scribbleUnderline(ctx, b.W / 2 - uw / 2, lastBaseline + px * 0.28, uw, accent, index * 977 + 13);
     }
     if (slide.body) {
       y += b.W * 0.03;
@@ -885,7 +1432,12 @@ export function drawTipSlide(
       ctx.fillText(label, b.W / 2, y + ph / 2 + 1);
     }
   } else {
-    const afterTitle = drawTitle(ctx, b, region, slide.title, b.W * 0.052, 3, accent) + b.W * 0.028;
+    let afterTitle = drawTitle(ctx, b, region, slide.title, b.W * 0.052, 3, accent) + b.W * 0.028;
+    // The click-path sits directly beneath the title: it IS the slide's instruction, and the body,
+    // prompt card or snippet below it are the elaboration.
+    if (slide.workflowPath?.length) {
+      afterTitle = drawWorkflowPath(ctx, b, region, slide.workflowPath, afterTitle, accent);
+    }
     const remaining = region.y + region.h - afterTitle;
 
     if (slide.kind === 'code' && slide.code.trim()) {
@@ -906,6 +1458,7 @@ export function drawTipSlide(
     } else if (slide.promptBox?.trim()) {
       // Same shape as the code branch: the body sets the prompt up in a line or two, the box is the
       // slide's actual payload. Checked after code so a slide carrying both never draws two panels.
+      let boxTop = afterTitle;
       if (slide.body) {
         setBody(ctx, b.W * 0.028, 400);
         ctx.direction = 'rtl';
@@ -916,11 +1469,24 @@ export function drawTipSlide(
           ctx.fillText(line, region.x + region.w, by);
           by += b.W * 0.04;
         }
-        const boxTop = by + b.W * 0.015;
-        drawPromptBox(ctx, b, region, slide.promptBox, boxTop, region.y + region.h - boxTop, accent);
-      } else {
-        drawPromptBox(ctx, b, region, slide.promptBox, afterTitle, remaining, accent);
+        boxTop = by + b.W * 0.015;
       }
+      // The doodle arrow gets its own reserved gap instead of being drawn over whatever sits
+      // above the card. Room is taken from the card, so the arrow can never collide with the body
+      // copy, and it is skipped outright when the card is already tight.
+      const gap = slide.scribble === 'arrow' && region.y + region.h - boxTop > b.W * 0.55 ? b.W * 0.062 : 0;
+      if (gap > 0) {
+        doodleArrow(
+          ctx,
+          region.x + region.w * 0.27,
+          boxTop + gap * 0.06,
+          region.x + region.w * 0.15,
+          boxTop + gap * 0.88,
+          accent,
+          index * 131 + 7
+        );
+      }
+      drawPromptBox(ctx, b, region, slide.promptBox, boxTop + gap, region.y + region.h - boxTop - gap, accent);
     } else if ((slide.kind === 'tool' || slide.kind === 'takeaway') && slide.bullets.length) {
       drawBulletList(ctx, b, region, slide.bullets, afterTitle, remaining, slide.kind === 'takeaway' ? 'check' : 'dot');
     } else {

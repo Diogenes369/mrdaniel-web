@@ -228,6 +228,31 @@ export type TipSlideKind = 'cover' | 'concept' | 'code' | 'step' | 'tool' | 'tak
  */
 export type ThreadTheme = 'ai' | 'automation' | 'security' | 'code' | 'data' | 'web3' | 'general';
 
+/**
+ * A tool the slide actually talks about, detected from the source thread's own words.
+ *
+ * Drives the vector logo mark drawn on the slide and the backdrop's glow colour, so a Gemini deck
+ * reads purple/cyan and a ChatGPT deck reads emerald without any per-deck configuration. The marks
+ * are drawn as canvas paths (see TOOL_MARKS in dashboard/src/lib/techTipRenderer.ts) — no external
+ * SVG fetch, which would taint the export canvas.
+ */
+export type ToolBrand =
+  | 'gemini'
+  | 'chatgpt'
+  | 'claude'
+  | 'canva'
+  | 'notebooklm'
+  | 'make'
+  | 'n8n'
+  | 'perplexity'
+  | 'copilot'
+  | 'workspace'
+  | 'veo'
+  | 'midjourney';
+
+/** Hand-drawn accent painted over the slide — the creator-deck signature. */
+export type ScribbleKind = 'underline' | 'circle' | 'arrow' | 'none';
+
 export interface TechTipSlide {
   kind: TipSlideKind;
   /** short section tag for the slide's top bar */
@@ -267,6 +292,26 @@ export interface TechTipSlide {
   sourceImage?: string;
   /** Absolute link the CTA slide promotes, e.g. `https://mrdaniel.co.il/g/<slug>`. */
   ctaUrl?: string;
+
+  // --- creator design engine ----------------------------------------------------------------
+
+  /** The tool this slide is about. Paints its vector mark and tints the backdrop glow. */
+  tool?: ToolBrand;
+  /**
+   * The exact UI path the thread told the reader to walk, already split: `['Tools','Canvas']`.
+   * Drawn as an LTR breadcrumb of chips — product menu labels are never translated, so a reader
+   * can follow them against the real interface.
+   */
+  workflowPath?: string[];
+  /** Hand-drawn accent for this slide. Assigned in code from the slide's role, not by the model. */
+  scribble?: ScribbleKind;
+  /**
+   * Forbids a searched/generated photo on this slide — the backdrop stays the procedural dark
+   * gradient. Set on every technical slide (prompt, code, workflow, tool), because a stock photo
+   * behind a prompt box is the single strongest tell that a deck was assembled rather than made.
+   * An image the thread itself published is NOT a stock photo and still renders.
+   */
+  noPhoto?: boolean;
 }
 
 export interface TechTipDeck {

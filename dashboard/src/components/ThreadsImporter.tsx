@@ -39,8 +39,14 @@ import { renderTipDeckVideo, isMotionSupported } from '../lib/motionStudioServic
 import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
 
-/** Background styles offered for the adapted deck — same shelf as the Tech Tips studio. */
+/**
+ * Background styles offered for the adapted deck — same shelf as the Tech Tips studio, plus the
+ * creator mode this tab defaults to: a thread walking a reader through a tool is a technical deck,
+ * and a searched stock photo behind its prompt card is the single loudest "assembled, not made"
+ * tell. Creator mode fetches nothing and lets the tool's own colours carry the slide.
+ */
 const TIP_STYLES: { id: TipStyle; label: string; hint: string }[] = [
+  { id: 'creator', label: 'קריאייטור (ללא תמונות)', hint: 'רקע כהה עם זוהר בצבעי הכלי, לוגו וקשקושים — בלי סטוק' },
   { id: 'photoreal', label: 'תמונות קונטקסטואליות', hint: 'תצלום אמיתי תואם לתוכן כל שקופית' },
   { id: 'enterprise', label: 'הייטק / עסקי נקי', hint: 'בהיר, מקצועי, ניגודיות חדה' },
   { id: 'dark-minimal', label: 'כהה מינימליסטי', hint: 'רקע כהה ומאופק' },
@@ -110,7 +116,7 @@ export default function ThreadsImporter() {
   const [active, setActive] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  const [style, setStyle] = useState<TipStyle>('photoreal');
+  const [style, setStyle] = useState<TipStyle>('creator');
   const [useAiBg, setUseAiBg] = useState(true);
   const [redesigning, setRedesigning] = useState(false);
 

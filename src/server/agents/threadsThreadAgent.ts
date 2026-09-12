@@ -1,7 +1,7 @@
 import { synthesizeThreadDeck, ModelOutputError, stripSourceCredits } from '../../agent/SocialAgentEngine.js';
 import { sanitizeHebrewText } from '../../agent/hebrewTextSanitizer.js';
 import { STATIC_GUIDES } from '../leadMagnets.js';
-import type { TechTipDeck, TechTipSlide, ThreadTheme } from '../../agent/types.js';
+import type { TechTipDeck, TechTipSlide, ThreadTheme, ToolBrand } from '../../agent/types.js';
 import type { ImportedThread } from '../threadsThreadFetcher.js';
 
 /**
@@ -27,6 +27,8 @@ export interface ThreadTopicProfile {
   badge: string;
   /** `/g/<slug>` the CTA promotes, or '' when no live guide fits the topic. */
   guideSlug: string;
+  /** The tool the thread as a whole is about, when one dominates. Drives the deck's logo mark. */
+  tool?: ToolBrand;
   /** Signals that fired, in order — surfaced in the dashboard so the operator sees the reasoning. */
   signals: string[];
 }
@@ -111,6 +113,107 @@ const BRAND_BADGES: { re: RegExp; label: string }[] = [
   { re: /\bzero[- ]?trust\b/i, label: 'Zero Trust' },
 ];
 
+/**
+ * Tools whose own mark and brand colour the deck should wear.
+ *
+ * Narrower than BRAND_BADGES on purpose: a badge is a text chip and any product name can fill one,
+ * but this list only holds tools we can DRAW — each entry has a vector mark in the renderer's
+ * TOOL_MARKS table. Ordered most specific first, so "Google AI Studio" resolves to Gemini rather
+ * than to the generic Workspace family, and NotebookLM is tested before the Gemini pattern that
+ * would otherwise swallow it.
+ */
+const TOOL_RULES: { tool: ToolBrand; re: RegExp }[] = [
+  { tool: 'notebooklm', re: /\bnotebook\s?lm\b/i },
+  { tool: 'veo', re: /\bveo\s?[0-9]?\b/i },
+  { tool: 'gemini', re: /\bgemini\b|\bgoogle ai studio\b|\bnano\s?banana\b|\bgems?\b(?=\s*(?:->|→|›|»|>|:))/i },
+  { tool: 'chatgpt', re: /\bchat\s?gpt\b|\bopenai\b|\bgpt-?[45](?:\.\d)?\b|\bsora\b|\bdall-?e\b/i },
+  { tool: 'claude', re: /\bclaude\b|\banthropic\b/i },
+  { tool: 'canva', re: /\bcanva\b/i },
+  { tool: 'make', re: /\bmake\.com\b|\bintegromat\b/i },
+  { tool: 'n8n', re: /\bn8n\b/i },
+  { tool: 'perplexity', re: /\bperplexity\b/i },
+  { tool: 'copilot', re: /\b(?:github\s+)?copilot\b/i },
+  { tool: 'midjourney', re: /\bmid\s?journey\b/i },
+  { tool: 'workspace', re: /\bgoogle\s+(?:workspace|docs|sheets|slides|drive|forms)\b|\bgmail\b/i },
+];
+
+/**
+ * The tool a piece of text is actually about, or undefined.
+ *
+ * Scored rather than first-match: a thread that mentions ChatGPT once in an aside but walks the
+ * reader through Gemini eight times is a Gemini deck. Ties go to the earlier (more specific) rule.
+ */
+export function detectTool(text: string): ToolBrand | undefined {
+  const source = String(text || '').slice(0, 12000);
+  const scored = TOOL_RULES.map((rule) => ({ rule, n: score(source, rule.re) })).filter((s) => s.n > 0);
+  if (!scored.length) return undefined;
+  scored.sort((a, b) => b.n - a.n || TOOL_RULES.indexOf(a.rule) - TOOL_RULES.indexOf(b.rule));
+  return scored[0].rule.tool;
+}
+
+// ─── workflow paths ─────────────────────────────────────────────────────────────────────────
+
+/** The separators authors write a UI path with: `Tools -> Canvas`, `Gems › Create New`. */
+const PATH_SEP = /\s*(?:->|=>|→|➔|➜|›|»|>)\s*/;
+
+/**
+ * One leg of a UI path. Deliberately strict — it must open with a capital or a digit and run no
+ * longer than a real menu label, because the whole point is to separate `Tools → Canvas` from a
+ * sentence that merely happens to contain an arrow ("AI -> better results", which fails on the
+ * lower-case second leg).
+ */
+const PATH_SEG = /^[A-Z0-9][A-Za-z0-9 .&+'’_-]{0,24}$/;
+
+/**
+ * The exact click-paths the thread told the reader to walk, in order.
+ *
+ * A how-to thread's most reusable sentence is the navigation line, and flattening it into a Hebrew
+ * paragraph destroys it: menu labels are not translatable, and a reader following along needs the
+ * literal English string that is printed in the product. Lifted here, they render as an LTR
+ * breadcrumb instead of being paraphrased away.
+ */
+export function extractWorkflowPaths(posts: string[]): string[][] {
+  const out: string[][] = [];
+  const seen = new Set<string>();
+  for (const post of posts) {
+    for (const rawLine of String(post ?? '').split('\n')) {
+      const line = rawLine
+        .trim()
+        // Leading list furniture only — `>` is a separator here, so it is never stripped.
+        .replace(/^[\s\-*•‣▪]+/, '')
+        // The sentence's closing punctuation is not part of the last menu label.
+        .replace(/[.,;:!?)\]]+$/, '');
+      if (!PATH_SEP.test(line)) continue;
+      const raw = line.split(PATH_SEP).map((s) => s.trim());
+      const segs = raw
+        .map((s, i) => {
+          // A path is almost never written on a line of its own — it is embedded in a sentence
+          // ("Take the palette into Canva. Tools -> Brand Kit -> Add colours."), so the outer legs
+          // arrive carrying prose. The first leg keeps only what follows the last sentence break,
+          // the last leg only what precedes the first one; the middle legs are already clean.
+          if (i === 0) return (s.split(/[.!?;:]/).pop() ?? s).trim();
+          if (i === raw.length - 1) return (s.split(/[.!?;:,"'“”]/)[0] ?? s).trim();
+          return s;
+        })
+        // "Open Gemini → Gems" names the same path as "Gemini → Gems"; the imperative and the
+        // connective belong to the sentence, not to the breadcrumb the reader hunts for on screen.
+        .map((s, i) =>
+          i === 0
+            ? s.replace(/^(?:open|go to|head to|navigate to|click|tap|select|then|next|now|and|so)\s+/i, '')
+            : s
+        )
+        .filter(Boolean);
+      if (segs.length < 2 || segs.length > 4) continue;
+      if (!segs.every((s) => PATH_SEG.test(s) && s.split(/\s+/).length <= 3)) continue;
+      const key = segs.join('>').toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(segs);
+    }
+  }
+  return out;
+}
+
 /** How many distinct matches a rule scores against the thread. */
 function score(text: string, re: RegExp): number {
   const global = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
@@ -137,16 +240,19 @@ export function analyzeThreadTopic(threadText: string): ThreadTopicProfile {
 
   const winner = scored[0]?.rule;
   const brand = BRAND_BADGES.find((b) => b.re.test(text));
+  const tool = detectTool(text);
   const signals = scored.slice(0, 3).map((s) => `${s.rule.theme}×${s.n}`);
+  if (tool) signals.unshift(`🎨 ${tool}`);
   if (brand) signals.unshift(brand.label);
 
   if (!winner) {
-    return { theme: 'general', badge: brand?.label ?? 'Tech', guideSlug: liveGuide('ai-learning-guide-2026'), signals };
+    return { theme: 'general', badge: brand?.label ?? 'Tech', guideSlug: liveGuide('ai-learning-guide-2026'), tool, signals };
   }
   return {
     theme: winner.theme,
     badge: brand?.label ?? winner.badge,
     guideSlug: liveGuide(winner.guideSlug),
+    tool,
     signals,
   };
 }
@@ -230,19 +336,46 @@ function layOutDeck(deck: TechTipDeck, thread: ImportedThread, topic: ThreadTopi
   // carry the media that came from roughly that point in the thread.
   const images = [...thread.images];
   const prompts = extractPrompts(thread.posts);
+  const paths = extractWorkflowPaths(thread.posts);
   const ctaUrl = topic.guideSlug ? `${SITE}/g/${topic.guideSlug}` : SITE;
 
   slides.forEach((slide, i) => {
     slide.theme = topic.theme;
     slide.badge = topic.badge;
+    // A slide that names its own tool wins over the deck's — a round-up thread walks through
+    // several, and each of those slides should wear the mark it is actually talking about. Brand
+    // names survive the Hebrew adaptation as Latin text (source-fidelity rule 3), so this reads the
+    // adapted copy directly rather than needing the English original.
+    const ownText = `${slide.title} ${slide.body} ${slide.bullets.join(' ')} ${slide.code}`;
+    slide.tool = detectTool(ownText) ?? topic.tool;
 
     if (i >= firstContent && i <= lastContent && contentCount > 0) {
       slide.stepLabel = `${i - firstContent + 1} / ${contentCount}`;
       // A slide that already carries real code keeps it; the prompt box is for the slides that
       // don't, so the two never compete for the same panel.
       if (!slide.code.trim() && prompts.length) slide.promptBox = prompts.shift();
+      if (paths.length) slide.workflowPath = paths.shift();
       if (images.length) slide.sourceImage = images.shift();
     }
+
+    // Anything carrying a payload the reader is meant to copy, run or click is a technical slide,
+    // and a searched stock photo behind one is the loudest "assembled, not made" tell there is.
+    // The thread's own screenshot is exempt — it is evidence, not filler.
+    if (slide.promptBox || slide.code.trim() || slide.workflowPath?.length || slide.tool) {
+      slide.noPhoto = true;
+    }
+
+    // Hand-drawn accents, assigned from the slide's ROLE so the rhythm is identical every run:
+    // the cover and the CTA get an underline under their closing line, a numbered step gets a
+    // circled numeral, and a prompt slide gets an arrow pointing into the box.
+    slide.scribble =
+      slide.kind === 'cover' || slide.kind === 'cta'
+        ? 'underline'
+        : slide.promptBox
+          ? 'arrow'
+          : slide.kind === 'step' && slide.stepNumber > 0
+            ? 'circle'
+            : 'none';
   });
 
   const cover = slides[0];
