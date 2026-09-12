@@ -221,6 +221,13 @@ export interface VideoJob {
  * snippets, numbered steps, tool round-ups — aimed at developers/practitioners. */
 export type TipSlideKind = 'cover' | 'concept' | 'code' | 'step' | 'tool' | 'takeaway' | 'cta';
 
+/**
+ * Subject family a deck belongs to, assigned by the Threads agent from the source thread's own
+ * words (`src/server/agents/threadsThreadAgent.ts`). It drives the accent colour, the topic badge
+ * and the CTA guide — so a Gemini thread and a ransomware thread do not render identically.
+ */
+export type ThreadTheme = 'ai' | 'automation' | 'security' | 'code' | 'data' | 'web3' | 'general';
+
 export interface TechTipSlide {
   kind: TipSlideKind;
   /** short section tag for the slide's top bar */
@@ -238,6 +245,28 @@ export interface TechTipSlide {
   stepNumber: number;
   /** English visual brief for the free image generator that paints this slide's backdrop */
   visualPrompt: string;
+
+  // --- Threads agent extensions -------------------------------------------------------------
+  // All optional, all additive: a deck from any other producer (Tech Tips, the local fallbacks)
+  // simply leaves them undefined and every renderer falls back to its existing behaviour.
+
+  /** Subject family, for the accent colour and typography accents. Defaults to 'general'. */
+  theme?: ThreadTheme;
+  /** Short topic chip drawn in the top bar, e.g. "Gemini AI" — Latin brand names stay Latin. */
+  badge?: string;
+  /** Sub-post progress, pre-formatted as `"2 / 7"`. Drawn in place of the deck-wide slide index. */
+  stepLabel?: string;
+  /**
+   * A prompt lifted verbatim out of the source thread, shown in its own dark copyable container.
+   * Kept apart from `code`: a prompt is prose to paste into a model, not source to run, and it is
+   * highlighted and framed differently.
+   */
+  promptBox?: string;
+  /** An image from the original Thread post, already same-origin-proxied. Painted as the backdrop
+   *  in place of a generated one. */
+  sourceImage?: string;
+  /** Absolute link the CTA slide promotes, e.g. `https://mrdaniel.co.il/g/<slug>`. */
+  ctaUrl?: string;
 }
 
 export interface TechTipDeck {

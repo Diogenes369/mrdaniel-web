@@ -15,6 +15,10 @@ import { describeAiError } from './aiErrors';
 
 export type TipSlideKind = 'cover' | 'concept' | 'code' | 'step' | 'tool' | 'takeaway' | 'cta';
 
+/** Subject family a deck belongs to. Assigned server-side by the Threads agent
+ *  (src/server/agents/threadsThreadAgent.ts); drives the accent colour and the topic badge. */
+export type ThreadTheme = 'ai' | 'automation' | 'security' | 'code' | 'data' | 'web3' | 'general';
+
 export interface TechTipSlide {
   kind: TipSlideKind;
   kicker: string;
@@ -25,6 +29,21 @@ export interface TechTipSlide {
   codeLang: string;
   stepNumber: number;
   visualPrompt: string;
+
+  // Threads agent extensions — all optional and additive, so a Tech Tips deck (which sets none of
+  // them) renders exactly as it always has. Mirrors src/agent/types.ts; keep the two in sync.
+  /** Subject family, for the accent colour and typography accents. Defaults to 'general'. */
+  theme?: ThreadTheme;
+  /** Short topic chip drawn in the top bar, e.g. "Gemini AI". */
+  badge?: string;
+  /** Sub-post progress, pre-formatted as `"2 / 7"`. Replaces the deck-wide slide index. */
+  stepLabel?: string;
+  /** A prompt lifted verbatim from the source thread, drawn in its own dark copyable container. */
+  promptBox?: string;
+  /** An image from the original Thread post, already same-origin-proxied. */
+  sourceImage?: string;
+  /** Absolute link the CTA slide promotes, e.g. `https://mrdaniel.co.il/g/<slug>`. */
+  ctaUrl?: string;
 }
 
 /**
@@ -48,6 +67,8 @@ export interface TechTipDeck {
   hashtags: string[];
   synthesized: boolean;
   fallbackReason?: string;
+  /** The Threads agent's read of the source thread's subject. Absent on Tech Tips decks. */
+  topic?: { theme: ThreadTheme; badge: string; guideSlug: string; signals: string[] };
   createdAt: number;
 }
 

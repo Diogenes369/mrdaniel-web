@@ -1,15 +1,18 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import { getAdminSecret } from './adminSecret';
 import { describeAiError } from './aiErrors';
-import { renumberSteps, type TechTipDeck, type TechTipSlide } from './techTipsApi';
+import { renumberSteps, type TechTipDeck, type TechTipSlide, type ThreadTheme } from './techTipsApi';
 
 /**
  * Threads → Hebrew carousel — content layer for the dashboard's "יבוא מ-Threads" tab.
  *
  * Two server round-trips, both through /api/agent-generate (no new Vercel Function — the project
  * is at the Hobby 12-function cap):
- *   1. `parse-thread`  → fetch & split a public Threads post into its individual posts.
- *   2. `thread-deck`   → translate/adapt those posts into a Hebrew TechTipDeck.
+ *   1. `parse-thread`  → fetch the post AND the author's own sub-replies, with their images
+ *                        (`src/server/threadsThreadFetcher.ts`).
+ *   2. `thread-deck`   → the dedicated agent (`src/server/agents/threadsThreadAgent.ts`): Hebrew
+ *                        adaptation, then theme, badges, step indicators, prompt boxes and a CTA
+ *                        pointed at whichever live `/g/<slug>` guide matches the topic.
  *
  * The deck type is deliberately TechTipDeck, so the entire existing Tech-Tips pipeline —
  * techTipRenderer (PNG carousel + ZIP), motionStudioService (9:16 reel), the preview player —
@@ -21,29 +24,64 @@ import { renumberSteps, type TechTipDeck, type TechTipSlide } from './techTipsAp
  * import has a concrete operator action attached to it — paste the thread manually.
  */
 
+/** One post in the thread: its text plus any images it carried (already same-origin-proxied). */
+export interface ThreadPost {
+  text: string;
+  images: string[];
+}
+
 export interface ImportedThread {
   ok: boolean;
   url: string;
   author: string;
   posts: string[];
+  /** the same chain with each post's images attached */
+  items: ThreadPost[];
+  /** every image in the thread, deduped and in order */
+  images: string[];
+  /** sub-replies by the same author under the main post */
+  replyCount: number;
   text: string;
   via: 'direct' | 'meta' | 'jina' | 'manual' | 'none';
   note?: string;
 }
 
+/** The agent's read of the thread's subject. Mirrors ThreadTopicProfile in the agent module. */
+export interface ThreadTopicProfile {
+  theme: ThreadTheme;
+  badge: string;
+  guideSlug: string;
+  signals: string[];
+}
+
 /** Minimum source characters for AI adaptation - mirrors MIN_THREAD_CHARS in
- *  src/server/threadsImport.ts, so client and server agree on what "too thin" means. */
+ *  src/server/threadsThreadFetcher.ts, so client and server agree on what "too thin" means. */
 export const MIN_THREAD_CHARS = 60;
+
+export const EMPTY_THREAD: ImportedThread = {
+  ok: false,
+  url: '',
+  author: '',
+  posts: [],
+  items: [],
+  images: [],
+  replyCount: 0,
+  text: '',
+  via: 'none',
+};
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
-/** Mirrors normalizeThreadsUrl in src/server/threadsImport.ts: the first threads.net / threads.com
- *  post link anywhere in the input, so a pasted share text ("look at this https://…") validates. */
+/** Mirrors normalizeThreadsUrl in src/server/threadsThreadFetcher.ts: the first threads.net /
+ *  threads.com post link anywhere in the input, so a pasted share text ("look at this https://…")
+ *  validates. */
 const THREADS_LINK = /(?:https?:\/\/)?(?:www\.|m\.)?threads\.(?:net|com)\/[^\s<>"'`]+/i;
-const POST_PATH = /^\/(?:@([A-Za-z0-9._]+)\/post\/([A-Za-z0-9_-]+)|t\/([A-Za-z0-9_-]+))(?:\/(?:media|embed))?\/?$/i;
+const POST_PATH =
+  /^\/(?:@([A-Za-z0-9._]+)\/post\/([A-Za-z0-9_-]+)|(?:t|share|p)\/([A-Za-z0-9_-]+))(?:\/(?:media|embed))?\/?$/i;
 
 /** The canonical post URL with share tracking (`?xmt=`, `?igshid=`, …) dropped, or null when the
- *  input holds no Threads post link. */
+ *  input holds no Threads post link. Only the path survives, so tracking is removed by
+ *  construction rather than by a blocklist. */
 export function sanitizeThreadsUrl(raw: string): string | null {
   const link = (raw || '').match(THREADS_LINK)?.[0];
   if (!link) return null;
@@ -98,11 +136,48 @@ async function post(action: string, body: Record<string, unknown>, timeoutMs = 9
   }
 }
 
-
 // ─── step 1 · import ────────────────────────────────────────────────────────────────────────
 
+/** Only images the site's own relay serves may be drawn onto the export canvas — anything else
+ *  taints it and makes `toDataURL` throw at export time. */
+function keepProxied(v: unknown): string[] {
+  return (Array.isArray(v) ? v : [])
+    .map((u) => String(u ?? ''))
+    .filter((u) => u.startsWith('https://mrdaniel.co.il/api/img-proxy?url='))
+    .slice(0, 4);
+}
+
 /**
- * Server-side import of a public Threads post.
+ * Fills in the fields a thread may be missing.
+ *
+ * A thread can reach here from three places with three vintages: this build's server, a
+ * sessionStorage entry written by the previous build, or the local paste parser. Deriving
+ * `items` / `images` / `replyCount` from `posts` whenever they are absent means no consumer has to
+ * defend against a half-populated object.
+ */
+export function normalizeThread(raw: Partial<ImportedThread> | null | undefined): ImportedThread {
+  const posts = (Array.isArray(raw?.posts) ? raw.posts : []).map((p) => String(p ?? '')).filter(Boolean);
+  const items: ThreadPost[] =
+    Array.isArray(raw?.items) && raw.items.length === posts.length
+      ? posts.map((text, i) => ({ text, images: keepProxied(raw.items?.[i]?.images) }))
+      : posts.map((text) => ({ text, images: [] }));
+  const images = [...new Set(items.flatMap((p) => p.images))].slice(0, 20);
+  return {
+    ok: Boolean(raw?.ok),
+    url: String(raw?.url ?? ''),
+    author: String(raw?.author ?? ''),
+    posts,
+    items,
+    images,
+    replyCount: Math.max(0, posts.length - 1),
+    text: String(raw?.text ?? posts.join('\n\n')),
+    via: (raw?.via ?? (posts.length ? 'manual' : 'none')) as ImportedThread['via'],
+    note: raw?.note,
+  };
+}
+
+/**
+ * Server-side import of a public Threads post and the author's own sub-replies.
  *
  * Throws only on a transport/auth failure. A post that exists but can't be read (login wall, rate
  * limit) comes back as `ok:false` with a `note` — the UI shows that note and opens the paste box,
@@ -111,10 +186,10 @@ async function post(action: string, body: Record<string, unknown>, timeoutMs = 9
 export async function importThread(url: string): Promise<ImportedThread> {
   const res = await post('parse-thread', { url: sanitizeThreadsUrl(url) ?? url }, 30000);
   if (!res.ok) throw new Error((await describeAiError(res)).message);
-  const data = (await res.json()) as { ok?: boolean; blocked?: boolean; thread?: ImportedThread; error?: string };
+  const data = (await res.json()) as { ok?: boolean; blocked?: boolean; thread?: Partial<ImportedThread>; error?: string };
   if (data.blocked) throw new Error('התוכן שיובא נחסם ע"י מסנן התוכן.');
   if (!data.thread) throw new Error(data.error || 'לא הצלחנו לקרוא את השרשור — הדביקו את הטקסט ידנית.');
-  return data.thread;
+  return normalizeThread(data.thread);
 }
 
 /** Threads UI chrome that rides along when a post is copied out of the app. Mirrors the server's
@@ -125,8 +200,12 @@ const NOISE_LINE =
 /** The header line a copied Threads post opens with: "username · 3h" (handle, then an age). */
 const PASTE_HEADER = /^\s*@?([A-Za-z0-9._]{2,30})\s*[·•|]\s*\d+\s*[hdwmy]\b.*$/;
 
-/** Local split of a manually pasted thread. Mirrors src/server/threadsImport.ts's splitter so the
- *  paste path needs no round-trip at all. */
+/** A line that opens a new part of a thread. Mirrors PART_MARKER in the server fetcher: ordinals
+ *  ("1/", "2/7", "🧵 3.") and bulleted items, since authors number a thread both ways. */
+const PART_MARKER = /^\s*(?:🧵\s*)?(?:\(?\d{1,2}\s*(?:\/\s*\d{1,2})?\s*[.):\/]|\d{1,2}\s*—|[-*•‣▪▶→]\s)\s*/;
+
+/** Local split of a manually pasted thread. Mirrors the server fetcher's splitter so the paste
+ *  path needs no round-trip at all. */
 export function parseThreadRawText(raw: string, url = ''): ImportedThread {
   const source = (raw || '').replace(/\r\n?/g, '\n').trim();
   // Author = the "username · 3h" header a copied post opens with, else a handle in the first two
@@ -138,13 +217,12 @@ export function parseThreadRawText(raw: string, url = ''): ImportedThread {
   // line is tested; the same shape mid-thread is a quoted post, i.e. real content.
   const text = (header ? sourceLines.slice(1) : sourceLines).join('\n').trimStart();
   const lines = text.split('\n');
-  const MARKER = /^\s*(?:🧵\s*)?(?:\(?\d{1,2}\s*(?:\/\s*\d{1,2})?\s*[.):\/]|\d{1,2}\s*—)\s+/;
 
   let parts: string[];
-  if (lines.filter((l) => MARKER.test(l)).length >= 2) {
+  if (lines.filter((l) => PART_MARKER.test(l)).length >= 2) {
     parts = [];
     for (const line of lines) {
-      if (MARKER.test(line) || parts.length === 0) parts.push(line.replace(MARKER, '').trim());
+      if (PART_MARKER.test(line) || parts.length === 0) parts.push(line.replace(PART_MARKER, '').trim());
       else parts[parts.length - 1] += `\n${line}`;
     }
   } else {
@@ -166,24 +244,57 @@ export function parseThreadRawText(raw: string, url = ''): ImportedThread {
   }
 
   const kept = posts.slice(0, 30);
-  return {
-    ok: kept.length > 0,
+  const chars = kept.join(' ').trim().length;
+  return normalizeThread({
+    ok: kept.length > 0 && chars >= MIN_THREAD_CHARS,
     url: url.trim(),
     author: handle ? `@${handle}` : '',
     posts: kept,
     text: kept.join('\n\n'),
     via: kept.length ? 'manual' : 'none',
-    note: kept.length ? undefined : 'לא נמצא טקסט שמיש בהדבקה.',
-  };
+    note: !kept.length
+      ? 'לא נמצא טקסט שמיש בהדבקה.'
+      : chars < MIN_THREAD_CHARS
+        ? `הטקסט שהודבק קצר מדי (${chars} תווים) — נדרשים לפחות ${MIN_THREAD_CHARS} תווים ליצירת קרוסלה.`
+        : undefined,
+  });
 }
 
-// ─── step 2 · translate & adapt ─────────────────────────────────────────────────────────────
+// ─── step 2 · translate, adapt & lay out ────────────────────────────────────────────────────
 
 const VISUAL_BASE =
   'abstract dark cyber technology background, deep obsidian, subtle circuit and node grid geometry, neon green and cyan accents, no text, no letters, no words, no logos, no watermark';
 
 const MAX_TITLE_WORDS = 8;
 const MAX_BODY_WORDS = 30;
+
+/**
+ * Offline twin of the agent's theme table (src/server/agents/threadsThreadAgent.ts).
+ *
+ * Only reached when the server never answered, so the local fallback deck still gets a sensible
+ * accent and badge instead of rendering grey. Deliberately coarser than the server's — it exists to
+ * avoid a colourless deck, not to reproduce the agent's scoring. Keep the families in sync.
+ */
+const LOCAL_THEMES: { theme: ThreadTheme; badge: string; re: RegExp }[] = [
+  { theme: 'security', badge: 'Cyber Security', re: /\b(security|cyber|vulnerab|exploit|ransomware|phishing|zero[- ]?trust|injection)\b|סייבר|אבטח/i },
+  { theme: 'web3', badge: 'Web3', re: /\b(web3|blockchain|solidity|ethereum|smart ?contract|nft|crypto)\b|בלוקצ|קריפטו/i },
+  { theme: 'automation', badge: 'Automation', re: /\b(automation|automate|workflow|n8n|zapier|webhook|no-?code|zero[- ]?touch)\b|אוטומצ/i },
+  { theme: 'ai', badge: 'AI & LLM', re: /\b(ai|llm|gpt|gemini|claude|openai|prompt|rag|embedding|agent|mcp)\b|בינה מלאכותית|פרומפט/i },
+  { theme: 'data', badge: 'Data', re: /\b(data|sql|postgres|mongo|vector|analytics|database)\b|נתונים/i },
+  { theme: 'code', badge: 'Engineering', re: /\b(python|typescript|javascript|react|docker|kubernetes|api|git|npm)\b|קוד|פיתוח/i },
+];
+
+function localTopic(text: string): ThreadTopicProfile {
+  const hit = LOCAL_THEMES.find((t) => t.re.test(text));
+  return {
+    theme: hit?.theme ?? 'general',
+    badge: hit?.badge ?? 'Tech',
+    // No guide is promised offline: the slug list lives on the server and guessing one risks a
+    // dead link on a published carousel.
+    guideSlug: '',
+    signals: hit ? [`${hit.theme} (מקומי)`] : [],
+  };
+}
 
 function clampWords(text: string, max: number): string {
   const words = String(text || '').trim().split(/\s+/).filter(Boolean);
@@ -205,34 +316,43 @@ function slide(partial: Partial<TechTipSlide> & Pick<TechTipSlide, 'kind'>): Tec
 }
 
 /**
- * Deterministic local deck built from the thread's own posts, used whenever AI adaptation is
- * unavailable. Deliberately honest: it does NOT machine-translate and does NOT invent Hebrew copy
+ * Deterministic local deck built from the thread's own posts, used whenever the server is
+ * unreachable. Deliberately honest: it does NOT machine-translate and does NOT invent Hebrew copy
  * — it carries the source text through, one post per slide, so the operator can see exactly what
  * was imported and edit from there. `synthesized:false` drives the amber "גיבוי מקומי" badge.
  */
 function buildFallbackDeck(thread: ImportedThread, reason: string): TechTipDeck {
   const source = thread.posts.length ? thread.posts : [thread.text].filter(Boolean);
+  const topic = localTopic(thread.text || source.join(' '));
   // Not run through sanitizeHebrewText: this text is the untranslated source (usually English),
   // and techTipRenderer already sanitises every string at draw time.
   const cover = clampWords(source[0] ?? 'שרשור מ-Threads', MAX_TITLE_WORDS);
-  const body = source.slice(1, 11).map((p, i) =>
+  const content = source.slice(1, 11);
+  const body = content.map((p, i) =>
     slide({
       kind: 'concept',
       kicker: `חלק ${i + 1}`,
       title: clampWords(p.split('\n')[0] ?? '', MAX_TITLE_WORDS),
       body: clampWords(p.replace(/\n+/g, ' '), MAX_BODY_WORDS),
+      theme: topic.theme,
+      badge: topic.badge,
+      stepLabel: `${i + 1} / ${content.length}`,
+      sourceImage: thread.items[i + 1]?.images[0],
     })
   );
 
   return {
     title: cover,
     slides: [
-      // No author credit on the cover either — same rule as the caption above.
+      // No author credit on the cover either — same rule as the caption below.
       slide({
         kind: 'cover',
         kicker: 'טיוטה',
         title: cover,
         body: 'טקסט המקור כפי שיובא — לעריכה ידנית לפני פרסום.',
+        theme: topic.theme,
+        badge: topic.badge,
+        sourceImage: thread.images[0],
       }),
       ...body,
       slide({
@@ -240,20 +360,20 @@ function buildFallbackDeck(thread: ImportedThread, reason: string): TechTipDeck 
         kicker: 'צעד הבא',
         title: 'רוצים את הגרסה המלאה?',
         body: 'עוד מדריכים, כלים ודוגמאות — ב-mrdaniel.co.il. עקבו לעוד תוכן על AI ואוטומציה לעסקים.',
+        theme: topic.theme,
+        badge: topic.badge,
       }),
     ],
     hashtags: ['#AI', '#אוטומציה', '#עסקים', '#טכנולוגיה'],
     synthesized: false,
     fallbackReason: reason,
+    topic,
     createdAt: Date.now(),
   };
 }
 
-/** Translate & adapt an imported thread into a Hebrew TechTipDeck. Never throws. */
-export async function synthesizeThreadDeck(
-  thread: ImportedThread,
-  notes?: string
-): Promise<TechTipDeck> {
+/** Translate, adapt and lay out an imported thread into a themed Hebrew deck. Never throws. */
+export async function synthesizeThreadDeck(thread: ImportedThread, notes?: string): Promise<TechTipDeck> {
   const posts = thread.posts.filter((p) => p.trim());
   // Mirrors MIN_THREAD_CHARS on the server. Below it there is not enough source text for a deck,
   // and calling the model anyway just spends quota to get this same fallback back.
@@ -265,16 +385,25 @@ export async function synthesizeThreadDeck(
     );
   }
   try {
+    // The whole thread goes over, images included, so the agent can place each post's own media on
+    // the slide that post became.
     const res = await post('thread-deck', {
-      posts,
-      author: thread.author || undefined,
-      sourceUrl: thread.url || undefined,
+      thread: {
+        posts,
+        items: thread.items,
+        author: thread.author || undefined,
+        url: thread.url || undefined,
+        via: thread.via,
+      },
       notes: notes?.trim() || undefined,
     });
     if (!res.ok) return buildFallbackDeck(thread, (await describeAiError(res)).message);
     const data = (await res.json()) as {
       ok?: boolean;
       blocked?: boolean;
+      synthesized?: boolean;
+      fallbackReason?: string;
+      topic?: ThreadTopicProfile;
       deck?: { title: string; slides: TechTipSlide[]; hashtags: string[] };
     };
     if (data.blocked) return buildFallbackDeck(thread, 'הפלט נחסם ע"י מסנן התוכן');
@@ -285,7 +414,11 @@ export async function synthesizeThreadDeck(
       title: data.deck.title || thread.posts[0]?.slice(0, 80) || 'שרשור מ-Threads',
       slides: renumberSteps(data.deck.slides),
       hashtags: data.deck.hashtags?.length ? data.deck.hashtags : ['#AI', '#אוטומציה', '#עסקים'],
-      synthesized: true,
+      // The agent serves its own source-faithful deck when the model's output is unusable, and says
+      // so here — reporting that as synthesised would hide a real degradation from the operator.
+      synthesized: data.synthesized !== false,
+      fallbackReason: data.fallbackReason,
+      topic: data.topic,
       createdAt: Date.now(),
     };
   } catch (e) {
@@ -298,16 +431,19 @@ export async function synthesizeThreadDeck(
  *
  * Carries no source attribution, per the repo-wide rule that the only brand on generated output is
  * mrdaniel.co.il (see AGENTS.md; the server's `stripSourceCredits` enforces the same on slide copy).
+ * When the agent picked a guide, the caption promotes that exact link — the same one printed on the
+ * CTA slide, so the carousel and its caption never point at two different places.
  */
 export function threadDeckCaption(deck: TechTipDeck): string {
   const first = deck.slides.find((s) => s.body)?.body ?? '';
+  const link = deck.slides.find((s) => s.kind === 'cta')?.ctaUrl ?? '';
   return [
     deck.title,
     '',
     first.slice(0, 220),
     '',
     'החליקו לכל השקפים ➔',
-    'עוד מדריכים ב-mrdaniel.co.il',
+    link ? `המדריך המלא: ${link}` : 'עוד מדריכים ב-mrdaniel.co.il',
     '',
     deck.hashtags.join(' '),
   ]
@@ -347,7 +483,9 @@ export function loadThreadState(): PersistedThreadState | null {
     const parsed = JSON.parse(raw) as PersistedThreadState;
     if (!parsed?.thread || !Array.isArray(parsed.thread.posts)) return null;
     if (parsed.deck && !Array.isArray(parsed.deck.slides)) parsed.deck = null;
-    return parsed;
+    // An entry written by the previous build has no items/images/replyCount — filled in here so the
+    // restored session behaves exactly like a fresh import.
+    return { ...parsed, thread: normalizeThread(parsed.thread) };
   } catch {
     return null;
   }

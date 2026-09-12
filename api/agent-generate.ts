@@ -1,7 +1,8 @@
-import { classifyGeminiError, engineConfigReason, generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck, synthesizeThreadDeck } from '../src/agent/SocialAgentEngine.js';
+import { classifyGeminiError, engineConfigReason, generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck } from '../src/agent/SocialAgentEngine.js';
 import { importUrlContent } from '../src/server/contentImport.js';
 import { optimizeForGrowth, flattenGrowthResult, GROWTH_OPS, type GrowthOp } from '../src/server/igGrowthStrategy.js';
-import { importThreadContent, parseThreadRawText, isThreadsUrl } from '../src/server/threadsImport.js';
+import { importThreadContent, parseThreadRawText, isThreadsUrl, type ImportedThread, type ThreadPost } from '../src/server/threadsThreadFetcher.js';
+import { buildThreadDeck } from '../src/server/agents/threadsThreadAgent.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
 import { pushQueueItem, readAgentMode, readAgentWebhooks, readStrategicContext, writeAutoPilotRunTimestamp, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
@@ -442,31 +443,69 @@ export default async function handler(req: any, res: any) {
     }
 
     if (action === 'thread-deck') {
+      // Threads → carousel, step 2. Runs through the dedicated agent
+      // (src/server/agents/threadsThreadAgent.ts), which assigns the theme, the topic badge, the
+      // step indicators, the prompt boxes and the CTA guide on top of the engine's Hebrew
+      // adaptation.
       if (!isEngineConfigured()) {
         res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
-      const { posts, author, sourceUrl, notes } = req.body ?? {};
-      const cleanPosts = (Array.isArray(posts) ? posts : []).map((p: unknown) => String(p ?? '').trim()).filter(Boolean);
+      const { thread, posts, author, sourceUrl, notes } = req.body ?? {};
+      // The dashboard now sends the whole imported thread (posts + per-post images); builds before
+      // 2026-09-12 sent the loose fields. Both shapes are accepted so a stale dashboard tab that a
+      // live-ops operator left open keeps working against the new deployment.
+      const src = (thread && typeof thread === 'object' ? thread : { posts, author, url: sourceUrl }) as Partial<ImportedThread>;
+      const cleanPosts = (Array.isArray(src.posts) ? src.posts : [])
+        .map((p: unknown) => String(p ?? '').trim())
+        .filter(Boolean)
+        .slice(0, 30);
       if (cleanPosts.join('\n').length < 40) {
         rejectThinInput(res, 'posts (>= 40 chars total) required', 'טקסט השרשור קצר מדי לעיבוד AI (נדרשים לפחות 40 תווים) — הדביקו את הטקסט המלא');
         return;
       }
-      const deck = await synthesizeThreadDeck({
-        posts: cleanPosts.slice(0, 30),
-        author: typeof author === 'string' ? author.slice(0, 60) : undefined,
-        sourceUrl: typeof sourceUrl === 'string' ? sourceUrl.slice(0, 300) : undefined,
+      // Images must already be same-origin-proxied by the fetcher. Re-checking here rather than
+      // trusting the body means a crafted request cannot plant an arbitrary URL in a slide that the
+      // renderer would then fetch on the operator's behalf.
+      const proxied = (v: unknown): string[] =>
+        (Array.isArray(v) ? v : [])
+          .map((u: unknown) => String(u ?? ''))
+          .filter((u) => u.startsWith('https://mrdaniel.co.il/api/img-proxy?url='))
+          .slice(0, 4);
+      const items: ThreadPost[] = Array.isArray(src.items) && src.items.length === cleanPosts.length
+        ? cleanPosts.map((text, i) => ({ text, images: proxied((src.items as ThreadPost[])[i]?.images) }))
+        : cleanPosts.map((text) => ({ text, images: [] }));
+      const normalized: ImportedThread = {
+        ok: true,
+        url: typeof src.url === 'string' ? src.url.slice(0, 300) : '',
+        author: typeof src.author === 'string' ? src.author.slice(0, 60) : '',
+        posts: cleanPosts,
+        items,
+        images: [...new Set(items.flatMap((p) => p.images))].slice(0, 20),
+        replyCount: Math.max(0, cleanPosts.length - 1),
+        text: cleanPosts.join('\n\n'),
+        via: typeof src.via === 'string' ? (src.via as ImportedThread['via']) : 'manual',
+      };
+      const result = await buildThreadDeck({
+        thread: normalized,
         notes: typeof notes === 'string' ? notes.slice(0, 600) : undefined,
       });
       // Same carve-out as tech-tip-deck: the guard's heuristics flag ordinary source code as a
-      // leak, so only the Hebrew prose is checked.
-      const prose = deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
+      // leak, so only the Hebrew prose is checked. The prompt box rides with the code exemption —
+      // it is a verbatim quote of a model instruction, not generated prose.
+      const prose = result.deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
       const security = sanitizeOutput(prose);
       if (!security.passed) {
         res.status(200).json({ ok: true, blocked: true, security });
         return;
       }
-      res.status(200).json({ ok: true, deck });
+      res.status(200).json({
+        ok: true,
+        deck: result.deck,
+        topic: result.topic,
+        synthesized: result.synthesized,
+        fallbackReason: result.fallbackReason,
+      });
       return;
     }
 

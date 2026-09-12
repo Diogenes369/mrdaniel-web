@@ -102,6 +102,38 @@ numbers) live in `SYSTEM_PROMPT.md` and `TECH_TIP_SYSTEM_INSTRUCTION` — keep t
 excluded from `sanitizeOutput`, whose leak heuristics flag ordinary source; only the Hebrew prose
 is guarded.
 
+### Threads → carousel (dashboard tab "יבוא מ-Threads")
+Two modules, one pipeline. **There is no other Threads scraper in the repo** — `threadsImport.ts`
+was renamed into the fetcher below on 2026-09-12; `ThreadsComposer.tsx` / `threadsFormatter.ts` are
+a *different* feature (publishing **to** Threads) and share nothing with it.
+
+- `src/server/threadsThreadFetcher.ts` — the main post **plus every sub-reply by the same author**,
+  each with its images. Four sources tried in parallel, all anchored to the requested post code so a
+  login-wall feed can never become the deck: server-rendered `data-sjs` JSON → ld+json/`og:` →
+  Jina Reader blocks → flat reader text. Never throws; a gated post returns `ok:false` + a Hebrew
+  `note` and the UI opens the manual-paste box, which is a first-class path. URL normalisation keeps
+  the **path only**, so `?xmt=`/`?igshid=`/`utm_*` are dropped by construction; `/t/`, `/share/`,
+  `/p/` and `threads.net` all fold to one canonical `threads.com` post URL.
+- `src/server/agents/threadsThreadAgent.ts` — the visual/content agent (action `thread-deck`).
+  Scores the thread against `THEME_RULES` → `{theme, badge, guideSlug}`, calls the engine for the
+  Hebrew adaptation, then lays the result out **in code, not in the prompt**: theme accent, topic
+  badge, `n / N` sub-post indicators, prompts isolated into their own boxes, the thread's own images
+  placed on the slides they came from, and a CTA pointed at the matching live `/g/<slug>` guide
+  (validated against `STATIC_GUIDES`, so a renamed guide can't ship a dead link).
+
+Division of labour is deliberate: **language is the model's job, structure is the agent's.** Asking
+the model for numbering/themes produced a deck that drifted every run.
+
+- Slide-model extensions (`theme`, `badge`, `stepLabel`, `promptBox`, `sourceImage`, `ctaUrl`) are
+  **all optional** on `TechTipSlide` — a Tech Tips deck sets none and renders exactly as before.
+  Declared in `src/agent/types.ts`, mirrored in `dashboard/src/lib/techTipsApi.ts`; keep in sync.
+- Post images are rewritten through `/api/img-proxy` **by the fetcher**, and the URL is re-checked
+  server-side in `thread-deck` — the export canvas would taint on a raw `cdninstagram.com` image,
+  and an unchecked URL in a slide is a request the renderer makes on the operator's behalf.
+- The agent falls back to a source-faithful deck only for **unusable model output**; a rate limit or
+  a missing key still surfaces as the retryable 429/503 it is (`synthesized:false` + `fallbackReason`
+  ride back to the dashboard's amber badge).
+
 ---
 
 ## Feed content policy — HARD RULE

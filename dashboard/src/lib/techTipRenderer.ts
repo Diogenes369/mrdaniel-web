@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { loadImage, getLogo, loadFont, wrapRtl, BRAND_GREEN } from './newsImageComposer';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
 import { highlightCode, TOKEN_PALETTE } from './syntaxHighlight';
-import type { TechTipDeck, TechTipSlide } from './techTipsApi';
+import type { TechTipDeck, TechTipSlide, ThreadTheme } from './techTipsApi';
 import { resolveSlidePhotoUrl, loadPhoto } from './pexelsBackground';
 
 /**
@@ -22,6 +22,32 @@ const OBSIDIAN_BOTTOM = '#0B0F17';
 const CYBER_CYAN = '#22D3EE';
 const SILVER = '#E2E8F0';
 const DOMAIN = 'mrdaniel.co.il';
+
+/**
+ * Accent per subject family, assigned by the Threads agent.
+ *
+ * A deck about Gemini and a deck about ransomware used to render in the identical cyan, so a
+ * follower's feed showed one indistinguishable wall of slides. The accent drives the title
+ * gradient, the badge and kicker chips, the step badge and the progress rail, which is enough to
+ * tell two decks apart at thumbnail size without touching the layout. Every colour here clears
+ * 4.5:1 against the obsidian backdrop.
+ *
+ * A deck that sets no theme (every Tech Tips deck) resolves to 'general' and renders exactly as it
+ * did before this table existed.
+ */
+const THEME_ACCENT: Record<ThreadTheme, string> = {
+  ai: CYBER_CYAN,
+  automation: BRAND_GREEN,
+  security: '#FB923C',
+  code: '#A78BFA',
+  data: '#38BDF8',
+  web3: '#F0ABFC',
+  general: BRAND_GREEN,
+};
+
+function accentFor(slide: TechTipSlide): string {
+  return THEME_ACCENT[slide.theme ?? 'general'] ?? BRAND_GREEN;
+}
 
 export interface SlideBox {
   W: number;
@@ -147,7 +173,13 @@ export async function resolveTipBackgrounds(
     while (cursor < total) {
       const i = cursor++;
       const slide = deck.slides[i];
-      if (style === 'sketchnote') {
+      if (slide.sourceImage) {
+        // An image the thread itself published beats anything generated or searched: it is what the
+        // post actually showed, so it can't be off-topic. Already routed through the site's own
+        // relay by the fetcher, so it draws to canvas without tainting it. A failure yields null
+        // and the slide falls back to the procedural backdrop, same as every other source here.
+        out[i] = await loadPhoto(slide.sourceImage, 12000);
+      } else if (style === 'sketchnote') {
         // Illustrated art: keep the existing Pollinations path driven by the slide's visualPrompt.
         const subject = [slide.title, slide.body, slide.code].filter(Boolean).join(' ');
         const brands = brandVisualsFor(subject);
@@ -271,17 +303,53 @@ function autoFit(
   return { lines, px };
 }
 
-function drawTopBar(ctx: CanvasRenderingContext2D, b: SlideBox, slide: TechTipSlide, index: number, total: number, logo: HTMLImageElement | null) {
+function drawTopBar(
+  ctx: CanvasRenderingContext2D,
+  b: SlideBox,
+  slide: TechTipSlide,
+  index: number,
+  total: number,
+  logo: HTMLImageElement | null,
+  accent: string
+) {
   const y = Math.round(b.H * 0.045);
-  // index, left (LTR)
+  // Progress, left (LTR). A Threads deck counts the SUB-POSTS it was built from ("2 / 7"), which is
+  // the sequence the reader is actually stepping through; a deck with no sub-posts keeps the
+  // deck-wide slide index it always showed.
+  const progress =
+    slide.stepLabel?.trim() || `${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`;
   ctx.save();
   ctx.direction = 'ltr';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   setMono(ctx, b.W * 0.019, 600);
   ctx.fillStyle = 'rgba(226,232,240,0.55)';
-  ctx.fillText(`${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`, b.PAD, y);
+  ctx.fillText(progress, b.PAD, y);
+  const progressW = ctx.measureText(progress).width;
   ctx.restore();
+
+  // Topic badge, beside the counter. Latin by design — "Gemini AI", not a transliteration — so it
+  // is drawn LTR next to the LTR counter rather than in the RTL lane on the right.
+  const badge = (slide.badge ?? '').trim();
+  if (badge) {
+    ctx.save();
+    ctx.direction = 'ltr';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    setMono(ctx, b.W * 0.0165, 700);
+    const bw = ctx.measureText(badge).width + b.W * 0.03;
+    const bh = b.W * 0.034;
+    const bx = b.PAD + progressW + b.W * 0.022;
+    roundRectPath(ctx, bx, y - bh / 2, bw, bh, bh * 0.3);
+    ctx.fillStyle = hexToRgba(accent, 0.14);
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba(accent, 0.5);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.fillText(badge, bx + b.W * 0.015, y + 1);
+    ctx.restore();
+  }
 
   // kicker chip, right (RTL)
   const kicker = sanitizeHebrewText(slide.kicker || '');
@@ -295,12 +363,12 @@ function drawTopBar(ctx: CanvasRenderingContext2D, b: SlideBox, slide: TechTipSl
     const kh = b.W * 0.038;
     const kx = b.W - b.PAD - kw;
     roundRectPath(ctx, kx, y - kh / 2, kw, kh, kh * 0.28);
-    ctx.fillStyle = hexToRgba(BRAND_GREEN, 0.12);
+    ctx.fillStyle = hexToRgba(accent, 0.12);
     ctx.fill();
-    ctx.strokeStyle = hexToRgba(BRAND_GREEN, 0.45);
+    ctx.strokeStyle = hexToRgba(accent, 0.45);
     ctx.lineWidth = 1;
     ctx.stroke();
-    ctx.fillStyle = '#9FE870';
+    ctx.fillStyle = accent;
     ctx.fillText(kicker, b.W - b.PAD - b.W * 0.017, y + 1);
     ctx.restore();
   }
@@ -315,7 +383,7 @@ function drawTopBar(ctx: CanvasRenderingContext2D, b: SlideBox, slide: TechTipSl
   }
 }
 
-function drawBottomBar(ctx: CanvasRenderingContext2D, b: SlideBox, index: number, total: number) {
+function drawBottomBar(ctx: CanvasRenderingContext2D, b: SlideBox, index: number, total: number, accent: string) {
   const railY = b.H - b.PAD * 1.15;
   const gap = 7;
   const railW = b.W - b.PAD * 2;
@@ -323,7 +391,7 @@ function drawBottomBar(ctx: CanvasRenderingContext2D, b: SlideBox, index: number
   for (let i = 0; i < total; i++) {
     const x = b.PAD + i * (segW + gap);
     roundRectPath(ctx, x, railY, Math.max(2, segW), 5, 2.5);
-    ctx.fillStyle = i <= index ? BRAND_GREEN : 'rgba(255,255,255,0.14)';
+    ctx.fillStyle = i <= index ? accent : 'rgba(255,255,255,0.14)';
     ctx.fill();
   }
   ctx.save();
@@ -351,7 +419,7 @@ function contentRegion(b: SlideBox): Region {
   return { x: b.PAD, y: top, w: b.W - b.PAD * 2, h: bottom - top };
 }
 
-function drawTitle(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, title: string, startPx: number, maxLines: number): number {
+function drawTitle(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, title: string, startPx: number, maxLines: number, accent: string): number {
   if (!title) return r.y;
   const { lines, px } = autoFit(ctx, sanitizeHebrewText(title), r.w, startPx, b.W * 0.032, maxLines, (c, p) => setDisplay(c, p, 800));
   setDisplay(ctx, px, 800);
@@ -363,7 +431,7 @@ function drawTitle(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, title:
     const grad = ctx.createLinearGradient(r.x + r.w, 0, r.x, 0);
     grad.addColorStop(0, '#FFFFFF');
     grad.addColorStop(0.6, SILVER);
-    grad.addColorStop(1, CYBER_CYAN);
+    grad.addColorStop(1, accent);
     ctx.fillStyle = grad;
     ctx.fillText(line, r.x + r.w, y);
     y += px * 1.18;
@@ -529,6 +597,115 @@ function wrapCodeLines(
   return out;
 }
 
+/**
+ * Plain greedy word wrap for Latin text. `wrapRtl` is tuned for Hebrew shaping; a quoted prompt is
+ * usually English and only needs word breaking, with blank lines preserved as paragraph breaks.
+ */
+function wrapLtr(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+  const out: string[] = [];
+  for (const para of text.split('\n')) {
+    let line = '';
+    for (const word of para.split(/\s+/).filter(Boolean)) {
+      const next = line ? `${line} ${word}` : word;
+      if (!line || ctx.measureText(next).width <= maxW) {
+        line = next;
+      } else {
+        out.push(line);
+        line = word;
+      }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+/**
+ * A prompt lifted from the source thread, in its own dark copyable container.
+ *
+ * Deliberately not drawCodeBlock: a prompt is text to COPY into a model, not source to read, so it
+ * gets a plain slab with a copy affordance and no line numbers or syntax colouring — tokenising
+ * English prose as if it were code makes it harder to read, not easier. Direction follows the
+ * prompt's own script, so a Hebrew prompt is not painted left-to-right.
+ */
+function drawPromptBox(
+  ctx: CanvasRenderingContext2D,
+  b: SlideBox,
+  r: Region,
+  raw: string,
+  top: number,
+  maxH: number,
+  accent: string
+) {
+  const clean = raw.trim();
+  if (!clean || maxH <= 0) return;
+  const rtl = /[֐-׿]/.test(clean.slice(0, 80));
+
+  ctx.save();
+  roundRectPath(ctx, r.x, top, r.w, maxH, b.W * 0.024);
+  ctx.fillStyle = 'rgba(2,4,8,0.74)';
+  ctx.fill();
+  roundRectPath(ctx, r.x, top, r.w, maxH, b.W * 0.024);
+  ctx.strokeStyle = hexToRgba(accent, 0.45);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // header: the PROMPT tag, plus the two-offset-squares mark that reads universally as "copy"
+  const headY = top + b.W * 0.034;
+  ctx.save();
+  ctx.direction = 'ltr';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  setMono(ctx, b.W * 0.017, 700);
+  ctx.fillStyle = hexToRgba(accent, 0.9);
+  ctx.fillText('PROMPT', r.x + b.W * 0.03, headY);
+  const gs = b.W * 0.022;
+  const gx = r.x + r.w - b.W * 0.03 - gs;
+  ctx.strokeStyle = hexToRgba(accent, 0.6);
+  ctx.lineWidth = Math.max(1.4, b.W * 0.002);
+  roundRectPath(ctx, gx + gs * 0.28, headY - gs * 0.64, gs * 0.72, gs * 0.72, gs * 0.16);
+  ctx.stroke();
+  roundRectPath(ctx, gx, headY - gs * 0.26, gs * 0.72, gs * 0.72, gs * 0.16);
+  ctx.fillStyle = 'rgba(2,4,8,0.92)';
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  const innerTop = headY + b.W * 0.032;
+  const innerH = top + maxH - innerTop - b.W * 0.026;
+  const innerW = r.w - b.W * 0.06;
+  if (innerH <= 0) return;
+
+  let px = b.W * 0.026;
+  const minPx = b.W * 0.015;
+  let lines: string[] = [];
+  for (let i = 0; i < 24; i++) {
+    setMono(ctx, px, 400);
+    lines = rtl ? wrapRtl(ctx, sanitizeHebrewText(clean), innerW) : wrapLtr(ctx, clean, innerW);
+    if (lines.length * px * 1.5 <= innerH || px <= minPx) break;
+    px = Math.max(minPx, px * 0.94);
+  }
+  setMono(ctx, px, 400);
+
+  ctx.save();
+  // Hard clip to the slab interior, so an over-long prompt truncates instead of bleeding out.
+  ctx.beginPath();
+  ctx.rect(r.x + b.W * 0.02, innerTop - px, r.w - b.W * 0.04, innerH + px);
+  ctx.clip();
+  ctx.direction = rtl ? 'rtl' : 'ltr';
+  ctx.textAlign = rtl ? 'right' : 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = 'rgba(226,232,240,0.93)';
+  const x = rtl ? r.x + r.w - b.W * 0.03 : r.x + b.W * 0.03;
+  let y = innerTop + px;
+  for (const line of lines) {
+    if (y > innerTop + innerH) break;
+    ctx.fillText(line, x, y);
+    y += px * 1.5;
+  }
+  ctx.restore();
+}
+
 function drawBulletList(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, bullets: string[], top: number, maxH: number, marker: 'check' | 'dot') {
   const items = bullets.slice(0, 5);
   if (!items.length) return;
@@ -578,15 +755,15 @@ function drawBulletList(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, b
   }
 }
 
-function drawStepBadge(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, n: number): number {
+function drawStepBadge(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, n: number, accent: string): number {
   const size = b.W * 0.115;
   const x = r.x + r.w - size;
   const y = r.y;
   ctx.save();
   roundRectPath(ctx, x, y, size, size, size * 0.28);
-  ctx.fillStyle = hexToRgba(BRAND_GREEN, 0.14);
+  ctx.fillStyle = hexToRgba(accent, 0.14);
   ctx.fill();
-  ctx.strokeStyle = hexToRgba(BRAND_GREEN, 0.55);
+  ctx.strokeStyle = hexToRgba(accent, 0.55);
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.direction = 'ltr';
@@ -596,8 +773,8 @@ function drawStepBadge(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, n:
   // Glow and numeral are drawn as separate passes: a shadowBlur applied to the fill itself
   // smeared the digit's own edges. The halo goes down first, then the numeral is painted crisp
   // with the shadow cleared, so the badge reads sharp at slide scale.
-  ctx.fillStyle = BRAND_GREEN;
-  ctx.shadowColor = BRAND_GREEN;
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
   ctx.shadowBlur = 16;
   ctx.globalAlpha = 0.55;
   ctx.fillText(String(n), x + size / 2, y + size / 2 + 2);
@@ -631,8 +808,9 @@ export function drawTipSlide(
   paintProceduralBackground(ctx, b, index);
   if (bg) drawBackgroundImage(ctx, b, bg);
 
-  drawTopBar(ctx, b, slide, index, total, logo);
-  drawBottomBar(ctx, b, index, total);
+  const accent = accentFor(slide);
+  drawTopBar(ctx, b, slide, index, total, logo, accent);
+  drawBottomBar(ctx, b, index, total, accent);
 
   const r = contentRegion(b);
   const alpha = Math.max(0, Math.min(1, anim.intro)) * (1 - Math.max(0, Math.min(1, anim.outro)));
@@ -646,7 +824,7 @@ export function drawTipSlide(
   let cursorY = region.y;
 
   if (slide.kind === 'step' && slide.stepNumber > 0) {
-    cursorY = drawStepBadge(ctx, b, region, slide.stepNumber);
+    cursorY = drawStepBadge(ctx, b, region, slide.stepNumber, accent);
     region.y = cursorY;
     region.h = r.y + r.h - cursorY;
   }
@@ -663,7 +841,7 @@ export function drawTipSlide(
       const grad = ctx.createLinearGradient(region.x + region.w, 0, region.x, 0);
       grad.addColorStop(0, '#FFFFFF');
       grad.addColorStop(0.55, SILVER);
-      grad.addColorStop(1, slide.kind === 'cta' ? BRAND_GREEN : CYBER_CYAN);
+      grad.addColorStop(1, accent);
       ctx.fillStyle = grad;
       ctx.fillText(line, b.W / 2, y);
       y += px * 1.18;
@@ -679,16 +857,26 @@ export function drawTipSlide(
     }
     if (slide.kind === 'cta') {
       y += b.W * 0.05;
-      setDisplay(ctx, b.W * 0.032, 800);
       ctx.direction = 'ltr';
-      const label = `🔗  ${DOMAIN}`;
-      const tw = ctx.measureText(label).width + b.W * 0.07;
-      const ph = b.W * 0.068;
+      // A Threads deck's CTA promotes the specific guide the agent matched to the topic; a deck
+      // that names no target keeps the bare domain, which is what the Tech Tips CTA has always
+      // drawn. A guide path is far longer than the domain, so the pill shrinks to fit the content
+      // column instead of running off the slide edge.
+      const target = (slide.ctaUrl ?? '').trim().replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      const label = `🔗  ${target || DOMAIN}`;
+      let lp = b.W * 0.032;
+      setDisplay(ctx, lp, 800);
+      while (lp > b.W * 0.017 && ctx.measureText(label).width + b.W * 0.07 > region.w) {
+        lp *= 0.94;
+        setDisplay(ctx, lp, 800);
+      }
+      const tw = Math.min(region.w, ctx.measureText(label).width + b.W * 0.07);
+      const ph = Math.max(b.W * 0.05, lp * 2.1);
       roundRectPath(ctx, b.W / 2 - tw / 2, y, tw, ph, ph / 2);
       ctx.save();
-      ctx.shadowColor = BRAND_GREEN;
+      ctx.shadowColor = accent;
       ctx.shadowBlur = 30;
-      ctx.fillStyle = BRAND_GREEN;
+      ctx.fillStyle = accent;
       ctx.fill();
       ctx.restore();
       ctx.fillStyle = '#05070A';
@@ -697,7 +885,7 @@ export function drawTipSlide(
       ctx.fillText(label, b.W / 2, y + ph / 2 + 1);
     }
   } else {
-    const afterTitle = drawTitle(ctx, b, region, slide.title, b.W * 0.052, 3) + b.W * 0.028;
+    const afterTitle = drawTitle(ctx, b, region, slide.title, b.W * 0.052, 3, accent) + b.W * 0.028;
     const remaining = region.y + region.h - afterTitle;
 
     if (slide.kind === 'code' && slide.code.trim()) {
@@ -714,6 +902,24 @@ export function drawTipSlide(
         drawCodeBlock(ctx, b, region, slide, by + b.W * 0.015, region.y + region.h - (by + b.W * 0.015));
       } else {
         drawCodeBlock(ctx, b, region, slide, afterTitle, remaining);
+      }
+    } else if (slide.promptBox?.trim()) {
+      // Same shape as the code branch: the body sets the prompt up in a line or two, the box is the
+      // slide's actual payload. Checked after code so a slide carrying both never draws two panels.
+      if (slide.body) {
+        setBody(ctx, b.W * 0.028, 400);
+        ctx.direction = 'rtl';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(226,232,240,0.8)';
+        let by = afterTitle;
+        for (const line of wrapRtl(ctx, sanitizeHebrewText(slide.body), region.w).slice(0, 2)) {
+          ctx.fillText(line, region.x + region.w, by);
+          by += b.W * 0.04;
+        }
+        const boxTop = by + b.W * 0.015;
+        drawPromptBox(ctx, b, region, slide.promptBox, boxTop, region.y + region.h - boxTop, accent);
+      } else {
+        drawPromptBox(ctx, b, region, slide.promptBox, afterTitle, remaining, accent);
       }
     } else if ((slide.kind === 'tool' || slide.kind === 'takeaway') && slide.bullets.length) {
       drawBulletList(ctx, b, region, slide.bullets, afterTitle, remaining, slide.kind === 'takeaway' ? 'check' : 'dot');

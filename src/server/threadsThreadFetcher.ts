@@ -1,10 +1,12 @@
 import * as cheerio from 'cheerio';
 
 /**
- * Best-effort importer for a public Threads post / thread. Server-side only — used by
- * /api/agent-generate · action:"parse-thread". Returns the thread's posts in order plus the
- * author handle, so the dashboard's Threads → carousel workflow can hand real source text to the
- * translation agent.
+ * Multi-post Threads thread fetcher. Server-side only — used by /api/agent-generate ·
+ * action:"parse-thread", and consumed by `src/server/agents/threadsThreadAgent.ts`.
+ *
+ * Returns the main post AND every sub-reply the ORIGINAL AUTHOR wrote under it, in reading order,
+ * each with any images that post carried. Other people's replies, quoted posts, the related-threads
+ * rail and login chrome are dropped by structure, never by guessing at individual lines.
  *
  * Threads has no open post API, and every extraction path here can be defeated by a login wall or
  * a rate limit. So the contract is deliberately soft: this NEVER throws, and when it recovers
@@ -13,21 +15,22 @@ import * as cheerio from 'cheerio';
  *
  * The page is fetched twice — as a browser and as a self-identified link-preview client, which
  * Threads serves far more fully — alongside Jina Reader, all in parallel. The best source wins:
- *   1. The server-rendered `data-sjs` JSON, which carries the thread verbatim. The payload also
- *      holds replies, the related-threads rail and, behind a login wall, a feed of unrelated
- *      posts, so only the thread containing the requested post code is read.
+ *   1. The server-rendered `data-sjs` JSON, which carries the thread verbatim, images included. The
+ *      payload also holds replies, the related-threads rail and, behind a login wall, a feed of
+ *      unrelated posts, so only the thread containing the requested post code is read.
  *   2. ld+json / `og:description`, the root post's text, clean: the public OG tags any chat app
  *      shows for a shared link. `og:url` must name the requested post; otherwise the page is a
  *      login wall or a profile, not the post.
  *   3. Jina Reader → markdown of the rendered page, split into one block per post (byline,
  *      permalink, body). Only the requested post and its author's own continuation are kept.
- *      Quoted posts, other people's replies, the related-threads rail, login prompts and the footer
- *      are dropped by structure, not by guessing at individual lines.
  * The metadata post anchors the choice: the reader's chain is used only when it opens with the
  * post the metadata describes.
  *
  * oEmbed was removed on 2026-09-11. threads.com/oembed now answers 302, and the tokenless
  * graph.threads.net oEmbed returns a blockquote with no post text in it.
+ *
+ * Renamed from `threadsImport.ts` on 2026-09-12 when the dedicated Threads agent landed; the
+ * extraction paths below are unchanged and battle-tested, the images and the per-post shape are new.
  */
 
 const BROWSER_HEADERS: Record<string, string> = {
@@ -50,6 +53,13 @@ const PREVIEW_HEADERS: Record<string, string> = {
 
 const JINA_KEY = process.env.JINA_API_KEY?.trim();
 
+/** One post in the thread: its text plus any images it carried. */
+export interface ThreadPost {
+  text: string;
+  /** Same-origin-proxied image URLs (see `proxiedImage`), so a canvas can draw them untainted. */
+  images: string[];
+}
+
 export interface ImportedThread {
   ok: boolean;
   /** canonicalised post URL */
@@ -58,6 +68,12 @@ export interface ImportedThread {
   author: string;
   /** the thread's posts, in reading order — one entry per post in the chain */
   posts: string[];
+  /** the same chain with each post's images attached — what the visual agent lays out */
+  items: ThreadPost[];
+  /** every image in the thread, deduped and in order — for the operator's preview strip */
+  images: string[];
+  /** sub-replies by the same author under the main post: `posts.length - 1`, floored at 0 */
+  replyCount: number;
   /** posts joined with blank lines; what the synthesis agent actually consumes */
   text: string;
   /** which path produced the content — surfaced in the UI so the operator knows how complete it is */
@@ -72,8 +88,10 @@ export interface ImportedThread {
  *  ("Check this out https://…"), so the whole paste is searched, not just its start. */
 const THREADS_LINK = /(?:https?:\/\/)?(?:www\.|m\.)?threads\.(?:net|com)\/[^\s<>"'`]+/i;
 
-/** A post path: `/@user/post/CODE` or the `/t/CODE` short form, optionally ending in `/media`. */
-const POST_PATH = /^\/(?:@([A-Za-z0-9._]+)\/post\/([A-Za-z0-9_-]+)|t\/([A-Za-z0-9_-]+))(?:\/(?:media|embed))?\/?$/i;
+/** A post path: `/@user/post/CODE`, or the `/t/CODE` and `/share/CODE` short forms, optionally
+ *  ending in `/media` or `/embed`. */
+const POST_PATH =
+  /^\/(?:@([A-Za-z0-9._]+)\/post\/([A-Za-z0-9_-]+)|(?:t|share|p)\/([A-Za-z0-9_-]+))(?:\/(?:media|embed))?\/?$/i;
 
 export function isThreadsUrl(raw: string): boolean {
   return normalizeThreadsUrl(raw) !== null;
@@ -89,9 +107,10 @@ function withScheme(raw: string): string {
  * Threads post link.
  *
  * Threads serves both threads.net and threads.com. Requests go to www.threads.com, the host the
- * current renderer answers on. Only the path is kept, so share tracking (`?xmt=`, `?igshid=`,
- * `?slof=`, `utm_*`) and fragments are dropped; they make the lookups miss. The host is never
- * taken from the input, so this cannot be used to fetch another site.
+ * current renderer answers on. Only the PATH is kept, so every share tracking parameter (`?xmt=`,
+ * `?igshid=`, `?slof=`, `utm_*`) and any fragment is dropped by construction rather than by a
+ * blocklist — they make the lookups miss. The host is never taken from the input, so this cannot
+ * be used to fetch another site.
  */
 export function normalizeThreadsUrl(raw: string): { url: string; handle: string; code: string } | null {
   const link = (raw || '').match(THREADS_LINK)?.[0];
@@ -124,6 +143,61 @@ async function getText(url: string, timeoutMs: number, headers: Record<string, s
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ─── images ─────────────────────────────────────────────────────────────────────────────────
+
+/** Hosts Threads actually serves post media from. An image URL from anywhere else in the payload
+ *  is not post media, and is never handed to the relay. */
+const MEDIA_HOST = /(?:^|\.)(?:cdninstagram\.com|fbcdn\.net)$/i;
+
+/**
+ * A Threads CDN image, rewritten to travel through the site's own relay.
+ *
+ * Instagram's CDN does not reliably send `Access-Control-Allow-Origin`, and the dashboard draws
+ * these onto a `<canvas>` it then exports as PNG — a tainted canvas throws on `toDataURL`. The
+ * existing `/api/img-proxy` re-serves the bytes CORS-open, so this returns the proxied form and
+ * the renderer never has to know where the image came from. Returns '' for anything that is not a
+ * Threads media URL.
+ */
+export function proxiedImage(raw: string): string {
+  const url = String(raw || '').trim();
+  if (!url) return '';
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return '';
+  }
+  if (parsed.protocol !== 'https:' || !MEDIA_HOST.test(parsed.hostname)) return '';
+  return `https://mrdaniel.co.il/api/img-proxy?url=${encodeURIComponent(parsed.toString())}`;
+}
+
+/** The widest candidate that is still sane to download (≤1440px), else the widest available. */
+function pickCandidate(node: unknown): string {
+  const cands = (node as { image_versions2?: { candidates?: unknown } } | null)?.image_versions2?.candidates;
+  if (!Array.isArray(cands)) return '';
+  const usable = cands
+    .map((c) => c as { url?: unknown; width?: unknown })
+    .filter((c): c is { url: string; width?: number } => typeof c.url === 'string' && c.url.length > 0)
+    .sort((a, b) => (Number(b.width) || 0) - (Number(a.width) || 0));
+  if (!usable.length) return '';
+  return (usable.find((c) => (Number(c.width) || 0) <= 1440) ?? usable[0]).url;
+}
+
+/** Every image on one post object: its own, plus each frame of a carousel post. */
+function sjsImages(node: unknown): string[] {
+  const out: string[] = [];
+  const own = pickCandidate(node);
+  if (own) out.push(own);
+  const carousel = (node as { carousel_media?: unknown } | null)?.carousel_media;
+  if (Array.isArray(carousel)) {
+    for (const frame of carousel) {
+      const url = pickCandidate(frame);
+      if (url) out.push(url);
+    }
+  }
+  return [...new Set(out.map(proxiedImage).filter(Boolean))].slice(0, 4);
 }
 
 // ─── text hygiene ───────────────────────────────────────────────────────────────────────────
@@ -166,12 +240,20 @@ function isGateText(text: string): boolean {
 }
 
 /** Drop gate/error boilerplate from a candidate post list. */
-function dropGatePosts(posts: string[]): string[] {
-  return posts.filter((p) => !isGateText(p));
+function dropGatePosts(posts: ThreadPost[]): ThreadPost[] {
+  return posts.filter((p) => !isGateText(p.text));
 }
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Trim, cap and drop empties across a candidate chain, preserving each post's images. */
+function tidyChain(items: ThreadPost[]): ThreadPost[] {
+  return items
+    .map((p) => ({ text: p.text.trim().slice(0, 3000), images: p.images.slice(0, 4) }))
+    .filter((p) => p.text.length > 0)
+    .slice(0, 30);
 }
 
 // ─── source 1 · server-rendered JSON ────────────────────────────────────────────────────────
@@ -180,6 +262,7 @@ interface SjsPost {
   code: string;
   user: string;
   text: string;
+  images: string[];
 }
 
 /** A post object from the payload: anything carrying a post code and a caption. */
@@ -187,7 +270,12 @@ function sjsPost(node: unknown): SjsPost | null {
   if (!node || typeof node !== 'object') return null;
   const o = node as { code?: unknown; caption?: { text?: unknown } | null; user?: { username?: unknown } | null };
   if (typeof o.code !== 'string' || typeof o.caption?.text !== 'string') return null;
-  return { code: o.code, user: typeof o.user?.username === 'string' ? o.user.username : '', text: o.caption.text };
+  return {
+    code: o.code,
+    user: typeof o.user?.username === 'string' ? o.user.username : '',
+    text: o.caption.text,
+    images: sjsImages(node),
+  };
 }
 
 /**
@@ -197,10 +285,11 @@ function sjsPost(node: unknown): SjsPost | null {
  * the requested thread, that payload holds the post it quotes, every reply, the related-threads
  * rail and, behind a login wall, a feed of unrelated posts, all with captions. So captions are
  * never collected wholesale. The thread whose `thread_items` include the requested post code is
- * found, and only the items by that post's author are kept, in order. If the payload has the post
- * but no thread around it, that one post is returned; if it lacks the code, nothing is.
+ * found, and only the items by that post's author are kept, in order — which is exactly the
+ * "1/, 2/, 3/" self-reply chain. If the payload has the post but no thread around it, that one post
+ * is returned; if it lacks the code, nothing is.
  */
-function extractSjsThread(html: string, code: string): { posts: string[]; author: string } | null {
+function extractSjsThread(html: string, code: string): { posts: ThreadPost[]; author: string } | null {
   const found: { chain: SjsPost[] | null; single: SjsPost | null } = { chain: null, single: null };
   const visit = (node: unknown): void => {
     if (found.chain || !node || typeof node !== 'object') return;
@@ -231,11 +320,7 @@ function extractSjsThread(html: string, code: string): { posts: string[]; author
     }
   }
   const chain = found.chain ?? (found.single ? [found.single] : []);
-  const posts = chain
-    .map((p) => p.text.trim())
-    .filter(Boolean)
-    .map((p) => p.slice(0, 3000))
-    .slice(0, 30);
+  const posts = tidyChain(chain.map((p) => ({ text: p.text, images: p.images })));
   return posts.length ? { posts, author: chain[0].user ? `@${chain[0].user}` : '' } : null;
 }
 
@@ -273,6 +358,8 @@ interface PageMeta {
   /** the root post's text; '' when the page is not the requested post */
   text: string;
   author: string;
+  /** the post's lead image from `og:image`, proxied — '' when absent or not Threads media */
+  image: string;
 }
 
 /**
@@ -292,7 +379,7 @@ function readPageMeta(html: string, code: string): PageMeta {
     return '';
   };
   const pageUrl = content('og:url') || $('link[rel="canonical"]').attr('href')?.trim() || '';
-  if (pageUrl && !pageUrl.includes(`/post/${code}`)) return { text: '', author: '' };
+  if (pageUrl && !pageUrl.includes(`/post/${code}`)) return { text: '', author: '', image: '' };
 
   const handle =
     pageUrl.match(/threads\.(?:net|com)\/@([A-Za-z0-9._]+)\/post\//i)?.[1] ??
@@ -305,7 +392,9 @@ function readPageMeta(html: string, code: string): PageMeta {
   if (!text) text = content('og:description', 'twitter:description', 'description');
   // With no page URL to check against, the gate filter is the only guard left.
   if (!pageUrl && isGateText(text)) text = '';
-  return { text, author: handle ? `@${handle}` : '' };
+  // og:image on a gated page is the Threads logo, so it rides the same page-URL check as the text.
+  const image = text ? proxiedImage(content('og:image', 'twitter:image')) : '';
+  return { text, author: handle ? `@${handle}` : '', image };
 }
 
 // ─── source 3 · reader markdown ─────────────────────────────────────────────────────────────
@@ -318,6 +407,9 @@ const PERMALINK_LINE =
  *  is also linked to its permalink, and this is what tells the two apart. */
 const TIMESTAMP_TEXT =
   /^(?:\d{1,2}[/.]\d{1,2}[/.]\d{2,4}|\d+\s*[smhdwy]|[a-z]{3,9}\.?\s+\d{1,2}(?:,?\s+\d{4})?|\d{4}-\d{2}-\d{2}|just now|yesterday)$/i;
+
+/** An image the reader rendered inside a post block: `![alt](https://…cdninstagram.com/…)`. */
+const MD_IMAGE = /!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/g;
 
 interface ReaderBlock {
   handle: string;
@@ -354,6 +446,19 @@ function isQuoteEmbed(b: ReaderBlock): boolean {
   return new RegExp(`^\\[.+${permalink}`, 'i').test(first);
 }
 
+/** Post media the reader inlined in this block. Avatars are `[](…)` empty links, not `![](…)`
+ *  images, so they do not reach here; anything off the media hosts is dropped by `proxiedImage`. */
+function blockImages(lines: string[]): string[] {
+  const out: string[] = [];
+  for (const line of lines) {
+    for (const m of line.matchAll(MD_IMAGE)) {
+      const url = proxiedImage(m[1]);
+      if (url) out.push(url);
+    }
+  }
+  return [...new Set(out)].slice(0, 4);
+}
+
 /**
  * A reader block as plain post text. Images, media and profile links, topic-tag chips,
  * link-preview cards and engagement counters are removed; ordinary links keep their text.
@@ -380,7 +485,7 @@ function blockText(lines: string[]): string {
  * requested post is not among them: behind a login wall the reader renders a feed of strangers'
  * posts, and those must never become the deck.
  */
-function readerThread(blocks: ReaderBlock[], code: string): { posts: string[]; author: string } | null {
+function readerThread(blocks: ReaderBlock[], code: string): { posts: ThreadPost[]; author: string } | null {
   const at = blocks.findIndex((b) => b.code === code);
   if (at < 0) return null;
   const author = blocks[at].handle.toLowerCase();
@@ -393,11 +498,7 @@ function readerThread(blocks: ReaderBlock[], code: string): { posts: string[]; a
     if (own(b)) chain.push(b);
     else if (!isQuoteEmbed(b)) break; // the first reply from someone else ends the thread
   }
-  const posts = chain
-    .map((b) => blockText(b.lines))
-    .filter(Boolean)
-    .map((p) => p.slice(0, 3000))
-    .slice(0, 30);
+  const posts = tidyChain(chain.map((b) => ({ text: blockText(b.lines), images: blockImages(b.lines) })));
   return posts.length ? { posts, author: `@${blocks[at].handle}` } : null;
 }
 
@@ -436,26 +537,35 @@ function isPostPageTitle(md: string): boolean {
 /**
  * Split a flat text blob into the thread's individual posts.
  *
- * Handles the two shapes an extracted thread actually arrives in: explicit part markers the author
- * typed ("1/", "2/7", "🧵 3."), or plain paragraph breaks. Anything under ~15 chars is folded back
- * into the previous part so a stray line ("👇") never becomes its own slide source.
+ * Handles the shapes an extracted or pasted thread actually arrives in: explicit part markers the
+ * author typed ("1/", "2/7", "🧵 3.", "• "), or plain paragraph breaks. Anything under ~15 chars is
+ * folded back into the previous part so a stray line ("👇") never becomes its own slide source.
  */
 export function splitThreadPosts(raw: string): string[] {
   const text = (raw || '').replace(/\r\n?/g, '\n').trim();
   if (!text) return [];
 
   const lines = text.split('\n');
-  const MARKER = /^\s*(?:🧵\s*)?(?:\(?\d{1,2}\s*(?:\/\s*\d{1,2})?\s*[.):\/]|\d{1,2}\s*—)\s+/;
-  if (lines.filter((l) => MARKER.test(l)).length >= 2) {
+  if (lines.filter((l) => PART_MARKER.test(l)).length >= 2) {
     const parts: string[] = [];
     for (const line of lines) {
-      if (MARKER.test(line) || parts.length === 0) parts.push(line.replace(MARKER, '').trim());
+      if (PART_MARKER.test(line) || parts.length === 0) parts.push(line.replace(PART_MARKER, '').trim());
       else parts[parts.length - 1] += `\n${line}`;
     }
     return tidyParts(parts);
   }
   return tidyParts(text.split(/\n{2,}/));
 }
+
+/**
+ * A line that opens a new part of a thread: "1/", "2/7", "🧵 3.", "4 —", or a bulleted item.
+ *
+ * The bullet forms are here because authors number a thread two ways — with ordinals, or as a
+ * bulleted list under one post — and only the ordinal form was recognised before, so a bulleted
+ * thread collapsed into a single slide. A bullet only counts when at least two lines carry one, so
+ * a post that happens to contain one bulleted aside is still one post.
+ */
+const PART_MARKER = /^\s*(?:🧵\s*)?(?:\(?\d{1,2}\s*(?:\/\s*\d{1,2})?\s*[.):\/]|\d{1,2}\s*—|[-*•‣▪▶→]\s)\s*/;
 
 function tidyParts(parts: string[]): string[] {
   const out: string[] = [];
@@ -493,26 +603,35 @@ function sameOpening(a: string, b: string): boolean {
  */
 export const MIN_THREAD_CHARS = 60;
 
-function totalChars(posts: string[]): number {
-  return posts.reduce((n, p) => n + p.trim().length, 0);
+function totalChars(posts: ThreadPost[]): number {
+  return posts.reduce((n, p) => n + p.text.trim().length, 0);
 }
 
 const THIN_NOTE =
   'הצלחנו למשוך רק קטע קצר מהפוסט (כנראה חסום מאחורי התחברות) — הדביקו את טקסט השרשור המלא כדי להמשיך.';
 
-function finish(base: ImportedThread, posts: string[], via: ImportedThread['via'], author: string): ImportedThread {
-  const chars = totalChars(posts);
+function finish(
+  base: ImportedThread,
+  items: ThreadPost[],
+  via: ImportedThread['via'],
+  author: string
+): ImportedThread {
+  const chars = totalChars(items);
   // Thin extractions are still returned, not discarded: the operator sees what little came back and
   // can paste the rest around it. They are just never reported as ok.
   const thin = chars > 0 && chars < MIN_THREAD_CHARS;
+  const posts = items.map((p) => p.text);
   return {
     ...base,
-    ok: posts.length > 0 && !thin,
+    ok: items.length > 0 && !thin,
     author: author || base.author,
     posts,
+    items,
+    images: [...new Set(items.flatMap((p) => p.images))].slice(0, 20),
+    replyCount: Math.max(0, items.length - 1),
     text: posts.join('\n\n'),
-    via: posts.length ? via : 'none',
-    note: !posts.length ? base.note : thin ? THIN_NOTE : undefined,
+    via: items.length ? via : 'none',
+    note: !items.length ? base.note : thin ? THIN_NOTE : undefined,
   };
 }
 
@@ -523,6 +642,9 @@ export async function importThreadContent(rawUrl: string): Promise<ImportedThrea
     url: normalized?.url ?? withScheme(rawUrl),
     author: normalized?.handle ?? '',
     posts: [],
+    items: [],
+    images: [],
+    replyCount: 0,
     text: '',
     via: 'none',
     note: 'לא הצלחנו למשוך את התוכן מ-Threads — הדביקו את טקסט השרשור ידנית.',
@@ -539,7 +661,7 @@ export async function importThreadContent(rawUrl: string): Promise<ImportedThrea
   const meta = readPageMeta(previewHtml || browserHtml || '', code);
   const author = meta.author || base.author;
 
-  // 1 · server-rendered JSON: the requested thread's posts, verbatim
+  // 1 · server-rendered JSON: the requested thread's posts, verbatim, images included
   for (const html of [previewHtml, browserHtml]) {
     const sjs = html ? extractSjsThread(html, code) : null;
     if (sjs) return finish(base, sjs.posts, 'direct', sjs.author || author);
@@ -549,11 +671,12 @@ export async function importThreadContent(rawUrl: string): Promise<ImportedThrea
   const metaPost = meta.text.trim();
   const blocks = readerMd ? readerBlocks(readerMd) : [];
   const chain = readerThread(blocks, code);
-  if (chain && (!metaPost || sameOpening(metaPost, chain.posts[0]))) {
-    const posts = [...chain.posts];
+  if (chain && (!metaPost || sameOpening(metaPost, chain.posts[0].text))) {
+    const posts = chain.posts.map((p) => ({ ...p }));
     // The metadata copy of the root post is the cleaner one. The reader's is kept only when the
-    // metadata came back cut short.
-    if (metaPost && metaPost.length >= posts[0].length * 0.9) posts[0] = metaPost;
+    // metadata came back cut short. The reader's images for that post survive either way.
+    if (metaPost && metaPost.length >= posts[0].text.length * 0.9) posts[0].text = metaPost;
+    if (meta.image && !posts[0].images.includes(meta.image)) posts[0].images.unshift(meta.image);
     const via = posts.length === 1 && metaPost ? 'meta' : 'jina';
     return finish(base, posts, via, chain.author || author);
   }
@@ -561,7 +684,7 @@ export async function importThreadContent(rawUrl: string): Promise<ImportedThrea
   // 3 · the metadata post alone. Without a usable page there is no telling whether the author
   //     continued the thread, so the operator is told only the first post came through.
   if (metaPost) {
-    const result = finish(base, [metaPost], 'meta', author);
+    const result = finish(base, [{ text: metaPost, images: meta.image ? [meta.image] : [] }], 'meta', author);
     return result.ok
       ? { ...result, note: 'חולץ רק הפוסט הראשון (מתגיות המטא של הפוסט) — אם זה שרשור, הדביקו את ההמשך ידנית.' }
       : result;
@@ -570,7 +693,9 @@ export async function importThreadContent(rawUrl: string): Promise<ImportedThrea
   // 4 · last resort: the reader page as flat text. Only when no post blocks were found at all (a
   //     reader format change) and the page is recognisably the post, never a login-wall feed.
   if (readerMd && !blocks.length && isPostPageTitle(readerMd)) {
-    const posts = dropGatePosts(splitThreadPosts(parseJina(readerMd, normalized.handle || author)));
+    const posts = dropGatePosts(
+      splitThreadPosts(parseJina(readerMd, normalized.handle || author)).map((text) => ({ text, images: [] }))
+    );
     // The reader's own boilerplate can survive the gate filter as a handful of characters, so
     // this path keeps a stricter bar than the shared floor before it wins the result.
     if (posts.length && totalChars(posts) > 120) {
@@ -609,18 +734,23 @@ export function authorFromPaste(raw: string): string {
   return handle ? `@${handle}` : '';
 }
 
-/** Local parse of a manually pasted thread — same shape as a successful fetch. */
+/** Local parse of a manually pasted thread — same shape as a successful fetch, minus the images
+ *  (a paste carries text only; the operator can still get visuals from the generated backdrops). */
 export function parseThreadRawText(raw: string, url = ''): ImportedThread {
   const author = authorFromPaste(raw);
   // The "username · 3h" header is app furniture, not the post — it would otherwise open the deck.
   const posts = splitThreadPosts(stripPasteHeader(raw));
-  const chars = totalChars(posts);
+  const items = posts.map((text) => ({ text, images: [] as string[] }));
+  const chars = totalChars(items);
   const normalized = url ? normalizeThreadsUrl(url) : null;
   return {
     ok: posts.length > 0 && chars >= MIN_THREAD_CHARS,
     url: normalized?.url ?? (url ? withScheme(url) : ''),
     author,
     posts,
+    items,
+    images: [],
+    replyCount: Math.max(0, posts.length - 1),
     text: posts.join('\n\n'),
     via: posts.length ? 'manual' : 'none',
     note: !posts.length

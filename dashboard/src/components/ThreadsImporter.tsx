@@ -17,6 +17,8 @@ import {
   ClipboardPaste,
   Trash2,
   Languages,
+  Layers,
+  Palette,
 } from 'lucide-react';
 import {
   importThread,
@@ -28,6 +30,7 @@ import {
   loadThreadState,
   clearThreadState,
   MIN_THREAD_CHARS,
+  EMPTY_THREAD,
   type ImportedThread,
 } from '../lib/threadsImportApi';
 import type { TechTipDeck } from '../lib/techTipsApi';
@@ -65,7 +68,16 @@ const VIA_LABEL: Record<ImportedThread['via'], string> = {
 const PREVIEW_W = 340;
 const PREVIEW_H = 425;
 
-const EMPTY_THREAD: ImportedThread = { ok: false, url: '', author: '', posts: [], text: '', via: 'none' };
+/** Hebrew label for the subject family the agent assigned — the operator sees what it decided. */
+const THEME_LABEL: Record<string, string> = {
+  ai: 'בינה מלאכותית',
+  automation: 'אוטומציה',
+  security: 'סייבר ואבטחה',
+  code: 'פיתוח וקוד',
+  data: 'נתונים',
+  web3: 'Web3',
+  general: 'טכנולוגיה',
+};
 
 /**
  * Threads → Hebrew carousel.
@@ -375,6 +387,18 @@ export default function ThreadsImporter() {
           </p>
         )}
 
+        {/* Multi-post detection. A thread with sub-replies becomes a slide per reply, so the
+            operator learns what they are about to generate before spending a run on it. */}
+        {thread.replyCount > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-xs font-bold text-brand-300">
+            <Layers className="w-3.5 h-3.5 shrink-0" />
+            זוהה שרשור מרובה שקופיות ({thread.replyCount} תגובות + עיצוב מוכוון קונטקסט)
+            {thread.images.length > 0 && (
+              <span className="font-normal text-brand-200/70">· {thread.images.length} תמונות מהמקור</span>
+            )}
+          </div>
+        )}
+
         {showPaste && (
           <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
             <label className="mb-1.5 block text-[12px] font-bold text-zinc-300">
@@ -407,6 +431,7 @@ export default function ThreadsImporter() {
               </span>
               <span>{VIA_LABEL[thread.via]}</span>
               {thread.author && <span dir="ltr">· {thread.author}</span>}
+              {thread.images.length > 0 && <span>· {thread.images.length} תמונות</span>}
             </div>
             <ol className="space-y-2 max-h-64 overflow-y-auto pl-1">
               {thread.posts.map((p, i) => (
@@ -486,11 +511,30 @@ export default function ThreadsImporter() {
         <PreviewErrorBoundary label="תצוגת הקרוסלה" resetKeys={[deck.createdAt, images.length, active]} onReset={() => setActive(0)}>
           <div className="dash-card p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-zinc-400 text-xs font-mono uppercase tracking-wider">
+              <span className="flex flex-wrap items-center gap-2 text-zinc-400 text-xs font-mono uppercase tracking-wider">
                 <AtSign className="w-3.5 h-3.5" /> {deck.slides.length} שקופיות ·{' '}
                 <span className={deck.synthesized ? 'text-brand-400 normal-case' : 'text-amber-400/80 normal-case'}>
                   {deck.synthesized ? 'תורגם והותאם ע"י AI' : `גיבוי מקומי${deck.fallbackReason ? ` — ${deck.fallbackReason}` : ''}`}
                 </span>
+                {/* What the agent decided the thread was about — the theme drives the accent
+                    colour, the badge on every slide and which guide the CTA promotes. */}
+                {deck.topic && (
+                  <span
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 normal-case text-zinc-300"
+                    title={deck.topic.signals.join(' · ') || 'לא זוהו אותות נושא'}
+                  >
+                    <Palette className="w-3 h-3 text-brand-400" />
+                    {THEME_LABEL[deck.topic.theme] ?? deck.topic.theme}
+                    <span dir="ltr" className="text-zinc-500">
+                      {deck.topic.badge}
+                    </span>
+                    {deck.topic.guideSlug && (
+                      <span dir="ltr" className="text-brand-400/80">
+                        /g/{deck.topic.guideSlug}
+                      </span>
+                    )}
+                  </span>
+                )}
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 <button
