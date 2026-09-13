@@ -14,9 +14,11 @@ import { renumberSteps, type TechTipDeck, type TechTipSlide, type ThreadTheme } 
  * with. Each returned slide gets ITS OWN uploaded frame reattached as `sourceImage` here, client
  * side, straight from the file the operator dropped in.
  *
- * The deck type is deliberately TechTipDeck, so the entire existing pipeline — techTipRenderer (PNG
- * carousel + ZIP), motionStudioService (9:16 reel), the preview player — works on this output with
- * no changes.
+ * The deck type is deliberately TechTipDeck. For the 'creator' preset the server also returns
+ * per-slide `overlayBoxes` (bounding-box text detections), which `imageOverlayRenderer.ts` uses to
+ * erase and redraw text directly on the original frame; every other preset keeps rendering through
+ * the existing techTipRenderer template pipeline (PNG carousel + ZIP, motionStudioService reel,
+ * preview player) unchanged.
  */
 
 export type ImageCarouselVisualPreset = 'creator' | 'cream-skill' | 'cream-workflow' | 'cream-prompt-library' | 'auto-detect';

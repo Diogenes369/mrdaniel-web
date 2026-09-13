@@ -393,6 +393,32 @@ export interface TechTipSlide {
   promptCards?: PromptCard[];
   /** Feature-grid tile labels for a prompt-library cover slide, e.g. 10 category names. */
   coverTiles?: string[];
+
+  // --- direct on-image overlay (bounding-box erase + in-place Hebrew) -----------------------
+  // Also optional and additive. Only the image-carousel translator's "creator" preset populates
+  // this — see imageTranslatorAgent.ts and dashboard/src/lib/imageOverlayRenderer.ts. Every other
+  // preset and every other producer of a TechTipDeck ignores it entirely.
+  /** Every on-image text block read off this slide's own uploaded frame, in reading position. */
+  overlayBoxes?: ImageOverlayBox[];
+}
+
+/**
+ * One block of printed text located on an uploaded carousel frame, read by Gemini vision — see
+ * `TechTipSlide.overlayBoxes`. `bbox` follows Gemini's own spatial convention: `[ymin, xmin, ymax,
+ * xmax]`, each an integer 0-1000 normalized to THIS frame's own width/height, independent of
+ * whatever pixel size the frame is actually rendered at.
+ */
+export interface ImageOverlayBox {
+  bbox: [number, number, number, number];
+  /** The exact printed text, untranslated — kept for auditing, never rendered. */
+  originalText: string;
+  /** Fluent Hebrew translation, rendered in the box's place. */
+  translatedText: string;
+  /** `handwritten` for a paper/notebook-styled block, `sans-serif` for a clean UI/deck block. */
+  fontType: 'handwritten' | 'sans-serif';
+  /** The original text's own colour, as printed — `#rrggbb`. */
+  textColor: string;
+  boxType: 'headline' | 'body' | 'command_code' | 'watermark';
 }
 
 /** One numbered prompt card recovered by vision OCR from a dense-text carousel frame — see

@@ -130,6 +130,23 @@ export interface TechTipSlide {
   promptCards?: PromptCard[];
   /** Feature-grid tile labels for a prompt-library cover slide, e.g. 10 category names. */
   coverTiles?: string[];
+
+  // Direct on-image overlay — optional and additive; only the image-carousel translator's
+  // 'creator' preset populates it. Mirrors src/agent/types.ts.
+  /** Every on-image text block read off this slide's own uploaded frame, in reading position. */
+  overlayBoxes?: ImageOverlayBox[];
+}
+
+/** One block of printed text located on an uploaded carousel frame — see
+ *  `TechTipSlide.overlayBoxes`. `bbox` is Gemini's own convention: `[ymin, xmin, ymax, xmax]`, each
+ *  an integer 0-1000 normalized to this frame's own width/height. Mirrors src/agent/types.ts. */
+export interface ImageOverlayBox {
+  bbox: [number, number, number, number];
+  originalText: string;
+  translatedText: string;
+  fontType: 'handwritten' | 'sans-serif';
+  textColor: string;
+  boxType: 'headline' | 'body' | 'command_code' | 'watermark';
 }
 
 /** One numbered prompt card recovered by vision OCR from a dense-text carousel frame. `index` is

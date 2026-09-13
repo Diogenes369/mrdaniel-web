@@ -30,20 +30,21 @@ import {
 } from '../lib/imageCarouselApi';
 import type { TechTipDeck } from '../lib/techTipsApi';
 import { renderTipDeckImages, exportTipDeckZip, resolveTipBackgrounds, type TipStyle } from '../lib/techTipRenderer';
+import { renderOverlayDeck } from '../lib/imageOverlayRenderer';
 import { renderTipDeckVideo, isMotionSupported } from '../lib/motionStudioService';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
 
 const PRESET_OPTIONS: { id: ImageCarouselVisualPreset; label: string; hint: string }[] = [
   { id: 'auto-detect', label: 'זיהוי אוטומטי', hint: 'ה-AI בוחר את העיצוב המתאים ביותר לפי התמונות שהועלו' },
-  { id: 'creator', label: 'קריאייטור (כהה)', hint: 'רקע סלייט כהה עם זוהר בצבעי הכלי — בלי סטוק' },
+  { id: 'creator', label: 'עריכה במקום', hint: 'שומר על התמונה המקורית לגמרי — מוחק כל טקסט מודפס ומצייר את התרגום העברי באותו מקום בדיוק' },
   { id: 'cream-skill', label: 'קרם וטרקוטה', hint: 'כרטיס מיומנות בהיר: פקודה, תיאור קצר וקופסת התקנה כהה' },
   { id: 'cream-workflow', label: 'דיאגרמת תהליך', hint: 'כרטיס בהיר עם שרשרת צמתי אוטומציה מחוברים' },
   { id: 'cream-prompt-library', label: 'ספריית פרומפטים', hint: 'קורא כרטיסי פרומפט ממוספרים המודפסים ישירות על השקופיות' },
 ];
 
 const PRESET_LABEL: Record<Exclude<ImageCarouselVisualPreset, 'auto-detect'>, string> = {
-  creator: 'קריאייטור (כהה)',
+  creator: 'עריכה במקום',
   'cream-skill': 'קרם וטרקוטה',
   'cream-workflow': 'דיאגרמת תהליך',
   'cream-prompt-library': 'ספריית פרומפטים',
@@ -79,8 +80,16 @@ const PREVIEW_H = 425;
  * drags in the carousel's own slide images directly, in reading order. One server round-trip reads
  * and translates every frame's printed text via Gemini vision (`imageCarouselApi.ts` →
  * `src/server/agents/imageTranslatorAgent.ts`), and the deck it returns keeps a strict
- * one-slide-per-uploaded-frame mapping — the source's own image becomes that slide's background, so
- * rendering, export and the 9:16 reel are the exact TechTipDeck pipeline every other studio tab uses.
+ * one-slide-per-uploaded-frame mapping — the source's own image is reattached as each slide's
+ * `sourceImage`, client-side.
+ *
+ * Two different renderers turn that into pixels, chosen by `resolvedPreset`:
+ * - 'creator' ("עריכה במקום"): `imageOverlayRenderer.ts` erases every on-image text block Gemini
+ *   located and paints the Hebrew translation back into the exact same spot, at the frame's own
+ *   native resolution — every pixel of the original artwork survives untouched.
+ * - every other preset (cream-skill / cream-workflow / cream-prompt-library): the shared
+ *   `techTipRenderer.ts` TechTipDeck pipeline every other studio tab uses — a fresh templated card
+ *   design, dimmed source image as texture, not an in-place edit.
  */
 export default function ImageCarouselUploader() {
   const [frames, setFrames] = useState<CarouselFrame[]>([]);
@@ -179,6 +188,19 @@ export default function ImageCarouselUploader() {
   }, []);
 
   const renderDeck = useCallback(async (d: TechTipDeck, style: TipStyle) => {
+    if (style === 'creator') {
+      // Direct on-image overlay: erase every detected English block and paint the Hebrew
+      // translation back into the exact same spot, at the frame's own native resolution — no
+      // template, no dimmed background, no card chrome. See imageOverlayRenderer.ts.
+      setRenderProgress({ done: 0, total: d.slides.length });
+      const imgs = await renderOverlayDeck(
+        d.slides.map((s) => s.sourceImage),
+        d.slides.map((s) => s.overlayBoxes),
+        (done, total) => setRenderProgress({ done, total })
+      );
+      setImages(imgs);
+      return;
+    }
     // Every slide already carries its own uploaded frame as `sourceImage`, so this pass never
     // fetches stock — it only prepares the images already in memory for the canvas.
     setBgProgress({ done: 0, total: d.slides.length });
@@ -502,7 +524,11 @@ export default function ImageCarouselUploader() {
                 >
                   <ImageIcon className="w-3.5 h-3.5" /> קרוסלה (ZIP · PNG)
                 </button>
-                {motionSupported ? (
+                {resolvedPreset === 'creator' ? (
+                  <span className="text-[11px] text-zinc-600" title="עריכה במקום שומרת על התמונה המקורית ברזולוציה שלה — ריל 9:16 לא נתמך עבורה כרגע">
+                    ריל 9:16 לא נתמך בעיצוב "עריכה במקום"
+                  </span>
+                ) : motionSupported ? (
                   <button
                     onClick={() => void makeVideo()}
                     disabled={videoBusy || busy}
@@ -514,7 +540,7 @@ export default function ImageCarouselUploader() {
                 ) : (
                   <span className="text-[11px] text-zinc-600">הפקת וידאו לא נתמכת בדפדפן זה</span>
                 )}
-                {videoBlob && (
+                {videoBlob && resolvedPreset !== 'creator' && (
                   <button
                     onClick={downloadVideo}
                     className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-bold text-black cursor-pointer"
@@ -522,10 +548,12 @@ export default function ImageCarouselUploader() {
                     <Download className="w-3.5 h-3.5" /> הורד ריל (MP4)
                   </button>
                 )}
-                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-400">
-                  <input type="checkbox" checked={withMusic} onChange={(e) => setWithMusic(e.target.checked)} className="accent-brand-500 w-3.5 h-3.5" />
-                  פס קול
-                </label>
+                {resolvedPreset !== 'creator' && (
+                  <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-400">
+                    <input type="checkbox" checked={withMusic} onChange={(e) => setWithMusic(e.target.checked)} className="accent-brand-500 w-3.5 h-3.5" />
+                    פס קול
+                  </label>
+                )}
               </div>
             </div>
 

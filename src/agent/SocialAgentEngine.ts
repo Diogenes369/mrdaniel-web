@@ -22,7 +22,7 @@ export { stripCodeFence, requireText, parseJsonOrThrow, ModelOutputError };
 export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
-import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode, PromptCard } from './types.js';
+import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode, PromptCard, ImageOverlayBox } from './types.js';
 
 
 // --- Brand knowledge base ------------------------------------------------------------------
@@ -2037,6 +2037,9 @@ export interface ImageCarouselSlideExtract {
    *  code, the same way instagramAgent.ts's `attachSkillExtras` used to — those must survive exactly
    *  and are never trusted to the translation pass. */
   rawText: string;
+  /** Populated only for the 'creator' preset — every on-image text block located by vision, in
+   *  reading order, for direct erase-and-replace rendering. See `IMAGE_CAROUSEL_OVERLAY_ADDENDUM`. */
+  overlayBoxes: ImageOverlayBox[];
 }
 
 export interface ImageCarouselExtraction {
@@ -2083,7 +2086,7 @@ ${AUDIENCE_RULES}
 לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי באנגלית בלבד, נטול טקסט: רקע אבסטרקטי-טכני כהה (dark cyber, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent, no text, no people, no logos, no watermark).
 
 פלט: JSON תקין בלבד, בלי markdown code fence:
-{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","badge":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"rawText":"...","visualPrompt":"..."}]}
+{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","badge":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"rawText":"...","visualPrompt":"...","overlayBoxes":[]}]}
 מערך "slides" חייב להכיל בדיוק שקופית אחת לכל תמונה שקיבלתם, באותו סדר. שדות שאינם רלוונטיים ל-kind: "" או [] או 0.`;
 
 /** Appended when the operator picked "קרם וטרקוטה" (or auto-detect, which asks for both extras and
@@ -2098,6 +2101,28 @@ const IMAGE_CAROUSEL_SKILL_ADDENDUM = `
 const IMAGE_CAROUSEL_WORKFLOW_ADDENDUM = `
 
 תוספת מבנה לעיצוב "דיאגרמת תהליך": אם ורק אם שקופית מציגה במפורש שרשרת שירותים/כלים (למשל webhook, סוכן AI, שליחת מייל, יומן, CRM, Make, n8n) — הוסיפו לה שדה "workflow": מערך צמתים בסדר הקריאה, כל אחד {"label":"עברית, עד 2 מילים","sublabel":"שם השירות באנגלית בדיוק כפי שהופיע בתמונה","icon":"אחד מתוך: webhook|openai|gmail|calendar|apify|crm|make|n8n|filter|router|scheduler|chat|phone|globe|doc|sheet|db","lane":0}. lane=0 (או השמטה) לצמתי הגזע הראשי; lane=1,2,3... לכל ענף מקביל. אסור להמציא שירות שלא מופיע בתמונה — אם אין שרשרת כזו, השאירו workflow ריק ([]).`;
+
+/**
+ * Appended for the 'creator' preset only. Instead of (or in addition to) the whole-slide
+ * title/body extraction above, this asks for a per-BLOCK reading of every piece of printed text on
+ * the frame, with a precise location — the input the direct on-image overlay renderer needs to
+ * erase each block of English in place and paint the Hebrew translation back into the exact same
+ * spot, preserving every pixel of the original artwork around it.
+ *
+ * The `[ymin, xmin, ymax, xmax]` / 0-1000 convention is Gemini's own object-detection bounding-box
+ * format — asking for anything else (pixel coordinates, a different axis order) reliably produces
+ * worse boxes, since it is what the model was actually trained to emit.
+ */
+const IMAGE_CAROUSEL_OVERLAY_ADDENDUM = `
+
+תוספת קריטית — מיקום מדויק של כל בלוק טקסט לצורך מחיקה והחלפה במקום: בנוסף לכל שדה שהתבקש למעלה, הוסיפו לכל שקופית שדה "overlayBoxes" — מערך שמכיל בלוק אחד לכל קטע טקסט מודפס נפרד שאתם רואים בפועל על התמונה (כותרת, פסקה, כיתוב פקודה/קוד, ותגית היוצר/שם המשתמש בתחתית או בפינה — "watermark"). לכל בלוק:
+- "bbox": מערך של 4 מספרים שלמים [ymin,xmin,ymax,xmax], כל אחד מנורמל לטווח 0-1000 ביחס לגובה/רוחב התמונה הזו בלבד (המוסכמה הרגילה של זיהוי אובייקטים ב-Gemini). התיבה צריכה לעטוף בדיוק את הטקסט הנראה, לא יותר ולא פחות.
+- "originalText": הטקסט המדויק כפי שהוא מודפס בבלוק הזה, ללא תרגום.
+- "translatedText": תרגום עברי שוטף וטבעי לבלוק הזה בלבד (לא לכל השקופית) — אם boxType הוא "watermark" תוכלו להשאיר את זה ריק, זה יוחלף בקוד.
+- "fontType": "handwritten" אם הטקסט נראה כמו כתב יד/מחברת/פתק (למשל כותרות עם קו תחתון משורטט ביד, רקע דף מחברת), אחרת "sans-serif" לטקסט UI נקי ומודפס.
+- "textColor": צבע הטקסט המקורי כפי שהוא נראה בתמונה, כ-hex בפורמט "#rrggbb".
+- "boxType": אחד מתוך "headline" (כותרת ראשית), "body" (טקסט הסבר/פסקה), "command_code" (פקודה/קוד/נתיב קובץ המיועד להעתקה מדויקת), "watermark" (שם משתמש/תגית של יוצר התוכן המקורי, בדרך כלל @ בתחילת השם, בפינה או בתחתית התמונה).
+אל תמציאו בלוקים שלא קיימים בפועל בתמונה. אם שקופית לא מכילה שום טקסט מודפס — השאירו overlayBoxes ריק ([]).`;
 
 /**
  * Read every uploaded carousel frame via Gemini vision and translate its printed text to Hebrew in
@@ -2135,7 +2160,9 @@ export async function extractImageCarouselContent(input: {
         ? IMAGE_CAROUSEL_WORKFLOW_ADDENDUM
         : input.visualPreset === 'auto-detect'
           ? `${IMAGE_CAROUSEL_SKILL_ADDENDUM}${IMAGE_CAROUSEL_WORKFLOW_ADDENDUM}`
-          : '';
+          : input.visualPreset === 'creator'
+            ? IMAGE_CAROUSEL_OVERLAY_ADDENDUM
+            : '';
 
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,
@@ -2149,6 +2176,50 @@ export async function extractImageCarouselContent(input: {
   });
 
   return parseImageCarouselResponse(stripCodeFence(requireText(response)), input.frames.length);
+}
+
+const OVERLAY_BOX_TYPES = new Set(['headline', 'body', 'command_code', 'watermark']);
+
+/** The only brand identity ever painted over a detected watermark — never the model's own guess,
+ *  so a mistranslated or omitted handle can't leak the source creator's name into the output. */
+const OVERLAY_WATERMARK_TEXT = '@mrdaniel.co.il';
+
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
+/** Validates and clamps one on-image text block. Returns null for anything too malformed to
+ *  render — an empty original/translated string, a degenerate (zero-area) box, or coordinates that
+ *  aren't 4 finite numbers — rather than letting a bad box crash the renderer downstream. */
+function parseOverlayBox(raw: unknown): ImageOverlayBox | null {
+  const rec = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const bboxRaw = Array.isArray(rec.bbox) ? rec.bbox.map(Number) : [];
+  if (bboxRaw.length !== 4 || bboxRaw.some((n) => !Number.isFinite(n))) return null;
+  const clamp = (n: number) => Math.max(0, Math.min(1000, Math.round(n)));
+  const [ymin, xmin, ymax, xmax] = bboxRaw.map(clamp) as [number, number, number, number];
+  if (ymax <= ymin || xmax <= xmin) return null;
+
+  const boxType = OVERLAY_BOX_TYPES.has(String(rec.boxType)) ? (rec.boxType as ImageOverlayBox['boxType']) : 'body';
+  const originalText = String(rec.originalText ?? '').trim().slice(0, 300);
+  const translatedText =
+    boxType === 'watermark'
+      ? OVERLAY_WATERMARK_TEXT
+      : sanitizeHebrewText(stripSourceCredits(String(rec.translatedText ?? '').trim())).slice(0, 300);
+  if (!originalText && boxType !== 'watermark') return null;
+  if (!translatedText) return null;
+
+  const colorRaw = String(rec.textColor ?? '').trim();
+  return {
+    bbox: [ymin, xmin, ymax, xmax],
+    originalText,
+    translatedText,
+    fontType: rec.fontType === 'handwritten' ? 'handwritten' : 'sans-serif',
+    textColor: HEX_COLOR_RE.test(colorRaw) ? colorRaw.toLowerCase() : '#1a1a1a',
+    boxType,
+  };
+}
+
+function parseOverlayBoxes(raw: unknown): ImageOverlayBox[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(parseOverlayBox).filter((b): b is ImageOverlayBox => b !== null).slice(0, 24);
 }
 
 function parseImageCarouselResponse(raw: string, frameCount: number): ImageCarouselExtraction {
@@ -2181,10 +2252,11 @@ function parseImageCarouselResponse(raw: string, frameCount: number): ImageCarou
       subtitle: rec.subtitle ? hebrew(rec.subtitle, 6).slice(0, 60) : '',
       workflow: parseWorkflowNodes(rec.workflow) ?? [],
       rawText: String(rec.rawText ?? '').slice(0, 1200),
+      overlayBoxes: parseOverlayBoxes(rec.overlayBoxes),
     };
   });
 
-  if (!slides.some((s) => s.title || s.body || s.bullets.length || s.code)) {
+  if (!slides.some((s) => s.title || s.body || s.bullets.length || s.code || s.overlayBoxes.length)) {
     throw new ModelOutputError('too few usable image-carousel slides extracted from frames');
   }
 

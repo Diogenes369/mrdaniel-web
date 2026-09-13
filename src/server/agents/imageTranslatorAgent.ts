@@ -113,6 +113,7 @@ function extractionToDeck(ext: ImageCarouselExtraction): TechTipDeck {
       workflow: s.workflow.length ? s.workflow : undefined,
       slashCommand: slashCommand || undefined,
       install,
+      overlayBoxes: s.overlayBoxes,
     };
   });
 
