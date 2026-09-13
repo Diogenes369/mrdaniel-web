@@ -2116,12 +2116,13 @@ const IMAGE_CAROUSEL_WORKFLOW_ADDENDUM = `
 const IMAGE_CAROUSEL_OVERLAY_ADDENDUM = `
 
 תוספת קריטית — מיקום מדויק של כל בלוק טקסט לצורך מחיקה והחלפה במקום: בנוסף לכל שדה שהתבקש למעלה, הוסיפו לכל שקופית שדה "overlayBoxes" — מערך שמכיל בלוק אחד לכל קטע טקסט מודפס נפרד שאתם רואים בפועל על התמונה (כותרת, פסקה, כיתוב פקודה/קוד, ותגית היוצר/שם המשתמש בתחתית או בפינה — "watermark"). לכל בלוק:
-- "bbox": מערך של 4 מספרים שלמים [ymin,xmin,ymax,xmax], כל אחד מנורמל לטווח 0-1000 ביחס לגובה/רוחב התמונה הזו בלבד (המוסכמה הרגילה של זיהוי אובייקטים ב-Gemini). התיבה צריכה לעטוף בדיוק את הטקסט הנראה, לא יותר ולא פחות.
+- "bbox": מערך של 4 מספרים שלמים [ymin,xmin,ymax,xmax], כל אחד מנורמל לטווח 0-1000 ביחס לגובה/רוחב התמונה הזו בלבד (המוסכמה הרגילה של זיהוי אובייקטים ב-Gemini). אם הטקסט יושב בתוך תיבה, כרטיס, פס צבעוני או הדגשה נבדלת מהרקע (למשל קופסת פקודה/קוד כהה) — ה-bbox חייב לעטוף את כל שטח התיבה הצבעונית עצמה, לא רק את קווי המתאר הצרים של האותיות. אם הטקסט יושב ישירות על רקע הדף/התמונה בלי תיבה נפרדת — ה-bbox עוטף רק את הטקסט הנראה, לא יותר ולא פחות.
 - "originalText": הטקסט המדויק כפי שהוא מודפס בבלוק הזה, ללא תרגום.
 - "translatedText": תרגום עברי שוטף וטבעי לבלוק הזה בלבד (לא לכל השקופית) — אם boxType הוא "watermark" תוכלו להשאיר את זה ריק, זה יוחלף בקוד.
 - "fontType": "handwritten" אם הטקסט נראה כמו כתב יד/מחברת/פתק (למשל כותרות עם קו תחתון משורטט ביד, רקע דף מחברת), אחרת "sans-serif" לטקסט UI נקי ומודפס.
 - "textColor": צבע הטקסט המקורי כפי שהוא נראה בתמונה, כ-hex בפורמט "#rrggbb".
 - "boxType": אחד מתוך "headline" (כותרת ראשית), "body" (טקסט הסבר/פסקה), "command_code" (פקודה/קוד/נתיב קובץ המיועד להעתקה מדויקת), "watermark" (שם משתמש/תגית של יוצר התוכן המקורי, בדרך כלל @ בתחילת השם, בפינה או בתחתית התמונה).
+- "containerColor": אם הטקסט יושב בתוך תיבה/כרטיס בצבע נבדל מהרקע (כמו קופסת פקודה כהה) — צבע המילוי של התיבה עצמה, כ-hex בפורמט "#rrggbb". אם הטקסט יושב ישירות על רקע הדף בלי תיבה נפרדת — השאירו מחרוזת ריקה ("").
 אל תמציאו בלוקים שלא קיימים בפועל בתמונה. אם שקופית לא מכילה שום טקסט מודפס — השאירו overlayBoxes ריק ([]).`;
 
 /**
@@ -2207,6 +2208,7 @@ function parseOverlayBox(raw: unknown): ImageOverlayBox | null {
   if (!translatedText) return null;
 
   const colorRaw = String(rec.textColor ?? '').trim();
+  const containerRaw = String(rec.containerColor ?? '').trim();
   return {
     bbox: [ymin, xmin, ymax, xmax],
     originalText,
@@ -2214,6 +2216,7 @@ function parseOverlayBox(raw: unknown): ImageOverlayBox | null {
     fontType: rec.fontType === 'handwritten' ? 'handwritten' : 'sans-serif',
     textColor: HEX_COLOR_RE.test(colorRaw) ? colorRaw.toLowerCase() : '#1a1a1a',
     boxType,
+    containerColor: HEX_COLOR_RE.test(containerRaw) ? containerRaw.toLowerCase() : '',
   };
 }
 

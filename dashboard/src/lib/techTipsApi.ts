@@ -147,6 +147,9 @@ export interface ImageOverlayBox {
   fontType: 'handwritten' | 'sans-serif';
   textColor: string;
   boxType: 'headline' | 'body' | 'command_code' | 'watermark';
+  /** Fill colour of a distinct container the text sits inside (`#rrggbb`), or `''` when the text
+   *  sits directly on the page/photo with no separate box. See src/agent/types.ts. */
+  containerColor: string;
 }
 
 /** One numbered prompt card recovered by vision OCR from a dense-text carousel frame. `index` is

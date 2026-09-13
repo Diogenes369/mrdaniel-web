@@ -419,6 +419,15 @@ export interface ImageOverlayBox {
   /** The original text's own colour, as printed — `#rrggbb`. */
   textColor: string;
   boxType: 'headline' | 'body' | 'command_code' | 'watermark';
+  /**
+   * The fill colour of a distinct container the text sits inside — a dark terminal/install box, a
+   * coloured chip or highlight — as `#rrggbb`, or `''` when the text sits directly on the page/photo
+   * background with no separate container. When set, the renderer fills the block with this EXACT
+   * colour instead of sampling pixels just outside it, which is the only reliable way to fully erase
+   * a small container: the ring just outside it is often the page background, not the container's
+   * own colour, once the container is much bigger than the tight text glyphs inside it.
+   */
+  containerColor: string;
 }
 
 /** One numbered prompt card recovered by vision OCR from a dense-text carousel frame — see

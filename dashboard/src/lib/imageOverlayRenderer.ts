@@ -19,6 +19,8 @@ import type { ImageOverlayBox } from './techTipsApi';
  * substitute for genuine content-aware fill against a busy photographic background.
  */
 
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
 interface Rect {
   x: number;
   y: number;
@@ -61,19 +63,32 @@ function averageStrip(ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
 }
 
 /**
- * Erases one text block: samples the background colour from a ring just outside the block (padded
- * generously for ascenders/descenders and rotated handwritten strokes), flat-fills the padded block
- * with it, then lays a faint tiled sample of the texture directly above it on top — full coverage
- * first, so nothing can bleed through, with a bit of texture continuity layered over that.
- * Returns the padded rect the caller may now paint Hebrew text into.
+ * Erases one text block. Returns the padded rect the caller may now paint Hebrew text into.
+ *
+ * When `containerColor` is set — the box sits inside a dark terminal box, a chip, a highlight — the
+ * block is a flat fill of that exact colour: sampling "just outside" is actively wrong there, since
+ * outside a small container is the PAGE background, not the container's own colour, the moment the
+ * container is bigger than the tight text glyphs Gemini boxed. Otherwise (plain text straight on the
+ * page/photo) the background is sampled from a ring just outside the block, padded generously for
+ * ascenders/descenders and rotated handwritten strokes, with a faint tiled sample of the texture
+ * directly above layered on top for continuity.
  */
-function erasePatch(ctx: CanvasRenderingContext2D, rect: Rect, canvasW: number, canvasH: number): Rect {
-  const padX = rect.width * 0.12 + 4;
-  const padY = rect.height * 0.3 + 4;
+function erasePatch(ctx: CanvasRenderingContext2D, rect: Rect, canvasW: number, canvasH: number, containerColor: string): Rect {
+  const hasContainer = HEX_COLOR_RE.test(containerColor);
+  const padX = hasContainer ? Math.max(2, rect.width * 0.02) : rect.width * 0.12 + 4;
+  const padY = hasContainer ? Math.max(2, rect.height * 0.06) : rect.height * 0.3 + 4;
   const ex = Math.max(0, rect.x - padX);
   const ey = Math.max(0, rect.y - padY);
   const ew = Math.min(canvasW - ex, rect.width + padX * 2);
   const eh = Math.min(canvasH - ey, rect.height + padY * 2);
+
+  if (hasContainer) {
+    ctx.save();
+    ctx.fillStyle = containerColor;
+    ctx.fillRect(ex, ey, ew, eh);
+    ctx.restore();
+    return { x: ex, y: ey, width: ew, height: eh };
+  }
 
   const gap = 2;
   const depth = Math.max(4, Math.round(Math.min(ew, eh) * 0.18));
@@ -209,7 +224,7 @@ export async function renderOverlayFrame(frameDataUrl: string, boxes: ImageOverl
   // Every block is erased FIRST, before any Hebrew is painted — so one box's erase-patch can never
   // wipe out text a previous box already drew (two blocks sitting close together, e.g. a watermark
   // right under a closing line).
-  const erased = rects.map((r) => erasePatch(ctx, r, w, h));
+  const erased = rects.map((r, i) => erasePatch(ctx, r, w, h, boxes[i].containerColor));
   boxes.forEach((box, i) => drawOverlayText(ctx, box, rects[i], erased[i]));
 
   return canvas.toDataURL('image/png');
