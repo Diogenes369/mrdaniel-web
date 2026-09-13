@@ -111,9 +111,9 @@ export function isThreadsUrl(raw: string): boolean {
 /**
  * Shared POST helper with one bounded 429 retry (Gemini free-tier hourly cap) and one 5xx retry.
  *
- * Exported because the Instagram importer (`instagramImportApi.ts`) talks to the same endpoint with
- * the same auth header and needs the same retry behaviour; a second copy would be one place for the
- * 429 backoff to silently diverge.
+ * Exported because the image carousel translator (`imageCarouselApi.ts`) talks to the same endpoint
+ * with the same auth header and needs the same retry behaviour; a second copy would be one place for
+ * the 429 backoff to silently diverge.
  */
 export async function postToAgent(action: string, body: Record<string, unknown>, timeoutMs = 90000): Promise<Response> {
   const headers: Record<string, string> = {

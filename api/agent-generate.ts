@@ -3,17 +3,7 @@ import { importUrlContent } from '../src/server/contentImport.js';
 import { optimizeForGrowth, flattenGrowthResult, GROWTH_OPS, type GrowthOp } from '../src/server/igGrowthStrategy.js';
 import { importThreadContent, parseThreadRawText, isThreadsUrl, type ImportedThread, type ThreadPost } from '../src/server/threadsThreadFetcher.js';
 import { buildThreadDeck } from '../src/server/agents/threadsThreadAgent.js';
-import {
-  importInstagramContent,
-  parseInstagramRawText,
-  isInstagramUrl,
-  captionWithoutHashtags,
-  captionLines,
-  extractHashtags,
-  type ImportedInstagramPost,
-  type InstagramSlide,
-} from '../src/server/instagramFetcher.js';
-import { buildInstagramDeck } from '../src/server/agents/instagramAgent.js';
+import { buildImageCarouselDeck } from '../src/server/agents/imageTranslatorAgent.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
 import { pushQueueItem, readAgentMode, readAgentWebhooks, readStrategicContext, writeAutoPilotRunTimestamp, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
@@ -520,118 +510,56 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    if (action === 'parse-instagram') {
-      // Instagram → carousel, step 1. Same contract as parse-thread: a gated or private post is
-      // never an error — it answers 200 with ok:false + a note, and the dashboard switches to the
-      // manual-paste path. `rawText` alone (no fetch at all) is a first-class input.
-      const { url, rawText } = req.body ?? {};
-      const pastedText = typeof rawText === 'string' ? rawText.trim() : '';
-      const rawTarget = typeof url === 'string' ? url.trim() : '';
-
-      if (!pastedText && !rawTarget) {
-        rejectThinInput(res, 'url or rawText required', 'לא הועברה כתובת מקור ולא טקסט גולמי לייבוא');
-        return;
-      }
-
-      const post = pastedText
-        ? parseInstagramRawText(pastedText, rawTarget)
-        : isInstagramUrl(rawTarget)
-          ? await importInstagramContent(rawTarget)
-          : null;
-
-      if (!post) {
-        rejectThinInput(res, 'valid instagram.com post url required', 'הכתובת אינה קישור תקין לפוסט באינסטגרם');
-        return;
-      }
-
-      // The frames' OCR text rides along in `slides` and is checked with the caption — it is
-      // model-visible content, so it goes through the same guard the caption does.
-      const security = sanitizeOutput(
-        [post.text, ...post.slides.map((s) => s.text)].join('\n').slice(0, 8000)
-      );
-      if (!security.passed) {
-        res.status(200).json({ ok: true, blocked: true, security });
-        return;
-      }
-      res.status(200).json({ ok: true, post });
-      return;
-    }
-
-    if (action === 'instagram-deck') {
-      // Instagram → carousel, step 2. Runs through the dedicated agent
-      // (src/server/agents/instagramAgent.ts), which assigns the theme, the topic badge, the step
-      // indicators, the prompt boxes and the CTA guide on top of the engine's Hebrew adaptation.
+    if (action === 'image-carousel-deck') {
+      // Direct carousel image upload → translated, rebranded carousel. Replaces the old
+      // parse-instagram/instagram-deck pair: there is no URL to fetch and no caption to translate —
+      // the operator uploads the carousel's own slide images directly, and the dedicated agent
+      // (src/server/agents/imageTranslatorAgent.ts) reads and translates every frame via Gemini
+      // vision in one call, then assigns the theme, topic badge and CTA guide.
       if (!isEngineConfigured()) {
         res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
-      const { post, notes, useSlideText, visualPreset } = req.body ?? {};
-      const src = (post && typeof post === 'object' ? post : {}) as Partial<ImportedInstagramPost>;
-      const caption = String(src.caption ?? src.text ?? '').slice(0, 8000).trim();
-      const rawSlides = Array.isArray(src.slides) ? src.slides : [];
-      // The prompt-library preset reads its content off the carousel FRAMES via vision OCR — the
-      // caption is context only and is often just a one-line pitch (the real target post's is 57
-      // chars) — so the usual "caption must carry the source material" floor does not apply to it,
-      // as long as there is at least one frame image to actually read.
-      const isPromptLibrary = visualPreset === 'cream-prompt-library';
-      if (!isPromptLibrary && captionWithoutHashtags(caption).trim().length < 40) {
-        rejectThinInput(
-          res,
-          'caption (>= 40 chars) required',
-          'כיתוב הפוסט קצר מדי לעיבוד AI (נדרשים לפחות 40 תווים) — הדביקו את הכיתוב המלא'
-        );
-        return;
-      }
-      if (isPromptLibrary && !rawSlides.length) {
-        rejectThinInput(
-          res,
-          'at least one carousel frame image required for prompt-library preset',
-          'לא נמצאו תמונות שקופיות לקריאה חזותית — עיצוב "ספריית פרומפטים" דורש קרוסלה עם תמונות'
-        );
-        return;
-      }
-      // Images must already be same-origin-proxied by the fetcher. Re-checking here rather than
-      // trusting the body means a crafted request cannot plant an arbitrary URL in a slide that the
-      // renderer would then fetch on the operator's behalf.
-      const slides: InstagramSlide[] = rawSlides
+      const { frames: rawFrames, notes, visualPreset } = req.body ?? {};
+      // Base64 payloads only — never a URL, so this route cannot be turned into an SSRF proxy. A
+      // 6 MB per-frame ceiling (base64, ~4.5 MB decoded) mirrors the old fetcher's own limit on a
+      // single carousel frame; the dashboard already downsizes before upload, so a legitimate
+      // carousel export never comes close.
+      const frames: { mimeType: string; data: string }[] = (Array.isArray(rawFrames) ? rawFrames : [])
         .slice(0, 20)
-        .map((s) => {
-          const rec = (s && typeof s === 'object' ? s : {}) as Partial<InstagramSlide>;
-          const image = String(rec.image ?? '');
-          return {
-            text: String(rec.text ?? '').slice(0, 1200),
-            image: image.startsWith('https://mrdaniel.co.il/api/img-proxy?url=') ? image : '',
-          };
+        .map((f: unknown) => {
+          const rec = (f && typeof f === 'object' ? f : {}) as { mimeType?: unknown; data?: unknown };
+          const mimeType = String(rec.mimeType ?? '').toLowerCase();
+          const data = String(rec.data ?? '').replace(/^data:[^;]+;base64,/, '');
+          return { mimeType, data };
         })
-        .filter((s) => s.text || s.image);
-      const body = captionWithoutHashtags(caption);
-      const normalized: ImportedInstagramPost = {
-        ok: true,
-        url: typeof src.url === 'string' ? src.url.slice(0, 300) : '',
-        code: typeof src.code === 'string' ? src.code.slice(0, 40) : '',
-        author: typeof src.author === 'string' ? src.author.slice(0, 60) : '',
-        caption,
-        lines: captionLines(body),
-        hashtags: extractHashtags(caption),
-        images: slides.map((s) => s.image).filter(Boolean),
-        slides,
-        isCarousel: slides.length > 1,
-        text: body,
-        via: typeof src.via === 'string' ? (src.via as ImportedInstagramPost['via']) : 'manual',
-      };
-      const preset: 'creator' | 'cream-skill' | 'cream-workflow' | 'cream-prompt-library' =
-        visualPreset === 'cream-skill' || visualPreset === 'cream-workflow' || visualPreset === 'cream-prompt-library'
+        .filter((f) => /^image\/(jpeg|jpg|png|webp|gif)$/.test(f.mimeType) && f.data.length > 100 && f.data.length < 6_000_000);
+
+      if (frames.length < 2) {
+        rejectThinInput(
+          res,
+          'at least 2 carousel frame images required',
+          'העלו לפחות שתי תמונות שקופיות מהקרוסלה (jpg / png / webp)'
+        );
+        return;
+      }
+
+      const preset: 'creator' | 'cream-skill' | 'cream-workflow' | 'cream-prompt-library' | 'auto-detect' =
+        visualPreset === 'cream-skill' ||
+        visualPreset === 'cream-workflow' ||
+        visualPreset === 'cream-prompt-library' ||
+        visualPreset === 'auto-detect'
           ? visualPreset
           : 'creator';
-      const result = await buildInstagramDeck({
-        post: normalized,
+
+      const result = await buildImageCarouselDeck({
+        frames,
         notes: typeof notes === 'string' ? notes.slice(0, 600) : undefined,
-        useSlideText: useSlideText !== false,
         visualPreset: preset,
       });
-      // Same carve-out as thread-deck: the guard's heuristics flag ordinary source code as a leak,
-      // so only the Hebrew prose is checked. Prompt-library slides carry their visible copy in
-      // `promptCards`, not `title`/`body`, so those are folded in too.
+      // Same carve-out as thread-deck / instagram-deck: the guard's heuristics flag ordinary source
+      // code as a leak, so only the Hebrew prose is checked. Prompt-library slides carry their
+      // visible copy in `promptCards`, not `title`/`body`, so those are folded in too.
       const prose = result.deck.slides
         .map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}\n${(s.promptCards ?? []).map((c) => `${c.body}\n${c.whyIUseThis}`).join('\n')}`)
         .join('\n\n');
@@ -646,6 +574,7 @@ export default async function handler(req: any, res: any) {
         topic: result.topic,
         synthesized: result.synthesized,
         fallbackReason: result.fallbackReason,
+        resolvedPreset: result.resolvedPreset,
       });
       return;
     }

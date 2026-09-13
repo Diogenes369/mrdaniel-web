@@ -2012,13 +2012,41 @@ function parseAdaptedDeck(
   };
 }
 
-// --- Instagram post → Hebrew carousel ---------------------------------------------------------
-// Powers the dashboard's "יבוא מ-Instagram" tab. Same adaptation job as the Threads path, different
-// source shape: an Instagram post is ONE caption plus, on a carousel, the text printed on each
-// slide. That second channel is machine OCR of a designed graphic, so it arrives partially garbled
-// and gets a very specific instruction below — it is read for STRUCTURE and never quoted verbatim.
+// --- Direct carousel image translator (vision OCR + rebrand) --------------------------------
+// Powers the dashboard's "תרגום ומיתוג קרוסלות (תמונות)" tab: the operator uploads a carousel's own
+// slide images directly — no link, no caption — and every frame's printed text is read and
+// translated to Hebrew in ONE vision call. Unlike the caption-driven Threads/Instagram paths this
+// never reorganises the material into an invented structure: it answers with exactly one slide per
+// uploaded frame, in the same order, so the deck keeps the source carousel's own shape.
 
-const INSTAGRAM_DECK_SYSTEM_INSTRUCTION = `אתה מתרגם ומעבד תוכן עבור דניאל בן ברוך. קיבלת פוסט או קרוסלה שפורסמו באינסטגרם — בדרך כלל באנגלית — והמשימה שלך היא להפוך אותם לקרוסלת לימוד בעברית ישראלית טבעית.
+/** One uploaded frame's extracted, translated content. */
+export interface ImageCarouselSlideExtract {
+  kind: 'cover' | 'concept' | 'step' | 'tool' | 'code' | 'takeaway' | 'cta';
+  kicker: string;
+  title: string;
+  body: string;
+  bullets: string[];
+  code: string;
+  codeLang: string;
+  stepNumber: number;
+  badge: string;
+  subtitle: string;
+  workflow: WorkflowNode[];
+  /** The frame's own printed text, verbatim and UNTRANSLATED — never shown to the reader. Kept so
+   *  the agent can extract literal strings (a slash command, an install path) deterministically in
+   *  code, the same way instagramAgent.ts's `attachSkillExtras` used to — those must survive exactly
+   *  and are never trusted to the translation pass. */
+  rawText: string;
+}
+
+export interface ImageCarouselExtraction {
+  title: string;
+  hashtags: string[];
+  /** Exactly one entry per frame image sent, in the same order. */
+  slides: ImageCarouselSlideExtract[];
+}
+
+const IMAGE_CAROUSEL_SYSTEM_INSTRUCTION = `אתה מתרגם, עורך ומעצב תוכן עבור דניאל בן ברוך. קיבלת את תמונות השקופיות של קרוסלה — בדרך כלל באנגלית — בדיוק כפי שפורסמו, שקופית אחר שקופית ובאותו סדר. המשימה שלך: לקרוא בעיון את כל הטקסט המודפס על כל שקופית ולתרגם ולהתאים אותו לעברית ישראלית טבעית, בלי לשנות את המבנה, בלי להמציא תוכן ובלי לאחד או לפצל שקופיות — לכל תמונה שקיבלת מוקצית שקופית פלט אחת משלה, באותו סדר.
 
 ${BRAND_KNOWLEDGE_BASE}
 
@@ -2026,144 +2054,188 @@ ${HEBREW_COPY_RULES}
 
 ${AUDIENCE_RULES}
 
-המשימה: תרגם והתאם את הפוסט לדק של 10 עד 12 שקופיות בעברית. זו לא תרגום מילולי — זו התאמה: אותו מסר, אותן עובדות, בעברית שנשמעת כאילו נכתבה מלכתחילה בעברית לקהל ישראלי.
+זיהוי מבנה, שקופית אחר שקופית:
+1. השקופית הראשונה היא כמעט תמיד kind:"cover" — כותרת שמבטיחה את הערך של הקרוסלה.
+2. השקופית האחרונה היא כמעט תמיד kind:"cta" — כרטיס סגירה, לא פרסומת: משפט סיכום אחד. אסור בה קישור, אסור כתובת אתר, אסור "כתבו X בתגובות" ואסור מילת טריגר — גם אם זה בדיוק מה שכתוב על התמונה, השמיטו את זה לחלוטין.
+3. כל שאר השקופיות: kind:"concept" להסבר רעיון, kind:"step" לשלב בתהליך ממוספר (עם stepNumber התואם למה שמופיע בפועל על השקופית), kind:"tool" לרשימת כלים, kind:"code" אם השקופית מציגה קוד/פקודת טרמינל/קובץ הגדרות, kind:"takeaway" לסיכום נקודות.
 
-מבנה החומר שאתה מקבל — שני ערוצים, ולא שווים בערכם:
-א. "כיתוב הפוסט" — זה מקור האמת. כל עובדה, מספר, שם מוצר וטענה שייכנסו לדק חייבים להיות מבוססים עליו.
-ב. "טקסט מהשקופיות" (אופציונלי) — קריאת OCR אוטומטית של הגרפיקה שהמחבר עיצב. הוא מגיע משובש: מילים כפולות, אותיות שהתחלפו, שברי תפריטים. השתמש בו אך ורק כדי להבין את **מבנה** הקרוסלה — כמה שלבים היו, מה הכותרת של כל שלב, ובאיזה סדר. אסור בהחלט לצטט ממנו מחרוזת מילולית, ואסור לגזור ממנו מספר או שם מוצר שלא מופיע גם בכיתוב. אם ה-OCR והכיתוב סותרים זה את זה — הכיתוב מנצח, תמיד.
+לכל שקופית מלאו גם:
+- "kicker": תגית קצרה מאוד (עד 3 מילים) לתיאור סוג השקופית.
+- "badge": תגית נושא קצרה באנגלית אם רלוונטי (שם כלי/מוצר, כמו על התמונה), אחרת ריק.
+- "rawText": הטקסט המדויק כפי שהוא מודפס על השקופית, ללא תרגום — כולל כל פקודה, נתיב קובץ או משתנה בסוגריים מרובעים. שדה זה הוא לקריאת מכונה בלבד, לא מוצג לקורא.
 
-מבנה חובה:
-1. השקופית הראשונה היא תמיד kind:"cover" — כותרת שמבטיחה את הערך של הפוסט. רק כותרת והבטחה, בלי גוף ארוך.
-2. השקופיות באמצע (8–10) עוקבות אחרי סדר הרעיונות במקור: kind:"concept" להסבר רעיון, kind:"step" לשלב בתהליך (עם stepNumber רץ 1,2,3…), kind:"tool" לרשימת כלים, kind:"code" רק אם המקור עצמו הכיל קוד או קובץ הגדרות, kind:"takeaway" לסיכום נקודות. אם המקור היה קרוסלה עם N שקופיות ממוספרות — שמור על אותו רצף ואותה חלוקה.
-3. השקופית האחרונה היא תמיד kind:"cta" — כרטיס סגירה, לא פרסומת: משפט סיכום אחד שמחזיר את הקורא לערך של הפוסט, ועד 3 bullets שמסכמים שלבים שכבר הופיעו בדק. אסור בה קישור, אסור כתובת אתר, אסור "כתבו X בתגובות" ואסור מילת טריגר — הקישור מופיע בכיתוב של הפוסט, לא על התמונה.
-
-מגבלות אורך — כלל אדום, נאכפות אוטומטית אחרי הפלט שלך (אם תחרוג, הטקסט ייחתך):
-- title: עד ${THREAD_DECK_LIMITS.titleWords} מילים. קצר, קונקרטי, בלי מילות קישור מיותרות.
+מגבלות אורך — כלל אדום, נאכפות אוטומטית אחרי הפלט שלכם (אם תחרגו, הטקסט ייחתך):
+- title: עד ${THREAD_DECK_LIMITS.titleWords} מילים.
 - body: עד ${THREAD_DECK_LIMITS.bodyWords} מילים. משפט אחד או שניים, לא פסקה.
 - bullets: עד ${THREAD_DECK_LIMITS.bullets} פריטים, כל פריט עד ${THREAD_DECK_LIMITS.bulletWords} מילים.
-- kicker: עד 3 מילים.
 
 סגנון הכתיבה — קול של יוצר תוכן טכנולוגי, לא של מתרגם:
-1. משפטים קצרים. נקודה במקום פסיק. אם אפשר לחתוך משפט לשניים — תחתוך.
-2. כותרת נפתחת בפועל או במספר, לא במילת קישור: "ככה מריצים את המודל מקומית", ולא "על האופן שבו ניתן להריץ".
-3. פנייה ישירה בגוף שני רבים ("תפתחו", "תדביקו", "שימו לב"). בלי סביל ובלי "המשתמש".
-4. אסורות מילות מילוי: "בעולם של היום", "חשוב לציין", "ניתן לומר", "בעידן ה-AI". מוחקים אותן, לא מחליפים במילה אחרת.
-5. מספרים נשארים ספרות (753B פרמטרים, 18 דולר לחודש) — הם מה שעוצר גלילה.
-6. שמות כלים, פריטי תפריט, דגלי CLI ונתיבי קבצים (Tools, Canvas, ~/.claude/settings.json, --model) נשארים באנגלית בדיוק כפי שהם מופיעים במוצר. אסור לתרגם או לתעתק אותם — הקורא צריך למצוא אותם על המסך שלו.
-7. אל תעתיק פרומפט ארוך לתוך שדה code: המערכת מחלצת פרומפטים מהמקור בעצמה ומציגה אותם בכרטיס ייעודי. ב-body רק הסבר קצר מה הפרומפט עושה.
-8. כל body הוא משפט שלם ותקני שנגמר בנקודה. אסור לסיים באמצע משפט, אסור לסיים במילת קישור ("ו", "של", "כדי", "עם"), ואסור להשאיר פסיק או מקף בסוף. אם הרעיון לא נכנס במגבלת המילים — כתבו רעיון קטן יותר, לא חצי משפט.
-9. דקדוק מלא: התאמת מין ומספר, סמיכות תקינה, זמנים עקביים. קראו כל משפט בקול לפני שאתם מחזירים אותו — אם הוא נשמע כמו תרגום מכונה, כתבו אותו מחדש מאפס בעברית.
-10. אסור להכניס כתובת אתר, דומיין, "הלינק בביו" או קריאה להגיב מילת מפתח — לא ב-title, לא ב-body ולא ב-bullets. המערכת מסירה אותם בכל מקרה, והתוצאה תהיה משפט קטוע.
+1. משפטים קצרים. נקודה במקום פסיק.
+2. כותרת נפתחת בפועל או במספר, לא במילת קישור.
+3. פנייה ישירה בגוף שני רבים ("תפתחו", "תדביקו", "שימו לב"). בלי סביל.
+4. אסורות מילות מילוי: "בעולם של היום", "חשוב לציין", "בעידן ה-AI".
+5. שמות כלים, פקודות CLI, נתיבי קבצים ומשתנים בסוגריים מרובעים (כמו [topic]) נשארים באנגלית בדיוק כפי שהם מופיעים בתמונה, אך משתנה בסוגריים מרובעים כן מתורגם בתוך הסוגריים (למשל [topic] -> [נושא]) — לעולם אל תמחקו את הסוגריים.
+6. כל body הוא משפט שלם ותקני שנגמר בנקודה.
+7. אסור להוסיף עובדה, מספר, שם כלי או טענה שלא מופיעים על התמונה עצמה. אם זה לא כתוב שם — זה לא נכנס לשקופית.
+8. אסור לקרדט את מפרסם הקרוסלה המקורי, אסור לאזכר רשת חברתית ואסור להעתיק קריאות אינגייג'מנט ("Follow for more", "Save this post", "Comment X", "Link in bio"). המותג היחיד שמופיע בפלט הוא mrdaniel.co.il.
+9. אם הטקסט על השקופית משובש או לא קריא — אל תמציאו תוכן. השאירו את השדה ריק במקום לנחש.
 
-חוקי נאמנות למקור (קריטי):
-1. אסור להוסיף עובדה, מספר, שם כלי או טענה שלא מופיעים בכיתוב המקורי. אם הכיתוב לא אמר את זה — זה לא נכנס לדק.
-2. אסור להשמיט את הרעיון המרכזי של הפוסט או להפוך את משמעותו.
-3. מספרים, שמות מוצרים, שמות חברות ומונחים טכניים — מועתקים כמו שהם מהמקור, בלי "לעגל" ובלי לתרגם שמות מותג.
-4. אם המקור מכיל קוד, פקודת טרמינל או קובץ הגדרות — העתק אותו כמו שהוא לשדה code (בלי markdown fence), עם codeLang אחד מתוך: python | ts | js | bash | json. אל תמציא קוד שלא היה שם, ואל תשחזר קוד מתוך ה-OCR אם הוא מגיע משובש.
-5. הומור או סלנג אנגלי מותאם לעברית ישראלית מקבילה, לא מתורגם מילולית.
-6. אסור תוויות מסגור ("הקשר:", "כותרת:", "תרגום:") בתוך title או body.
-7. אסור לקרדט את מחבר הפוסט המקורי, אסור לאזכר את Instagram ואסור להעתיק את מילות הפתיחה שלו ("Follow for more", "Save this post", "Comment X"). שם המחבר ניתן לך כהקשר לטון בלבד — המותג היחיד שמופיע בפלט הוא mrdaniel.co.il.
-
-לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית בלבד**, נטול טקסט: רקע אבסטרקטי-טכני כהה שמתאים לתוכן השקופית (dark cyber, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent). חובה לכלול בסוף: "no text, no letters, no words, no logos, no watermark". אין אנשים, אין לוגואים.
+לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי באנגלית בלבד, נטול טקסט: רקע אבסטרקטי-טכני כהה (dark cyber, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent, no text, no people, no logos, no watermark).
 
 פלט: JSON תקין בלבד, בלי markdown code fence:
-{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"visualPrompt":"..."}]}
-שדות שאינם רלוונטיים ל-kind: "" או [] או 0.`;
+{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","badge":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"rawText":"...","visualPrompt":"..."}]}
+מערך "slides" חייב להכיל בדיוק שקופית אחת לכל תמונה שקיבלתם, באותו סדר. שדות שאינם רלוונטיים ל-kind: "" או [] או 0.`;
+
+/** Appended when the operator picked "קרם וטרקוטה" (or auto-detect, which asks for both extras and
+ *  lets an unrelated frame simply leave the field empty). Mirrors the caption-driven addendum this
+ *  replaces — see git history on this file for the previous `CREAM_SKILL_ADDENDUM`. */
+const IMAGE_CAROUSEL_SKILL_ADDENDUM = `
+
+תוספת מבנה לעיצוב "קרם וטרקוטה": לכל שקופית תוכן (לא שער ולא סיכום) שיש לה רעיון-על ברור, הוסיפו שדה "subtitle" — כותרת-משנה קצרה מאוד בעברית (עד 5 מילים) שמסכמת את הרעיון במשפט אחד קליט. אם אין רעיון-על ברור — השאירו את השדה ריק ("").`;
+
+/** Appended for "דיאגרמת תהליך" (or auto-detect). The node chain IS a model-structured field, not a
+ *  translation — only reached when a frame explicitly draws or names a service chain. */
+const IMAGE_CAROUSEL_WORKFLOW_ADDENDUM = `
+
+תוספת מבנה לעיצוב "דיאגרמת תהליך": אם ורק אם שקופית מציגה במפורש שרשרת שירותים/כלים (למשל webhook, סוכן AI, שליחת מייל, יומן, CRM, Make, n8n) — הוסיפו לה שדה "workflow": מערך צמתים בסדר הקריאה, כל אחד {"label":"עברית, עד 2 מילים","sublabel":"שם השירות באנגלית בדיוק כפי שהופיע בתמונה","icon":"אחד מתוך: webhook|openai|gmail|calendar|apify|crm|make|n8n|filter|router|scheduler|chat|phone|globe|doc|sheet|db","lane":0}. lane=0 (או השמטה) לצמתי הגזע הראשי; lane=1,2,3... לכל ענף מקביל. אסור להמציא שירות שלא מופיע בתמונה — אם אין שרשרת כזו, השאירו workflow ריק ([]).`;
 
 /**
- * Appended to the base instruction ONLY when the operator picked the "קרם וטרקוטה" preset — the
- * default creator-preset prompt above is completely unchanged for every other run, so this adds
- * zero regression risk to the path already verified in production. `subtitle` is a translated
- * tagline (the model's job); `slashCommand` and `install` are deliberately NOT requested here —
- * those are literal strings a reader has to type, and are extracted from the source's own per-frame
- * OCR text in code (see instagramAgent.ts's `attachSkillExtras`), never trusted to the model.
+ * Read every uploaded carousel frame via Gemini vision and translate its printed text to Hebrew in
+ * one call. `frames` must already be in the carousel's own reading order — the model answers with
+ * exactly one slide per image, in that order (enforced in `parseImageCarouselResponse`, not just
+ * asked for).
  */
-const CREAM_SKILL_ADDENDUM = `
-
-תוספת מבנה לעיצוב "קרם וטרקוטה": לכל שקופית תוכן (לא שער ולא סיכום) שיש לה רעיון-על ברור, הוסף שדה "subtitle" — כותרת-משנה קצרה מאוד בעברית (עד 5 מילים) שמסכמת את הרעיון במשפט אחד קליט (למשל "משמעת בדיקות תחילה"). אם אין רעיון-על ברור — השאירו את השדה ריק ("").`;
-
-/**
- * Appended only for the "דיאגרמת תהליך" (workflow node) preset. Unlike everything else on the
- * slide, the node chain IS a model-structured field, not a translation — a caption describing an
- * automation in prose has no literal "A -> B -> C" text for code to extract, so turning it into a
- * chain of named services is the same kind of interpretive structuring the base instruction already
- * asks for when it splits a post into cover/step/takeaway slides. The guard is the same source-
- * fidelity rule as everywhere else: no service that is not in the caption may appear.
- */
-const CREAM_WORKFLOW_ADDENDUM = `
-
-תוספת מבנה לעיצוב "דיאגרמת תהליך": הפוסט מתאר תהליך אוטומציה. לכל שקופית תוכן, אם ורק אם הכיתוב מתאר במפורש שרשרת שירותים/כלים (למשל webhook, סוכן AI, שליחת מייל, יומן, CRM, Make, n8n) — הוסף שדה "workflow": מערך צמתים בסדר הקריאה, כל אחד {"label":"עברית, עד 2 מילים","sublabel":"שם השירות באנגלית בדיוק כפי שהופיע במקור","icon":"אחד מתוך: webhook|openai|gmail|calendar|apify|crm|make|n8n|filter|router|scheduler|chat|phone|globe|doc|sheet|db","lane":0}. lane=0 (או השמטה) לצמתי הגזע הראשי, שרצים לפי סדר הקריאה; lane=1,2,3... לכל ענף מקביל שמתחיל אחרי צומת הגזע האחרון (בדיוק כמו בדוגמה: webhook -> סוכן, ואז כמה ענפים מקבילים שכל אחד מסתיים בפעולה אחרת). אסור להמציא שירות שלא הוזכר בכיתוב במפורש — אם התהליך לא פורט בכיתוב, השאירו workflow ריק ([]) והשקופית תיראה ככרטיס טקסט רגיל.`;
-
-/**
- * Adapt an imported Instagram post into a Hebrew carousel deck.
- *
- * `caption` is the source of truth. `slideTexts` — the OCR of a carousel's own graphics — is passed
- * as clearly-labelled secondary structure, and the system instruction above forbids quoting it.
- * Kept as separate parameters rather than one blob so that separation survives into the prompt; a
- * concatenated source would let the model treat garbled OCR as quotable prose.
- *
- * `visualPreset` only changes what is ASKED FOR (see the two addenda above) — the base instruction,
- * the length caps and the source-fidelity rules are identical across every preset.
- */
-export async function synthesizeInstagramDeck(input: {
-  caption: string;
-  slideTexts?: string[];
-  author?: string;
-  sourceUrl?: string;
+export async function extractImageCarouselContent(input: {
+  frames: { mimeType: string; data: string }[];
   notes?: string;
-  visualPreset?: 'creator' | 'cream-skill' | 'cream-workflow';
-}): Promise<TechTipDeck> {
+  visualPreset?: 'creator' | 'cream-skill' | 'cream-workflow' | 'auto-detect';
+}): Promise<ImageCarouselExtraction> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
-  const { clean } = sanitizeInput(String(input.caption ?? '').slice(0, 8000));
-  if (clean.trim().length < 40) throw new Error('caption too short to adapt');
-
-  const slideTexts = (input.slideTexts ?? [])
-    .map((t) => String(t ?? '').trim())
-    .filter(Boolean)
-    .slice(0, 20);
-  const slideBlock = slideTexts.length
-    ? `\n\nטקסט מהשקופיות (OCR אוטומטי — משובש חלקית, לקריאת מבנה בלבד, אסור לצטט ממנו):\n"""\n${
-        sanitizeInput(slideTexts.map((t, i) => `[שקופית ${i + 1}] ${t}`).join('\n').slice(0, 6000)).clean
-      }\n"""`
-    : '';
+  if (!input.frames.length) throw new Error('no frame images to read');
 
   const context = [
-    input.author ? `מחבר הפוסט: ${input.author}` : '',
-    input.sourceUrl ? `מקור: ${input.sourceUrl}` : '',
-    slideTexts.length ? `מבנה המקור: קרוסלה בת ${slideTexts.length} שקופיות` : '',
+    `מספר שקופיות בקרוסלה: ${input.frames.length}`,
     input.notes ? `הנחיות המפעיל: ${String(input.notes).slice(0, 600)}` : '',
   ]
     .filter(Boolean)
     .join('\n');
 
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+    { text: `${context}\n\nלהלן ${input.frames.length} תמונות שקופיות הקרוסלה, לפי הסדר. קראו את הטקסט המודפס על כל אחת מהן ותרגמו אותו.` },
+  ];
+  input.frames.forEach((f, i) => {
+    parts.push({ text: `[שקופית ${i + 1}]` });
+    parts.push({ inlineData: { mimeType: f.mimeType, data: f.data } });
+  });
+
   const addendum =
     input.visualPreset === 'cream-skill'
-      ? CREAM_SKILL_ADDENDUM
+      ? IMAGE_CAROUSEL_SKILL_ADDENDUM
       : input.visualPreset === 'cream-workflow'
-        ? CREAM_WORKFLOW_ADDENDUM
-        : '';
+        ? IMAGE_CAROUSEL_WORKFLOW_ADDENDUM
+        : input.visualPreset === 'auto-detect'
+          ? `${IMAGE_CAROUSEL_SKILL_ADDENDUM}${IMAGE_CAROUSEL_WORKFLOW_ADDENDUM}`
+          : '';
 
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: `${context ? `${context}\n\n` : ''}כיתוב הפוסט:\n"""\n${clean}\n"""${slideBlock}` }],
-      },
-    ],
+    contents: [{ role: 'user', parts }],
     config: {
-      systemInstruction: `${INSTAGRAM_DECK_SYSTEM_INSTRUCTION}${addendum}`,
-      temperature: 0.55,
+      systemInstruction: `${IMAGE_CAROUSEL_SYSTEM_INSTRUCTION}${addendum}`,
+      temperature: 0.5,
       topP: 0.9,
       responseMimeType: 'application/json',
     },
   });
 
-  return parseAdaptedDeck(stripCodeFence(requireText(response)), {
-    label: 'synthesizeInstagramDeck',
-    defaultKicker: 'מהפוסט',
-    thinError: 'model returned too few usable instagram slides',
+  return parseImageCarouselResponse(stripCodeFence(requireText(response)), input.frames.length);
+}
+
+function parseImageCarouselResponse(raw: string, frameCount: number): ImageCarouselExtraction {
+  const parsed = parseJsonOrThrow(raw, 'extractImageCarouselContent') as Record<string, unknown>;
+  const hebrew = (v: unknown, words: number): string =>
+    sanitizeHebrewText(clampWords(stripMetaFraming(stripSourceCredits(String(v ?? '').trim())), words));
+  const prose = (v: unknown, words: number): string =>
+    sanitizeHebrewText(clampProse(stripMetaFraming(stripSourceCredits(String(v ?? '').trim())), words));
+
+  const slidesRaw = Array.isArray(parsed.slides) ? parsed.slides : [];
+  const slides: ImageCarouselSlideExtract[] = slidesRaw.slice(0, Math.max(frameCount, 1)).map((s): ImageCarouselSlideExtract => {
+    const rec = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+    const kind = mapTipKind(rec.kind);
+    const lang = String(rec.codeLang ?? '').toLowerCase().trim();
+    return {
+      kind,
+      kicker: hebrew(rec.kicker, 3).slice(0, 40) || 'מהקרוסלה',
+      title: hebrew(rec.title, THREAD_DECK_LIMITS.titleWords).slice(0, 120),
+      body: prose(rec.body, THREAD_DECK_LIMITS.bodyWords).slice(0, 420),
+      bullets: Array.isArray(rec.bullets)
+        ? rec.bullets
+            .map((b) => hebrew(b, THREAD_DECK_LIMITS.bulletWords).slice(0, 90))
+            .filter((b) => b.length > 1)
+            .slice(0, THREAD_DECK_LIMITS.bullets)
+        : [],
+      code: stripCodeFence(String(rec.code ?? '').trim()).slice(0, 900),
+      codeLang: VALID_CODE_LANGS.has(lang) ? lang : kind === 'code' ? 'bash' : '',
+      stepNumber: Number.isFinite(Number(rec.stepNumber)) ? Math.max(0, Math.min(20, Number(rec.stepNumber))) : 0,
+      badge: String(rec.badge ?? '').trim().slice(0, 24),
+      subtitle: rec.subtitle ? hebrew(rec.subtitle, 6).slice(0, 60) : '',
+      workflow: parseWorkflowNodes(rec.workflow) ?? [],
+      rawText: String(rec.rawText ?? '').slice(0, 1200),
+    };
   });
+
+  if (!slides.some((s) => s.title || s.body || s.bullets.length || s.code)) {
+    throw new ModelOutputError('too few usable image-carousel slides extracted from frames');
+  }
+
+  const hashtags = Array.isArray(parsed.hashtags)
+    ? parsed.hashtags.map((h) => String(h).trim()).filter((h) => h.startsWith('#')).slice(0, 8)
+    : [];
+
+  return {
+    title: hebrew(parsed.title ?? slides[0]?.title ?? '', THREAD_DECK_LIMITS.titleWords).slice(0, 140),
+    hashtags: hashtags.length ? hashtags : ['#AI', '#אוטומציה', '#עסקים'],
+    slides,
+  };
+}
+
+const PRESET_CLASSIFIER_INSTRUCTION = `אתם מסווגים קרוסלת תמונות לאחד מארבעה עיצובים, לפי מה שהתמונות עצמן מראות — לא לפי הטקסט שבהן:
+- "cream-prompt-library": כל שקופית מציגה רשת צפופה של כרטיסי פרומפט ממוספרים (מספר + טקסט פרומפט + שורת "why I use this" קצרה מתחתיו), בדרך כלל 1-2 כרטיסים לשקופית.
+- "cream-workflow": השקופיות מתארות במפורש שרשרת שירותים/כלים מחוברים (תרשים זרימה, חצים בין אייקונים של webhook/CRM/מייל/יומן וכו').
+- "cream-skill": השקופיות מלמדות פקודת CLI/סקריפט אחת, עם קופסת התקנה ("save as", "run") בתחתית.
+- "dark-creator": כל שאר סוגי הקרוסלות (רעיון כללי, טיפים, השוואה, סיכום).
+בחרו את הקטגוריה שהכי מתאימה לרוב השקופיות. פלט: JSON בלבד: {"preset":"dark-creator|cream-skill|cream-workflow|cream-prompt-library"}`;
+
+/**
+ * "auto-detect" preset: a cheap classification pass over a handful of frames, deciding which of the
+ * four visual presets fits before the (more expensive) full extraction runs. Falls back to
+ * 'creator' on any ambiguity — the safest default, since it never triggers a structural field
+ * (`workflow`, `promptCards`) that the source images don't actually support.
+ */
+export async function classifyImageCarouselPreset(
+  frames: { mimeType: string; data: string }[]
+): Promise<'creator' | 'cream-skill' | 'cream-workflow' | 'cream-prompt-library'> {
+  if (!genAI || !frames.length) return 'creator';
+  const sample = frames.slice(0, 4);
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+    { text: `להלן ${sample.length} שקופיות לדוגמה מתוך הקרוסלה.` },
+    ...sample.map((f) => ({ inlineData: { mimeType: f.mimeType, data: f.data } })),
+  ];
+  try {
+    const response = await generateContentWithRetry({
+      model: GEMINI_TEXT_MODEL,
+      contents: [{ role: 'user', parts }],
+      config: { systemInstruction: PRESET_CLASSIFIER_INSTRUCTION, temperature: 0.1, responseMimeType: 'application/json' },
+    });
+    const parsed = parseJsonOrThrow(stripCodeFence(requireText(response)), 'classifyImageCarouselPreset') as Record<string, unknown>;
+    const p = String(parsed.preset ?? '').toLowerCase();
+    if (p.includes('prompt')) return 'cream-prompt-library';
+    if (p.includes('workflow')) return 'cream-workflow';
+    if (p.includes('skill')) return 'cream-skill';
+    return 'creator';
+  } catch {
+    return 'creator';
+  }
 }
 
 // --- Instagram dense on-slide prompt-library decks (vision OCR) ------------------------------

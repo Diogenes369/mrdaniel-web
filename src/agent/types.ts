@@ -387,8 +387,8 @@ export interface TechTipSlide {
   // --- cream prompt-library preset ------------------------------------------------------------
   // Also optional and additive. Source shape: a dense-text carousel where the teaching content is
   // printed directly on the images (numbered prompt cards, 1-2 per frame) rather than carried in
-  // the caption — see instagramAgent.ts's `buildPromptLibraryDeck` and the vision-OCR extraction
-  // in SocialAgentEngine.ts. Every other preset ignores these fields entirely.
+  // the caption — see imageTranslatorAgent.ts's `buildPromptLibraryImageDeck` and the vision-OCR
+  // extraction in SocialAgentEngine.ts. Every other preset ignores these fields entirely.
   /** 1 or 2 dense on-slide prompt cards read (and translated) off this frame by vision OCR. */
   promptCards?: PromptCard[];
   /** Feature-grid tile labels for a prompt-library cover slide, e.g. 10 category names. */

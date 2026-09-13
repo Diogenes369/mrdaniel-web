@@ -1181,7 +1181,7 @@ function drawCreamSlide(
 // carousel where the teaching content is PRINTED ON the images themselves — numbered prompt
 // cards, one or two per frame, each with a "why I use this" rationale underneath. Instagram's own
 // accessibility OCR reads only a minority of such frames reliably, so the deck this preset renders
-// comes from a dedicated vision-OCR extraction (see instagramAgent.ts's `buildPromptLibraryDeck`)
+// comes from a dedicated vision-OCR extraction (see imageTranslatorAgent.ts's `buildPromptLibraryImageDeck`)
 // rather than the caption-driven adaptation the other two presets consume. Shares the cream
 // palette and the avatar/progress-rail chrome with `drawCreamSlide` but is its own composition:
 // stacked white prompt cards instead of an install box or a node diagram.

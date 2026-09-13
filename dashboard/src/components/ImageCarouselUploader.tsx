@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Instagram,
+  ImagePlus,
   Loader2,
   Sparkles,
   Download,
@@ -13,56 +13,41 @@ import {
   Wand2,
   Copy,
   Check,
-  Link2,
-  ClipboardPaste,
   Trash2,
-  Languages,
-  Layers,
+  X,
+  GripVertical,
   Palette,
-  ScanText,
+  Wand as WandSparkle,
 } from 'lucide-react';
 import {
-  importInstagramPost,
-  parseInstagramRawText,
-  synthesizeInstagramDeck,
-  instagramDeckCaption,
-  isInstagramUrl,
-  saveInstagramState,
-  loadInstagramState,
-  clearInstagramState,
-  captionWithoutHashtags,
-  MIN_CAPTION_CHARS,
-  EMPTY_POST,
-  type ImportedInstagramPost,
-  type InstagramVisualPreset,
-} from '../lib/instagramImportApi';
+  readCarouselFrames,
+  synthesizeImageCarouselDeck,
+  imageCarouselDeckCaption,
+  MIN_FRAMES,
+  MAX_FRAMES,
+  type CarouselFrame,
+  type ImageCarouselVisualPreset,
+} from '../lib/imageCarouselApi';
 import type { TechTipDeck } from '../lib/techTipsApi';
-import { renderTipDeckImages, exportTipDeckZip, resolveTipBackgrounds } from '../lib/techTipRenderer';
+import { renderTipDeckImages, exportTipDeckZip, resolveTipBackgrounds, type TipStyle } from '../lib/techTipRenderer';
 import { renderTipDeckVideo, isMotionSupported } from '../lib/motionStudioService';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
 
-/**
- * The three visual presets this tab offers — no photographic styles: an Instagram post walking a
- * reader through a tool or an automation is a technical deck, and a searched stock photo behind an
- * install box or a node diagram is the single loudest "assembled, not made" tell there is.
- *
- * `creator` (the original dark preset) fetches nothing at all — the slide is painted on the deep
- * slate backdrop lit by the tool's own colours. `cream-skill` and `cream-workflow` are the warm
- * paper family: same zero-stock rule, different palette and composition (see designAssets.ts /
- * techTipRenderer.ts's `drawCreamSlide`). All three share one exception the renderer makes on its
- * own: an image the POST published is evidence, not stock, and still renders.
- */
-const PRESET_OPTIONS: { id: InstagramVisualPreset; label: string; hint: string }[] = [
+const PRESET_OPTIONS: { id: ImageCarouselVisualPreset; label: string; hint: string }[] = [
+  { id: 'auto-detect', label: 'זיהוי אוטומטי', hint: 'ה-AI בוחר את העיצוב המתאים ביותר לפי התמונות שהועלו' },
   { id: 'creator', label: 'קריאייטור (כהה)', hint: 'רקע סלייט כהה עם זוהר בצבעי הכלי — בלי סטוק' },
   { id: 'cream-skill', label: 'קרם וטרקוטה', hint: 'כרטיס מיומנות בהיר: פקודה, תיאור קצר וקופסת התקנה כהה' },
   { id: 'cream-workflow', label: 'דיאגרמת תהליך', hint: 'כרטיס בהיר עם שרשרת צמתי אוטומציה מחוברים' },
-  {
-    id: 'cream-prompt-library',
-    label: 'ספריית פרומפטים',
-    hint: 'קורא את הטקסט המודפס על השקופיות עצמן (OCR חזותי) ומציג עד 2 כרטיסי פרומפט לשקופית',
-  },
+  { id: 'cream-prompt-library', label: 'ספריית פרומפטים', hint: 'קורא כרטיסי פרומפט ממוספרים המודפסים ישירות על השקופיות' },
 ];
+
+const PRESET_LABEL: Record<Exclude<ImageCarouselVisualPreset, 'auto-detect'>, string> = {
+  creator: 'קריאייטור (כהה)',
+  'cream-skill': 'קרם וטרקוטה',
+  'cream-workflow': 'דיאגרמת תהליך',
+  'cream-prompt-library': 'ספריית פרומפטים',
+};
 
 const KIND_LABEL: Record<string, string> = {
   cover: 'שער',
@@ -74,18 +59,6 @@ const KIND_LABEL: Record<string, string> = {
   cta: 'CTA',
 };
 
-const VIA_LABEL: Record<ImportedInstagramPost['via'], string> = {
-  direct: 'נמשך ישירות מאינסטגרם',
-  meta: 'נמשך מתגיות המטא של הפוסט',
-  jina: 'נמשך דרך קורא חיצוני',
-  manual: 'הודבק ידנית',
-  none: 'לא נמשך תוכן',
-};
-
-const PREVIEW_W = 340;
-const PREVIEW_H = 425;
-
-/** Hebrew label for the subject family the agent assigned — the operator sees what it decided. */
 const THEME_LABEL: Record<string, string> = {
   ai: 'בינה מלאכותית',
   automation: 'אוטומציה',
@@ -96,28 +69,30 @@ const THEME_LABEL: Record<string, string> = {
   general: 'טכנולוגיה',
 };
 
+const PREVIEW_W = 340;
+const PREVIEW_H = 425;
+
 /**
- * Instagram → Hebrew carousel.
+ * Direct carousel image translator & rebrander.
  *
- * Three stages, each its own card: import a public Instagram post, carousel or reel (or paste its
- * caption), adapt it into Hebrew with the translation agent, then preview and export. The deck it
- * produces is a TechTipDeck, so rendering, the 9:16 reel and the ZIP export are the exact same code
- * paths the Tech Tips studio uses — this tab adds a source, not a second pipeline.
- *
- * State is plain `useState` (dashboard convention — no TanStack Query), mirrored into
- * sessionStorage so an expensive import + adaptation survives a tab switch or a hot reload.
+ * Replaces the old link-based Instagram importer: instead of fetching a public post, the operator
+ * drags in the carousel's own slide images directly, in reading order. One server round-trip reads
+ * and translates every frame's printed text via Gemini vision (`imageCarouselApi.ts` →
+ * `src/server/agents/imageTranslatorAgent.ts`), and the deck it returns keeps a strict
+ * one-slide-per-uploaded-frame mapping — the source's own image becomes that slide's background, so
+ * rendering, export and the 9:16 reel are the exact TechTipDeck pipeline every other studio tab uses.
  */
-export default function InstagramImporter() {
-  const [url, setUrl] = useState('');
-  const [rawText, setRawText] = useState('');
-  const [showPaste, setShowPaste] = useState(false);
-  const [post, setPost] = useState<ImportedInstagramPost>(EMPTY_POST);
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
+export default function ImageCarouselUploader() {
+  const [frames, setFrames] = useState<CarouselFrame[]>([]);
+  const [reading, setReading] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
+  const [dragOverDrop, setDragOverDrop] = useState(false);
+  const dragIndex = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [notes, setNotes] = useState('');
-  const [useSlideText, setUseSlideText] = useState(true);
-  const [visualPreset, setVisualPreset] = useState<InstagramVisualPreset>('creator');
+  const [visualPreset, setVisualPreset] = useState<ImageCarouselVisualPreset>('auto-detect');
+  const [resolvedPreset, setResolvedPreset] = useState<Exclude<ImageCarouselVisualPreset, 'auto-detect'>>('creator');
   const [deck, setDeck] = useState<TechTipDeck | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,32 +113,6 @@ export default function InstagramImporter() {
   const [withMusic, setWithMusic] = useState(true);
   const motionSupported = useMemo(() => isMotionSupported(), []);
 
-  // Restore a previous session's import/deck once, before the first paint that could overwrite it.
-  const restored = useRef(false);
-  useEffect(() => {
-    if (restored.current) return;
-    restored.current = true;
-    const saved = loadInstagramState();
-    if (!saved) return;
-    setPost(saved.post);
-    setDeck(saved.deck);
-    setUrl(saved.url);
-    setNotes(saved.notes);
-    if (saved.visualPreset) setVisualPreset(saved.visualPreset);
-  }, []);
-
-  useEffect(() => {
-    if (!restored.current) return;
-    if (!post.text && !deck) return;
-    saveInstagramState({ post, deck, url, notes, visualPreset, savedAt: Date.now() });
-  }, [post, deck, url, notes, visualPreset]);
-
-  useEffect(() => {
-    return () => {
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
-    };
-  }, [videoUrl]);
-
   const resetOutputs = useCallback(() => {
     setImages([]);
     setActive(0);
@@ -176,78 +125,83 @@ export default function InstagramImporter() {
     setVideoPct(0);
   }, []);
 
-  /** Stage 1 — pull the post off Instagram. A private/gated post is not an error: the paste box opens. */
-  const runImport = useCallback(async () => {
-    const target = url.trim();
-    if (!isInstagramUrl(target)) {
-      setImportError('הדביקו קישור לפוסט באינסטגרם (instagram.com/p/… או /reel/…).');
-      return;
-    }
-    setImporting(true);
-    setImportError(null);
+  // ─── upload & reorder ────────────────────────────────────────────────────────────────────
+
+  const addFiles = useCallback(async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
+    if (!files.length) return;
+    setReading(true);
+    setReadError(null);
     try {
-      const imported = await importInstagramPost(target);
-      setPost(imported);
-      setRawText(imported.caption);
-      // `ok:false` also covers a thin extraction — a gated post whose OG shell yielded a few
-      // characters. That would otherwise pass as success and only surface later as a silent
-      // local-mode deck, so the paste box opens here instead, with the server's note explaining why.
-      if (!imported.ok || !imported.text.trim()) {
-        setShowPaste(true);
-        setImportError(imported.note ?? 'לא הצלחנו לקרוא את הפוסט — הדביקו את הכיתוב ידנית.');
-      } else if (imported.note) {
-        setImportError(imported.note);
+      const read = await readCarouselFrames(files);
+      if (!read.length) {
+        setReadError('לא ניתן היה לקרוא אף תמונה מהקבצים שנבחרו.');
+        return;
       }
-    } catch (e) {
-      setShowPaste(true);
-      setImportError((e as Error).message || 'ייבוא הפוסט נכשל — הדביקו את הכיתוב ידנית.');
+      setFrames((prev) => [...prev, ...read].slice(0, MAX_FRAMES));
+      if (read.length < files.length) {
+        setReadError(`${files.length - read.length} קבצים לא זוהו כתמונות תקינות ולא נוספו.`);
+      }
     } finally {
-      setImporting(false);
+      setReading(false);
     }
-  }, [url]);
+  }, []);
 
-  /** Stage 1b — the manual path. Parsed locally, no round-trip. */
-  const applyPaste = useCallback(() => {
-    const parsed = parseInstagramRawText(rawText, url);
-    setPost(parsed);
-    setImportError(parsed.ok ? null : (parsed.note ?? 'לא נמצא טקסט שמיש בהדבקה.'));
-  }, [rawText, url]);
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOverDrop(false);
+      if (e.dataTransfer.files?.length) void addFiles(e.dataTransfer.files);
+    },
+    [addFiles]
+  );
 
-  const renderDeck = useCallback(async (d: TechTipDeck) => {
-    // Still called in creator mode even though it fetches no stock: this is the pass that loads the
-    // post's OWN carousel frames onto the slides they came from.
+  const removeFrame = useCallback((id: string) => {
+    setFrames((prev) => prev.filter((f) => f.id !== id));
+  }, []);
+
+  const clearFrames = useCallback(() => {
+    setFrames([]);
+    setDeck(null);
+    setReadError(null);
+    setError(null);
+    resetOutputs();
+  }, [resetOutputs]);
+
+  const moveFrame = useCallback((from: number, to: number) => {
+    setFrames((prev) => {
+      if (to < 0 || to >= prev.length || from === to) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const renderDeck = useCallback(async (d: TechTipDeck, style: TipStyle) => {
+    // Every slide already carries its own uploaded frame as `sourceImage`, so this pass never
+    // fetches stock — it only prepares the images already in memory for the canvas.
     setBgProgress({ done: 0, total: d.slides.length });
-    const bgs = await resolveTipBackgrounds(d, 1080, 1350, (done, total) => setBgProgress({ done, total }), visualPreset);
+    const bgs = await resolveTipBackgrounds(d, 1080, 1350, (done, total) => setBgProgress({ done, total }), style);
     setBgProgress(null);
     setRenderProgress({ done: 0, total: d.slides.length });
-    const imgs = await renderTipDeckImages(d, { backgrounds: bgs, style: visualPreset }, (done, total) => setRenderProgress({ done, total }));
+    const imgs = await renderTipDeckImages(d, { backgrounds: bgs, style }, (done, total) => setRenderProgress({ done, total }));
     setImages(imgs);
-  }, [visualPreset]);
+  }, []);
 
-  /** Stage 2 — translate & adapt, then render. */
   const generate = useCallback(async () => {
-    const source = post.text.trim() ? post : parseInstagramRawText(rawText, url);
-    const sourceChars = captionWithoutHashtags(source.caption || source.text).trim().length;
-    // The prompt-library preset reads its content off the carousel frames (vision OCR), not the
-    // caption — so a short caption is not a blocker there as long as a frame image came through.
-    const hasFrames = source.slides.some((s) => s.image);
-    if (visualPreset === 'cream-prompt-library' ? !hasFrames : sourceChars < MIN_CAPTION_CHARS) {
-      setShowPaste(true);
-      setError(
-        visualPreset === 'cream-prompt-library'
-          ? 'עיצוב "ספריית פרומפטים" דורש קרוסלה עם תמונות שקופיות — משכו מחדש קישור לפוסט קרוסלה.'
-          : `אין מספיק טקסט מקור (${sourceChars} תווים, נדרשים ${MIN_CAPTION_CHARS}) — הדביקו את כיתוב הפוסט המלא בתיבה למטה.`
-      );
+    if (frames.length < MIN_FRAMES) {
+      setError(`נדרשות לפחות ${MIN_FRAMES} תמונות שקופיות ליצירת קרוסלה.`);
       return;
     }
-    if (!post.text.trim()) setPost(source);
     setBusy(true);
     setError(null);
     resetOutputs();
     try {
-      const d = await synthesizeInstagramDeck(source, notes, { useSlideText, visualPreset });
+      const { deck: d, resolvedPreset: rp } = await synthesizeImageCarouselDeck(frames, notes, visualPreset);
       setDeck(d);
-      await renderDeck(d);
+      setResolvedPreset(rp);
+      await renderDeck(d, rp);
     } catch (e) {
       setError((e as Error).message || 'יצירת הקרוסלה נכשלה.');
     } finally {
@@ -255,15 +209,14 @@ export default function InstagramImporter() {
       setBgProgress(null);
       setBusy(false);
     }
-  }, [post, rawText, url, notes, useSlideText, visualPreset, resetOutputs, renderDeck]);
+  }, [frames, notes, visualPreset, resetOutputs, renderDeck]);
 
-  /** Swap backgrounds and re-render — the adapted copy is untouched. */
   const redesign = useCallback(async () => {
     if (!deck) return;
     setRedesigning(true);
     setError(null);
     try {
-      await renderDeck(deck);
+      await renderDeck(deck, resolvedPreset);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'עיצוב מחדש נכשל');
     } finally {
@@ -271,9 +224,9 @@ export default function InstagramImporter() {
       setBgProgress(null);
       setRenderProgress(null);
     }
-  }, [deck, renderDeck]);
+  }, [deck, resolvedPreset, renderDeck]);
 
-  const caption = useMemo(() => (deck ? instagramDeckCaption(deck) : ''), [deck]);
+  const caption = useMemo(() => (deck ? imageCarouselDeckCaption(deck) : ''), [deck]);
 
   const exportZip = useCallback(async () => {
     if (!deck || !images.length) return;
@@ -286,10 +239,8 @@ export default function InstagramImporter() {
     setVideoError(null);
     setVideoPct(0);
     try {
-      // The reel is 9:16, so the post's own frames are re-fetched at the vertical aspect.
-      setVideoStage(null);
-      const bgs = await resolveTipBackgrounds(deck, 1080, 1920, undefined, visualPreset);
-      const { blob } = await renderTipDeckVideo(deck, { backgrounds: bgs, music: withMusic, style: visualPreset }, (pct, stage) => {
+      const bgs = await resolveTipBackgrounds(deck, 1080, 1920, undefined, resolvedPreset);
+      const { blob } = await renderTipDeckVideo(deck, { backgrounds: bgs, music: withMusic, style: resolvedPreset }, (pct, stage) => {
         setVideoPct(pct);
         setVideoStage(stage);
       });
@@ -304,15 +255,15 @@ export default function InstagramImporter() {
       setVideoBusy(false);
       setVideoStage(null);
     }
-  }, [deck, motionSupported, withMusic, visualPreset]);
+  }, [deck, motionSupported, withMusic, resolvedPreset]);
 
   const downloadVideo = useCallback(() => {
     if (!videoBlob || !deck) return;
-    const slug = (deck.title || 'instagram').replace(/[^\w֐-׿]+/g, '-').slice(0, 40) || 'instagram';
+    const slug = (deck.title || 'carousel').replace(/[^\w֐-׿]+/g, '-').slice(0, 40) || 'carousel';
     const objectUrl = URL.createObjectURL(videoBlob);
     const a = document.createElement('a');
     a.href = objectUrl;
-    a.download = `mrdaniel-ig-${slug}.mp4`;
+    a.download = `mrdaniel-image-carousel-${slug}.mp4`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -330,42 +281,19 @@ export default function InstagramImporter() {
     }
   }, [deck, caption]);
 
-  /** Explicit wipe — the only thing that clears the persisted session state. */
-  const clearAll = useCallback(() => {
-    clearInstagramState();
-    setPost(EMPTY_POST);
-    setDeck(null);
-    setRawText('');
-    setUrl('');
-    setNotes('');
-    setVisualPreset('creator');
-    setImportError(null);
-    setError(null);
-    resetOutputs();
-  }, [resetOutputs]);
-
   const activeSlide = deck?.slides[Math.min(active, deck.slides.length - 1)];
-  const sourceChars = captionWithoutHashtags(post.caption || post.text).trim().length;
-  const ocrFrames = post.slides.filter((s) => s.text.trim().length > 12).length;
-  // The generate button's own readiness check — mirrors the gate inside `generate()` above. The
-  // prompt-library preset needs a carousel frame image, not caption length; every other preset
-  // keeps the original "enough source text, imported or pasted" rule.
-  const canGenerate =
-    visualPreset === 'cream-prompt-library'
-      ? post.slides.some((s) => s.image)
-      : sourceChars >= MIN_CAPTION_CHARS || rawText.trim().length >= MIN_CAPTION_CHARS;
 
   return (
     <div className="space-y-5">
-      {/* 1 · import */}
+      {/* 1 · upload */}
       <div className="dash-card p-6">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <span className="flex items-center gap-2 text-zinc-400 text-xs font-mono uppercase tracking-wider">
-            <Instagram className="w-3.5 h-3.5" /> ייבוא פוסט / קרוסלה מאינסטגרם
+            <ImagePlus className="w-3.5 h-3.5" /> העלאת תמונות שקופיות הקרוסלה, לפי סדר
           </span>
-          {(post.text.length > 0 || deck) && (
+          {frames.length > 0 && (
             <button
-              onClick={clearAll}
+              onClick={clearFrames}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-300 text-xs font-bold cursor-pointer hover:bg-white/10"
             >
               <Trash2 className="w-3.5 h-3.5" /> נקה / התחל מחדש
@@ -373,137 +301,100 @@ export default function InstagramImporter() {
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <div className="relative min-w-[18rem] flex-1">
-            <Link2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-            <input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !importing && void runImport()}
-              placeholder="https://www.instagram.com/p/ABC123/"
-              dir="ltr"
-              className="w-full rounded-lg border border-white/15 bg-black/40 py-2 pr-9 pl-3 text-sm text-zinc-200 placeholder:text-zinc-600"
-            />
-          </div>
-          <button
-            onClick={() => void runImport()}
-            disabled={importing || !url.trim()}
-            className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-black cursor-pointer disabled:opacity-40"
-          >
-            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            משוך תוכן
-          </button>
-          <button
-            onClick={() => setShowPaste((v) => !v)}
-            className="flex items-center gap-1.5 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs font-bold text-zinc-300 cursor-pointer hover:bg-white/10"
-          >
-            <ClipboardPaste className="w-3.5 h-3.5" /> {showPaste ? 'סגור הדבקה ידנית' : 'הדבקה ידנית'}
-          </button>
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOverDrop(true);
+          }}
+          onDragLeave={() => setDragOverDrop(false)}
+          onDrop={onDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center cursor-pointer transition-colors ${
+            dragOverDrop ? 'border-brand-500 bg-brand-500/10' : 'border-white/15 bg-black/20 hover:border-white/25'
+          }`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) void addFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
+          {reading ? <Loader2 className="w-6 h-6 animate-spin text-brand-400" /> : <ImagePlus className="w-6 h-6 text-zinc-500" />}
+          <p className="text-sm font-bold text-zinc-200">גררו לכאן את תמונות השקופיות, או לחצו לבחירה</p>
+          <p className="text-[11px] text-zinc-500">jpg · png · webp — עד {MAX_FRAMES} שקופיות, בסדר הקרוסלה המקורי</p>
         </div>
 
-        {importError && (
+        {readError && (
           <p className="mt-3 text-xs text-amber-400 flex items-start gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {importError}
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {readError}
           </p>
         )}
 
-        {/* Carousel detection. The operator learns what they are about to generate before spending
-            a run on it — and whether the frames' own text was recovered. */}
-        {post.slides.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-xs font-bold text-brand-300">
-            <Layers className="w-3.5 h-3.5 shrink-0" />
-            {post.isCarousel ? `זוהתה קרוסלה בת ${post.slides.length} שקופיות` : 'זוהה פוסט בודד'}
-            {ocrFrames > 0 && (
-              <span className="font-normal text-brand-200/70">· טקסט נקרא מ-{ocrFrames} שקופיות</span>
-            )}
-            {post.images.length > 0 && (
-              <span className="font-normal text-brand-200/70">· {post.images.length} תמונות מהמקור</span>
-            )}
-          </div>
-        )}
-
-        {showPaste && (
-          <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
-            <label className="mb-1.5 block text-[12px] font-bold text-zinc-300">
-              הדביקו את כיתוב הפוסט (כל פסקה תהפוך לשקופית)
-            </label>
-            <textarea
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              rows={8}
-              dir="auto"
-              placeholder={'GLM-5.2 is open weights under MIT…\n\nThe catch is memory…'}
-              className="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600"
-            />
-            <button
-              onClick={applyPaste}
-              disabled={rawText.trim().length < 20}
-              className="mt-2 flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold text-zinc-100 cursor-pointer disabled:opacity-40"
-            >
-              <Check className="w-3.5 h-3.5" /> השתמש בטקסט הזה
-            </button>
-          </div>
-        )}
-
-        {/* extracted caption — the operator sees exactly what will be adapted */}
-        {post.lines.length > 0 && (
-          <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4">
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-mono text-zinc-500">
-              <span className="rounded-full border border-brand-500/30 bg-brand-500/10 px-2 py-0.5 text-brand-300">
-                {sourceChars} תווים בכיתוב
-              </span>
-              <span>{VIA_LABEL[post.via]}</span>
-              {post.author && <span dir="ltr">· {post.author}</span>}
-              {post.hashtags.length > 0 && <span>· {post.hashtags.length} האשטגים</span>}
-            </div>
-            <ol className="space-y-2 max-h-64 overflow-y-auto pl-1">
-              {post.lines.map((line, i) => (
-                <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-zinc-300">
-                  <span className="mt-0.5 shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
+        {frames.length > 0 && (
+          <>
+            <p className="mt-4 mb-2 text-[11px] text-zinc-500">
+              {frames.length} שקופיות · גררו לשינוי סדר, או השתמשו בחצים
+            </p>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+              {frames.map((f, i) => (
+                <div
+                  key={f.id}
+                  draggable
+                  onDragStart={() => {
+                    dragIndex.current = i;
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragIndex.current !== null) moveFrame(dragIndex.current, i);
+                    dragIndex.current = null;
+                  }}
+                  className="group relative overflow-hidden rounded-lg border border-white/10 bg-black/40 cursor-grab active:cursor-grabbing"
+                >
+                  <img src={f.dataUrl} alt={`שקופית ${i + 1}`} className="block w-full aspect-[4/5] object-cover" />
+                  <span className="absolute top-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-mono text-zinc-200">
                     {i + 1}
                   </span>
-                  <span dir="auto" className="whitespace-pre-wrap">{line}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-
-        {/* the carousel's own frames + the text read off them */}
-        {post.slides.length > 0 && (
-          <details className="mt-3">
-            <summary className="cursor-pointer font-mono text-[11px] text-zinc-500">
-              שקופיות המקור ({post.slides.length}) — תמונות וטקסט שנקרא מהן
-            </summary>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {post.slides.map((s, i) => (
-                <div key={i} className="flex gap-2 rounded-lg border border-white/10 bg-black/40 p-2">
-                  {s.image ? (
-                    <img
-                      src={s.image}
-                      alt={`שקופית מקור ${i + 1}`}
-                      loading="lazy"
-                      className="h-20 w-20 shrink-0 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded bg-white/5 text-zinc-700">
-                      <ImageIcon className="w-5 h-5" />
-                    </div>
-                  )}
-                  <p dir="ltr" className="min-w-0 flex-1 text-[10px] leading-relaxed text-zinc-500 line-clamp-5">
-                    {s.text || '(לא נקרא טקסט מהתמונה)'}
-                  </p>
+                  <GripVertical className="absolute top-1 left-1 w-3.5 h-3.5 text-white/40" />
+                  <button
+                    onClick={() => removeFrame(f.id)}
+                    title="הסר שקופית"
+                    className="absolute bottom-1 left-1 flex items-center justify-center rounded bg-black/70 p-1 text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100 cursor-pointer hover:text-red-400"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                  <div className="absolute bottom-1 right-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      onClick={() => moveFrame(i, i - 1)}
+                      disabled={i === 0}
+                      className="rounded bg-black/70 p-1 text-zinc-300 cursor-pointer disabled:opacity-30 hover:text-white"
+                    >
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => moveFrame(i, i + 1)}
+                      disabled={i === frames.length - 1}
+                      className="rounded bg-black/70 p-1 text-zinc-300 cursor-pointer disabled:opacity-30 hover:text-white"
+                    >
+                      <ChevronLeft className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
-          </details>
+          </>
         )}
       </div>
 
-      {/* 2 · adapt */}
+      {/* 2 · translate & brand */}
       <div className="dash-card p-6">
         <span className="mb-4 flex items-center gap-2 text-zinc-400 text-xs font-mono uppercase tracking-wider">
-          <Languages className="w-3.5 h-3.5" /> תרגום והתאמה לעברית ישראלית
+          <WandSparkle className="w-3.5 h-3.5" /> תרגום, מיתוג ועיצוב
         </span>
 
         <textarea
@@ -518,18 +409,18 @@ export default function InstagramImporter() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => void generate()}
-            disabled={busy || !canGenerate}
+            disabled={busy || frames.length < MIN_FRAMES}
             className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-black cursor-pointer disabled:opacity-40"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            צור קרוסלה בעברית (10–12 שקופיות)
+            תרגמו ומתגו את הקרוסלה
           </button>
           <label className="flex items-center gap-2 text-xs text-zinc-300">
             <Palette className="w-3.5 h-3.5 text-brand-400" />
             עיצוב
             <select
               value={visualPreset}
-              onChange={(e) => setVisualPreset(e.target.value as InstagramVisualPreset)}
+              onChange={(e) => setVisualPreset(e.target.value as ImageCarouselVisualPreset)}
               className="cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-white"
             >
               {PRESET_OPTIONS.map((p) => (
@@ -537,33 +428,17 @@ export default function InstagramImporter() {
               ))}
             </select>
           </label>
-          {/* The frames' OCR is read for STRUCTURE only (see the agent), but a post whose graphics
-              are pure decoration produces noise — so the operator can switch that channel off. */}
-          {ocrFrames > 0 && (
-            <label
-              className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-400"
-              title="קורא את הטקסט שמודפס על שקופיות המקור כדי לשחזר את מבנה הקרוסלה. הכיתוב תמיד מנצח בסתירה."
-            >
-              <input
-                type="checkbox"
-                checked={useSlideText}
-                onChange={(e) => setUseSlideText(e.target.checked)}
-                className="accent-brand-500 w-3.5 h-3.5"
-              />
-              <ScanText className="w-3.5 h-3.5 text-brand-400" />
-              השתמש בטקסט מהשקופיות ({ocrFrames})
-            </label>
-          )}
         </div>
 
         <p className="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-500">
           <Wand2 className="w-3.5 h-3.5 shrink-0 text-brand-400" />
-          {PRESET_OPTIONS.find((p) => p.id === visualPreset)?.hint} — אפס תמונות סטוק.
+          {PRESET_OPTIONS.find((p) => p.id === visualPreset)?.hint}
         </p>
+        {frames.length > 0 && frames.length < MIN_FRAMES && (
+          <p className="mt-2 text-[11px] text-amber-400">נדרשות לפחות {MIN_FRAMES} תמונות ליצירת קרוסלה.</p>
+        )}
         {bgProgress && (
-          <p className="mt-3 text-[11px] text-sky-400/90">
-            מכין נכסים לשקופיות… {bgProgress.done}/{bgProgress.total}
-          </p>
+          <p className="mt-3 text-[11px] text-sky-400/90">מכין נכסים לשקופיות… {bgProgress.done}/{bgProgress.total}</p>
         )}
         {renderProgress && (
           <p className="mt-2 text-[11px] text-sky-400/90">מרנדר שקופיות… {renderProgress.done}/{renderProgress.total}</p>
@@ -581,12 +456,15 @@ export default function InstagramImporter() {
           <div className="dash-card p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <span className="flex flex-wrap items-center gap-2 text-zinc-400 text-xs font-mono uppercase tracking-wider">
-                <Instagram className="w-3.5 h-3.5" /> {deck.slides.length} שקופיות ·{' '}
+                <ImagePlus className="w-3.5 h-3.5" /> {deck.slides.length} שקופיות ·{' '}
                 <span className={deck.synthesized ? 'text-brand-400 normal-case' : 'text-amber-400/80 normal-case'}>
-                  {deck.synthesized ? 'תורגם והותאם ע"י AI' : `גיבוי מקומי${deck.fallbackReason ? ` — ${deck.fallbackReason}` : ''}`}
+                  {deck.synthesized ? 'תורגם ומותג ע"י AI' : `טיוטה${deck.fallbackReason ? ` — ${deck.fallbackReason}` : ''}`}
                 </span>
-                {/* What the agent decided the post was about — the theme drives the accent colour,
-                    the badge on every slide and which guide the CTA promotes. */}
+                {visualPreset === 'auto-detect' && (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 normal-case text-zinc-300">
+                    זוהה: {PRESET_LABEL[resolvedPreset]}
+                  </span>
+                )}
                 {deck.topic && (
                   <span
                     className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 normal-case text-zinc-300"
@@ -594,13 +472,8 @@ export default function InstagramImporter() {
                   >
                     <Palette className="w-3 h-3 text-brand-400" />
                     {THEME_LABEL[deck.topic.theme] ?? deck.topic.theme}
-                    <span dir="ltr" className="text-zinc-500">
-                      {deck.topic.badge}
-                    </span>
                     {deck.topic.guideSlug && (
-                      <span dir="ltr" className="text-brand-400/80">
-                        /g/{deck.topic.guideSlug}
-                      </span>
+                      <span dir="ltr" className="text-brand-400/80">/g/{deck.topic.guideSlug}</span>
                     )}
                   </span>
                 )}
@@ -616,22 +489,12 @@ export default function InstagramImporter() {
                 <button
                   onClick={() => void redesign()}
                   disabled={redesigning || busy}
-                  title="מחליף רקעים ומרנדר מחדש — הטקסט נשאר כפי שהוא"
+                  title="מרנדר מחדש באותו עיצוב — הטקסט נשאר כפי שהוא"
                   className="flex items-center gap-1.5 rounded-lg border border-brand-500/50 px-3 py-1.5 text-xs font-bold text-brand-400 cursor-pointer hover:bg-brand-500/10 disabled:opacity-40"
                 >
                   {redesigning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-                  עיצוב מחדש
+                  רענון עיצוב
                 </button>
-                <select
-                  value={visualPreset}
-                  onChange={(e) => setVisualPreset(e.target.value as InstagramVisualPreset)}
-                  title="שינוי הסגנון דורש 'עיצוב מחדש'. אם הדק סונתז תחת סגנון אחר, כותרות-משנה ודיאגרמות תהליך יופיעו רק אחרי יצירה מחדש."
-                  className="cursor-pointer rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-white"
-                >
-                  {PRESET_OPTIONS.map((p) => (
-                    <option key={p.id} value={p.id}>{p.label}</option>
-                  ))}
-                </select>
                 <button
                   onClick={() => void exportZip()}
                   disabled={!images.length || busy}
@@ -666,7 +529,6 @@ export default function InstagramImporter() {
               </div>
             </div>
 
-            {/* slide rail */}
             <div className="mb-4 flex flex-wrap items-center gap-1.5">
               {deck.slides.map((s, i) => (
                 <button
@@ -765,7 +627,6 @@ export default function InstagramImporter() {
               )}
             </div>
 
-            {/* bento contact sheet — every rendered slide at a glance */}
             {images.length > 0 && (
               <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {images.map((img, i) => (
@@ -782,7 +643,6 @@ export default function InstagramImporter() {
               </div>
             )}
 
-            {/* motion output */}
             {(videoBusy || videoUrl || videoError) && (
               <div className="mt-5 rounded-xl border border-white/10 bg-black/30 p-4">
                 <div className="mb-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-zinc-400">
@@ -824,7 +684,7 @@ export default function InstagramImporter() {
             <QuickPublishBar
               text={caption}
               image={images[Math.min(active, images.length - 1)]}
-              label="פרסום מהיר · קרוסלה מאינסטגרם"
+              label="פרסום מהיר · קרוסלה מתורגמת"
               className="mt-5 justify-center"
             />
 
@@ -843,10 +703,9 @@ export default function InstagramImporter() {
 
       {!deck && !busy && (
         <div className="dash-card p-10 text-center text-sm leading-relaxed text-zinc-500">
-          הדביקו קישור לפוסט או לקרוסלה באינסטגרם — המערכת תמשוך את הכיתוב, את שקופיות המקור ואת הטקסט
-          שמודפס עליהן, תתרגם ותתאים אותם לעברית ישראלית טבעית, ותבנה קרוסלת לימוד של 10–12 שקופיות
-          בעיצוב סייבר כהה. אם הפוסט חסום, הדביקו את הכיתוב ידנית — התוצאה זהה. פלט כפול: קרוסלה
-          (PNG · ZIP) וריל 9:16.
+          העלו את תמונות השקופיות של קרוסלה — בדיוק כפי שפורסמה, בסדר הנכון. המערכת תקרא את כל הטקסט
+          המודפס על כל שקופית, תתרגם ותתאים אותו לעברית ישראלית טבעית, תשמור על מבנה הקרוסלה המקורי
+          ותמתג אותו ל-@mrdaniel.co.il — בלי קישור או שם מקור זר. פלט כפול: קרוסלה (PNG · ZIP) וריל 9:16.
         </div>
       )}
     </div>
