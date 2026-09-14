@@ -1,5 +1,6 @@
 import Parser from 'rss-parser';
 import { createHash } from 'node:crypto';
+import { translateForeignItems } from './newsTranslate.js';
 
 export type NewsTopic = 'ai' | 'cyber' | 'cloud' | 'devops' | 'general';
 
@@ -18,9 +19,10 @@ export interface NewsItem {
    * source provides one — many Hebrew RSS feeds don't. Absolute `https:`/`http:` only; consumers
    * that draw it onto a <canvas> must route it through `/api/img-proxy` for CORS. */
   image?: string;
-  /** 'en' marks a curated English specialist outlet (AWS/Azure/GCP/OpenAI/…). Absent = Hebrew
-   * native or Google-News. Consumers that want the Hebrew-only site stream leave these out by
-   * default (see `sanitizeAndKeep`); `allowEnglish` opts in (used by the dashboard). */
+  /** Set to 'en' only transiently, between a curated English specialist outlet's fetch
+   * (AWS/Azure/GCP/OpenAI/…, see `FeedSource.lang`) and `translateForeignItems` in
+   * newsTranslate.ts, which runs every refresh cycle before anything is cached. A cached/served
+   * item is always already-Hebrew and has this cleared (undefined) — see `sanitizeAndKeep`. */
   lang?: 'he' | 'en';
 }
 
@@ -86,13 +88,12 @@ const SOURCES: FeedSource[] = [
   { name: 'SPD Blog', url: 'https://blog.spd.co.il/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
   { name: 'Kodkod Cyber', url: 'https://kodkodcyber.com/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
   // NOTE: the general-purpose English international outlets (TechCrunch, The Verge, Ars Technica,
-  // CyberNews, Krebs on Security) stay removed — the PUBLIC site feed is a Hebrew-only AI/cyber
-  // stream (see `sanitizeAndKeep`), so those broad-mandate sources would just add fetch latency for
-  // no on-brand content. The curated single-topic outlets below are different: `lang: 'en'` tags
-  // their items so they're gated behind `allowEnglish` (opt-in, off by default) instead of dropped
-  // by the Hebrew gate outright — the dashboard's Cloud/AI/DevOps/extra-Cyber tabs opt in via
-  // `/api/news?allowEnglish=1` (see newsFeedClient.ts) because those categories had no real Hebrew
-  // coverage to draw from (this is what was making the dashboard's Cloud tab come back empty).
+  // CyberNews, Krebs on Security) stay removed — broad-mandate sources would mostly add off-brand
+  // noise even once translated. The curated single-topic outlets below are different: `lang: 'en'`
+  // tags their items so `translateForeignItems` (newsTranslate.ts) auto-translates them to Hebrew
+  // every refresh cycle, BEFORE the cache is written — this is what feeds the site's and
+  // dashboard's Cloud/AI/DevOps tabs real content instead of coming back empty for lack of native
+  // Hebrew coverage in those categories.
   // ── Cyber specialists ──
   { name: 'Dark Reading', url: 'https://www.darkreading.com/rss.xml', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
   { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
@@ -440,20 +441,31 @@ const MARKUP_LEFTOVER = /<\/?[a-z][^>]*>|&#\d{2,};|\]\]>|\{\{|https?:\/\/\S+\s*$
 /**
  * The feed's content gate — ON BY DEFAULT for `/api/news` (opt out with `?strict=0`). An item is
  * kept only when ALL hold:
- *   1. Hebrew — the title carries Hebrew letters (drops the residual English items Google News
- *      still slips in).
+ *   1. Hebrew — the title carries real Hebrew content. Enforced UNCONDITIONALLY (not just for
+ *      native-Hebrew sources): `refreshAll()` in this file runs every non-Hebrew item through
+ *      `translateForeignItems` (newsTranslate.ts) before it's ever cached, so by the time this
+ *      function sees an item it should already be Hebrew — this check is the last-line defense
+ *      that guarantees zero raw-English titles reach any consumer (site or dashboard) even if
+ *      translation silently misbehaved for one item.
  *   2. Clean — the title isn't a scrape/parse artefact (`...`, bare URL, leftover `<tag>` /
  *      `&#8217;`, CDATA tail) and is a real headline length.
- *   3. On-topic — AI / cyber / cloud signal in the title+summary (reuses the SAME classifier
- *      patterns the feed already runs on), and NOT generic consumer-tech/gadget/gaming without
- *      one of those signals.
+ *   3. On-topic — AI / cyber / cloud / devops signal in the title+summary (reuses the SAME
+ *      classifier patterns the feed already runs on), and NOT generic consumer-tech/gadget/gaming
+ *      without one of those signals.
+ * `opts.allowEnglish` is accepted for API back-compat (the dashboard still passes
+ * `?allowEnglish=1`) but no longer bypasses the Hebrew check — see point 1.
  * Applied as a per-request VIEW over the shared cache in `getNewsItems` — never mutates the cache,
  * so an unfiltered (`?strict=0`) call and a filtered one can't poison each other.
  */
-export function sanitizeAndKeep(item: NewsItem, opts: { allowEnglish?: boolean } = {}): boolean {
+export function sanitizeAndKeep(item: NewsItem, _opts: { allowEnglish?: boolean } = {}): boolean {
   const title = (item.title || '').trim();
   // clean, real headline — applies regardless of language
   if (title.length < 12 || GARBAGE_TITLE.test(title) || MARKUP_LEFTOVER.test(title)) return false;
+
+  // 1 · Hebrew
+  if (!HEBREW_CHAR.test(title)) return false;
+  const hebLen = (title.match(/[֐-׿]/g) || []).length;
+  if (hebLen < 6) return false; // mostly-Latin string with one stray Hebrew glyph
 
   const text = `${title} ${item.excerpt} ${item.summary} ${item.category}`;
   const onTopic =
@@ -462,19 +474,6 @@ export function sanitizeAndKeep(item: NewsItem, opts: { allowEnglish?: boolean }
     CLOUD_PATTERNS.some((re) => re.test(text)) ||
     DEVOPS_PATTERNS.some((re) => re.test(text));
 
-  // Curated English specialist outlets (AWS/Azure/GCP/OpenAI/Red Hat/…) are single-topic by
-  // construction (`forceTopic`) — skip the Hebrew requirement below for them when the caller opts
-  // in, since it exists only to filter Google-News noise, not to gatekeep a deliberately bilingual
-  // source list.
-  if (opts.allowEnglish && item.lang === 'en') {
-    if (GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text)) && !onTopic) return false;
-    return onTopic || classifyTopic(text) !== 'general';
-  }
-
-  // 1 · Hebrew
-  if (!HEBREW_CHAR.test(title)) return false;
-  const hebLen = (title.match(/[֐-׿]/g) || []).length;
-  if (hebLen < 6) return false; // mostly-Latin string with one stray Hebrew glyph
   // 2 · on-topic
   if (GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text)) && !onTopic) return false;
   if (onTopic) return true;
@@ -672,9 +671,18 @@ async function refreshAll(): Promise<NewsItem[]> {
     }
   });
 
-  const items = dedupe(raw, priorityOf).sort(
+  const deduped = dedupe(raw, priorityOf).sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
+
+  // Auto-translate the curated English specialist outlets (AWS/Azure/GCP/OpenAI/Dark Reading/…)
+  // into Hebrew BEFORE anything is cached — see newsTranslate.ts. An item that can't be translated
+  // this cycle (Gemini unconfigured/rate-limited/bad response) is dropped here, never cached in
+  // English, so `sanitizeAndKeep`'s Hebrew gate downstream never has to filter it out later.
+  const items = await translateForeignItems(deduped).catch((err) => {
+    console.error('[news] translateForeignItems failed, falling back to Hebrew-native items only:', err);
+    return deduped.filter((it) => (it.title.match(/[֐-׿]/g) || []).length >= 6);
+  });
 
   // Scrape og:image for the newest items whose feed carried no inline media (TechTime, Israel
   // Defense, most Google-News entries) so the Content Agent has a real article photo to render.
@@ -682,7 +690,7 @@ async function refreshAll(): Promise<NewsItem[]> {
 
   const withImg = items.filter((i) => i.image).length;
   console.info(
-    `[news] refreshed — ${items.length} items after dedup (${raw.length} raw), ${withImg} with image · ${stats.join(' ')}`
+    `[news] refreshed — ${items.length} items after translate (${deduped.length} deduped, ${raw.length} raw), ${withImg} with image · ${stats.join(' ')}`
   );
 
   cache = { items, fetchedAt: Date.now() };
@@ -691,10 +699,10 @@ async function refreshAll(): Promise<NewsItem[]> {
 
 export async function getNewsItems(
   // `strict` is ON by default — the site news page, the Live Feed ticker and the dashboard all get
-  // the sanitized stream. Pass `{ strict: false }` (via `/api/news?strict=0`) only for debugging
-  // the raw aggregate. `allowEnglish` additionally lets the curated English specialist outlets
-  // (AWS/Azure/GCP/OpenAI/…) through the strict gate — off by default so the public site stays
-  // Hebrew-only; the dashboard opts in via `/api/news?allowEnglish=1` for its Cloud/AI/DevOps tabs.
+  // the sanitized, always-Hebrew stream. Pass `{ strict: false }` (via `/api/news?strict=0`) only
+  // for debugging the raw aggregate (which CAN carry untranslated English — never use it for
+  // anything user-facing). `allowEnglish` is accepted for API back-compat but no longer changes the
+  // result — see `sanitizeAndKeep`.
   opts: { strict?: boolean; allowEnglish?: boolean } = {}
 ): Promise<{ items: NewsItem[]; updatedAt: string }> {
   const strict = opts.strict ?? true;

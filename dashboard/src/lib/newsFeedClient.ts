@@ -17,14 +17,15 @@ export async function fetchLatestNewsItem(category: NewsCategory): Promise<NewsI
  * (or all of them for `'all'`), newest-first. The dashboard renders these as a selectable list so
  * the operator can preview the raw text and pick a specific article before generating.
  *
- * The site feed is the sanitized on-topic stream by default (no scrape artefacts, on-topic only).
- * Pass `strict = false` to fetch the raw unfiltered aggregate (`?strict=0`) for debugging.
+ * The site feed is the sanitized on-topic stream by default (no scrape artefacts, on-topic only,
+ * ALWAYS Hebrew — the server auto-translates the curated English specialist outlets AWS/Azure/GCP/
+ * OpenAI/Dark Reading/… before caching, see src/server/newsTranslate.ts). Pass `strict = false` to
+ * fetch the raw unfiltered aggregate (`?strict=0`) for debugging — that path can still carry
+ * untranslated English, so don't use it for anything user-facing.
  *
- * Requests `allowEnglish=1` so the curated English specialist outlets (AWS/Azure/GCP/OpenAI/Red
- * Hat/…) come through too — the public site stays Hebrew-only, but the dashboard's Cloud/AI/DevOps
- * tabs have no real Hebrew coverage to draw from otherwise (this is what made Cloud come back
- * empty). The operator/AI content pipeline downstream already rewrites source material into Hebrew
- * posts, so an English headline in the picker is fine.
+ * `allowEnglish=1` is kept for API back-compat but no longer changes what comes back — the Hebrew
+ * gate in `sanitizeAndKeep` is unconditional now, so the dashboard's Cloud/AI/DevOps tabs get the
+ * same translated Hebrew items the flag used to bypass filtering for.
  */
 export async function fetchNewsList(category: NewsCategory, limit = 40, strict = true): Promise<NewsItem[]> {
   const params = new URLSearchParams({ allowEnglish: '1' });
