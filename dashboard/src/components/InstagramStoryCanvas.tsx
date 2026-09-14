@@ -22,12 +22,19 @@ import GrowthScorePanel from './GrowthScorePanel';
 import { deckToCaption } from '../lib/socialPublish';
 import { deckToGrowthContent } from '../lib/growthPlaybook';
 
-const CATEGORIES: NewsCategory[] = ['cyber', 'ai', 'tech', 'all'];
-const TOPIC_LABEL: Record<string, string> = { ai: 'AI', cyber: 'סייבר', cloud: 'ענן / IT', general: 'גאדג׳טים / טק' };
+const CATEGORIES: NewsCategory[] = ['cyber', 'cloud', 'ai', 'devops', 'all'];
+const TOPIC_LABEL: Record<string, string> = {
+  ai: 'AI',
+  cyber: 'סייבר',
+  cloud: 'ענן / IT',
+  devops: 'DevOps',
+  general: 'גאדג׳טים / טק',
+};
 const TOPICS: { id: NewsTopic; label: string }[] = [
   { id: 'ai', label: 'AI / בינה מלאכותית' },
   { id: 'cyber', label: 'סייבר ואבטחה' },
   { id: 'cloud', label: 'ענן ותשתיות' },
+  { id: 'devops', label: 'ניהול מערכות ו-DevOps' },
   { id: 'general', label: 'טכנולוגיה כללית' },
 ];
 

@@ -40,6 +40,7 @@ const TOPIC: Record<NewsTopic, TopicStyle> = {
   ai: { glyph: '🤖', accent: '#F0356E', soft: '#FCE7EF' },
   cyber: { glyph: '🛡️', accent: '#2F6BFF', soft: '#E4ECFF' },
   cloud: { glyph: '☁️', accent: '#0EA5E9', soft: '#E0F3FC' },
+  devops: { glyph: '⚙️', accent: '#F59E0B', soft: '#FEF3D6' },
   general: { glyph: '⚡', accent: '#7C3AED', soft: '#EFE7FD' },
 };
 

@@ -23,6 +23,7 @@ const NICHE_TAGS: Record<NewsTopic, string[]> = {
   ai: ['#בינהמלאכותית', '#אוטומציה', '#סוכניAI', '#אוטומציהלעסקים', '#פיתוחתוכנה'],
   cyber: ['#סייבר', '#אבטחתמידע', '#בינהמלאכותית', '#אבטחתסייבר'],
   cloud: ['#פיתוחתוכנה', '#אוטומציה', '#ענן', '#תשתיותIT'],
+  devops: ['#DevOps', '#אוטומציה', '#פיתוחתוכנה', '#תשתיותIT'],
   general: ['#בינהמלאכותית', '#אוטומציה', '#פיתוחתוכנה', '#הייטק'],
 };
 
@@ -30,6 +31,7 @@ const BROAD_TAGS: Record<NewsTopic, string[]> = {
   ai: ['#AI', '#ArtificialIntelligence', '#AIAutomation', '#AITools'],
   cyber: ['#CyberSecurity', '#InfoSec', '#AI'],
   cloud: ['#DevOps', '#CloudComputing', '#Automation'],
+  devops: ['#DevOps', '#CICD', '#Automation'],
   general: ['#Tech', '#AI', '#Automation'],
 };
 
@@ -37,10 +39,11 @@ export const SEO_KEYWORD_BANK: Record<NewsTopic, string[]> = {
   ai: ['סוכני AI לעסקים', 'בינה מלאכותית לעסקים', 'אוטומציה לעסקים', 'כלי AI'],
   cyber: ['אבטחת סייבר לעסקים', 'אבטחת מידע', 'הגנה מפני פישינג', 'סייבר לעסק קטן'],
   cloud: ['פיתוח תוכנה', 'תשתיות ענן', 'אוטומציה לעסקים', 'DevOps'],
+  devops: ['DevOps לעסקים', 'ניהול מערכות', 'אוטומציית CI/CD', 'תשתיות IT'],
   general: ['בינה מלאכותית', 'אוטומציה לעסקים', 'פיתוח תוכנה', 'טכנולוגיה לעסקים'],
 };
 
-const TOPIC_KEYWORD: Record<NewsTopic, string> = { ai: 'סוכן', cyber: 'הגנה', cloud: 'ענן', general: 'מדריך' };
+const TOPIC_KEYWORD: Record<NewsTopic, string> = { ai: 'סוכן', cyber: 'הגנה', cloud: 'ענן', devops: 'תפעול', general: 'מדריך' };
 
 /** Same 3–5 ceiling the server caption rules use. */
 export const MAX_HASHTAGS = 5;

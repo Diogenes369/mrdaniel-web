@@ -1,7 +1,7 @@
 import Parser from 'rss-parser';
 import { createHash } from 'node:crypto';
 
-export type NewsTopic = 'ai' | 'cyber' | 'cloud' | 'general';
+export type NewsTopic = 'ai' | 'cyber' | 'cloud' | 'devops' | 'general';
 
 export interface NewsItem {
   id: string;
@@ -18,6 +18,10 @@ export interface NewsItem {
    * source provides one — many Hebrew RSS feeds don't. Absolute `https:`/`http:` only; consumers
    * that draw it onto a <canvas> must route it through `/api/img-proxy` for CORS. */
   image?: string;
+  /** 'en' marks a curated English specialist outlet (AWS/Azure/GCP/OpenAI/…). Absent = Hebrew
+   * native or Google-News. Consumers that want the Hebrew-only site stream leave these out by
+   * default (see `sanitizeAndKeep`); `allowEnglish` opts in (used by the dashboard). */
+  lang?: 'he' | 'en';
 }
 
 interface FeedSource {
@@ -40,6 +44,15 @@ interface FeedSource {
   /** Per-source item cap (default `PER_FEED_ITEM_CAP`). International outlets publish constantly —
    * a lower cap keeps them present in the mix without drowning the Israeli feeds. */
   maxItems?: number;
+  /** 'en' for a curated English specialist outlet — tags every item with `NewsItem.lang: 'en'` so
+   * `sanitizeAndKeep` can gate it behind `allowEnglish` instead of the Hebrew-only requirement.
+   * Omit (default 'he') for native Hebrew outlets and the Google-News queries. */
+  lang?: 'he' | 'en';
+  /** Pins the item's topic without running it through `classifyTopic` — for a single-purpose
+   * outlet (AWS/Azure/GCP/OpenAI/…) whose headlines rarely repeat the vendor/category keyword the
+   * classifier looks for (e.g. an AWS "What's New" title is just a feature name). Also skips the
+   * `onlyTopics` check, since the source itself is the topic filter. */
+  forceTopic?: NewsTopic;
 }
 
 // Aggregated Israeli tech / AI / cyber / economy coverage. Native RSS from each outlet first, with
@@ -72,10 +85,36 @@ const SOURCES: FeedSource[] = [
   { name: 'Machine Learning Israel', url: 'https://machinelearning.co.il/feed/', priority: 2, maxItems: 10, timeoutMs: 8000 },
   { name: 'SPD Blog', url: 'https://blog.spd.co.il/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
   { name: 'Kodkod Cyber', url: 'https://kodkodcyber.com/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
-  // NOTE: the English-only international outlets (TechCrunch, The Verge, Ars Technica,
-  // BleepingComputer, The Hacker News, CyberNews, Krebs on Security) were removed — the feed is a
-  // Hebrew-only AI/cyber stream now (see `sanitizeAndKeep`), so those sources contributed nothing
-  // but fetch latency. Reinstate them only if the Hebrew-only policy is lifted.
+  // NOTE: the general-purpose English international outlets (TechCrunch, The Verge, Ars Technica,
+  // CyberNews, Krebs on Security) stay removed — the PUBLIC site feed is a Hebrew-only AI/cyber
+  // stream (see `sanitizeAndKeep`), so those broad-mandate sources would just add fetch latency for
+  // no on-brand content. The curated single-topic outlets below are different: `lang: 'en'` tags
+  // their items so they're gated behind `allowEnglish` (opt-in, off by default) instead of dropped
+  // by the Hebrew gate outright — the dashboard's Cloud/AI/DevOps/extra-Cyber tabs opt in via
+  // `/api/news?allowEnglish=1` (see newsFeedClient.ts) because those categories had no real Hebrew
+  // coverage to draw from (this is what was making the dashboard's Cloud tab come back empty).
+  // ── Cyber specialists ──
+  { name: 'Dark Reading', url: 'https://www.darkreading.com/rss.xml', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
+  { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
+  { name: 'The Hacker News', url: 'https://feeds.feedburner.com/TheHackersNews', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
+  { name: 'CISA Advisories', url: 'https://www.cisa.gov/cybersecurity-advisories/all.xml', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
+  // ── Cloud & infrastructure ──
+  { name: 'AWS News', url: 'https://aws.amazon.com/about-aws/whats-new/recent/feed/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 10, timeoutMs: 9000 },
+  // Azure + GCP's blogs are real 200s (verified) but heavier to parse than the others — a slightly
+  // longer timeout avoids them flaking out under `Promise.allSettled` on a slow tick.
+  { name: 'Azure Blog', url: 'https://azure.microsoft.com/en-us/blog/feed/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 10, timeoutMs: 13000 },
+  // cloud.google.com/blog/rss serves an HTML page, not RSS — this is GCP's actual feed endpoint.
+  { name: 'Google Cloud Blog', url: 'https://cloudblog.withgoogle.com/rss/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 10, timeoutMs: 13000 },
+  { name: 'Kubernetes Blog', url: 'https://kubernetes.io/feed.xml', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 8, timeoutMs: 9000 },
+  { name: 'CNCF', url: 'https://www.cncf.io/feed/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 8, timeoutMs: 9000 },
+  // ── Artificial intelligence ──
+  { name: 'OpenAI News', url: 'https://openai.com/news/rss.xml', priority: 5, lang: 'en', forceTopic: 'ai', maxItems: 10, timeoutMs: 9000 },
+  { name: 'Hugging Face Blog', url: 'https://huggingface.co/blog/feed.xml', priority: 5, lang: 'en', forceTopic: 'ai', maxItems: 8, timeoutMs: 9000 },
+  { name: 'AI News', url: 'https://www.artificialintelligence-news.com/feed/', priority: 5, lang: 'en', forceTopic: 'ai', maxItems: 8, timeoutMs: 9000 },
+  // ── DevOps & SysAdmin ──
+  { name: 'The New Stack', url: 'https://thenewstack.io/feed/', priority: 5, lang: 'en', forceTopic: 'devops', maxItems: 10, timeoutMs: 9000 },
+  { name: 'Red Hat Blog', url: 'https://www.redhat.com/en/rss/blog', priority: 5, lang: 'en', forceTopic: 'devops', maxItems: 10, timeoutMs: 9000 },
+  { name: 'Microsoft Tech Community · IT Ops', url: 'https://techcommunity.microsoft.com/t5/s/gxcuf89792/rss/board?board.id=ITOpsTalkBlog', priority: 5, lang: 'en', forceTopic: 'devops', maxItems: 8, timeoutMs: 9000 },
   // ── Google News safety nets — Hebrew tech query + a dedicated Hebrew cyber query ──
   { name: 'Google News', url: GNEWS_URL, priority: 7, stripTitleSuffix: true, timeoutMs: 9000 },
   { name: 'Google News · סייבר', url: GNEWS_CYBER_URL, priority: 7, stripTitleSuffix: true, maxItems: 12, timeoutMs: 9000 },
@@ -359,14 +398,24 @@ const AI_PATTERNS = [
 const CLOUD_PATTERNS = [
   /ענן/, /מחשוב ענן/, /אחסון (ב)?ענן/, /שירותי ענן/, /ספק(ית)? ענן/, /תשתית(ות)? ענן/,
   /דאטה סנטר/, /גוגל קלאוד/, /\bcloud\b/i, /\baws\b/i, /\bazure\b/i, /\bgcp\b/i,
-  /google cloud/i, /\bvercel\b/i, /קוברנטיס/, /kubernetes/i, /\bdocker\b/i, /\bterraform\b/i,
+  /google cloud/i, /\bvercel\b/i, /קוברנטיס/, /kubernetes/i, /\bcncf\b/i,
   /מרכז(י)? נתונים/, /data.?center/i, /serverless/i, /\bsaas\b/i,
+];
+// DevOps / SysAdmin operational tooling & culture — distinct from CLOUD_PATTERNS' vendor/infra
+// terms so a story about running/operating systems (CI/CD, IaC, on-call) lands in its own tab
+// rather than the cloud-provider one.
+const DEVOPS_PATTERNS = [
+  /דבופס/, /ניהול מערכות/, /תפעול מערכות/, /אוטומציה( של)? תשתיות/,
+  /\bdevops\b/i, /\bsysadmin\b/i, /\bci\/cd\b/i, /\bcontinuous (integration|deployment|delivery)\b/i,
+  /\bansible\b/i, /\bterraform\b/i, /\bdocker\b/i, /\bgitops\b/i, /\bred ?hat\b/i, /\bopenshift\b/i,
+  /\binfrastructure as code\b/i, /\bit ops\b/i, /\bobservability\b/i, /\bincident response\b/i,
 ];
 
 function classifyTopic(text: string): NewsTopic {
   if (CYBER_PATTERNS.some((re) => re.test(text))) return 'cyber';
   if (AI_PATTERNS.some((re) => re.test(text))) return 'ai';
   if (CLOUD_PATTERNS.some((re) => re.test(text))) return 'cloud';
+  if (DEVOPS_PATTERNS.some((re) => re.test(text))) return 'devops';
   return 'general';
 }
 
@@ -401,20 +450,32 @@ const MARKUP_LEFTOVER = /<\/?[a-z][^>]*>|&#\d{2,};|\]\]>|\{\{|https?:\/\/\S+\s*$
  * Applied as a per-request VIEW over the shared cache in `getNewsItems` — never mutates the cache,
  * so an unfiltered (`?strict=0`) call and a filtered one can't poison each other.
  */
-export function sanitizeAndKeep(item: NewsItem): boolean {
+export function sanitizeAndKeep(item: NewsItem, opts: { allowEnglish?: boolean } = {}): boolean {
   const title = (item.title || '').trim();
-  // 1 · Hebrew
-  if (!HEBREW_CHAR.test(title)) return false;
-  // 2 · clean, real headline
+  // clean, real headline — applies regardless of language
   if (title.length < 12 || GARBAGE_TITLE.test(title) || MARKUP_LEFTOVER.test(title)) return false;
-  const hebLen = (title.match(/[֐-׿]/g) || []).length;
-  if (hebLen < 6) return false; // mostly-Latin string with one stray Hebrew glyph
-  // 3 · on-topic
+
   const text = `${title} ${item.excerpt} ${item.summary} ${item.category}`;
   const onTopic =
     CYBER_PATTERNS.some((re) => re.test(text)) ||
     AI_PATTERNS.some((re) => re.test(text)) ||
-    CLOUD_PATTERNS.some((re) => re.test(text));
+    CLOUD_PATTERNS.some((re) => re.test(text)) ||
+    DEVOPS_PATTERNS.some((re) => re.test(text));
+
+  // Curated English specialist outlets (AWS/Azure/GCP/OpenAI/Red Hat/…) are single-topic by
+  // construction (`forceTopic`) — skip the Hebrew requirement below for them when the caller opts
+  // in, since it exists only to filter Google-News noise, not to gatekeep a deliberately bilingual
+  // source list.
+  if (opts.allowEnglish && item.lang === 'en') {
+    if (GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text)) && !onTopic) return false;
+    return onTopic || classifyTopic(text) !== 'general';
+  }
+
+  // 1 · Hebrew
+  if (!HEBREW_CHAR.test(title)) return false;
+  const hebLen = (title.match(/[֐-׿]/g) || []).length;
+  if (hebLen < 6) return false; // mostly-Latin string with one stray Hebrew glyph
+  // 2 · on-topic
   if (GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text)) && !onTopic) return false;
   if (onTopic) return true;
   return classifyTopic(text) !== 'general';
@@ -436,6 +497,7 @@ function deriveCategory(topic: NewsTopic, text: string): string {
   if (topic === 'cyber') return 'סייבר';
   if (topic === 'ai') return 'בינה מלאכותית';
   if (topic === 'cloud') return 'ענן ותשתיות';
+  if (topic === 'devops') return 'ניהול מערכות ו-DevOps';
   if (ECONOMY_PATTERNS.some((re) => re.test(text))) return 'כלכלה';
   return 'טכנולוגיה';
 }
@@ -565,8 +627,8 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
     const summary = truncate(fullText || cleanText(item.contentSnippet, title) || title, SUMMARY_MAX);
     const categories = item.categories ?? [];
     const classifierText = `${title} ${summary} ${categories.join(' ')}`;
-    const topic = classifyTopic(classifierText);
-    if (source.onlyTopics && !source.onlyTopics.includes(topic)) continue;
+    const topic = source.forceTopic ?? classifyTopic(classifierText);
+    if (!source.forceTopic && source.onlyTopics && !source.onlyTopics.includes(topic)) continue;
     const publishedAt = item.isoDate || (item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString());
     const slug = buildSlug(title, link);
 
@@ -582,6 +644,7 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
       summary,
       publishedAt,
       image: extractImage(item as Record<string, any>),
+      lang: source.lang,
     });
   }
 
@@ -628,11 +691,14 @@ async function refreshAll(): Promise<NewsItem[]> {
 
 export async function getNewsItems(
   // `strict` is ON by default — the site news page, the Live Feed ticker and the dashboard all get
-  // the sanitized Hebrew AI/cyber stream. Pass `{ strict: false }` (via `/api/news?strict=0`) only
-  // for debugging the raw aggregate.
-  opts: { strict?: boolean } = {}
+  // the sanitized stream. Pass `{ strict: false }` (via `/api/news?strict=0`) only for debugging
+  // the raw aggregate. `allowEnglish` additionally lets the curated English specialist outlets
+  // (AWS/Azure/GCP/OpenAI/…) through the strict gate — off by default so the public site stays
+  // Hebrew-only; the dashboard opts in via `/api/news?allowEnglish=1` for its Cloud/AI/DevOps tabs.
+  opts: { strict?: boolean; allowEnglish?: boolean } = {}
 ): Promise<{ items: NewsItem[]; updatedAt: string }> {
   const strict = opts.strict ?? true;
+  const allowEnglish = opts.allowEnglish ?? false;
   const isStale = !cache || Date.now() - cache.fetchedAt > CACHE_TTL_MS;
   if (isStale) {
     inFlight = inFlight ?? refreshAll().finally(() => { inFlight = null; });
@@ -641,7 +707,7 @@ export async function getNewsItems(
   const all = cache?.items ?? [];
   return {
     // Applied here, on the way out — the cache always holds the full unfiltered set.
-    items: strict ? all.filter(sanitizeAndKeep) : all,
+    items: strict ? all.filter((it) => sanitizeAndKeep(it, { allowEnglish })) : all,
     updatedAt: cache ? new Date(cache.fetchedAt).toISOString() : new Date().toISOString(),
   };
 }

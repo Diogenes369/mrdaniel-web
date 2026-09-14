@@ -17,12 +17,19 @@ export async function fetchLatestNewsItem(category: NewsCategory): Promise<NewsI
  * (or all of them for `'all'`), newest-first. The dashboard renders these as a selectable list so
  * the operator can preview the raw text and pick a specific article before generating.
  *
- * The site feed is the sanitized Hebrew AI/cyber/cloud stream by default (Hebrew-only titles, no
- * scrape artefacts, on-topic only), so the content agent only ever sees on-brand source material.
+ * The site feed is the sanitized on-topic stream by default (no scrape artefacts, on-topic only).
  * Pass `strict = false` to fetch the raw unfiltered aggregate (`?strict=0`) for debugging.
+ *
+ * Requests `allowEnglish=1` so the curated English specialist outlets (AWS/Azure/GCP/OpenAI/Red
+ * Hat/…) come through too — the public site stays Hebrew-only, but the dashboard's Cloud/AI/DevOps
+ * tabs have no real Hebrew coverage to draw from otherwise (this is what made Cloud come back
+ * empty). The operator/AI content pipeline downstream already rewrites source material into Hebrew
+ * posts, so an English headline in the picker is fine.
  */
 export async function fetchNewsList(category: NewsCategory, limit = 40, strict = true): Promise<NewsItem[]> {
-  const url = `${SITE_ORIGIN}/api/news${strict ? '' : '?strict=0'}`;
+  const params = new URLSearchParams({ allowEnglish: '1' });
+  if (!strict) params.set('strict', '0');
+  const url = `${SITE_ORIGIN}/api/news?${params.toString()}`;
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`news feed responded ${res.status}`);
   const data = (await res.json()) as { items?: NewsItem[] };

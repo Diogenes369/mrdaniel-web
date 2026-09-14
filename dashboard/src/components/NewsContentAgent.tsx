@@ -66,7 +66,7 @@ import { getAdminSecret, reportAuthFailure } from '../lib/adminSecret';
 import { resolveArticleText } from '../lib/articleText';
 
 
-const CATEGORIES: NewsCategory[] = ['cyber', 'ai', 'tech', 'all'];
+const CATEGORIES: NewsCategory[] = ['cyber', 'cloud', 'ai', 'devops', 'all'];
 const PLATFORM_ICON: Record<SocialPlatform, typeof Linkedin> = { linkedin: Linkedin, instagram: Instagram };
 
 const TOPIC_LABEL: Record<string, string> = {
@@ -76,11 +76,26 @@ const TOPIC_LABEL: Record<string, string> = {
   general: 'גאדג׳טים / טק',
 };
 
+const RELATIVE_TIME_HE = new Intl.RelativeTimeFormat('he', { numeric: 'auto' });
+
+/** "לפני 15 דקות" style relative label for anything under a week old; falls back to an absolute
+ * Jerusalem-time date/time (the feed runs on UTC ISO timestamps, and the operator is in Israel). */
 function timeLabel(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? ''
-    : d.toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  if (Number.isNaN(d.getTime())) return '';
+  const diffMin = Math.round((d.getTime() - Date.now()) / 60_000);
+  if (Math.abs(diffMin) < 60) return RELATIVE_TIME_HE.format(diffMin, 'minute');
+  const diffHr = Math.round(diffMin / 60);
+  if (Math.abs(diffHr) < 24) return RELATIVE_TIME_HE.format(diffHr, 'hour');
+  const diffDay = Math.round(diffHr / 24);
+  if (Math.abs(diffDay) < 7) return RELATIVE_TIME_HE.format(diffDay, 'day');
+  return d.toLocaleString('he-IL', {
+    timeZone: 'Asia/Jerusalem',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function NewsContentAgent() {

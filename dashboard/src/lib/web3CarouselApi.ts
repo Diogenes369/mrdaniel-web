@@ -368,6 +368,7 @@ function topicHashtags(topic: NewsTopic): string[] {
     ai: ['#בינה_מלאכותית', '#סוכני_AI', '#AI', '#אוטומציה', '#פרודוקטיביות'],
     cyber: ['#סייבר', '#אבטחת_מידע', '#ZeroTrust', '#CyberSecurity', '#הגנת_סייבר'],
     cloud: ['#ענן', '#תשתיות', '#DevOps', '#CloudComputing', '#ארכיטקטורה'],
+    devops: ['#DevOps', '#אוטומציה', '#CI_CD', '#ITOps', '#תשתיות'],
     general: ['#טכנולוגיה', '#חדשנות', '#הייטק', '#Tech', '#דיגיטל'],
   };
   return [...(base[topic] || base.general), '#mrdaniel'];

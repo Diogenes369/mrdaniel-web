@@ -96,6 +96,7 @@ const KICKER: Record<NewsTopic, string> = {
   cyber: 'סייבר ואבטחה',
   ai: 'בינה מלאכותית',
   cloud: 'ענן ותשתיות',
+  devops: 'ניהול מערכות ו-DevOps',
   general: 'טכנולוגיה',
 };
 

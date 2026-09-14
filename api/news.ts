@@ -53,7 +53,11 @@ export default async function handler(req: any, res: any) {
     // Sanitized Hebrew stream by default; `?strict=0` / `?strict=false` opts out to the raw feed.
     const strictRaw = String((req.query?.strict ?? '')).toLowerCase();
     const strict = !(strictRaw === '0' || strictRaw === 'false' || strictRaw === 'no');
-    const data = await getNewsItems({ strict });
+    // Off by default (keeps the public site Hebrew-only) — `?allowEnglish=1` lets the curated
+    // English specialist outlets (AWS/Azure/GCP/OpenAI/…) through, for the dashboard's tabs.
+    const allowEnglishRaw = String((req.query?.allowEnglish ?? '')).toLowerCase();
+    const allowEnglish = allowEnglishRaw === '1' || allowEnglishRaw === 'true';
+    const data = await getNewsItems({ strict, allowEnglish });
     res.status(200).json(data);
   } catch (err) {
     console.error('[api/news] failed to fetch news items:', err);
