@@ -8,7 +8,13 @@ import { useState } from 'react';
  * - `object-cover object-center` by default so subjects/faces stay centred, never edge-cropped.
  * - On load it measures the natural ratio: a portrait / tall image (ratio < ~0.92) switches to
  *   `object-contain` on a `bg-black/40` letterbox instead of cropping the subject out of frame.
+ * - An image that loads but is below 400×300 (a blurry/tiny thumbnail the server-side enrichment
+ *   couldn't upscale) is treated as a load failure — the caller's topic-gradient + watermark shows
+ *   through instead of a visibly stretched-up low-res photo.
  */
+const MIN_W = 400;
+const MIN_H = 300;
+
 export default function NewsImage({ src, className = '' }: { src?: string; className?: string }) {
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>(src ? 'loading' : 'error');
   const [contain, setContain] = useState(false);
@@ -24,6 +30,10 @@ export default function NewsImage({ src, className = '' }: { src?: string; class
       referrerPolicy="no-referrer"
       onLoad={(e) => {
         const el = e.currentTarget;
+        if (el.naturalWidth < MIN_W || el.naturalHeight < MIN_H) {
+          setStatus('error');
+          return;
+        }
         const ratio = el.naturalWidth / Math.max(1, el.naturalHeight);
         setContain(ratio > 0 && ratio < 0.92);
         setStatus('ok');

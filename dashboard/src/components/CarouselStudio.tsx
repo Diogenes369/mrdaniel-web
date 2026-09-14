@@ -28,6 +28,7 @@ import QuickPublishBar from './QuickPublishBar';
 
 const TOPICS: { id: NewsTopic; label: string }[] = [
   { id: 'ai', label: 'AI / בינה מלאכותית' },
+  { id: 'ai_models', label: 'מודלי AI וחידושים' },
   { id: 'cyber', label: 'סייבר ואבטחה' },
   { id: 'cloud', label: 'ענן ותשתיות' },
   { id: 'general', label: 'טכנולוגיה כללית' },

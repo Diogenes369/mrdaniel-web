@@ -27,6 +27,7 @@ const ORIENTATION_FOR_ASPECT: Record<ImageAspect, PhotoOrientation> = { '1:1': '
 export const TOPIC_KICKER: Record<NewsTopic, string> = {
   cyber: 'סייבר ואבטחה',
   ai: 'בינה מלאכותית',
+  ai_models: 'מודלי AI וחידושים',
   cloud: 'ענן ותשתיות',
   devops: 'ניהול מערכות ו-DevOps',
   general: 'טכנולוגיה',

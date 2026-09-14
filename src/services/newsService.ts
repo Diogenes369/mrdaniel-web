@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-export type NewsTopic = 'ai' | 'cyber' | 'cloud' | 'general';
+export type NewsTopic = 'ai' | 'ai_models' | 'cyber' | 'cloud' | 'general';
 
 export interface NewsItem {
   id: string;

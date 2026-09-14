@@ -38,6 +38,7 @@ interface TopicStyle {
 }
 const TOPIC: Record<NewsTopic, TopicStyle> = {
   ai: { glyph: '🤖', accent: '#F0356E', soft: '#FCE7EF' },
+  ai_models: { glyph: '🧠', accent: '#D946EF', soft: '#FBE7FE' },
   cyber: { glyph: '🛡️', accent: '#2F6BFF', soft: '#E4ECFF' },
   cloud: { glyph: '☁️', accent: '#0EA5E9', soft: '#E0F3FC' },
   devops: { glyph: '⚙️', accent: '#F59E0B', soft: '#FEF3D6' },

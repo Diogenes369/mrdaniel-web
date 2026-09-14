@@ -366,6 +366,7 @@ export async function synthesizeStudioDeck(
 function topicHashtags(topic: NewsTopic): string[] {
   const base: Record<NewsTopic, string[]> = {
     ai: ['#בינה_מלאכותית', '#סוכני_AI', '#AI', '#אוטומציה', '#פרודוקטיביות'],
+    ai_models: ['#מודלי_AI', '#LLM', '#GenerativeAI', '#AI', '#MachineLearning'],
     cyber: ['#סייבר', '#אבטחת_מידע', '#ZeroTrust', '#CyberSecurity', '#הגנת_סייבר'],
     cloud: ['#ענן', '#תשתיות', '#DevOps', '#CloudComputing', '#ארכיטקטורה'],
     devops: ['#DevOps', '#אוטומציה', '#CI_CD', '#ITOps', '#תשתיות'],

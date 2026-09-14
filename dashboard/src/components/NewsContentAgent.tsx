@@ -66,13 +66,15 @@ import { getAdminSecret, reportAuthFailure } from '../lib/adminSecret';
 import { resolveArticleText } from '../lib/articleText';
 
 
-const CATEGORIES: NewsCategory[] = ['cyber', 'cloud', 'ai', 'devops', 'all'];
+const CATEGORIES: NewsCategory[] = ['cyber', 'cloud', 'ai', 'ai_models', 'devops', 'all'];
 const PLATFORM_ICON: Record<SocialPlatform, typeof Linkedin> = { linkedin: Linkedin, instagram: Instagram };
 
 const TOPIC_LABEL: Record<string, string> = {
   ai: 'AI',
+  ai_models: 'מודלי AI',
   cyber: 'סייבר',
   cloud: 'ענן / IT',
+  devops: 'DevOps',
   general: 'גאדג׳טים / טק',
 };
 

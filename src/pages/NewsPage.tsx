@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ShieldAlert,
   Sparkles,
+  BrainCircuit,
   Cloud,
   Newspaper,
   type LucideIcon,
@@ -25,6 +26,7 @@ const CATEGORIES: { id: NewsTopic | 'all'; he: string; en: string; icon?: Lucide
   { id: 'all', he: 'הכל', en: 'ALL' },
   { id: 'cyber', he: 'סייבר ואבטחת מידע', en: 'Cyber Security', icon: ShieldAlert },
   { id: 'ai', he: 'בינה מלאכותית ואוטומציה', en: 'AI & Automation', icon: Sparkles },
+  { id: 'ai_models', he: 'מודלי AI וחידושים', en: 'AI Models & LLMs', icon: BrainCircuit },
   { id: 'cloud', he: 'פיתוח ותשתיות', en: 'Full-Stack & Cloud', icon: Cloud },
   { id: 'general', he: 'חדשות שוק', en: 'Tech Market Insights', icon: Newspaper },
 ];

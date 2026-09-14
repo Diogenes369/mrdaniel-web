@@ -2,7 +2,7 @@ import Parser from 'rss-parser';
 import { createHash } from 'node:crypto';
 import { translateForeignItems } from './newsTranslate.js';
 
-export type NewsTopic = 'ai' | 'cyber' | 'cloud' | 'devops' | 'general';
+export type NewsTopic = 'ai' | 'ai_models' | 'cyber' | 'cloud' | 'devops' | 'general';
 
 export interface NewsItem {
   id: string;
@@ -94,10 +94,12 @@ const SOURCES: FeedSource[] = [
   // every refresh cycle, BEFORE the cache is written — this is what feeds the site's and
   // dashboard's Cloud/AI/DevOps tabs real content instead of coming back empty for lack of native
   // Hebrew coverage in those categories.
-  // ── Cyber specialists ──
+  // ── Cyber specialists (high-frequency, multi-times-daily outlets — keeps the cyber tab from
+  //    lagging behind the Hebrew outlets, which publish far less often) ──
   { name: 'Dark Reading', url: 'https://www.darkreading.com/rss.xml', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
   { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
   { name: 'The Hacker News', url: 'https://feeds.feedburner.com/TheHackersNews', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
+  { name: 'SecurityWeek', url: 'https://www.securityweek.com/feed/', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
   { name: 'CISA Advisories', url: 'https://www.cisa.gov/cybersecurity-advisories/all.xml', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
   // ── Cloud & infrastructure ──
   { name: 'AWS News', url: 'https://aws.amazon.com/about-aws/whats-new/recent/feed/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 10, timeoutMs: 9000 },
@@ -108,10 +110,28 @@ const SOURCES: FeedSource[] = [
   { name: 'Google Cloud Blog', url: 'https://cloudblog.withgoogle.com/rss/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 10, timeoutMs: 13000 },
   { name: 'Kubernetes Blog', url: 'https://kubernetes.io/feed.xml', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 8, timeoutMs: 9000 },
   { name: 'CNCF', url: 'https://www.cncf.io/feed/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 8, timeoutMs: 9000 },
-  // ── Artificial intelligence ──
-  { name: 'OpenAI News', url: 'https://openai.com/news/rss.xml', priority: 5, lang: 'en', forceTopic: 'ai', maxItems: 10, timeoutMs: 9000 },
-  { name: 'Hugging Face Blog', url: 'https://huggingface.co/blog/feed.xml', priority: 5, lang: 'en', forceTopic: 'ai', maxItems: 8, timeoutMs: 9000 },
+  // ── Artificial intelligence (broad AI/automation business & product coverage) ──
   { name: 'AI News', url: 'https://www.artificialintelligence-news.com/feed/', priority: 5, lang: 'en', forceTopic: 'ai', maxItems: 8, timeoutMs: 9000 },
+  // ── AI Models & LLMs — dedicated feed for model releases, research and dev tools from the
+  //    frontier labs. Kept separate from the broad `ai` topic above so a reader who wants just
+  //    "what's new in the models themselves" doesn't have to wade through general AI-business news.
+  { name: 'OpenAI News', url: 'https://openai.com/news/rss.xml', priority: 5, lang: 'en', forceTopic: 'ai_models', maxItems: 10, timeoutMs: 9000 },
+  { name: 'Hugging Face Blog', url: 'https://huggingface.co/blog/feed.xml', priority: 5, lang: 'en', forceTopic: 'ai_models', maxItems: 8, timeoutMs: 9000 },
+  { name: 'Google AI Blog', url: 'https://blog.google/innovation-and-ai/technology/ai/rss/', priority: 5, lang: 'en', forceTopic: 'ai_models', maxItems: 8, timeoutMs: 9000 },
+  { name: 'DeepMind Blog', url: 'https://deepmind.google/blog/rss.xml', priority: 5, lang: 'en', forceTopic: 'ai_models', maxItems: 8, timeoutMs: 9000 },
+  // Anthropic and Meta AI don't publish an official RSS feed — a scoped Google News query is the
+  // safety net (same pattern as GNEWS_URL/GNEWS_CYBER_URL below), so the tab still gets their
+  // model/product news instead of coming back empty for lack of a native feed.
+  {
+    name: 'Google News · Anthropic',
+    url: `https://news.google.com/rss/search?q=${encodeURIComponent('(Anthropic OR "Claude AI" OR "Claude Opus" OR "Claude Sonnet") when:7d')}&hl=en-US&gl=US&ceid=US:en`,
+    priority: 6, lang: 'en', forceTopic: 'ai_models', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
+  },
+  {
+    name: 'Google News · Meta AI',
+    url: `https://news.google.com/rss/search?q=${encodeURIComponent('("Meta AI" OR "Llama 4" OR "Llama model") when:7d')}&hl=en-US&gl=US&ceid=US:en`,
+    priority: 6, lang: 'en', forceTopic: 'ai_models', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
+  },
   // ── DevOps & SysAdmin ──
   { name: 'The New Stack', url: 'https://thenewstack.io/feed/', priority: 5, lang: 'en', forceTopic: 'devops', maxItems: 10, timeoutMs: 9000 },
   { name: 'Red Hat Blog', url: 'https://www.redhat.com/en/rss/blog', priority: 5, lang: 'en', forceTopic: 'devops', maxItems: 10, timeoutMs: 9000 },
@@ -390,6 +410,16 @@ const AI_PATTERNS = [
   /openai/i, /\bllm\b/i, /gemini/i, /copilot/i, /anthropic/i, /\bclaude\b/i, /generativ/i,
   /gpt-?\d/i, /agentic/i,
 ];
+// Specific model/LLM/dev-tool releases — a narrower slice of AI_PATTERNS, checked first so a
+// story about an actual model drop (GPT-5, Claude Opus, Llama, a Hugging Face release, a new
+// agent framework) lands in the dedicated `ai_models` tab rather than the broad `ai` one.
+const AI_MODEL_PATTERNS = [
+  /מודל(ים)? (שפה|בינה מלאכותית|AI)/, /סוכן(י)? AI/, /גרסת מודל/, /דגם שפה/,
+  /\bgpt-?\d/i, /\bo\d(-mini|-pro)?\b.*openai/i, /\bclaude\b/i, /\banthropic\b/i, /\bgemini\b/i,
+  /\bllama-?\d?\b/i, /\bmistral\b/i, /\bdeepseek\b/i, /\bllm\b/i, /\bslm\b/i, /hugging.?face/i,
+  /\bdeepmind\b/i, /foundation model/i, /open.?weight model/i, /model weights/i, /fine-?tun(e|ing)/i,
+  /\bagentic\b/i, /ai agent/i, /model release/i, /\bmulti-?modal model\b/i,
+];
 // NOTE: `/ענן/` is a deliberate bare substring match, not `/\bענן\b/` — JavaScript's `\b` is
 // defined only in terms of ASCII `[A-Za-z0-9_]`, so it never recognizes a boundary next to a
 // Hebrew letter. `/\bענן\b/` silently matched nothing, ever (confirmed: `/\bענן\b/.test("מחשוב
@@ -414,6 +444,7 @@ const DEVOPS_PATTERNS = [
 
 function classifyTopic(text: string): NewsTopic {
   if (CYBER_PATTERNS.some((re) => re.test(text))) return 'cyber';
+  if (AI_MODEL_PATTERNS.some((re) => re.test(text))) return 'ai_models';
   if (AI_PATTERNS.some((re) => re.test(text))) return 'ai';
   if (CLOUD_PATTERNS.some((re) => re.test(text))) return 'cloud';
   if (DEVOPS_PATTERNS.some((re) => re.test(text))) return 'devops';
@@ -429,6 +460,23 @@ const GENERIC_CONSUMER_PATTERNS = [
   /\bgaming\b/i, /\bconsole\b/i, /\bsmartphone\b/i, /\blaptop\b/i, /\bwearable\b/i,
   /\bheadphones?\b/i, /\bearbuds?\b/i, /\bdrone\b/i, /\bTV\b/, /\bGPU\b.*\bgaming\b/i,
 ];
+
+// Stock-market / finance noise — banned outright regardless of topic classification, since a
+// story like "מניית NVIDIA זינקה בעקבות AI" would otherwise pass the AI on-topic check. This is a
+// harder gate than ECONOMY_PATTERNS (which only relabels the display category): a match here drops
+// the item entirely from the strict feed.
+// NOTE: bare substrings for the Hebrew terms, deliberately no `\b` — JS regex `\b` is defined only
+// over ASCII `[A-Za-z0-9_]` and never recognizes a boundary next to a Hebrew letter (same pitfall
+// documented on CLOUD_PATTERNS above; `/\bמסחר\b/` would silently match nothing, ever).
+const STOCK_NOISE_PATTERNS = [
+  /מניות/, /מניה/, /שער הדולר/, /שער השקל/, /מסחר/, /בבורסה/, /בורסה/, /תשואות/,
+  /דוחות כספיים/, /דוח כספי/, /רבעון/, /wall street/i, /\binvesting\.com\b/i,
+  /\bstocks?\b/i, /\bnasdaq\b/i, /\bshare price\b/i, /\bearnings report\b/i, /\bmarket cap\b/i,
+];
+
+function isStockNoise(text: string): boolean {
+  return STOCK_NOISE_PATTERNS.some((re) => re.test(text));
+}
 
 const HEBREW_CHAR = /[֐-׿]/;
 // A "title" that is actually a scrape/parse artefact rather than a headline: a bare URL, an
@@ -468,17 +516,25 @@ export function sanitizeAndKeep(item: NewsItem, _opts: { allowEnglish?: boolean 
   if (hebLen < 6) return false; // mostly-Latin string with one stray Hebrew glyph
 
   const text = `${title} ${item.excerpt} ${item.summary} ${item.category}`;
+
+  // 2 · strict relevance — no stock/finance market noise, regardless of any AI/cyber overlap
+  if (isStockNoise(text)) return false;
+
   const onTopic =
     CYBER_PATTERNS.some((re) => re.test(text)) ||
+    AI_MODEL_PATTERNS.some((re) => re.test(text)) ||
     AI_PATTERNS.some((re) => re.test(text)) ||
     CLOUD_PATTERNS.some((re) => re.test(text)) ||
     DEVOPS_PATTERNS.some((re) => re.test(text));
 
-  // 2 · on-topic
+  // 3 · on-topic
   if (GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text)) && !onTopic) return false;
   if (onTopic) return true;
   return classifyTopic(text) !== 'general';
 }
+
+/** @deprecated alias kept for any external caller expecting this exact name (task-requested). */
+export const filterIrrelevantArticles = sanitizeAndKeep;
 
 /** @deprecated kept as an alias so any external caller of the old name still resolves. */
 export const strictTopicKeep = sanitizeAndKeep;
@@ -491,9 +547,10 @@ const ECONOMY_PATTERNS = [
   /\bIPO\b/i, /\bVC\b/, /\bM&A\b/i, /valuation/i, /funding round/i, /\bseed\b/i, /series [a-e]\b/i, /raised \$/i,
 ];
 
-/** Clean Hebrew display tag: סייבר / בינה מלאכותית / ענן ותשתיות / כלכלה / טכנולוגיה. */
+/** Clean Hebrew display tag: סייבר / בינה מלאכותית / מודלי AI וחידושים / ענן ותשתיות / כלכלה / טכנולוגיה. */
 function deriveCategory(topic: NewsTopic, text: string): string {
   if (topic === 'cyber') return 'סייבר';
+  if (topic === 'ai_models') return 'מודלי AI וחידושים';
   if (topic === 'ai') return 'בינה מלאכותית';
   if (topic === 'cloud') return 'ענן ותשתיות';
   if (topic === 'devops') return 'ניהול מערכות ו-DevOps';
@@ -685,7 +742,7 @@ async function refreshAll(): Promise<NewsItem[]> {
   // (see its comment), so whichever finishes last doesn't clobber the other's write. Running these
   // back-to-back instead of together is what pushed a cold-cache refresh past `api/news.ts`'s
   // function timeout (confirmed via a 504 in production before this fix).
-  const [items] = await Promise.all([
+  const [translated] = await Promise.all([
     translateForeignItems(deduped).catch((err) => {
       console.error('[news] translateForeignItems failed, falling back to Hebrew-native items only:', err);
       return deduped.filter((it) => (it.title.match(/[֐-׿]/g) || []).length >= 6);
@@ -694,6 +751,13 @@ async function refreshAll(): Promise<NewsItem[]> {
     // Defense, most Google-News entries) so the Content Agent has a real article photo to render.
     enrichImages(deduped).catch((err) => console.error('[news] enrichImages failed:', err)),
   ]);
+
+  // `translateForeignItems` returns Hebrew-native items first and translated-foreign items
+  // appended after — it does NOT preserve `deduped`'s recency order. Re-sorting here is what
+  // actually keeps the cyber tab fresh: without it, a BleepingComputer/Hacker News item published
+  // minutes ago (foreign, needs translation) always lands after every older native-Hebrew item,
+  // no matter how stale, because it was appended rather than merged back into place.
+  const items = translated.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
   const withImg = items.filter((i) => i.image).length;
   console.info(
