@@ -151,13 +151,17 @@ async function translateChunk(targets: TranslateTarget[]): Promise<Map<string, T
 // A 10-item/900-char-summary chunk measured too slow in production: `Promise.race` was hitting its
 // deadline before ANY chunk resolved (0/90 translated, with no error — the calls just hadn't
 // finished yet, and Vercel freezes the function once the response is sent, so they never got the
-// chance to). Smaller chunks return faster individually; higher concurrency keeps total throughput
-// up despite the smaller batch size.
+// chance to). Even a 5-item chunk measured 13-24s (production log) per call — this translation
+// prompt is just slow on gemini-3.6-flash, not something a timeout tweak fixes. The real lever is
+// concurrency: workers pull the next chunk off a shared cursor as soon as they free up (no
+// wave-sync stalling), so raising CHUNK_CONCURRENCY well above what a naive "chunks / deadline"
+// calculation suggests lets pipelining cover most of MAX_ITEMS_PER_REFRESH inside one deadline.
 const CHUNK_SIZE = 5;
-const CHUNK_CONCURRENCY = 6;
+const CHUNK_CONCURRENCY = 12;
 // Runs CONCURRENTLY with `enrichImages` in refreshAll (newsFeed.ts), not after it — kept well under
-// `api/news.ts`'s 45s function budget alongside the RSS fetch phase that precedes both.
-const OVERALL_DEADLINE_MS = 25_000;
+// `api/news.ts`'s 45s function budget alongside the RSS fetch phase (~13s worst case) that precedes
+// both.
+const OVERALL_DEADLINE_MS = 28_000;
 // Hard cap on how many foreign items get a translation attempt per refresh cycle — the source list
 // can carry 100+ English items before cache warms up; this keeps one refresh bounded. Skipped items
 // are simply dropped this cycle and retried (cache miss) on the next `refreshAll()`.
