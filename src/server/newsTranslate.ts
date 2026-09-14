@@ -120,13 +120,30 @@ async function translateChunk(targets: TranslateTarget[]): Promise<Map<string, T
     'news translation',
   );
 
+  // Diagnostics only — no article text is sensitive, this is public headline data. Kept terse
+  // (one line, not per-item) so it doesn't flood logs once translation is working reliably.
+  let notHebrew = 0;
+  let idMismatch = 0;
+  let tooShort = 0;
+  const knownIds = new Set(targets.map((t) => t.id));
+  let sample: { id: string; title: string } | null = null;
+
   for (const entry of Array.isArray(parsed.items) ? parsed.items : []) {
     const id = String(entry.id ?? '').trim();
     const title = String(entry.title ?? '').replace(/\s+/g, ' ').trim();
     const summary = String(entry.summary ?? '').replace(/\s+/g, ' ').trim();
-    if (!id || title.length < 8 || summary.length < 15) continue;
-    if (!isAlreadyHebrew(title)) continue; // model failed to actually translate — drop, don't pass English through
+    if (!sample && title) sample = { id, title: title.slice(0, 60) };
+    if (!id || !knownIds.has(id)) { idMismatch++; continue; }
+    if (title.length < 8 || summary.length < 15) { tooShort++; continue; }
+    if (!isAlreadyHebrew(title)) { notHebrew++; continue; } // model failed to actually translate — drop, don't pass English through
     out.set(id, { title, summary });
+  }
+  if (out.size === 0 && targets.length > 0) {
+    console.warn(
+      `[news-translate] chunk of ${targets.length} produced 0 usable translations ` +
+        `(notHebrew=${notHebrew} idMismatch=${idMismatch} tooShort=${tooShort} parsedItems=${parsed.items?.length ?? 0}) ` +
+        `sample=${sample ? JSON.stringify(sample) : 'none'}`,
+    );
   }
   return out;
 }
