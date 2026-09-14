@@ -122,14 +122,17 @@ const SOURCES: FeedSource[] = [
   // Anthropic and Meta AI don't publish an official RSS feed — a scoped Google News query is the
   // safety net (same pattern as GNEWS_URL/GNEWS_CYBER_URL below), so the tab still gets their
   // model/product news instead of coming back empty for lack of a native feed.
+  // A bare "Anthropic" query pulled in unrelated stories that merely mention the company (an
+  // office-lease signing, a nearby real-estate listing) — scoped to phrases that only occur in an
+  // actual model/product story.
   {
     name: 'Google News · Anthropic',
-    url: `https://news.google.com/rss/search?q=${encodeURIComponent('(Anthropic OR "Claude AI" OR "Claude Opus" OR "Claude Sonnet") when:7d')}&hl=en-US&gl=US&ceid=US:en`,
+    url: `https://news.google.com/rss/search?q=${encodeURIComponent('("Claude AI" OR "Claude Opus" OR "Claude Sonnet" OR "Claude model" OR "Anthropic model" OR "Anthropic AI") when:7d')}&hl=en-US&gl=US&ceid=US:en`,
     priority: 6, lang: 'en', forceTopic: 'ai_models', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
   },
   {
     name: 'Google News · Meta AI',
-    url: `https://news.google.com/rss/search?q=${encodeURIComponent('("Meta AI" OR "Llama 4" OR "Llama model") when:7d')}&hl=en-US&gl=US&ceid=US:en`,
+    url: `https://news.google.com/rss/search?q=${encodeURIComponent('("Meta AI" OR "Llama 4" OR "Llama model" OR "Meta\'s AI model") when:7d')}&hl=en-US&gl=US&ceid=US:en`,
     priority: 6, lang: 'en', forceTopic: 'ai_models', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
   },
   // ── DevOps & SysAdmin ──
