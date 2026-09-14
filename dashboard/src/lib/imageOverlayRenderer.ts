@@ -83,9 +83,22 @@ function erasePatch(ctx: CanvasRenderingContext2D, rect: Rect, canvasW: number, 
   const eh = Math.min(canvasH - ey, rect.height + padY * 2);
 
   if (hasContainer) {
+    // Every containerColor chip actually seen in source decks (code pills, "Ans:" highlights,
+    // numbered badges, watermark tags) is a stadium/circle shape, never a hard-cornered card — so a
+    // flat fillRect here would visibly square off a shape the original never had. Rounding the fill
+    // to a stadium (radius = half the shorter side) matches a wide pill and a small round badge alike
+    // without needing per-shape corner-radius detection.
+    const radius = Math.min(ew, eh) / 2;
     ctx.save();
     ctx.fillStyle = containerColor;
-    ctx.fillRect(ex, ey, ew, eh);
+    ctx.beginPath();
+    ctx.moveTo(ex + radius, ey);
+    ctx.arcTo(ex + ew, ey, ex + ew, ey + eh, radius);
+    ctx.arcTo(ex + ew, ey + eh, ex, ey + eh, radius);
+    ctx.arcTo(ex, ey + eh, ex, ey, radius);
+    ctx.arcTo(ex, ey, ex + ew, ey, radius);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
     return { x: ex, y: ey, width: ew, height: eh };
   }
@@ -150,11 +163,14 @@ function fontFor(box: ImageOverlayBox, px: number): string {
 
 /** Paints one block's Hebrew translation, autofit-shrunk and wrapped to sit inside the erased rect,
  *  vertically centred, in the original text's own colour. Direction follows the translated text's
- *  own script — a stray Latin command inside a Hebrew block is not force-flipped. */
+ *  own script — a stray Latin command inside a Hebrew block is not force-flipped. A `command_code`
+ *  block is the one exception: it stays strictly LTR even when its bracketed placeholder was
+ *  translated into Hebrew (e.g. "/timeline [נושא]") — bidi-reordering a slash command by script would
+ *  make it unreadable/uncopyable as a literal string. */
 function drawOverlayText(ctx: CanvasRenderingContext2D, box: ImageOverlayBox, original: Rect, erased: Rect) {
   const text = box.translatedText.trim();
   if (!text) return;
-  const rtl = HEBREW_RE.test(text);
+  const rtl = box.boxType !== 'command_code' && HEBREW_RE.test(text);
   const padX = original.width * 0.04;
   const padY = original.height * 0.06;
   const innerW = Math.max(4, Math.min(original.width, erased.width) - padX * 2);
