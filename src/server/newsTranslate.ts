@@ -148,12 +148,16 @@ async function translateChunk(targets: TranslateTarget[]): Promise<Map<string, T
   return out;
 }
 
-const CHUNK_SIZE = 10;
-const CHUNK_CONCURRENCY = 3;
+// A 10-item/900-char-summary chunk measured too slow in production: `Promise.race` was hitting its
+// deadline before ANY chunk resolved (0/90 translated, with no error — the calls just hadn't
+// finished yet, and Vercel freezes the function once the response is sent, so they never got the
+// chance to). Smaller chunks return faster individually; higher concurrency keeps total throughput
+// up despite the smaller batch size.
+const CHUNK_SIZE = 5;
+const CHUNK_CONCURRENCY = 6;
 // Runs CONCURRENTLY with `enrichImages` in refreshAll (newsFeed.ts), not after it — kept well under
-// `api/news.ts`'s 30s (now raised, see vercel.json) function budget alongside the RSS fetch phase
-// that precedes both.
-const OVERALL_DEADLINE_MS = 18_000;
+// `api/news.ts`'s 45s function budget alongside the RSS fetch phase that precedes both.
+const OVERALL_DEADLINE_MS = 25_000;
 // Hard cap on how many foreign items get a translation attempt per refresh cycle — the source list
 // can carry 100+ English items before cache warms up; this keeps one refresh bounded. Skipped items
 // are simply dropped this cycle and retried (cache miss) on the next `refreshAll()`.
@@ -203,15 +207,19 @@ export async function translateForeignItems(items: NewsItem[], excerptMax = 160)
       );
     }
 
-    const deadline = Date.now() + OVERALL_DEADLINE_MS;
+    const startedAt = Date.now();
+    const deadline = startedAt + OVERALL_DEADLINE_MS;
     let cursor = 0;
     let rateLimited = false;
     let translatedCount = 0;
+    let chunksFinished = 0;
     const worker = async () => {
       while (cursor < chunks.length && Date.now() < deadline && !rateLimited) {
         const chunk = chunks[cursor++];
         try {
           const result = await translateChunk(chunk);
+          chunksFinished++;
+          console.info(`[news-translate] chunk done in ${Date.now() - startedAt}ms — ${result.size}/${chunk.length} translated`);
           for (const [id, value] of result) {
             resolved.set(id, value);
             writeCache(id, value);
@@ -232,7 +240,7 @@ export async function translateForeignItems(items: NewsItem[], excerptMax = 160)
       new Promise((r) => setTimeout(r, OVERALL_DEADLINE_MS + 1000)),
     ]);
     console.info(
-      `[news-translate] translated ${translatedCount}/${pending.length} pending items (${resolved.size - translatedCount} from cache)`,
+      `[news-translate] translated ${translatedCount}/${pending.length} pending items via ${chunksFinished}/${chunks.length} chunks in ${Date.now() - startedAt}ms (${resolved.size - translatedCount} from cache)`,
     );
   }
 
