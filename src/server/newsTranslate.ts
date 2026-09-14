@@ -133,7 +133,10 @@ async function translateChunk(targets: TranslateTarget[]): Promise<Map<string, T
 
 const CHUNK_SIZE = 10;
 const CHUNK_CONCURRENCY = 3;
-const OVERALL_DEADLINE_MS = 25_000;
+// Runs CONCURRENTLY with `enrichImages` in refreshAll (newsFeed.ts), not after it — kept well under
+// `api/news.ts`'s 30s (now raised, see vercel.json) function budget alongside the RSS fetch phase
+// that precedes both.
+const OVERALL_DEADLINE_MS = 18_000;
 // Hard cap on how many foreign items get a translation attempt per refresh cycle — the source list
 // can carry 100+ English items before cache warms up; this keeps one refresh bounded. Skipped items
 // are simply dropped this cycle and retried (cache miss) on the next `refreshAll()`.
@@ -216,17 +219,19 @@ export async function translateForeignItems(items: NewsItem[], excerptMax = 160)
     );
   }
 
+  // Mutates each item IN PLACE (rather than spreading into a copy) so that `enrichImages`, which
+  // the caller runs concurrently with this function against the SAME array (see refreshAll in
+  // newsFeed.ts), can safely fill `.image` on these same object references — whichever of the two
+  // async operations finishes last doesn't clobber the other's write.
   const out = [...passthrough];
   for (const item of capped) {
     const hit = resolved.get(cacheKey(item));
     if (!hit) continue; // translation unavailable for this item — dropped, never shown in English
-    out.push({
-      ...item,
-      title: hit.title,
-      summary: hit.summary,
-      excerpt: truncate(hit.summary, excerptMax),
-      lang: undefined,
-    });
+    item.title = hit.title;
+    item.summary = hit.summary;
+    item.excerpt = truncate(hit.summary, excerptMax);
+    item.lang = undefined;
+    out.push(item);
   }
   return out;
 }

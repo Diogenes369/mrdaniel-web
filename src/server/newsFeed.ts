@@ -679,14 +679,21 @@ async function refreshAll(): Promise<NewsItem[]> {
   // into Hebrew BEFORE anything is cached — see newsTranslate.ts. An item that can't be translated
   // this cycle (Gemini unconfigured/rate-limited/bad response) is dropped here, never cached in
   // English, so `sanitizeAndKeep`'s Hebrew gate downstream never has to filter it out later.
-  const items = await translateForeignItems(deduped).catch((err) => {
-    console.error('[news] translateForeignItems failed, falling back to Hebrew-native items only:', err);
-    return deduped.filter((it) => (it.title.match(/[֐-׿]/g) || []).length >= 6);
-  });
-
-  // Scrape og:image for the newest items whose feed carried no inline media (TechTime, Israel
-  // Defense, most Google-News entries) so the Content Agent has a real article photo to render.
-  await enrichImages(items).catch((err) => console.error('[news] enrichImages failed:', err));
+  //
+  // Run CONCURRENTLY with `enrichImages` (og:image scraping), not sequentially after it — both
+  // operate on `deduped`'s object references and `translateForeignItems` mutates items IN PLACE
+  // (see its comment), so whichever finishes last doesn't clobber the other's write. Running these
+  // back-to-back instead of together is what pushed a cold-cache refresh past `api/news.ts`'s
+  // function timeout (confirmed via a 504 in production before this fix).
+  const [items] = await Promise.all([
+    translateForeignItems(deduped).catch((err) => {
+      console.error('[news] translateForeignItems failed, falling back to Hebrew-native items only:', err);
+      return deduped.filter((it) => (it.title.match(/[֐-׿]/g) || []).length >= 6);
+    }),
+    // Scrape og:image for the newest items whose feed carried no inline media (TechTime, Israel
+    // Defense, most Google-News entries) so the Content Agent has a real article photo to render.
+    enrichImages(deduped).catch((err) => console.error('[news] enrichImages failed:', err)),
+  ]);
 
   const withImg = items.filter((i) => i.image).length;
   console.info(
