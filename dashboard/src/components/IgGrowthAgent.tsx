@@ -33,6 +33,7 @@ import {
   type TrendMomentum,
   type TrendRadar,
 } from '../lib/igGrowthTypes';
+import CommentDmPanel from './CommentDmPanel';
 
 const RADAR_KEY = 'ig:radar_v1';
 const REPLIES_KEY = 'ig:replies_v1';
@@ -356,6 +357,9 @@ export default function IgGrowthAgent() {
           </p>
         )}
       </div>
+
+      {/* ───────────── Panel B.5: Comment-to-DM campaigns ───────────── */}
+      <CommentDmPanel />
 
       {/* ───────────── Panel B: Smart Response Assistant ───────────── */}
       <div className="dash-card p-6">
