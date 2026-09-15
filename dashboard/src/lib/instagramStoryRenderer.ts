@@ -17,6 +17,22 @@ import {
   type StoryPayload,
 } from './storySlides';
 import { getAdminSecret } from './adminSecret';
+import {
+  ensureDeckFonts,
+  metricsFor,
+  vintageThemeFor,
+  paintVintagePanel,
+  drawVintagePlaque,
+  drawVintageHeadline,
+  drawParchmentCard,
+  parchmentCardHeight,
+  drawBrandBadge,
+  hexToRgba,
+  FONT_VINTAGE_DISPLAY,
+  FONT_BODY,
+  FONT_MONO,
+  type ParchmentBlock,
+} from './designAssets';
 
 
 /**
@@ -35,6 +51,10 @@ import { getAdminSecret } from './adminSecret';
  */
 
 export type SlideFormat = '9:16' | '4:5' | '1:1';
+
+/** Which look a deck is painted in: the existing dark full-bleed photo treatment, or the vector
+ *  "vintage showcase" preset (plaque + two-tone headline + parchment card, no photo). */
+export type SlidePreset = 'photo' | 'vintage';
 
 interface Dims {
   W: number;
@@ -232,7 +252,126 @@ function safeSlide(raw: unknown, index: number, total: number): StorySlide {
   };
 }
 
-async function renderSlide(raw: StorySlide, photo: HTMLImageElement | null, d: Dims, format: SlideFormat, index = 0, total = 0): Promise<string> {
+/** Sentence-ish split of a body paragraph into two roughly even halves — feeds the two fixed
+ *  question labels the vintage card always shows, mirroring the reference decks' own convention
+ *  of reusing the same two questions on every slide, the answers being the only thing that changes. */
+function splitForQa(text: string): [string, string] {
+  const sentences = text.split(/(?<=[.!?׃…])\s+/).filter(Boolean);
+  if (sentences.length < 2) {
+    const mid = Math.ceil(text.length / 2);
+    const cut = text.indexOf(' ', mid);
+    return cut > 0 ? [text.slice(0, cut).trim(), text.slice(cut).trim()] : [text, ''];
+  }
+  const half = Math.ceil(sentences.length / 2);
+  return [sentences.slice(0, half).join(' ').trim(), sentences.slice(half).join(' ').trim()];
+}
+
+/** The vintage-showcase preset's own painter — a themed panel, a plaque, a big two-tone headline
+ *  and a parchment explainer card. Fully procedural: no photo is ever fetched or drawn. */
+async function renderVintageSlide(raw: StorySlide, d: Dims, index: number, total: number): Promise<string> {
+  const { W, H } = d;
+  const slide = safeSlide(raw, index, total);
+  const theme = vintageThemeFor(index);
+  const m = metricsFor(W);
+  await ensureDeckFonts();
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas 2d context unavailable');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  paintVintagePanel(ctx, W, H, theme);
+  const cx = W / 2;
+  const cardW = W - m.pad * 2;
+
+  // "n / total" — a quiet corner tag, LTR, since it is a counter not prose.
+  ctx.save();
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = `600 ${Math.round(W * 0.022)}px ${FONT_MONO}`;
+  ctx.fillStyle = hexToRgba(theme.headlineInk, 0.55);
+  ctx.fillText(`${index + 1} / ${total}`, m.pad, H * 0.052);
+  ctx.restore();
+
+  if (slide.kind === 'cover') {
+    const plaqueBottom = drawVintagePlaque(ctx, cx, H * 0.09, cardW * 0.86, W, m, slide.kicker || 'טכנולוגיה', theme);
+    let fs = W * 0.088;
+    ctx.font = `400 ${Math.round(fs)}px ${FONT_VINTAGE_DISPLAY}`;
+    const headText = sanitizeHebrewText(slide.headline ?? '');
+    let lines = wrapRtl(ctx, headText, cardW * 0.92);
+    while (lines.length > 3 && fs > W * 0.05) {
+      fs *= 0.9;
+      ctx.font = `400 ${Math.round(fs)}px ${FONT_VINTAGE_DISPLAY}`;
+      lines = wrapRtl(ctx, headText, cardW * 0.92);
+    }
+    const startY = Math.max(plaqueBottom + fs * 1.1, H * 0.42 - ((lines.length - 1) * fs * 1.2) / 2);
+    drawVintageHeadline(ctx, cx, startY, fs, lines, theme);
+  } else if (slide.kind === 'cta') {
+    const plaqueBottom = drawVintagePlaque(ctx, cx, H * 0.08, cardW * 0.7, W, m, 'הצעד הבא', theme);
+    let fs = W * 0.064;
+    ctx.font = `400 ${Math.round(fs)}px ${FONT_VINTAGE_DISPLAY}`;
+    const headText = sanitizeHebrewText(slide.heading ?? '');
+    let lines = wrapRtl(ctx, headText, cardW * 0.9);
+    while (lines.length > 3 && fs > W * 0.04) {
+      fs *= 0.9;
+      ctx.font = `400 ${Math.round(fs)}px ${FONT_VINTAGE_DISPLAY}`;
+      lines = wrapRtl(ctx, headText, cardW * 0.9);
+    }
+    const headlineBottom = drawVintageHeadline(ctx, cx, plaqueBottom + fs * 1.15, fs, lines, theme) + fs * 0.3;
+
+    const bodyText = sanitizeHebrewText(slide.narrativeText || slide.body || '');
+    ctx.font = `400 ${Math.round(W * 0.024)}px ${FONT_BODY}`;
+    const bodyLines = wrapRtl(ctx, bodyText, cardW * 0.84).slice(0, 6);
+    const blocks: ParchmentBlock[] = [{ label: `🔗 ${slide.linkLabel ?? 'mrdaniel.co.il'}`, lines: bodyLines }];
+    const cardY = Math.min(headlineBottom + W * 0.03, H * 0.98 - parchmentCardHeight(W, blocks) - H * 0.1);
+    drawParchmentCard(ctx, m.pad, Math.max(cardY, headlineBottom + W * 0.02), cardW, W, m, blocks, theme);
+  } else {
+    // bullets / insight — a content slide: short lead headline + the two-question parchment card.
+    const plaqueBottom = drawVintagePlaque(ctx, cx, H * 0.075, cardW * 0.6, W, m, slide.kicker || `שקופית ${index + 1}`, theme);
+    const bodyRaw = sanitizeHebrewText((slide.narrativeText || slide.body || (slide.points ?? []).join(' ')).trim());
+    const [firstHalf, secondHalf] = splitForQa(bodyRaw);
+
+    let leadFs = W * 0.052;
+    const leadWords = firstHalf.split(/\s+/).slice(0, 8).join(' ');
+    ctx.font = `400 ${Math.round(leadFs)}px ${FONT_VINTAGE_DISPLAY}`;
+    let leadLines = wrapRtl(ctx, leadWords, cardW * 0.92);
+    while (leadLines.length > 2 && leadFs > W * 0.036) {
+      leadFs *= 0.9;
+      ctx.font = `400 ${Math.round(leadFs)}px ${FONT_VINTAGE_DISPLAY}`;
+      leadLines = wrapRtl(ctx, leadWords, cardW * 0.92);
+    }
+    const headlineBottom = drawVintageHeadline(ctx, cx, plaqueBottom + leadFs * 1.15, leadFs, leadLines, theme);
+
+    ctx.font = `400 ${Math.round(W * 0.024)}px ${FONT_BODY}`;
+    const blocks: ParchmentBlock[] = [
+      { label: 'מה זה אומר?', lines: wrapRtl(ctx, firstHalf || bodyRaw, cardW * 0.84).slice(0, 4) },
+    ];
+    if (secondHalf) blocks.push({ label: 'למה זה חשוב?', lines: wrapRtl(ctx, secondHalf, cardW * 0.84).slice(0, 4) });
+
+    const availH = H * 0.9 - (headlineBottom + W * 0.03);
+    const cardH = parchmentCardHeight(W, blocks);
+    const cardY = headlineBottom + W * 0.03 + Math.max(0, (availH - cardH) / 2);
+    drawParchmentCard(ctx, m.pad, cardY, cardW, W, m, blocks, theme);
+  }
+
+  drawBrandBadge(ctx, cx, H * 0.955, W, m, theme.headlineAccent, { withName: true });
+  return canvas.toDataURL('image/png');
+}
+
+async function renderSlide(
+  raw: StorySlide,
+  photo: HTMLImageElement | null,
+  d: Dims,
+  format: SlideFormat,
+  index = 0,
+  total = 0,
+  preset: SlidePreset = 'photo'
+): Promise<string> {
+  if (preset === 'vintage') return renderVintageSlide(raw, d, index, total);
   const { W, H, PAD } = d;
   const slide = safeSlide(raw, index, total);
   const canvas = document.createElement('canvas');
@@ -393,7 +532,8 @@ async function renderSlide(raw: StorySlide, photo: HTMLImageElement | null, d: D
 export async function renderStorySlides(
   payload: StoryPayload,
   photo: HTMLImageElement | null,
-  format: SlideFormat = '9:16'
+  format: SlideFormat = '9:16',
+  preset: SlidePreset = 'photo'
 ): Promise<{ images: string[]; payload: StoryPayload }> {
   // Defensive: a malformed / empty payload must never throw out of the render path.
   const baseSlides = Array.isArray(payload?.slides) ? payload.slides.filter((s) => s && typeof s === 'object') : [];
@@ -407,7 +547,7 @@ export async function renderStorySlides(
   const slides = safe.slides.length ? safe.slides : base.slides;
   const out: string[] = [];
   for (let i = 0; i < slides.length; i++) {
-    out.push(await renderSlide(slides[i], photo, d, format, i, slides.length));
+    out.push(await renderSlide(slides[i], photo, d, format, i, slides.length, preset));
   }
   return { images: out, payload: safe };
 }
@@ -418,6 +558,8 @@ export interface RenderedDeck {
   payload: StoryPayload;
   images: string[];
   format: SlideFormat;
+  /** Which preset painted these images — needed so a later edit re-renders in the same look. */
+  preset: SlidePreset;
 }
 
 // Session cache of the resolved background per deck+format, so a live text edit re-renders on
@@ -436,16 +578,22 @@ export async function renderSlidesFromSource(
   opts: {
     format?: SlideFormat;
     /** explicit background: an image, `null` for the branded graphic bg, or omit to auto-resolve
-     * (scraped image → topic stock photo → branded graphic). */
+     * (scraped image → topic stock photo → branded graphic). Ignored when `preset` is 'vintage' —
+     * that preset never fetches or draws a photo. */
     photo?: HTMLImageElement | null;
     apiBase?: string;
     adminSecret?: string;
+    /** 'photo' (default) — the existing dark full-bleed treatment; 'vintage' — the procedural
+     *  plaque/headline/parchment-card preset. Skips photo resolution entirely when 'vintage'. */
+    preset?: SlidePreset;
   }
 ): Promise<RenderedDeck> {
   const format = opts.format ?? '9:16';
+  const preset = opts.preset ?? 'photo';
   const apiBase = opts.apiBase ?? SITE_ORIGIN;
   const adminSecret = opts.adminSecret ?? getAdminSecret();
-  const photo = 'photo' in opts ? (opts.photo ?? null) : await resolveBgForSource(src, format);
+  const photo =
+    preset === 'vintage' ? null : 'photo' in opts ? (opts.photo ?? null) : await resolveBgForSource(src, format);
   bgCache.set(bgKey(src.id, format), photo);
 
   let payload: StoryPayload;
@@ -457,15 +605,19 @@ export async function renderSlidesFromSource(
     payload = buildSlides(src, reason);
   }
 
-  const rendered = await renderStorySlides(payload, photo, format);
-  return { payload: rendered.payload, images: rendered.images, format };
+  const rendered = await renderStorySlides(payload, photo, format, preset);
+  return { payload: rendered.payload, images: rendered.images, format, preset };
 }
 
 /**
  * Re-render an already-built deck after its slide text was edited in the AI Slide Editor chat.
  * Reuses the cached background photo for that deck+format (falls back to a fresh resolve).
  */
-export async function rerenderDeck(payload: StoryPayload, format: SlideFormat): Promise<RenderedDeck> {
+export async function rerenderDeck(payload: StoryPayload, format: SlideFormat, preset: SlidePreset = 'photo'): Promise<RenderedDeck> {
+  if (preset === 'vintage') {
+    const rendered = await renderStorySlides(payload, null, format, 'vintage');
+    return { payload: rendered.payload, images: rendered.images, format, preset };
+  }
   const key = bgKey(payload.newsId, format);
   let photo: HTMLImageElement | null;
   if (bgCache.has(key)) {
@@ -487,7 +639,7 @@ export async function rerenderDeck(payload: StoryPayload, format: SlideFormat): 
     bgCache.set(key, photo);
   }
   const rendered = await renderStorySlides(payload, photo, format);
-  return { payload: rendered.payload, images: rendered.images, format };
+  return { payload: rendered.payload, images: rendered.images, format, preset: 'photo' };
 }
 
 /**
@@ -517,9 +669,9 @@ export async function renderStoryForItem(item: NewsItem, format: SlideFormat = '
  */
 export async function renderSlidesForText(
   text: string,
-  opts: { title?: string; topic?: NewsTopic; format?: SlideFormat; imageUrl?: string } = {}
+  opts: { title?: string; topic?: NewsTopic; format?: SlideFormat; imageUrl?: string; preset?: SlidePreset } = {}
 ): Promise<RenderedDeck> {
   const src = textToSlideSource(text, { title: opts.title, topic: opts.topic });
   if (opts.imageUrl) src.imageUrl = opts.imageUrl;
-  return renderSlidesFromSource(src, { format: opts.format ?? '9:16' });
+  return renderSlidesFromSource(src, { format: opts.format ?? '9:16', preset: opts.preset ?? 'photo' });
 }

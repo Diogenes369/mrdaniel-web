@@ -15,7 +15,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import type { NewsTopic } from '../lib/newsAgentTypes';
-import { renderSlidesForText, type SlideFormat, type RenderedDeck } from '../lib/instagramStoryRenderer';
+import { renderSlidesForText, type SlideFormat, type RenderedDeck, type SlidePreset } from '../lib/instagramStoryRenderer';
 import { renderBrandedCard, type CardFormat } from '../lib/brandedCardRenderer';
 import { buildWhatsappPayload, deterministicWhatsappBody, type WhatsappPayload } from '../lib/whatsappPayload';
 import { importUrl, synthesizeChannelPost, parseRawText, stripAuthorNoise } from '../lib/repurposeApi';
@@ -51,6 +51,16 @@ const TARGETS: Target[] = [
   { id: 'whatsapp', label: 'עדכון לקהילת WhatsApp', hint: 'טקסט + נכס ויזואלי ממותג', kind: 'whatsapp' },
 ];
 
+const DESIGN_STYLES: { id: SlidePreset; label: string; hint: string }[] = [
+  { id: 'photo', label: 'תמונה כהה', hint: 'רקע צילום/גרפי כהה — הסגנון הקיים' },
+  { id: 'vintage', label: 'כרטיס וינטג׳ מאויר', hint: 'שלט מקורי + כותרת דו-גונית + כרטיס הסבר על רקע קרם' },
+];
+
+/** Instagram post/reel links — the scraper cannot reach these (Instagram serves an empty JS shell
+ *  to any unauthenticated fetch, confirmed 2026-09-15), so a detected link routes the operator to
+ *  the manual-paste box instead of silently importing nothing, mirroring the LinkedIn-blocked note. */
+const INSTAGRAM_POST_URL = /instagram\.com\/(?:p|reel|tv)\/[A-Za-z0-9_-]+/i;
+
 const PREVIEW_DIMS: Record<SlideFormat, { w: number; h: number }> = {
   '9:16': { w: 288, h: 512 },
   '4:5': { w: 340, h: 425 },
@@ -76,6 +86,7 @@ export default function ContentRepurposer() {
   const [topic, setTopic] = useState<NewsTopic>('ai');
   const [targetId, setTargetId] = useState<string>('reels');
   const [cardFormat, setCardFormat] = useState<CardFormat>('1:1');
+  const [visualPreset, setVisualPreset] = useState<SlidePreset>('photo');
 
   const [importing, setImporting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -103,6 +114,14 @@ export default function ContentRepurposer() {
   };
 
   const runImport = useCallback(async () => {
+    if (INSTAGRAM_POST_URL.test(urlInput)) {
+      setError(null);
+      setNotice(
+        'אינסטגרם חוסם גישה אוטומטית לפוסטים (גם דרך הדפדפן) — אין דרך לחלץ את הכיתוב אוטומטית. עברו ל"הדבקת טקסט" והדביקו את כיתוב הפוסט ידנית.'
+      );
+      setImportMode('text');
+      return;
+    }
     setImporting(true);
     setError(null);
     setNotice(null);
@@ -154,6 +173,7 @@ export default function ContentRepurposer() {
           topic,
           format: target.format ?? '9:16',
           imageUrl: imageUrl || undefined,
+          preset: visualPreset,
         });
         setDeck(d);
       } else {
@@ -193,7 +213,7 @@ export default function ContentRepurposer() {
     } finally {
       setBusy(false);
     }
-  }, [body, title, topic, target, sourceLabel, sourceLink, cardFormat, topicLabel, imageUrl]);
+  }, [body, title, topic, target, sourceLabel, sourceLink, cardFormat, topicLabel, imageUrl, visualPreset]);
 
   const regenCard = useCallback(
     async (fmt: CardFormat) => {
@@ -259,7 +279,7 @@ export default function ContentRepurposer() {
       if (!deck) return;
       setBusy(true);
       try {
-        setDeck(await rerenderDeck(edited, deck.format));
+        setDeck(await rerenderDeck(edited, deck.format, deck.preset));
       } catch (e) {
         setError((e as Error).message || 'הרינדור מחדש נכשל.');
       } finally {
@@ -315,7 +335,7 @@ export default function ContentRepurposer() {
             <input
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="https://www.linkedin.com/posts/…  או קישור לכתבה"
+              placeholder="https://www.linkedin.com/posts/…  או קישור לכתבה (אינסטגרם: הדביקו טקסט ידנית)"
               dir="ltr"
               className="flex-1 min-w-[260px] bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200"
             />
@@ -423,6 +443,27 @@ export default function ContentRepurposer() {
               </button>
             ))}
           </div>
+
+          {target.kind === 'visual' && (
+            <div className="flex items-center gap-2 flex-wrap mb-4">
+              <span className="text-[11px] text-zinc-500 font-mono">סגנון עיצוב:</span>
+              {DESIGN_STYLES.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    setVisualPreset(s.id);
+                    resetOutputs();
+                  }}
+                  title={s.hint}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${
+                    visualPreset === s.id ? 'bg-brand-500 text-black' : 'bg-white/5 text-zinc-400 border border-white/10'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center gap-2 flex-wrap">
             <button

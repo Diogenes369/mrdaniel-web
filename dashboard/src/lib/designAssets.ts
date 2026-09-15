@@ -161,6 +161,17 @@ export const FONT_DISPLAY = "Rubik, Assistant, Heebo, 'Segoe UI', sans-serif";
 export const FONT_BODY = "Assistant, Heebo, Rubik, 'Segoe UI', sans-serif";
 export const FONT_MONO = "'JetBrains Mono', Assistant, Heebo, ui-monospace, monospace";
 
+/**
+ * The vintage-showcase preset's own two faces — see `paintVintagePanel` below.
+ *
+ * Secular One's single heavy weight is what the reference decks' big two-line headline actually
+ * is: a rounded, poster-bold slab with no lighter cut to accidentally fall back to. Karantina is
+ * condensed and all-caps-shaped even in lowercase, which is what makes the plaque's short label
+ * read as a stamped sign rather than as a UI chip at the same size Rubik would need.
+ */
+export const FONT_VINTAGE_DISPLAY = "'Secular One', Rubik, Heebo, 'Segoe UI', sans-serif";
+export const FONT_VINTAGE_PLAQUE = "Karantina, Rubik, Heebo, 'Segoe UI', sans-serif";
+
 export const setDisplay = (ctx: CanvasRenderingContext2D, px: number, w = 800) => {
   ctx.font = `${w} ${Math.round(px)}px ${FONT_DISPLAY}`;
 };
@@ -191,6 +202,10 @@ export async function ensureDeckFonts(): Promise<void> {
     `500 28px ${FONT_MONO}`,
     `700 20px ${FONT_MONO}`,
     `400 22px ${FONT_MONO}`,
+    `400 64px ${FONT_VINTAGE_DISPLAY}`,
+    `400 40px ${FONT_VINTAGE_DISPLAY}`,
+    `700 26px ${FONT_VINTAGE_PLAQUE}`,
+    `400 30px ${FONT_VINTAGE_PLAQUE}`,
   ];
   await Promise.all(
     specs.map(async (spec) => {
@@ -1629,4 +1644,362 @@ export function drawNodeLink(
   ctx.closePath();
   ctx.fill();
   ctx.restore();
+}
+
+// ─── vintage-showcase preset ────────────────────────────────────────────────────────────────
+
+/**
+ * The third look a deck can wear — a vector interpretation of a themed "workshop diorama" carousel
+ * format (vintage plaque naming the slide, a big two-tone headline, a parchment explainer card).
+ *
+ * Deliberately NOT a reproduction of a photoreal AI-illustrated backdrop: every other preset in
+ * this module paints with canvas primitives only, at zero external-image cost, and this one keeps
+ * that contract — a solid themed gradient panel stands in for the diorama, carrying the same
+ * plaque + headline + parchment-card structure the reference decks use.
+ */
+export interface VintageTheme {
+  name: string;
+  bgTop: string;
+  bgBottom: string;
+  plaqueFill: string;
+  plaqueBorder: string;
+  plaqueInk: string;
+  headlineInk: string;
+  headlineAccent: string;
+  cardFill: string;
+  cardInk: string;
+  cardAccent: string;
+  rivet: string;
+}
+
+/** Six themed palettes, one per plaque, cycling by slide index — distinct at thumbnail size the
+ *  same way the reference deck's rooms were (magenta print shop, orange travel room, crimson
+ *  stage, charcoal basement, terracotta workshop, navy jazz club). */
+export const VINTAGE_THEMES: VintageTheme[] = [
+  {
+    name: 'ink',
+    bgTop: '#7C1E49',
+    bgBottom: '#4A1030',
+    plaqueFill: '#F4E4C1',
+    plaqueBorder: '#2F6F66',
+    plaqueInk: '#2B1220',
+    headlineInk: '#FBF3E3',
+    headlineAccent: '#FF6B7A',
+    cardFill: '#FBF3E3',
+    cardInk: '#3A2418',
+    cardAccent: '#B23A54',
+    rivet: '#D9A441',
+  },
+  {
+    name: 'travel',
+    bgTop: '#C1691F',
+    bgBottom: '#7E3D10',
+    plaqueFill: '#F6E7C9',
+    plaqueBorder: '#1F3B4D',
+    plaqueInk: '#2A1B0E',
+    headlineInk: '#FFF8EC',
+    headlineAccent: '#2FA8A0',
+    cardFill: '#FBF3E3',
+    cardInk: '#3A2A16',
+    cardAccent: '#C1691F',
+    rivet: '#F0D9A8',
+  },
+  {
+    name: 'stage',
+    bgTop: '#9C1F27',
+    bgBottom: '#570F16',
+    plaqueFill: '#E9C46A',
+    plaqueBorder: '#5C1015',
+    plaqueInk: '#3A1206',
+    headlineInk: '#FBF3E3',
+    headlineAccent: '#E9C46A',
+    cardFill: '#FBF3E3',
+    cardInk: '#3A2418',
+    cardAccent: '#9C1F27',
+    rivet: '#F1DDA0',
+  },
+  {
+    name: 'basement',
+    bgTop: '#33333C',
+    bgBottom: '#18181D',
+    plaqueFill: '#F0E6D8',
+    plaqueBorder: '#D6409F',
+    plaqueInk: '#241C1F',
+    headlineInk: '#F6F0E8',
+    headlineAccent: '#E64FA8',
+    cardFill: '#F0E6D8',
+    cardInk: '#2A2228',
+    cardAccent: '#D6409F',
+    rivet: '#D6409F',
+  },
+  {
+    name: 'terra',
+    bgTop: '#C9702D',
+    bgBottom: '#8A4A18',
+    plaqueFill: '#FBEFDC',
+    plaqueBorder: '#8A4A18',
+    plaqueInk: '#3D2610',
+    headlineInk: '#FFF6E8',
+    headlineAccent: '#3A2A18',
+    cardFill: '#FBF3E3',
+    cardInk: '#3D2610',
+    cardAccent: '#C9702D',
+    rivet: '#EAB877',
+  },
+  {
+    name: 'jazz',
+    bgTop: '#15243C',
+    bgBottom: '#0A1420',
+    plaqueFill: '#F3E4C6',
+    plaqueBorder: '#D6A85A',
+    plaqueInk: '#241A08',
+    headlineInk: '#F6EFDD',
+    headlineAccent: '#D6A85A',
+    cardFill: '#F3E4C6',
+    cardInk: '#2A2010',
+    cardAccent: '#15243C',
+    rivet: '#D6A85A',
+  },
+];
+
+/** Picks a theme deterministically off the slide index, so a deck's slides visibly differ without
+ *  ever moving between the carousel PNG and the reel frames drawn from the same index. */
+export function vintageThemeFor(seed: number): VintageTheme {
+  return VINTAGE_THEMES[((seed % VINTAGE_THEMES.length) + VINTAGE_THEMES.length) % VINTAGE_THEMES.length];
+}
+
+/**
+ * The themed panel backdrop: a diagonal gradient in the slide's theme, a faint top/bottom trim
+ * bar (the "molding" every reference room shares), two chevron nav marks mid-height (the carousel
+ * affordance baked into the reference photos themselves) and a muted worktable band along the
+ * bottom edge — the one motif every themed room in the reference shared regardless of its colour.
+ */
+export function paintVintagePanel(ctx: CanvasRenderingContext2D, W: number, H: number, theme: VintageTheme) {
+  const g = ctx.createLinearGradient(0, 0, W * 0.25, H);
+  g.addColorStop(0, theme.bgTop);
+  g.addColorStop(1, theme.bgBottom);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // Trim bars.
+  const trim = Math.max(4, H * 0.008);
+  ctx.fillStyle = hexToRgba(theme.plaqueFill, 0.5);
+  ctx.fillRect(0, 0, W, trim);
+  ctx.fillRect(0, H - trim, W, trim);
+
+  // Chevron nav marks — small stroked carets, mid-height, faint.
+  const chevY = H * 0.5;
+  const chevSize = W * 0.028;
+  for (const [cx, dir] of [[W * 0.055, -1] as const, [W * 0.945, 1] as const]) {
+    ctx.save();
+    ctx.strokeStyle = hexToRgba(theme.plaqueFill, 0.35);
+    ctx.lineWidth = Math.max(2, W * 0.0055);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx + dir * chevSize * 0.4, chevY - chevSize);
+    ctx.lineTo(cx - dir * chevSize * 0.4, chevY);
+    ctx.lineTo(cx + dir * chevSize * 0.4, chevY + chevSize);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Worktable band — the unifying motif, muted so it never competes with slide content.
+  const tableH = H * 0.1;
+  const ty = H - tableH;
+  const tg = ctx.createLinearGradient(0, ty, 0, H);
+  tg.addColorStop(0, 'rgba(20,24,20,0)');
+  tg.addColorStop(1, 'rgba(12,16,12,0.42)');
+  ctx.fillStyle = tg;
+  ctx.fillRect(0, ty, W, tableH);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let x = W * 0.06; x < W; x += W * 0.06) {
+    ctx.beginPath();
+    ctx.moveTo(x, ty + tableH * 0.3);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Corner vignette so the plaque/headline column stays the brightest thing on the slide.
+  const vig = ctx.createRadialGradient(W / 2, H * 0.38, W * 0.3, W / 2, H * 0.5, W * 0.9);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.28)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/**
+ * The vintage plaque: a rounded, bolted sign carrying one short label, centred at `cx`.
+ *
+ * The four rivets are what read as "stamped metal sign" rather than "rounded chip" at a glance —
+ * the same visual shorthand the reference decks' plaques use. Returns the y just below the plaque.
+ */
+export function drawVintagePlaque(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  y: number,
+  w: number,
+  W: number,
+  m: Metrics,
+  label: string,
+  theme: VintageTheme
+): number {
+  const fs = W * 0.03;
+  ctx.save();
+  ctx.direction = 'rtl';
+  ctx.font = `700 ${Math.round(fs)}px ${FONT_VINTAGE_PLAQUE}`;
+  const textW = ctx.measureText(label).width;
+  const padX = fs * 1.1;
+  const boxW = Math.min(w, textW + padX * 2);
+  const boxH = fs * 1.9;
+  const x = cx - boxW / 2;
+  const r = boxH * 0.28;
+
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = W * 0.02;
+  ctx.shadowOffsetY = W * 0.008;
+  roundRectPath(ctx, x, y, boxW, boxH, r);
+  ctx.fillStyle = theme.plaqueFill;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  roundRectPath(ctx, x, y, boxW, boxH, r);
+  ctx.strokeStyle = theme.plaqueBorder;
+  ctx.lineWidth = Math.max(1.5, W * 0.0032);
+  ctx.stroke();
+
+  // Rivets, inset from each corner.
+  const rv = Math.max(2, W * 0.0055);
+  const inset = boxH * 0.24;
+  ctx.fillStyle = theme.rivet;
+  for (const [rx, ry] of [
+    [x + inset, y + inset],
+    [x + boxW - inset, y + inset],
+    [x + inset, y + boxH - inset],
+    [x + boxW - inset, y + boxH - inset],
+  ]) {
+    ctx.beginPath();
+    ctx.arc(rx, ry, rv, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = theme.plaqueInk;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, cx, y + boxH / 2 + fs * 0.04);
+  ctx.restore();
+
+  return y + boxH;
+}
+
+/**
+ * The big two-line (occasionally three) headline, centred like the reference decks — the last
+ * line carries the accent colour, every line above it the ink colour, which is the two-tone
+ * effect the reference plaques use without requiring the caller to pre-split the copy semantically.
+ * `lines` must already be wrapped (see `wrapRtl` in newsImageComposer.ts) and capped to ≤3.
+ */
+export function drawVintageHeadline(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  y: number,
+  fs: number,
+  lines: string[],
+  theme: VintageTheme
+): number {
+  ctx.save();
+  ctx.direction = 'rtl';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `400 ${Math.round(fs)}px ${FONT_VINTAGE_DISPLAY}`;
+  const lh = fs * 1.2;
+  let cy = y;
+  lines.forEach((line, i) => {
+    ctx.fillStyle = i === lines.length - 1 ? theme.headlineAccent : theme.headlineInk;
+    ctx.fillText(line, cx, cy);
+    cy += lh;
+  });
+  ctx.restore();
+  return cy - lh;
+}
+
+/** One question/answer (or label/body) block inside a parchment card. */
+export interface ParchmentBlock {
+  label: string;
+  lines: string[];
+}
+
+function parchmentMetrics(W: number) {
+  return { pad: W * 0.042, labelFs: W * 0.026, bodyFs: W * 0.024, bodyLh: W * 0.0335, blockGap: W * 0.026 };
+}
+
+/** The parchment card's own height for the given (already-wrapped) blocks — call before drawing
+ *  to reserve space, mirroring `installBoxHeight`'s contract. */
+export function parchmentCardHeight(W: number, blocks: ParchmentBlock[]): number {
+  const pm = parchmentMetrics(W);
+  let h = pm.pad * 2;
+  blocks.forEach((b, i) => {
+    h += pm.labelFs * 1.3 + b.lines.length * pm.bodyLh;
+    if (i < blocks.length - 1) h += pm.blockGap;
+  });
+  return h;
+}
+
+/**
+ * The parchment explainer card — the vector counterpart of the reference decks' cream Q&A box.
+ * Each block prints a bold accent-coloured question/label line, then its wrapped answer lines in
+ * the card's ink colour. Returns the y just below the card.
+ */
+export function drawParchmentCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  W: number,
+  m: Metrics,
+  blocks: ParchmentBlock[],
+  theme: VintageTheme
+): number {
+  const pm = parchmentMetrics(W);
+  const h = parchmentCardHeight(W, blocks);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.22)';
+  ctx.shadowBlur = W * 0.028;
+  ctx.shadowOffsetY = W * 0.007;
+  roundRectPath(ctx, x, y, w, h, m.radiusLg);
+  ctx.fillStyle = theme.cardFill;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  roundRectPath(ctx, x, y, w, h, m.radiusLg);
+  ctx.strokeStyle = hexToRgba(theme.cardAccent, 0.25);
+  ctx.lineWidth = m.hair;
+  ctx.stroke();
+
+  ctx.direction = 'rtl';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  let cy = y + pm.pad + pm.labelFs;
+  const rightX = x + w - pm.pad;
+  blocks.forEach((b, i) => {
+    ctx.font = `700 ${Math.round(pm.labelFs)}px ${FONT_BODY}`;
+    ctx.fillStyle = theme.cardAccent;
+    ctx.fillText(b.label, rightX, cy);
+    cy += pm.labelFs * 1.3;
+    ctx.font = `400 ${Math.round(pm.bodyFs)}px ${FONT_BODY}`;
+    ctx.fillStyle = theme.cardInk;
+    for (const line of b.lines) {
+      ctx.fillText(line, rightX, cy);
+      cy += pm.bodyLh;
+    }
+    if (i < blocks.length - 1) cy += pm.blockGap;
+  });
+  ctx.restore();
+
+  return y + h;
 }
