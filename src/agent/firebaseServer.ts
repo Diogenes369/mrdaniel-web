@@ -50,6 +50,39 @@ export async function pushQueueItem(item: Record<string, unknown>): Promise<stri
   }
 }
 
+/** Raw shape of one `comment_dm_campaigns/<id>` row — see dashboard/src/lib/useCommentDmManager.ts,
+ *  the source of truth for the fields a campaign can carry. Not access-controlled (same rules as
+ *  `agent_queue`), so this reads with the plain client like pushQueueItem above, not privilegedDb(). */
+export interface CommentDmCampaignRow {
+  id: string;
+  label?: string;
+  keyword?: string;
+  guideSlug?: string;
+  active?: boolean;
+  pageTitle?: string;
+  pageSubtitle?: string;
+  fileUrl?: string;
+  previewImageUrl?: string;
+  createdAt?: number;
+}
+
+/** Every `comment_dm_campaigns` row, for the public download route to resolve a guideSlug against.
+ *  The collection is small (authored by hand in the dashboard), so reading it whole beats adding an
+ *  `.indexOn` rule just to query by guideSlug. */
+export async function readCommentDmCampaigns(): Promise<CommentDmCampaignRow[]> {
+  const db = getServerDb();
+  if (!db) return [];
+  try {
+    const snap = await get(ref(db, 'comment_dm_campaigns'));
+    const raw = snap.val();
+    if (!raw || typeof raw !== 'object') return [];
+    return Object.entries(raw as Record<string, Omit<CommentDmCampaignRow, 'id'>>).map(([id, c]) => ({ id, ...c }));
+  } catch (err) {
+    console.error('[comment-dm] failed to read comment_dm_campaigns:', err);
+    return [];
+  }
+}
+
 export async function readAgentMode(): Promise<string | null> {
   const db = getServerDb();
   if (!db) return null;

@@ -173,6 +173,70 @@ export const STATIC_GUIDES: StaticGuide[] = [
   },
 ];
 
+/**
+ * A campaign-backed guide: content authored directly on a `comment_dm_campaigns` row in the
+ * dashboard (CommentDmPanel) rather than committed to this file. This is the zero-deploy path — a
+ * campaign with `guideSlug` + `fileUrl` set is servable at `/g/<guideSlug>` the moment it is saved,
+ * same contract as a STATIC_GUIDES entry but read from Firebase per request instead of from code.
+ */
+export interface CampaignGuide {
+  slug: string;
+  campaignId: string;
+  title: string;
+  subtitle: string;
+  /** The resource itself — PDF, video, Notion link, whatever was pasted into the dashboard. Any
+   *  http(s) URL; unlike a static guide's `file` it is not confined to `/guides/`. */
+  fileUrl: string;
+  previewImageUrl: string;
+  createdAt: number | null;
+}
+
+const HTTP_URL_RE = /^https:\/\/[^\s]+$/i;
+
+/**
+ * The campaign whose `guideSlug` matches, if it carries inline page content. A campaign that only
+ * references a STATIC_GUIDES slug (the original Comment-to-DM design) has no `fileUrl` and is
+ * correctly ignored here — that guide is still served from the registry above.
+ */
+export function findCampaignGuide(rows: { id: string; guideSlug?: string; active?: boolean; pageTitle?: string; pageSubtitle?: string; fileUrl?: string; previewImageUrl?: string; createdAt?: number }[], slug: string): CampaignGuide | null {
+  const key = slug.trim().toLowerCase();
+  const row = rows.find((r) => r.active !== false && (r.guideSlug ?? '').trim().toLowerCase() === key);
+  if (!row) return null;
+  const fileUrl = (row.fileUrl ?? '').trim();
+  if (!HTTP_URL_RE.test(fileUrl)) return null;
+  const previewImageUrl = (row.previewImageUrl ?? '').trim();
+  return {
+    slug: key,
+    campaignId: row.id,
+    title: (row.pageTitle ?? '').trim(),
+    subtitle: (row.pageSubtitle ?? '').trim(),
+    fileUrl,
+    previewImageUrl: HTTP_URL_RE.test(previewImageUrl) ? previewImageUrl : '',
+    createdAt: row.createdAt ?? null,
+  };
+}
+
+/** The `/api/download/<slug>?meta=1` body for a campaign guide — same shape staticGuideMeta answers,
+ *  so GuideDownloadPage needs no branch for it. `expiresAt` is always null, same as a static guide. */
+export function campaignGuideMeta(g: CampaignGuide) {
+  return {
+    ok: true,
+    kind: 'static' as const,
+    guideId: g.slug,
+    title: g.title || 'המדריך מוכן להורדה',
+    subtitle: g.subtitle,
+    slides: 0,
+    pages: null,
+    hasPdf: true,
+    topics: [],
+    sections: [],
+    createdAt: g.createdAt,
+    expiresAt: null,
+    coverUrl: g.previewImageUrl || null,
+    downloadUrl: g.fileUrl,
+  };
+}
+
 /** Slug shape. Mirrored in src/pages/GuideDownloadPage.tsx — keep the two identical. */
 export const GUIDE_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 const BRIDGE_ID_RE = /^[a-f0-9]{32}$/;

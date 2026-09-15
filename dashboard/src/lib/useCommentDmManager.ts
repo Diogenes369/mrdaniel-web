@@ -16,7 +16,20 @@ export interface CommentDmCampaign {
   guideSlug: string;
   postUrl: string;
   publicReplyTemplate: string;
+  /** First DM — soft, no hard wall: a welcome message with one button ("קבלת המדריך"). Its button
+   *  routes into ManyChat's own "Is Following @mrdaniel.co.il?" condition, not into a template here. */
   dmTemplate: string;
+  /** Second DM — sent only when the condition above answers false. Polite, asks for the follow and
+   *  offers a retry button that re-runs the same condition. */
+  followUpTemplate: string;
+  /** Dynamic landing-page content, read live from this row by /api/download (see
+   *  src/server/leadMagnets.ts findCampaignGuide) — filling `fileUrl` makes `/g/<guideSlug>` serve
+   *  straight from Firebase with no deploy, instead of needing a STATIC_GUIDES entry. */
+  pageTitle: string;
+  pageSubtitle: string;
+  /** The resource itself: PDF / video / Notion link. Any https:// URL. */
+  fileUrl: string;
+  previewImageUrl: string;
   active: boolean;
   createdAt: number;
   updatedAt: number;
@@ -25,7 +38,9 @@ export interface CommentDmCampaign {
 export type CommentDmCampaignDraft = Omit<CommentDmCampaign, 'id' | 'createdAt' | 'updatedAt'>;
 
 const DEFAULT_PUBLIC_REPLY = 'שלחתי לך 📩 תבדוק/י DM!';
-const DEFAULT_DM_TEMPLATE = 'היי {{first_name}} 👋\nהנה המדריך שביקשת: {{guide_link}}\n\nאם יש שאלות — אני כאן.';
+const DEFAULT_DM_TEMPLATE = 'היי {{first_name}} 👋\nהנה המדריך שביקשת — לחצו למטה לקבלה 👇';
+const DEFAULT_FOLLOWUP_TEMPLATE =
+  "כדי לקבל את הגישה למדריך, לחץ על 'עקוב' בחשבון @mrdaniel.co.il וגלול שוב לקישור!";
 
 export const NEW_CAMPAIGN_DRAFT: CommentDmCampaignDraft = {
   label: '',
@@ -34,6 +49,11 @@ export const NEW_CAMPAIGN_DRAFT: CommentDmCampaignDraft = {
   postUrl: '',
   publicReplyTemplate: DEFAULT_PUBLIC_REPLY,
   dmTemplate: DEFAULT_DM_TEMPLATE,
+  followUpTemplate: DEFAULT_FOLLOWUP_TEMPLATE,
+  pageTitle: '',
+  pageSubtitle: '',
+  fileUrl: '',
+  previewImageUrl: '',
   active: true,
 };
 
@@ -65,6 +85,11 @@ function toCampaigns(raw: unknown): CommentDmCampaign[] {
       postUrl: c.postUrl ?? '',
       publicReplyTemplate: c.publicReplyTemplate ?? DEFAULT_PUBLIC_REPLY,
       dmTemplate: c.dmTemplate ?? DEFAULT_DM_TEMPLATE,
+      followUpTemplate: c.followUpTemplate ?? DEFAULT_FOLLOWUP_TEMPLATE,
+      pageTitle: c.pageTitle ?? '',
+      pageSubtitle: c.pageSubtitle ?? '',
+      fileUrl: c.fileUrl ?? '',
+      previewImageUrl: c.previewImageUrl ?? '',
       active: c.active !== false,
       createdAt: c.createdAt ?? 0,
       updatedAt: c.updatedAt ?? 0,

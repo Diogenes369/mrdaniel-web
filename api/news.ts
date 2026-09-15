@@ -1,5 +1,9 @@
 import { getNewsItems } from '../src/server/newsFeed.js';
-import { findStaticGuide, staticGuideMeta, GUIDE_SLUG_RE, type StaticGuide } from '../src/server/leadMagnets.js';
+import {
+  findStaticGuide, staticGuideMeta, GUIDE_SLUG_RE, type StaticGuide,
+  findCampaignGuide, campaignGuideMeta,
+} from '../src/server/leadMagnets.js';
+import { readCommentDmCampaigns } from '../src/agent/firebaseServer.js';
 
 // Vercel Serverless Function. Written as `.ts` (not `.js`) deliberately: Vercel's Node builder
 // only bundles a function's dependency graph when the entry file itself is TypeScript — a plain
@@ -158,8 +162,17 @@ async function handleDownload(req: any, res: any) {
   }
 
   if (!/^[a-f0-9]{32}$/.test(guideId)) {
-    // Slug-shaped but not in the registry is an unknown guide; anything else is malformed.
+    // Not a registry slug and not bridge-id-shaped: try a dashboard-authored campaign before giving
+    // up. This is the zero-deploy guide path — see findCampaignGuide in leadMagnets.ts.
     const slugShaped = GUIDE_SLUG_RE.test(guideId);
+    if (slugShaped) {
+      const campaigns = await readCommentDmCampaigns();
+      const campaignGuide = findCampaignGuide(campaigns, guideId);
+      if (campaignGuide) {
+        handleCampaignGuide(req, res, campaignGuide);
+        return;
+      }
+    }
     res.status(slugShaped ? 404 : 400).json({ ok: false, error: slugShaped ? 'guide not found' : 'malformed guide id' });
     return;
   }
@@ -258,6 +271,25 @@ async function handleDownload(req: any, res: any) {
     console.error('[api/news?action=download] bridge unreachable:', err);
     res.status(503).json({ ok: false, error: 'download service is temporarily unavailable' });
   }
+}
+
+/**
+ * A campaign guide (dashboard/src/components/CommentDmPanel.tsx → `comment_dm_campaigns`): content
+ * lives in Firebase, not code, so — unlike handleStaticGuide — this is NOT edge-cached; a save in
+ * the dashboard must be visible on the next request, not up to `s-maxage` later.
+ */
+function handleCampaignGuide(req: any, res: any, guide: import('../src/server/leadMagnets.js').CampaignGuide) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (String(req.query?.meta || '') === '1') {
+    res.status(200).json(campaignGuideMeta(guide));
+    return;
+  }
+  if (String(req.query?.variant || '').toLowerCase() === 'slide') {
+    res.status(404).json({ ok: false, error: 'this guide has no slide previews' });
+    return;
+  }
+  res.status(302).setHeader('Location', guide.fileUrl);
+  res.end();
 }
 
 /**

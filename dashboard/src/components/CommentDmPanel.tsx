@@ -11,6 +11,8 @@ import {
   Tag,
   Users,
   X,
+  UserCheck,
+  Globe,
 } from 'lucide-react';
 import {
   useCommentDmManager,
@@ -67,7 +69,7 @@ function CampaignEditor({
 }) {
   const [draft, setDraft] = useState<CommentDmCampaignDraft>(initial);
   const patch = (p: Partial<CommentDmCampaignDraft>) => setDraft((d) => ({ ...d, ...p }));
-  const insertTag = (field: 'dmTemplate' | 'publicReplyTemplate', tag: string) =>
+  const insertTag = (field: 'dmTemplate' | 'publicReplyTemplate' | 'followUpTemplate', tag: string) =>
     patch({ [field]: `${draft[field]}${draft[field] && !draft[field].endsWith('\n') ? ' ' : ''}${tag}` } as Partial<CommentDmCampaignDraft>);
 
   const canSave = draft.label.trim() && draft.keyword.trim();
@@ -133,7 +135,9 @@ function CampaignEditor({
 
       <div>
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-          <label className="text-[11px] text-zinc-500 font-mono uppercase tracking-wider">תבנית DM</label>
+          <label className="text-[11px] text-zinc-500 font-mono uppercase tracking-wider">
+            DM ראשון — רך, בלי חומה (כפתור "קבלת המדריך")
+          </label>
           <div className="flex items-center gap-1.5 flex-wrap">
             {DM_MERGE_TAGS.map((tag) => (
               <button
@@ -152,12 +156,87 @@ function CampaignEditor({
           value={draft.dmTemplate}
           onChange={(e) => patch({ dmTemplate: e.target.value })}
           dir="rtl"
-          rows={5}
+          rows={4}
           className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 leading-relaxed resize-y"
         />
         <p className="text-[10px] text-zinc-600 mt-1">
-          תגי המיזוג נפתרים בפועל ע"י ManyChat כשההודעה נשלחת — הדביקו את הטקסט בבונה הפלואו שם.
+          תגי המיזוג נפתרים בפועל ע"י ManyChat כשההודעה נשלחת — הדביקו את הטקסט בבונה הפלואו שם. הכפתור עצמו מוגדר
+          ב-ManyChat ומוביל לבדיקת התנאי "Is Following @mrdaniel.co.il?" — לא לקישור ישירות.
         </p>
+      </div>
+
+      <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.04] p-3">
+        <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+          <label className="flex items-center gap-1.5 text-[11px] text-amber-300/90 font-mono uppercase tracking-wider">
+            <UserCheck className="w-3 h-3" /> DM שני — רק אם "Is Following" = False
+          </label>
+          <CopyChip text={draft.followUpTemplate} label="העתק" />
+        </div>
+        <textarea
+          value={draft.followUpTemplate}
+          onChange={(e) => patch({ followUpTemplate: e.target.value })}
+          dir="rtl"
+          rows={2}
+          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 leading-relaxed resize-y"
+        />
+        <p className="text-[10px] text-zinc-600 mt-1">
+          כפתור ההודעה הזו ("לחץ לאימות ומעקב") חוזר לאותו תנאי Is Following ב-ManyChat — לולאת אימות, לא חומה קשה.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Globe className="w-3 h-3 text-zinc-500" />
+          <label className="text-[11px] text-zinc-500 font-mono uppercase tracking-wider">
+            תוכן דף הנחיתה — דינמי, בלי דיפלוי
+          </label>
+        </div>
+        <p className="text-[10px] text-zinc-600 mb-2.5 leading-relaxed">
+          אם ממלאים כאן קובץ — הדף <code dir="ltr" className="text-zinc-400">/g/{draft.guideSlug || '<slug>'}</code> יוצג
+          ישירות מהשורה הזו ב-Firebase, בלי להוסיף רשומה בקוד ובלי דיפלוי. עריכה כאן מתעדכנת בדף מיד.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] text-zinc-600 mb-1 block">כותרת הדף</label>
+            <input
+              value={draft.pageTitle}
+              onChange={(e) => patch({ pageTitle: e.target.value })}
+              dir="rtl"
+              placeholder="שם המדריך כפי שיוצג בדף"
+              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-zinc-600 mb-1 block">תת-כותרת</label>
+            <input
+              value={draft.pageSubtitle}
+              onChange={(e) => patch({ pageSubtitle: e.target.value })}
+              dir="rtl"
+              placeholder="שורה אחת מתחת לכותרת"
+              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-zinc-600 mb-1 block">קובץ (PDF / וידאו / Notion)</label>
+            <input
+              value={draft.fileUrl}
+              onChange={(e) => patch({ fileUrl: e.target.value })}
+              dir="ltr"
+              placeholder="https://…"
+              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-zinc-600 mb-1 block">תמונת תצוגה מקדימה (אופציונלי)</label>
+            <input
+              value={draft.previewImageUrl}
+              onChange={(e) => patch({ previewImageUrl: e.target.value })}
+              dir="ltr"
+              placeholder="https://…"
+              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 font-mono"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center justify-between pt-1">
@@ -208,7 +287,19 @@ function CampaignRow({
             </span>
           </div>
           <div className="flex items-center gap-3 mt-1.5 text-[11px] text-zinc-500 flex-wrap">
-            {campaign.guideSlug && <span dir="ltr" className="font-mono">/g/{campaign.guideSlug}</span>}
+            {campaign.guideSlug && (
+              <span dir="ltr" className="font-mono inline-flex items-center gap-1">
+                /g/{campaign.guideSlug}
+                {campaign.fileUrl && (
+                  <span
+                    title="דף נחיתה דינמי — נטען חי מה-Firebase, בלי דיפלוי"
+                    className="px-1.5 py-0.5 rounded bg-brand-500/10 border border-brand-500/30 text-brand-300 text-[9px] not-italic"
+                  >
+                    Firebase
+                  </span>
+                )}
+              </span>
+            )}
             {campaign.postUrl && (
               <a href={campaign.postUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-200">
                 <Link2 className="w-3 h-3" /> פוסט
@@ -260,9 +351,12 @@ export default function CommentDmPanel() {
       </div>
 
       <p className="text-xs text-zinc-500 leading-relaxed mb-4">
-        האוטומציה בפועל (זיהוי קומנט, תגובה ציבורית ושליחת ה-DM) רצה ב-ManyChat. הפאנל הזה הוא מקור האמת לקמפיינים — מילת טריגר, המדריך
-        שמשויך אליה, ותבניות הטקסט — כדי להדביק ישירות בבונה הפלואו של ManyChat, ולראות כמה לידים כל קמפיין הביא (מתוך{' '}
-        <code dir="ltr" className="text-zinc-400">/api/leads</code> שה-Webhook כבר כותב אליו).
+        האוטומציה בפועל (זיהוי קומנט, תגובה ציבורית ושליחת ה-DM) רצה ב-ManyChat, בזרימה רכה דו-שלבית: DM ראשון עם כפתור
+        (בלי חומה) → לחיצה מפעילה תנאי <code dir="ltr" className="text-zinc-400">Is Following @mrdaniel.co.il?</code> ב-ManyChat
+        → אם כן, שולחים מיד את קישור דף הנחיתה; אם לא, DM שני מנומס עם כפתור שחוזר לאותו תנאי. הפאנל הזה הוא מקור האמת
+        לקמפיינים — מילת טריגר, המדריך שמשויך אליה, ותבניות הטקסט לשני ה-DM — כדי להדביק ישירות בבונה הפלואו של ManyChat,
+        ולראות כמה לידים כל קמפיין הביא (מתוך <code dir="ltr" className="text-zinc-400">/api/leads</code> שה-Webhook כבר כותב
+        אליו).
       </p>
 
       {creating && (

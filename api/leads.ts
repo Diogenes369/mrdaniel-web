@@ -9,9 +9,10 @@ import {
   recordEmailCampaign,
   upsertManychatLead,
   pushSiteLead,
+  readCommentDmCampaigns,
 } from '../src/agent/firebaseServer.js';
 import { sendOne, sendCampaign, welcomeEmailHtml, wrapBrandedEmail, isEmailConfigured } from '../src/server/emailEngine.js';
-import { findStaticGuide } from '../src/server/leadMagnets.js';
+import { findStaticGuide, findCampaignGuide } from '../src/server/leadMagnets.js';
 
 // Vercel Serverless Function — the site's lead endpoint AND the email engine (folded in here
 // rather than a new `/api/send-email` because Vercel Hobby caps a deployment at 12 functions).
@@ -337,8 +338,9 @@ function mcField(v: unknown, max: number): string {
   return /^\{\{.*\}\}$/.test(s) ? '' : s.slice(0, max);
 }
 
-/** The guide a lead asked for: a static slug (with its title) or a bridge guideId. */
-function resolveGuide(id: string): { guideId: string; ref: string; title: string; url: string } | null {
+/** The guide a lead asked for: a static slug (with its title), a bridge guideId, or a dashboard
+ *  campaign guide (zero-deploy — see findCampaignGuide). */
+async function resolveGuide(id: string): Promise<{ guideId: string; ref: string; title: string; url: string } | null> {
   if (!id) return null;
   const staticGuide = findStaticGuide(id);
   if (staticGuide) {
@@ -347,6 +349,11 @@ function resolveGuide(id: string): { guideId: string; ref: string; title: string
   // A bridge guideId IS the download capability, so only its first 8 hex are stored on the lead
   // (`ref`) — enough to tell guides apart, useless for fetching one.
   if (/^[a-f0-9]{32}$/.test(id)) return { guideId: id, ref: id.slice(0, 8), title: '', url: `${SITE_ORIGIN}/g/${id}` };
+  const campaigns = await readCommentDmCampaigns();
+  const campaignGuide = findCampaignGuide(campaigns, id);
+  if (campaignGuide) {
+    return { guideId: campaignGuide.slug, ref: campaignGuide.slug, title: campaignGuide.title, url: `${SITE_ORIGIN}/g/${campaignGuide.slug}` };
+  }
   return null;
 }
 
@@ -384,7 +391,7 @@ async function handleManychatLead(req: any, res: any, body: Record<string, unkno
   const email = mcField(body.email, 200).toLowerCase();
   const keyword = mcField(body.keyword, 40);
   const requested = mcField(body.guideId, 64).toLowerCase();
-  const guide = resolveGuide(requested);
+  const guide = await resolveGuide(requested);
   const campaign = keyword ? `ManyChat · ${keyword}` : 'ManyChat';
 
   const identity = subscriberId || `@${igUsername.toLowerCase()}`;
