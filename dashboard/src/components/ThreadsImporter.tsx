@@ -33,8 +33,8 @@ import {
   EMPTY_THREAD,
   type ImportedThread,
 } from '../lib/threadsImportApi';
-import type { TechTipDeck } from '../lib/techTipsApi';
-import { renderTipDeckImages, exportTipDeckZip, resolveTipBackgrounds, type TipStyle } from '../lib/techTipRenderer';
+import type { TechTipDeck, TechTipSlide } from '../lib/techTipsApi';
+import { renderTipDeckImages, renderSingleTipSlide, exportTipDeckZip, resolveTipBackgrounds, type TipStyle } from '../lib/techTipRenderer';
 import { renderTipDeckVideo, isMotionSupported } from '../lib/motionStudioService';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
 import QuickPublishBar from './QuickPublishBar';
@@ -113,6 +113,11 @@ export default function ThreadsImporter() {
   const [active, setActive] = useState(0);
   const [copied, setCopied] = useState(false);
   const [redesigning, setRedesigning] = useState(false);
+
+  // Backgrounds resolved for the current deck, keyed by slide index — kept so an in-place text
+  // edit can repaint just ONE slide (renderSingleTipSlide) without re-resolving every background.
+  const backgroundsRef = useRef<(HTMLImageElement | null)[]>([]);
+  const [slideRendering, setSlideRendering] = useState(false);
 
   const [videoBusy, setVideoBusy] = useState(false);
   const [videoPct, setVideoPct] = useState(0);
@@ -202,6 +207,7 @@ export default function ThreadsImporter() {
     // thread's OWN screenshots onto the slides they came from.
     setBgProgress({ done: 0, total: d.slides.length });
     const bgs = await resolveTipBackgrounds(d, 1080, 1350, (done, total) => setBgProgress({ done, total }), DECK_STYLE);
+    backgroundsRef.current = bgs;
     setBgProgress(null);
     setRenderProgress({ done: 0, total: d.slides.length });
     const imgs = await renderTipDeckImages(d, { backgrounds: bgs }, (done, total) => setRenderProgress({ done, total }));
@@ -253,6 +259,50 @@ export default function ThreadsImporter() {
       setRenderProgress(null);
     }
   }, [deck, renderDeck]);
+
+  /** Patches one field on the active slide. The canvas re-render is a separate debounced effect
+   *  below, so a fast typist doesn't trigger a full-resolution repaint on every keystroke. */
+  const updateActiveSlide = useCallback((patch: Partial<TechTipSlide>) => {
+    setDeck((d) => {
+      if (!d) return d;
+      const slides = d.slides.map((s, i) => (i === active ? { ...s, ...patch } : s));
+      return { ...d, slides };
+    });
+  }, [active]);
+
+  const activeSlide = deck?.slides[Math.min(active, deck.slides.length - 1)];
+
+  // Debounced live-preview repaint: any edit to the active slide's own text repaints only that
+  // slide's canvas, reusing whatever background was already resolved for it.
+  useEffect(() => {
+    if (!deck || !activeSlide) return;
+    const idx = Math.min(active, deck.slides.length - 1);
+    const handle = window.setTimeout(() => {
+      setSlideRendering(true);
+      renderSingleTipSlide(deck, idx, { background: backgroundsRef.current[idx] ?? null, style: DECK_STYLE })
+        .then((url) => {
+          setImages((prev) => {
+            const next = [...prev];
+            next[idx] = url;
+            return next;
+          });
+        })
+        .catch(() => {})
+        .finally(() => setSlideRendering(false));
+    }, 250);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    active,
+    deck,
+    activeSlide?.title,
+    activeSlide?.body,
+    activeSlide?.code,
+    activeSlide?.promptBox,
+    activeSlide?.badge,
+    activeSlide?.kicker,
+    activeSlide?.stepNumber,
+  ]);
 
   const caption = useMemo(() => (deck ? threadDeckCaption(deck) : ''), [deck]);
 
@@ -323,8 +373,6 @@ export default function ThreadsImporter() {
     setError(null);
     resetOutputs();
   }, [resetOutputs]);
-
-  const activeSlide = deck?.slides[Math.min(active, deck.slides.length - 1)];
 
   return (
     <div className="space-y-5">
@@ -618,31 +666,111 @@ export default function ThreadsImporter() {
                 <div className="min-w-0 space-y-3">
                   <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-500">
                     <span className="font-bold uppercase text-brand-400">{KIND_LABEL[activeSlide.kind] ?? activeSlide.kind}</span>
-                    {activeSlide.stepNumber > 0 && <span>· שלב {activeSlide.stepNumber}</span>}
                     {activeSlide.codeLang && <span>· {activeSlide.codeLang}</span>}
+                    {slideRendering && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
                   </div>
-                  <p className="text-base font-bold leading-snug text-white">{activeSlide.title}</p>
-                  {activeSlide.body && <p className="text-sm leading-relaxed text-zinc-300">{activeSlide.body}</p>}
+
+                  {/* badge / kicker / step — the small chips drawn in the slide's top bar */}
+                  <div className="flex flex-wrap gap-2">
+                    <label className="flex min-w-[8rem] flex-1 flex-col gap-1">
+                      <span className="text-[10px] font-bold text-zinc-500" dir="ltr">Badge (LTR)</span>
+                      <input
+                        value={activeSlide.badge ?? ''}
+                        onChange={(e) => updateActiveSlide({ badge: e.target.value })}
+                        dir="ltr"
+                        placeholder="Gemini AI"
+                        className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600"
+                      />
+                    </label>
+                    <label className="flex min-w-[8rem] flex-1 flex-col gap-1">
+                      <span className="text-[10px] font-bold text-zinc-500">קטגוריה (kicker)</span>
+                      <input
+                        value={activeSlide.kicker}
+                        onChange={(e) => updateActiveSlide({ kicker: e.target.value })}
+                        dir="rtl"
+                        className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-zinc-200"
+                      />
+                    </label>
+                    {activeSlide.kind === 'step' && (
+                      <label className="flex w-20 flex-col gap-1">
+                        <span className="text-[10px] font-bold text-zinc-500">מס' שלב</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={activeSlide.stepNumber}
+                          onChange={(e) => updateActiveSlide({ stepNumber: Math.max(0, Number(e.target.value) || 0) })}
+                          className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-zinc-200"
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* title */}
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-zinc-500">כותרת ראשית</span>
+                    <textarea
+                      value={activeSlide.title}
+                      onChange={(e) => updateActiveSlide({ title: e.target.value })}
+                      dir="auto"
+                      rows={2}
+                      className="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-sm font-bold leading-snug text-white"
+                    />
+                  </label>
+
+                  {/* subtitle / description */}
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-zinc-500">תיאור / תת-כותרת</span>
+                    <textarea
+                      value={activeSlide.body}
+                      onChange={(e) => updateActiveSlide({ body: e.target.value })}
+                      dir="auto"
+                      rows={3}
+                      className="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-sm leading-relaxed text-zinc-300"
+                    />
+                  </label>
+
                   {activeSlide.bullets.length > 0 && (
-                    <ul className="space-y-1.5">
-                      {activeSlide.bullets.map((bl, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
-                          <Check className="mt-1 w-3.5 h-3.5 shrink-0 text-brand-400" />
-                          <span>{bl}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[10px] font-bold text-zinc-500">נקודות (שורה לנקודה)</span>
+                      <textarea
+                        value={activeSlide.bullets.join('\n')}
+                        onChange={(e) => updateActiveSlide({ bullets: e.target.value.split('\n') })}
+                        dir="auto"
+                        rows={Math.min(6, activeSlide.bullets.length + 1)}
+                        className="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-sm leading-relaxed text-zinc-300"
+                      />
+                    </label>
                   )}
-                  {activeSlide.code && (
-                    <pre
-                      dir="ltr"
-                      className="overflow-x-auto rounded-lg border border-white/10 bg-black/50 p-3 font-mono text-[11px] leading-relaxed text-zinc-300"
-                    >
-                      <code className="flex items-start gap-1.5">
-                        <Code2 className="mt-0.5 w-3.5 h-3.5 shrink-0 text-cyan-400" />
-                        <span>{activeSlide.code}</span>
-                      </code>
-                    </pre>
+
+                  {/* code / prompt snippet — a slide carries at most one of the two */}
+                  {(activeSlide.code || !activeSlide.promptBox) && (
+                    <label className="flex flex-col gap-1">
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500">
+                        <Code2 className="w-3 h-3 text-cyan-400" /> קטע קוד
+                      </span>
+                      <textarea
+                        value={activeSlide.code}
+                        onChange={(e) => updateActiveSlide({ code: e.target.value })}
+                        dir="ltr"
+                        rows={5}
+                        placeholder="(ריק — אין קוד בשקופית זו)"
+                        className="w-full resize-y overflow-x-auto rounded-lg border border-white/10 bg-black/50 px-3 py-2 font-mono text-[11px] leading-relaxed text-zinc-300 placeholder:text-zinc-600"
+                      />
+                    </label>
+                  )}
+                  {activeSlide.promptBox !== undefined && (
+                    <label className="flex flex-col gap-1">
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500">
+                        <Code2 className="w-3 h-3 text-brand-400" /> פרומפט
+                      </span>
+                      <textarea
+                        value={activeSlide.promptBox ?? ''}
+                        onChange={(e) => updateActiveSlide({ promptBox: e.target.value })}
+                        dir="auto"
+                        rows={4}
+                        className="w-full resize-y rounded-lg border border-white/10 bg-black/50 px-3 py-2 font-mono text-[11px] leading-relaxed text-zinc-300"
+                      />
+                    </label>
                   )}
                 </div>
               )}

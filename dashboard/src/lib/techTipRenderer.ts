@@ -1633,6 +1633,32 @@ export async function renderTipDeckImages(
   return out;
 }
 
+/**
+ * Repaints ONE slide, reusing an already-resolved background — the live-preview path for the
+ * slide text editor. Re-running the full `renderTipDeckImages` loop on every keystroke would
+ * re-decode every other slide's background for nothing; this touches only the index that changed.
+ */
+export async function renderSingleTipSlide(
+  deck: TechTipDeck,
+  index: number,
+  opts: { width?: number; height?: number; background?: HTMLImageElement | null; style?: TipStyle } = {}
+): Promise<string> {
+  const width = opts.width ?? 1080;
+  const height = opts.height ?? 1350;
+  const b = boxFor(width, height);
+  const logo = await getLogo();
+  await ensureDeckFonts();
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas 2d context unavailable');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  drawTipSlide(ctx, b, deck.slides[index], index, deck.slides.length, opts.background ?? null, logo, undefined, opts.style ?? 'creator');
+  return canvas.toDataURL('image/png');
+}
+
 function dataUrlToBytes(dataUrl: string): Uint8Array {
   const base64 = dataUrl.split(',')[1] ?? '';
   const bin = atob(base64);

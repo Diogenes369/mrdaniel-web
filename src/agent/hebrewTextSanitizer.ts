@@ -10,6 +10,11 @@
 // anchor instead of drifting.
 const RLM = '‏';
 
+// Private-use-area marker for the held-URL placeholder below — distinct from any digit that can
+// occur in real text, so the restore step can't mistake an ordinary number ("30" in "ב-30 יום")
+// for a placeholder index.
+const PUA = '';
+
 // A maximal run of Latin letters/digits, allowing single embedded hyphens/apostrophes/spaces so a
 // multi-word term ("Agent Guardian") or a hyphenated one ("GPT-4") wraps as one unit — but a space
 // only extends the run if another Latin word-char immediately follows, so it never swallows the
@@ -44,12 +49,17 @@ export function sanitizeHebrewText(raw: string): string {
   // which must start with a letter), run the Latin-run pass on the rest, then restore each one
   // inside an LTR isolate so it keeps left-to-right order within the RTL line.
   const held: string[] = [];
-  text = text.replace(URL_LIKE, (m) => `${held.push(m) - 1}`);
+  text = text.replace(URL_LIKE, (m) => `${PUA}${held.push(m) - 1}${PUA}`);
 
   text = text.replace(LATIN_RUN, (match) => `${RLM}${match}${RLM}`);
   text = text.replace(/‏{2,}/g, RLM);
 
-  text = text.replace(/(\d+)/g, (_m, i) => `${LTR_ISO_OPEN}${held[Number(i)]}${LTR_ISO_CLOSE}`);
+  text = text.replace(new RegExp(`${PUA}(\\d+)${PUA}`, 'g'), (_m, i) => `${LTR_ISO_OPEN}${held[Number(i)]}${LTR_ISO_CLOSE}`);
+
+  // A plain number elsewhere in the sentence ("30" in "ב-30 יום") — isolate it too so its run
+  // can't get pulled to the wrong side by a neutral character (hyphen, space) between it and a
+  // neighbouring RLM-wrapped Latin term.
+  text = text.replace(/\d+/g, (m) => `${LTR_ISO_OPEN}${m}${LTR_ISO_CLOSE}`);
 
   return text;
 }
