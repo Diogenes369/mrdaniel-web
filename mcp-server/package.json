@@ -1,0 +1,23 @@
+{
+  "name": "mrdaniel-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local MCP server + 24/7 background worker for mrdaniel.co.il ops. Standalone like whatsapp-server/ — never deployed to Vercel.",
+  "scripts": {
+    "mcp": "node src/server.js",
+    "agent": "node start-agent.js",
+    "agent:once": "node start-agent.js --once",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop mrdaniel-agent",
+    "pm2:logs": "pm2 logs mrdaniel-agent",
+    "selftest": "node src/selftest.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^17.4.2",
+    "firebase": "^12.19.0",
+    "firebase-admin": "^14.4.0",
+    "zod": "^4.6.5"
+  }
+}
