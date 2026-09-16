@@ -2,7 +2,7 @@ import { classifyGeminiError, engineConfigReason, generateSocialContent, generat
 import { importUrlContent } from '../src/server/contentImport.js';
 import { optimizeForGrowth, flattenGrowthResult, GROWTH_OPS, type GrowthOp } from '../src/server/igGrowthStrategy.js';
 import { importThreadContent, parseThreadRawText, isThreadsUrl, type ImportedThread, type ThreadPost } from '../src/server/threadsThreadFetcher.js';
-import { buildThreadDeck } from '../src/server/agents/threadsThreadAgent.js';
+import { buildThreadDeck, detectTool } from '../src/server/agents/threadsThreadAgent.js';
 import { buildImageCarouselDeck } from '../src/server/agents/imageTranslatorAgent.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
@@ -398,6 +398,13 @@ export default async function handler(req: any, res: any) {
         return;
       }
       const deck = await synthesizeTechTipDeck({ topic, notes: typeof notes === 'string' ? notes : undefined });
+      // Tech Tips decks wear real tool logos too — same scored detector as the Threads agent. Each
+      // slide's own copy wins, the topic is the fallback, so a "Vercel + Next.js" deck shows both.
+      const deckTool = detectTool(`${topic}
+${typeof notes === 'string' ? notes : ''}`);
+      for (const slide of deck.slides) {
+        slide.tool = detectTool(`${slide.title} ${slide.body} ${slide.bullets.join(' ')} ${slide.code}`) ?? deckTool;
+      }
       // Code is excluded from the output guard on purpose: sanitizeOutput's heuristics flag ordinary
       // source (URLs, key-like identifiers) as leaks. The Hebrew prose is what gets checked.
       const prose = deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');

@@ -23,6 +23,7 @@ import {
   drawBrandBadge,
   drawToolMark,
   scribbleUnderline,
+  markerHighlight,
   scribbleCircle,
   doodleArrow,
   paintSlateBackdrop,
@@ -418,7 +419,8 @@ function drawTitle(
   title: string,
   startPx: number,
   maxLines: number,
-  accent: string
+  accent: string,
+  markerSeed?: number
 ): number {
   if (!title) return r.y;
   const { lines, px } = autoFit(ctx, sanitizeHebrewText(title), r.w, startPx, b.W * 0.032, maxLines, (c, p) => setDisplay(c, p, 800));
@@ -427,6 +429,18 @@ function drawTitle(
   ctx.textAlign = 'right';
   ctx.textBaseline = 'alphabetic';
   let y = r.y + px;
+  lines.forEach((line, i) => {
+    // The marker goes on the title's closing line — where the claim usually lands in Hebrew — and
+    // is painted first so the swipe sits under the glyphs instead of greying them out.
+    if (markerSeed !== undefined && i === lines.length - 1) {
+      const w = Math.min(ctx.measureText(line).width, r.w);
+      markerHighlight(ctx, r.x + r.w - w, r.y + px + i * px * 1.18, w, px, accent, markerSeed);
+      setDisplay(ctx, px, 800);
+      ctx.direction = 'rtl';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'alphabetic';
+    }
+  });
   for (const line of lines) {
     const grad = ctx.createLinearGradient(r.x + r.w, 0, r.x, 0);
     grad.addColorStop(0, '#FFFFFF');
@@ -437,6 +451,76 @@ function drawTitle(
     y += px * 1.18;
   }
   return y;
+}
+
+/**
+ * A slide that is one strong line and nothing else: no code, no prompt, no path, no list, and a body
+ * short enough to read as a statement. Those used to get the same glass card as a 60-word
+ * explanation, which is exactly the "every slide is the same template" tell — so they get the
+ * editorial treatment instead: giant display type, a big quote mark, deliberately off-centre.
+ */
+export function isQuoteSlide(slide: TechTipSlide): boolean {
+  if (slide.kind !== 'concept' && slide.kind !== 'takeaway') return false;
+  if (slide.code.trim() || slide.promptBox?.trim() || slide.workflowPath?.length || slide.bullets.some((t) => t.trim())) return false;
+  const body = (slide.body || '').trim();
+  const words = body.split(/\s+/).filter(Boolean).length;
+  return words >= 4 && words <= 22;
+}
+
+function drawQuoteLayout(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, slide: TechTipSlide, accent: string, index: number) {
+  // The title shrinks to a label: on this slide the body IS the headline.
+  let y = r.y;
+  if (slide.title) {
+    // Body face, not mono: JetBrains Mono has no Hebrew, and the fallback spaces the letters apart.
+    setBody(ctx, b.W * 0.03, 700);
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = hexToRgba(accent, 0.95);
+    const label = wrapRtl(ctx, sanitizeHebrewText(slide.title), r.w * 0.8)[0] ?? '';
+    ctx.fillText(label, r.x + r.w, y + b.W * 0.03);
+    y += b.W * 0.07;
+  }
+
+  // Oversized quote glyph, bleeding off the right edge of the text column — the asymmetry is the point.
+  ctx.save();
+  setDisplay(ctx, b.W * 0.34, 900);
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = accent;
+  ctx.fillText('”', r.x + r.w + b.W * 0.02, y - b.W * 0.06);
+  ctx.restore();
+
+  // The statement itself: display face, as large as the column allows, indented from the LEFT only
+  // so the ragged edge opens toward the empty side of the slide.
+  const colW = r.w * 0.88;
+  const top = y + b.W * 0.12;
+  const avail = r.y + r.h - top - b.W * 0.06;
+  const { lines, px } = autoFit(ctx, sanitizeHebrewText(slide.body), colW, b.W * 0.082, b.W * 0.046, 6, (c, p) => setDisplay(c, p, 800));
+  const lh = px * 1.22;
+  let ty = top + Math.max(0, (avail - lines.length * lh) * 0.35) + px;
+  const last = lines.length - 1;
+  lines.forEach((line, i) => {
+    setDisplay(ctx, px, 800);
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    if (i === last) {
+      const w = Math.min(ctx.measureText(line).width, colW);
+      markerHighlight(ctx, r.x + r.w - w, ty, w, px, accent, index * 613 + 29);
+      setDisplay(ctx, px, 800);
+    }
+    ctx.fillStyle = i === last ? '#FFFFFF' : 'rgba(241,245,249,0.92)';
+    ctx.fillText(line, r.x + r.w, ty);
+    ty += lh;
+  });
+
+  // Accent rule under the statement, short and left of the column — the counterweight.
+  ctx.fillStyle = accent;
+  roundRectPath(ctx, r.x + r.w - b.W * 0.12, ty - lh + px * 0.5, b.W * 0.12, b.W * 0.008, b.W * 0.004);
+  ctx.fill();
 }
 
 function drawParagraph(
@@ -1536,8 +1620,17 @@ export function drawTipSlide(
       // The brand lockup, sitting where the link pill used to: handle badge plus the name beneath.
       drawBrandBadge(ctx, b.W / 2, region.y + region.h - b.W * 0.09, b.W, b.m, accent, { withName: true });
     }
+  } else if (isQuoteSlide(slide)) {
+    drawQuoteLayout(ctx, b, region, slide, accent, index);
   } else {
-    let afterTitle = drawTitle(ctx, b, region, slide.title, b.W * 0.052, 3, accent) + b.m.gap;
+    // A snippet longer than a handful of lines is the slide's whole point: the title steps down to
+    // two smaller lines and the set-up copy to one, and the terminal takes everything that frees up.
+    const codeHeavy = slide.kind === 'code' && slide.code.split(/\r?\n/).filter((l) => l.trim()).length >= 8;
+    // Marker swipe on alternating plain slides only — on every slide it stops reading as emphasis.
+    const plain = !slide.code.trim() && !slide.promptBox?.trim() && !slide.workflowPath?.length;
+    const markerSeed = plain && slide.scribble !== 'underline' && index % 2 === 1 ? index * 389 + 11 : undefined;
+    let afterTitle =
+      drawTitle(ctx, b, region, slide.title, codeHeavy ? b.W * 0.042 : b.W * 0.052, codeHeavy ? 2 : 3, accent, markerSeed) + b.m.gap;
     // The click-path sits directly beneath the title: it IS the slide's instruction, and the body,
     // prompt card or snippet below it are the elaboration.
     if (slide.workflowPath?.length) {
@@ -1553,7 +1646,7 @@ export function drawTipSlide(
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = 'rgba(226,232,240,0.8)';
         let by = afterTitle;
-        for (const line of wrapRtl(ctx, sanitizeHebrewText(slide.body), region.w).slice(0, 2)) {
+        for (const line of wrapRtl(ctx, sanitizeHebrewText(slide.body), region.w).slice(0, codeHeavy ? 1 : 2)) {
           ctx.fillText(line, region.x + region.w, by);
           by += b.W * 0.04;
         }

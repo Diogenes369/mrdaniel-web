@@ -249,7 +249,21 @@ export type ToolBrand =
   | 'workspace'
   | 'veo'
   | 'midjourney'
-  | 'glm';
+  | 'glm'
+  // Dev-platform brands (2026-09-16). Unlike the AI tools above these have no hand-drawn mark —
+  // they render their real Simple Icons logo (dashboard/src/lib/brandLogoPaths.generated.ts).
+  | 'vercel'
+  | 'python'
+  | 'react'
+  | 'meta'
+  | 'nextjs'
+  | 'typescript'
+  | 'docker'
+  | 'github'
+  | 'cursor'
+  | 'supabase'
+  | 'firebase'
+  | 'cloudflare';
 
 /** Hand-drawn accent painted over the slide — the creator-deck signature. */
 export type ScribbleKind = 'underline' | 'circle' | 'arrow' | 'none';

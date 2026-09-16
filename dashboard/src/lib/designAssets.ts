@@ -1,4 +1,5 @@
 import type { NodeIcon, ThreadTheme, ToolBrand } from './techTipsApi';
+import { BRAND_LOGO_PATHS } from './brandLogoPaths.generated';
 
 /**
  * Design asset engine — the single source of truth for how a generated slide LOOKS.
@@ -80,6 +81,20 @@ export const TOOL_STYLE: Record<ToolBrand, { label: string; accent: string; glow
   veo: { label: 'Veo', accent: '#7AAEFF', glow: '#A78BFA' },
   midjourney: { label: 'Midjourney', accent: '#E2E8F0', glow: '#94A3B8' },
   glm: { label: 'GLM', accent: '#5B8DEF', glow: '#22D3EE' },
+  // Brand hexes lifted toward the light end where the official one is black or too deep to clear
+  // 4.5:1 on slate (Vercel, Next.js, GitHub and Cursor are all #000000 upstream).
+  vercel: { label: 'Vercel', accent: '#E2E8F0', glow: '#94A3B8' },
+  python: { label: 'Python', accent: '#FFD43B', glow: '#3776AB' },
+  react: { label: 'React', accent: '#61DAFB', glow: '#22D3EE' },
+  meta: { label: 'Meta', accent: '#4F9BFF', glow: '#A78BFA' },
+  nextjs: { label: 'Next.js', accent: '#E2E8F0', glow: '#7AAEFF' },
+  typescript: { label: 'TypeScript', accent: '#5B9BFF', glow: '#3178C6' },
+  docker: { label: 'Docker', accent: '#3AA8F5', glow: '#2496ED' },
+  github: { label: 'GitHub', accent: '#E2E8F0', glow: '#A78BFA' },
+  cursor: { label: 'Cursor', accent: '#E2E8F0', glow: '#22D3EE' },
+  supabase: { label: 'Supabase', accent: '#3FCF8E', glow: '#10B981' },
+  firebase: { label: 'Firebase', accent: '#FFA611', glow: '#FF6D00' },
+  cloudflare: { label: 'Cloudflare', accent: '#F6821F', glow: '#FBAD41' },
 };
 
 // ─── cream & terracotta preset ──────────────────────────────────────────────────────────────
@@ -538,6 +553,45 @@ export function scribbleUnderline(
   ctx.restore();
 }
 
+/**
+ * Highlighter swipe BEHIND a run of text — the "someone went over this with a marker" effect.
+ *
+ * Drawn before the text, never over it: a translucent band painted on top would dull the glyphs it
+ * is meant to call out. The band is slightly skewed and ragged at both ends, and seeded like every
+ * other scribble so the carousel PNG and the reel frames get the same stroke.
+ */
+export function markerHighlight(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  baseline: number,
+  w: number,
+  px: number,
+  colour: string,
+  seed: number
+) {
+  if (w <= 0) return;
+  const rnd = rand(seed);
+  const top = baseline - px * 0.62;
+  const h = px * 0.5;
+  const skew = (rnd() - 0.5) * px * 0.12;
+  const over = px * 0.18;
+  ctx.save();
+  // A near-white accent (Vercel, Next.js, GitHub) at full marker strength greys out the white glyphs
+  // on top of it, so light colours get a lighter swipe.
+  const hex = colour.replace('#', '');
+  const lum = hex.length === 6 ? (parseInt(hex.slice(0, 2), 16) * 0.299 + parseInt(hex.slice(2, 4), 16) * 0.587 + parseInt(hex.slice(4, 6), 16) * 0.114) / 255 : 0.5;
+  ctx.globalAlpha = lum > 0.75 ? 0.18 : 0.34;
+  ctx.fillStyle = colour;
+  ctx.beginPath();
+  ctx.moveTo(x - over + rnd() * px * 0.08, top + skew);
+  ctx.lineTo(x + w + over, top - skew + (rnd() - 0.5) * px * 0.06);
+  ctx.lineTo(x + w + over * (0.6 + rnd() * 0.5), top + h - skew);
+  ctx.lineTo(x - over * (0.6 + rnd() * 0.5), top + h + skew + (rnd() - 0.5) * px * 0.06);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 /** Open circle drawn around something — slightly over a full turn, with the overshoot a hand
  *  leaves behind. Used to ring a step numeral. */
 export function scribbleCircle(
@@ -630,7 +684,7 @@ export function doodleArrow(
  * These are geometric identity marks in each product's own shape language — not reproductions of a
  * trademark — which is also why each one sits next to its wordmark rather than standing alone.
  */
-const TOOL_MARKS: Record<ToolBrand, (ctx: CanvasRenderingContext2D, colour: string) => void> = {
+const TOOL_MARKS: Partial<Record<ToolBrand, (ctx: CanvasRenderingContext2D, colour: string) => void>> = {
   // Four-point sparkle.
   gemini: (ctx, c) => {
     ctx.fillStyle = c;
@@ -827,7 +881,48 @@ const TOOL_MARKS: Record<ToolBrand, (ctx: CanvasRenderingContext2D, colour: stri
   },
 };
 
-/** Paints a tool's mark into a `size`×`size` box at (x, y). */
+/** Parsed once per brand — a Path2D from a 1–5 KB path string is not free, and a reel re-draws the
+ *  same mark on every one of its frames. */
+const LOGO_CACHE = new Map<ToolBrand, Path2D>();
+
+function logoPath(tool: ToolBrand): Path2D | null {
+  const entry = BRAND_LOGO_PATHS[tool];
+  if (!entry) return null;
+  let p = LOGO_CACHE.get(tool);
+  if (!p) {
+    p = new Path2D(entry.path);
+    LOGO_CACHE.set(tool, p);
+  }
+  return p;
+}
+
+/**
+ * The tool's real logo as a 0..100 mark: its Simple Icons path (24×24, CC0 data) scaled into the
+ * same box the hand-drawn marks use. Still a canvas path, never a fetched SVG/PNG, so everything the
+ * TOOL_MARKS comment says about the tainted export canvas holds. Tinted with the slide's colour
+ * rather than the brand hex — the chip, glow and title gradient are already in that colour, and a
+ * black Vercel triangle on slate would simply disappear.
+ */
+function logoMark(tool: ToolBrand): ((ctx: CanvasRenderingContext2D, colour: string) => void) | null {
+  const path = logoPath(tool);
+  if (!path) return null;
+  return (ctx, c) => {
+    ctx.save();
+    ctx.translate(4, 4);
+    ctx.scale(92 / 24, 92 / 24);
+    ctx.fillStyle = c;
+    ctx.fill(path);
+    ctx.restore();
+  };
+}
+
+/** Whether a tool has anything drawable — a real logo or a hand-drawn mark. */
+export function hasToolMark(tool: ToolBrand): boolean {
+  return Boolean(BRAND_LOGO_PATHS[tool] || TOOL_MARKS[tool]);
+}
+
+/** Paints a tool's mark into a `size`×`size` box at (x, y): its real logo when one is known, the
+ *  geometric identity mark otherwise (ChatGPT, Canva, Midjourney, Workspace, Veo, GLM). */
 export function drawToolMark(
   ctx: CanvasRenderingContext2D,
   tool: ToolBrand,
@@ -837,7 +932,7 @@ export function drawToolMark(
   colour: string,
   opts: { glow?: boolean } = {}
 ) {
-  const mark = TOOL_MARKS[tool];
+  const mark = logoMark(tool) ?? TOOL_MARKS[tool];
   if (!mark) return;
   ctx.save();
   ctx.translate(x, y);

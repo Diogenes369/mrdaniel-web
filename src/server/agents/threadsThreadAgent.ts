@@ -144,6 +144,23 @@ const TOOL_RULES: { tool: ToolBrand; re: RegExp }[] = [
   { tool: 'copilot', re: /\b(?:github\s+)?copilot\b/i },
   { tool: 'midjourney', re: /\bmid\s?journey\b/i },
   { tool: 'workspace', re: /\bgoogle\s+(?:workspace|docs|sheets|slides|drive|forms)\b|\bgmail\b/i },
+  // Dev platforms — drawn with their real logo, not a TOOL_MARKS entry. Every rule for a word that is
+  // also plain English ("react", "meta", "cursor") demands a technical neighbour, because a thread
+  // saying "how teams react to outages" must not wear the React logo.
+  { tool: 'nextjs', re: /\bnext\.?js\b/i },
+  { tool: 'vercel', re: /\bvercel\b|\bv0\.dev\b/i },
+  { tool: 'react', re: /\breact(?:\.?js)?\s+(?:native|19|18|hooks?|components?|app|query|router|server components?)\b|\breact\.?js\b|\buse(?:State|Effect|Memo|Ref)\b|\bjsx\b/i },
+  { tool: 'typescript', re: /\btypescript\b|\btsconfig\b/i },
+  { tool: 'python', re: /\bpython\b|\bpip install\b|\bpandas\b|\bfastapi\b|\bdjango\b/i },
+  { tool: 'meta', re: /\bmeta\s+(?:ai|platforms|llama|glasses|quest)\b|\bllama\s?[2-9]\b|\bmeta['’]s\b/i },
+  { tool: 'docker', re: /\bdocker(?:file|\s+compose)?\b/i },
+  { tool: 'cursor', re: /\bcursor\s+(?:ai|ide|editor|agent|rules|composer|tab)\b|\bcursor\.(?:com|sh)\b|\.cursorrules\b/i },
+  { tool: 'supabase', re: /\bsupabase\b/i },
+  { tool: 'firebase', re: /\bfirebase\b|\bfirestore\b/i },
+  { tool: 'cloudflare', re: /\bcloudflare\b|\bwrangler\b/i },
+  // Last: "GitHub" is named in passing by half of all dev threads, so it only wins when nothing
+  // more specific scored (ties go to earlier rules), and "GitHub Copilot" stays a Copilot deck.
+  { tool: 'github', re: /\bgithub\b(?!\s+copilot)/i },
 ];
 
 /**
