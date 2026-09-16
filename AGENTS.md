@@ -16,6 +16,7 @@ The deep reference is **`DOCUMENTATION.md`** (Hebrew, ~360 lines) — consult it
 | Admin dashboard (analytics + content agents) | `/dashboard` | `dashboard` | `https://dashboard-snowy-psi-94.vercel.app` |
 | Serverless functions | `/api` | ships with `my-website` | `mrdaniel.co.il/api/*` |
 | Local dev server (Express, shared server code) | `server.ts` | local only | `localhost:3000` |
+| Local MCP server + 24/7 ops worker | `mcp-server/` | local only (standalone package) | stdio · see `mcp-server/README.md` |
 
 - The **dashboard always talks to the production API** (`mrdaniel.co.il/api/*`) — it's a live-ops tool. Override with `VITE_SITE_ORIGIN` / `VITE_AGENT_API_BASE`.
 - Database: **Firebase Realtime Database (RTDB)**, not Firestore. Server code uses the client SDK, not `firebase-admin` (`src/agent/firebaseServer.ts`).
@@ -34,6 +35,9 @@ Run from the **repo root** for the site, from **`dashboard/`** for the dashboard
 | Prod build | `npm run build` | `npm run build` |
 | Deploy (prod) | `npm run deploy` | `npm run deploy:dashboard` |
 | Deploy both | `npm run deploy:all` | — |
+| Full preflight (mirrors + tsc + build, both apps) | `npm run ship` (`-- --scrapers`, `-- --deploy`) | — |
+| Type-mirror drift (`src/` ↔ `dashboard/`) | `npm run check:mirrors` | — |
+| Threads scraper live regression | `npm run check:scrapers` | — |
 
 **Always** run `npx tsc --noEmit` **and** `npm run build` for every project you touched before calling a change done. `tsc` covers `src`, `api`, `server.ts`, `netlify` at root; `src` in the dashboard.
 

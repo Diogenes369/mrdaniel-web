@@ -11,6 +11,9 @@
     "start": "tsx server.ts",
     "preview": "vite preview",
     "deploy": "vercel --prod",
+    "ship": "node scripts/ship.mjs",
+    "check:mirrors": "node scripts/check-mirrors.mjs",
+    "check:scrapers": "tsx scripts/scraper-watch.ts",
     "deploy:dashboard": "cd dashboard && vercel --prod",
     "deploy:all": "npm run deploy && npm run deploy:dashboard"
   },
