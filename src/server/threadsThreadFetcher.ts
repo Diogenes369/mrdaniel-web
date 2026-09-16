@@ -397,6 +397,32 @@ function chainFrom(groups: SjsPost[][], code: string): SjsPost[] {
 }
 
 /**
+ * A post's own "1/, 2/, 3/" continuation in the shape the post page ships since ~2026-09-15:
+ * `media.text_post_app_info.self_thread.posts.edges[].node`.
+ *
+ * Measured on /@iffikhans/post/DdKjD6yiBbt on 2026-09-16, which returned 9 posts on 09-12 and 1 post
+ * after the change. The root post (with its code and caption) now arrives in one `data-sjs` blob,
+ * while the chain arrives in a SEPARATE deferred Relay blob (`BarcelonaPostPageStrongIdDownwardQuery`)
+ * whose `media` carries only `id` + `text_post_app_info` — no code, no caption. So the only join key
+ * back to the requested post is the media `id` (`<pk>_<author pk>`), and that is what this returns.
+ * The same blob also holds `direct_replies` (strangers) right beside `self_thread`, which is why the
+ * field is read by name here instead of collecting every post in the blob.
+ *
+ * No headless browser is involved or needed. Checked the same day: a fully rendered logged-out
+ * headless Chrome showed NO replies at all on /@ai.tools_list/post/DVIruowlMx2 (the page's JS
+ * puts them behind the login prompt), while this payload carries the chain whenever one exists.
+ */
+function selfThreadOf(node: Record<string, unknown>): { id: string; posts: SjsPost[] } | null {
+  const info = node.text_post_app_info as { self_thread?: { posts?: { edges?: unknown } } | null } | undefined;
+  const edges = info?.self_thread?.posts?.edges;
+  if (typeof node.id !== 'string' || !Array.isArray(edges)) return null;
+  const posts = edges
+    .map((edge) => sjsPost((edge as { node?: unknown } | null)?.node))
+    .filter((p): p is SjsPost => p !== null);
+  return posts.length ? { id: node.id, posts } : null;
+}
+
+/**
  * The requested post and its author's own continuation, from the server-rendered JSON.
  *
  * Threads inlines its GraphQL payload in `<script type="application/json" data-sjs>` blobs. Besides
@@ -414,6 +440,9 @@ function chainFrom(groups: SjsPost[][], code: string): SjsPost[] {
 function extractSjsThread(html: string, code: string): { posts: ThreadPost[]; author: string } | null {
   const candidates: SjsPost[][][] = [];
   let single: SjsPost | null = null;
+  let singleId = '';
+  // media id → that post's `self_thread` chain. See `selfThreadOf` for why this is keyed by id.
+  const selfThreads = new Map<string, SjsPost[]>();
   const visit = (node: unknown): void => {
     if (!node || typeof node !== 'object') return;
     if (Array.isArray(node)) {
@@ -424,7 +453,12 @@ function extractSjsThread(html: string, code: string): { posts: ThreadPost[]; au
     }
     const o = node as Record<string, unknown>;
     const post = sjsPost(o);
-    if (post?.code === code && !single) single = post;
+    if (post?.code === code && !single) {
+      single = post;
+      singleId = typeof o.id === 'string' ? o.id : '';
+    }
+    const own = selfThreadOf(o);
+    if (own && !selfThreads.has(own.id)) selfThreads.set(own.id, own.posts);
     for (const value of Object.values(o)) visit(value);
   };
   for (const m of html.matchAll(/<script type="application\/json"[^>]*data-sjs[^>]*>([\s\S]*?)<\/script>/g)) {
@@ -434,10 +468,16 @@ function extractSjsThread(html: string, code: string): { posts: ThreadPost[]; au
       // one unparseable blob does not invalidate the others
     }
   }
-  const best = candidates
-    .map((groups) => chainFrom(groups, code))
-    .sort((a, b) => b.length - a.length)[0];
-  const chain = best?.length ? best : single ? [single] : [];
+  const root = single as SjsPost | null;
+  // The post-page shape since mid-September 2026: root post + its `self_thread`, joined by media id.
+  // Only the root's author is kept — the edge list is the author's by definition today, and this
+  // keeps a future shape change from pulling a stranger's reply into the deck.
+  const selfChain =
+    root && singleId
+      ? [root, ...(selfThreads.get(singleId) ?? []).filter((p) => p.code !== code && p.user.toLowerCase() === root.user.toLowerCase())]
+      : [];
+  const best = [selfChain, ...candidates.map((groups) => chainFrom(groups, code))].sort((a, b) => b.length - a.length)[0];
+  const chain = best?.length ? best : root ? [root] : [];
   const posts = tidyChain(chain.map((p) => ({ text: p.text, images: p.images })));
   return posts.length ? { posts, author: chain[0].user ? `@${chain[0].user}` : '' } : null;
 }
