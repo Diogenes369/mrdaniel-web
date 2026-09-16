@@ -1,4 +1,5 @@
 import { genAI, generateContentWithRetry, requireText, stripCodeFence, parseJsonOrThrow, ModelOutputError } from '../agent/geminiClient.js';
+import { EXPERT_VOICE_RULES } from '../agent/expertVoice.js';
 
 /**
  * AI email copywriter — Gemini generates a full, long-form, structured HTML email body (inner
@@ -24,6 +25,8 @@ const PRESET_GUIDANCE: Record<Exclude<EmailPreset, ''>, string> = {
 };
 
 const SYSTEM = `אתה קופירייטר בכיר למיילים שיווקיים B2B בעברית, עבור המותג "MR. DANIEL" (דניאל בן ברוך) — סוכני AI מותאמים אישית, אבטחת סייבר וניהול IT ברמת Enterprise, ופיתוח דיגיטלי.
+
+${EXPERT_VOICE_RULES}
 
 החזר אך ורק JSON תקין במבנה:
 {

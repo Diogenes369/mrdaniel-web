@@ -34,7 +34,21 @@ export type ToolBrand =
   | 'workspace'
   | 'veo'
   | 'midjourney'
-  | 'glm';
+  | 'glm'
+  // Dev-platform brands (2026-09-16). Unlike the AI tools above these have no hand-drawn mark —
+  // they render their real Simple Icons logo (dashboard/src/lib/brandLogoPaths.generated.ts).
+  | 'vercel'
+  | 'python'
+  | 'react'
+  | 'meta'
+  | 'nextjs'
+  | 'typescript'
+  | 'docker'
+  | 'github'
+  | 'cursor'
+  | 'supabase'
+  | 'firebase'
+  | 'cloudflare';
 
 /** Hand-drawn accent painted over the slide — the creator-deck signature. */
 export type ScribbleKind = 'underline' | 'circle' | 'arrow' | 'none';
@@ -295,7 +309,7 @@ function buildFallbackDeck(topic: string, reason: string): TechTipDeck {
     { kind: 'step', kicker: 'שלב 1', title: 'הכנה', body: 'התקינו את התלויות והגדירו את משתני הסביבה הנדרשים.', bullets: [], code: '', codeLang: '', stepNumber: 1, visualPrompt: VISUAL_BASE },
     { kind: 'step', kicker: 'שלב 2', title: 'מימוש', body: 'כתבו את הליבה — פונקציה אחת שעושה את העבודה, בלי הפשטות מיותרות.', bullets: [], code: '', codeLang: '', stepNumber: 2, visualPrompt: VISUAL_BASE },
     { kind: 'step', kicker: 'שלב 3', title: 'בדיקה', body: 'הריצו על מקרה אמיתי אחד, ומדדו את התוצאה מול קריטריון ברור.', bullets: [], code: '', codeLang: '', stepNumber: 3, visualPrompt: VISUAL_BASE },
-    { kind: 'takeaway', kicker: 'לסיכום', title: 'מה לוקחים מכאן', body: '', bullets: ['התחילו מתהליך אחד קטן', 'מדדו לפני שמרחיבים', 'אבטחה כברירת מחדל, לא כתוספת'], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
+    { kind: 'takeaway', kicker: 'השורה התחתונה', title: 'מה עושים מחר בבוקר', body: '', bullets: ['התחילו מתהליך אחד קטן', 'מדדו לפני שמרחיבים', 'אבטחה כברירת מחדל, לא כתוספת'], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
     { kind: 'cta', kicker: 'צעד הבא', title: 'רוצים את המדריך המלא?', body: 'עוד מדריכים, כלים ודוגמאות קוד — ב-mrdaniel.co.il. עקבו לעוד תוכן על AI, סייבר ופיתוח.', bullets: [], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
   ];
   return {

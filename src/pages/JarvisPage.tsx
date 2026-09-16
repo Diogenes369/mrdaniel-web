@@ -282,7 +282,7 @@ export default function JarvisPage() {
             JARVIS: סוכן בינה מלאכותית אוטונומי לניהול העסק שלך
           </h1>
           <p className="mt-5 md:mt-6 text-sm sm:text-base md:text-lg text-zinc-200 leading-[1.8] md:leading-[1.9] max-w-2xl [text-shadow:0_1px_16px_rgba(0,0,0,0.8)]">
-            מערכת JARVIS (Just A Rather Very Intelligent System) היא תפיסה מהפכנית של ניהול סביבה, פרויקטים
+            מערכת JARVIS (Just A Rather Very Intelligent System) היא דרך אחרת לגמרי לנהל סביבה, פרויקטים
             ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
             המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
           </p>

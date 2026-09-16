@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { scrubAiPhrases } from './expertVoice.js';
 
 /**
  * The one Gemini client, and the one retry policy, for every model call in the codebase.
@@ -69,6 +70,22 @@ export function detectGeminiRateLimit(err: unknown): RateLimitInfo | null {
 }
 
 type GenContentReq = Parameters<GoogleGenAI['models']['generateContent']>[0];
+type GenContentRes = Awaited<ReturnType<GoogleGenAI['models']['generateContent']>>;
+
+/**
+ * Strips the banned AI-cliché phrases out of every text part, in place, before any caller reads it.
+ * Done on the parts rather than on `response.text` because `text` is a getter that re-joins the
+ * parts on every read — and half the callers read `response.text` directly, not via requireText.
+ * See expertVoice.ts for why this is enforced in code and not left to the prompt.
+ */
+function scrubResponse(res: GenContentRes): GenContentRes {
+  for (const cand of res.candidates ?? []) {
+    for (const part of cand.content?.parts ?? []) {
+      if (typeof part.text === 'string' && !part.thought) part.text = scrubAiPhrases(part.text);
+    }
+  }
+  return res;
+}
 
 /** Up to two retries (0.7s then 1.8s) for a transient upstream 5xx from Gemini Flash — INTERNAL /
  * UNAVAILABLE / "overloaded" / deadline / reset. A 429 is NOT retried here (surfaced so the
@@ -82,7 +99,7 @@ export async function generateContentWithRetry(params: GenContentReq) {
   for (const waitMs of [0, 700, 1800]) {
     if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
     try {
-      return await genAI.models.generateContent(params);
+      return scrubResponse(await genAI.models.generateContent(params));
     } catch (err) {
       lastErr = err;
       // A quota error is surfaced immediately - retrying it only burns the remaining budget.

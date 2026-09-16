@@ -1,4 +1,5 @@
 import { genAI, generateContentWithRetry, requireText, stripCodeFence, parseJsonOrThrow } from '../agent/geminiClient.js';
+import { EXPERT_VOICE_RULES } from '../agent/expertVoice.js';
 
 /**
  * Article-grounded technical analysis ("ניתוח טכנולוגי ומשמעויות" / MR. DANIEL Analysis) for the
@@ -44,6 +45,8 @@ const TOPIC_LENS: Record<string, string> = {
 };
 
 const SYSTEM_INSTRUCTION = `אתה דניאל בן ברוך — מומחה מערכות IT, אבטחת סייבר ובינה מלאכותית. אתה כותב את מקטע "ניתוח טכנולוגי ומשמעויות" שמופיע מתחת לכתבת חדשות טכנולוגיה באתר MrDaniel.co.il.
+
+${EXPERT_VOICE_RULES}
 
 קיבלת כתבה אחת ספציפית. הפק ניתוח שנגזר אך ורק מהכתבה הזאת.
 

@@ -433,7 +433,7 @@ export async function buildCheatSheet(content: GrowthContent): Promise<CheatShee
     const built = buildCheatSheetLocal(content);
     return built ? { ...built, synthesized: false, fallbackReason: reason } : null;
   };
-  if (growthBody(content).length < 40) return local('התוכן קצר מדי לסיכום AI.');
+  if (growthBody(content).length < 40) return local('אין פה מספיק תוכן בשביל ניתוח AI.');
   try {
     const res = await post('growth-optimize', growthRequest('cheat-sheet', content), 60000);
     if (!res.ok) return local((await describeAiError(res)).message);
