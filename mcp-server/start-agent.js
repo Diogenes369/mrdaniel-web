@@ -117,11 +117,33 @@ async function maybeDraft(force = false) {
   const { date, hour } = israelNow();
   // Once per Israel calendar day, at or after the configured hour — a machine that was asleep at
   // 09:00 still produces the day's draft when it wakes, instead of silently skipping the day.
-  if (!force && (hour < draftHour || readState().lastDraftDate === date)) return;
+  const state = readState();
+  if (!force && (hour < draftHour || state.lastDraftDate === date)) return;
+  // A failed draft used to be retried on every 10-minute tick for the rest of the day — on
+  // 2026-09-17 that was a Gemini call every 10 min against a project whose credits were depleted.
+  // Back off exponentially (20 min → 40 → 80 → … capped at 4 h), and give up for the day on a
+  // failure that waiting cannot fix: depleted credits / spent daily quota / rejected secret.
+  if (!force && state.draftRetryAt && Date.now() < state.draftRetryAt) return;
+  if (!force && state.draftGaveUpDate === date) return;
   const r = await generateDraft();
   log(r.ok ? 'info' : 'error', `daily draft ${r.ok ? 'queued' : 'failed'}`, { topic: r.topic, status: r.status, result: r.ok ? r.result?.id : r.result });
-  if (r.ok) writeState({ lastDraftDate: date });
-  else if (r.status === 401) await notify('🔑 agent-generate rejected the admin secret — update dashboard/.env');
+  if (r.ok) {
+    writeState({ lastDraftDate: date, draftFailures: 0, draftRetryAt: null, draftGaveUpDate: null });
+    return;
+  }
+  const code = r.result?.code;
+  const permanent = r.status === 401 || r.status === 402 || code === 'billing_exhausted' || code === 'quota_exhausted' || code === 'invalid_api_key';
+  const failures = (date === state.draftFailureDate ? state.draftFailures ?? 0 : 0) + 1;
+  const retryInMin = Math.min(240, 10 * 2 ** failures);
+  writeState({
+    draftFailureDate: date,
+    draftFailures: failures,
+    draftRetryAt: permanent ? null : Date.now() + retryInMin * 60_000,
+    draftGaveUpDate: permanent ? date : null,
+  });
+  log('info', permanent ? `daily draft: not retrying today (${code ?? r.status})` : `daily draft: retry in ${retryInMin} min`);
+  if (r.status === 401) await notify('🔑 agent-generate rejected the admin secret — update dashboard/.env');
+  else if (code === 'billing_exhausted') await notify('💳 Gemini prepaid credits are depleted — top up in AI Studio; daily draft skipped');
 }
 
 // ─── loop ───────────────────────────────────────────────────────────────────────────────────

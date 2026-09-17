@@ -12,6 +12,10 @@ import { reportAuthFailure } from './adminSecret';
 /** Stable causes the endpoint reports. Anything unrecognised falls back to the status text. */
 export type AiErrorCode =
   | 'rate_limited'
+  // Per-day quota spent — waiting seconds does nothing; resets at Google's daily boundary.
+  | 'quota_exhausted'
+  // Prepaid Gemini credits spent (answered as 402). Every call fails until the project is topped up.
+  | 'billing_exhausted'
   | 'invalid_api_key'
   | 'model_not_found'
   | 'safety_blocked'
@@ -36,7 +40,8 @@ export interface AiError {
 
 /** Status-only fallback, for the cases where the body is unreadable (proxy error page, offline). */
 export function httpReason(status: number): string {
-  if (status === 429) return 'מכסת ה-API של Gemini לשעה זו מוצתה (429)';
+  if (status === 429) return 'Gemini הגביל את קצב הבקשות (429)';
+  if (status === 402) return 'קרדיט Gemini אזל — יש להטעין ב-AI Studio (402)';
   if (status === 401) {
     // One actionable re-auth prompt — the usual cause is a build-time secret that went stale
     // after ADMIN_API_SECRET was rotated on the site.
@@ -89,4 +94,28 @@ export async function describeAiError(res: Response): Promise<AiError> {
 /** Convenience for the many call sites that only want the sentence. */
 export async function aiErrorMessage(res: Response): Promise<string> {
   return (await describeAiError(res)).message;
+}
+
+/**
+ * How long to wait before retrying a 429 from the AI endpoint, or `null` when a retry is pointless.
+ *
+ * Every API client used to retry any 429 after a fixed pause, which is right for a per-minute
+ * throttle and wrong for the other two things Google also reports as 429 — a spent daily quota and
+ * depleted prepaid credits. Those now arrive as `retryable: false` (billing as a 402), and this is
+ * the one place that honours it. The wait follows the server's `retryAfterSeconds`, clamped so the
+ * UI is never parked for long, with jitter so parallel tabs don't retry in lockstep.
+ */
+export async function aiRetryDelayMs(res: Response, attempt = 0): Promise<number | null> {
+  if (res.status !== 429) return null;
+  let retryAfterSeconds: number | undefined;
+  try {
+    const j = (await res.clone().json()) as { retryable?: boolean; code?: string; retryAfterSeconds?: number };
+    if (j.retryable === false || j.code === 'quota_exhausted' || j.code === 'billing_exhausted') return null;
+    if (typeof j.retryAfterSeconds === 'number') retryAfterSeconds = j.retryAfterSeconds;
+  } catch {
+    /* unreadable body — treat as a plain throttle */
+  }
+  const base = Math.max(2000 * 2 ** attempt, (retryAfterSeconds ?? 0) * 1000);
+  if (base > 20000) return null;
+  return Math.round(base * (0.8 + Math.random() * 0.4));
 }

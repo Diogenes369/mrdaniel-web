@@ -1,6 +1,6 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import { getAdminSecret } from './adminSecret';
-import { describeAiError } from './aiErrors';
+import { describeAiError, aiRetryDelayMs } from './aiErrors';
 
 /** Shared POST helper with one bounded 429 retry (Gemini free-tier hourly cap). */
 async function post(action: string, body: Record<string, unknown>): Promise<Response> {
@@ -11,14 +11,8 @@ async function post(action: string, body: Record<string, unknown>): Promise<Resp
   };
   const payload = JSON.stringify({ action, ...body });
   let res = await fetch(url, { method: 'POST', headers, body: payload });
-  if (res.status === 429) {
-    let waitMs = 6000;
-    try {
-      const j = (await res.clone().json()) as { retryAfterSeconds?: number };
-      if (typeof j.retryAfterSeconds === 'number') waitMs = Math.min(12000, Math.max(3000, j.retryAfterSeconds * 1000));
-    } catch {
-      /* keep default */
-    }
+  const waitMs = await aiRetryDelayMs(res);
+  if (waitMs !== null) {
     await new Promise((r) => setTimeout(r, waitMs));
     res = await fetch(url, { method: 'POST', headers, body: payload });
   }

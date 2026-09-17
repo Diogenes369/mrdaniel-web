@@ -93,7 +93,7 @@ export function useWeeklyPlan() {
         return false;
       }
       if (!data.ok) {
-        setError(data.error || 'היצירה נכשלה');
+        setError(data.message || data.error || 'היצירה נכשלה');
         return false;
       }
       // Firebase's live listener above will pick up the write almost immediately, but setting it

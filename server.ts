@@ -8,7 +8,7 @@ import { getNewsItemBySlug, getNewsItems } from './src/server/newsFeed';
 import { generateArticleInsights, isInsightsConfigured } from './src/server/newsInsights';
 import { getAINews } from './src/server/aiNewsFeed';
 import { AI_ASSISTANT_SYSTEM_INSTRUCTION } from './src/server/aiSystemPrompt';
-import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, transcribeAudio, detectGeminiRateLimit, generateVisualSearchQuery, generateImageGenerationPrompt } from './src/agent/SocialAgentEngine';
+import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, transcribeAudio, detectGeminiRateLimit, classifyGeminiError, generateVisualSearchQuery, generateImageGenerationPrompt } from './src/agent/SocialAgentEngine';
 import { sanitizeOutput, containsPromptInjection } from './src/agent/AgentSecurityGuard';
 import { buildMediaFrames } from './src/agent/MediaTemplateRenderer';
 import {
@@ -384,9 +384,9 @@ app.post('/api/agent-generate', async (req: Request, res: Response) => {
 
     res.status(400).json({ ok: false, error: 'unknown action' });
   } catch (err) {
-    const rateLimit = detectGeminiRateLimit(err);
-    if (rateLimit) {
-      res.status(429).json({ ok: false, status: 'rate_limited', message: 'הגעת למגבלת ה-API החינמית לשעה זו', retryAfterSeconds: rateLimit.retryAfterSeconds });
+    const failure = classifyGeminiError(err);
+    if (failure.code === 'rate_limited' || failure.code === 'quota_exhausted' || failure.code === 'billing_exhausted') {
+      res.status(failure.status).json({ ok: false, status: failure.code === 'rate_limited' ? 'rate_limited' : failure.code, code: failure.code, message: failure.message, retryable: failure.retryable, retryAfterSeconds: failure.retryAfterSeconds });
       return;
     }
     console.error('[api/agent-generate] error:', err);
@@ -519,9 +519,9 @@ app.post('/api/generate-weekly-plan', async (req: Request, res: Response) => {
     const saved = agentFirebaseConfigured ? await writeWeeklyPlan(plan) : false;
     res.json({ ok: true, plan, saved });
   } catch (err) {
-    const rateLimit = detectGeminiRateLimit(err);
-    if (rateLimit) {
-      res.status(429).json({ ok: false, status: 'rate_limited', message: 'הגעת למגבלת ה-API החינמית לשעה זו', retryAfterSeconds: rateLimit.retryAfterSeconds });
+    const failure = classifyGeminiError(err);
+    if (failure.code === 'rate_limited' || failure.code === 'quota_exhausted' || failure.code === 'billing_exhausted') {
+      res.status(failure.status).json({ ok: false, status: failure.code === 'rate_limited' ? 'rate_limited' : failure.code, code: failure.code, message: failure.message, retryable: failure.retryable, retryAfterSeconds: failure.retryAfterSeconds });
       return;
     }
     console.error('[api/generate-weekly-plan] error:', err);

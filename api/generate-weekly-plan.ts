@@ -1,5 +1,5 @@
 import { generateWeeklyPlan, isEngineConfigured } from '../src/agent/WeeklyPlanEngine.js';
-import { detectGeminiRateLimit } from '../src/agent/SocialAgentEngine.js';
+import { classifyGeminiError } from '../src/agent/SocialAgentEngine.js';
 import { writeWeeklyPlan, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
 
 /**
@@ -46,9 +46,9 @@ export default async function handler(req: any, res: any) {
     const saved = agentFirebaseConfigured ? await writeWeeklyPlan(plan) : false;
     res.status(200).json({ ok: true, plan, saved });
   } catch (err) {
-    const rateLimit = detectGeminiRateLimit(err);
-    if (rateLimit) {
-      res.status(429).json({ ok: false, status: 'rate_limited', message: 'הגעת למגבלת ה-API החינמית לשעה זו', retryAfterSeconds: rateLimit.retryAfterSeconds });
+    const failure = classifyGeminiError(err);
+    if (failure.code === 'rate_limited' || failure.code === 'quota_exhausted' || failure.code === 'billing_exhausted') {
+      res.status(failure.status).json({ ok: false, status: failure.code === 'rate_limited' ? 'rate_limited' : failure.code, code: failure.code, message: failure.message, retryable: failure.retryable, retryAfterSeconds: failure.retryAfterSeconds });
       return;
     }
     console.error('[api/generate-weekly-plan] error:', err);

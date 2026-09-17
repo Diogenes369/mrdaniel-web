@@ -1,5 +1,5 @@
 import type { NewsItem, NewsTopic } from './newsAgentTypes';
-import { describeAiError } from './aiErrors';
+import { describeAiError, aiRetryDelayMs } from './aiErrors';
 import { adminSecretHeader } from './adminSecret';
 
 /**
@@ -398,8 +398,9 @@ interface SynthSlide {
   narrativeText: string;
 }
 
-/** POST to the story-synth endpoint, retrying once on a 429 (Gemini free-tier hourly cap) after a
- * short, bounded wait so a brief quota blip doesn't force the deterministic fallback. */
+/** POST to the story-synth endpoint. Retries a per-minute 429 throttle up to twice with
+ * exponential backoff (aiRetryDelayMs); a spent quota or depleted credits returns immediately so
+ * the deterministic fallback shows the real reason instead of a spinner that cannot succeed. */
 async function postStorySynth(url: string, headers: Record<string, string>, body: string): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     // Per-attempt hard timeout — a hung fetch never rejects on its own, which would hang the
@@ -413,18 +414,79 @@ async function postStorySynth(url: string, headers: Record<string, string>, body
     } finally {
       clearTimeout(timer);
     }
-    if (res.status !== 429 || attempt >= 1) return res;
-    let waitMs = 6000;
-    try {
-      const j = (await res.clone().json()) as { retryAfterSeconds?: number };
-      if (typeof j.retryAfterSeconds === 'number') {
-        waitMs = Math.min(12000, Math.max(3000, j.retryAfterSeconds * 1000));
-      }
-    } catch {
-      /* keep the default wait */
-    }
+    if (attempt >= 2) return res;
+    const waitMs = await aiRetryDelayMs(res, attempt);
+    if (waitMs === null) return res;
+    console.warn(`[slides] story-synthesize throttled (429), retry ${attempt + 1}/2 in ${waitMs}ms`);
     await new Promise((r) => setTimeout(r, waitMs));
   }
+}
+
+// ─── synthesis cache + request queue ────────────────────────────────────────────────────────
+// The synthesized text does not depend on the aspect ratio or the background, yet every format
+// switch and every re-selected news item used to fire a fresh Gemini call, and quick clicks sent
+// overlapping ones. Results are now cached per source (memory + sessionStorage, so a reload keeps
+// them), identical in-flight requests share one promise, and distinct requests go out one at a
+// time with a short gap between them.
+
+const SYNTH_CACHE_KEY = 'storySynthCache:v1';
+const SYNTH_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const SYNTH_CACHE_MAX = 30;
+const SYNTH_MIN_GAP_MS = 1200;
+
+const synthMemCache = new Map<string, { at: number; value: SynthResult }>();
+const synthInFlight = new Map<string, Promise<SynthResult>>();
+let synthQueueTail: Promise<unknown> = Promise.resolve();
+let synthLastStartedAt = 0;
+
+function synthKey(src: SlideSource): string {
+  const raw = [src.title, src.source, src.topic, src.bodyText].join(' | ');
+  let h = 5381;
+  for (let i = 0; i < raw.length; i++) h = ((h << 5) + h + raw.charCodeAt(i)) | 0;
+  return `${(h >>> 0).toString(36)}:${raw.length}`;
+}
+
+function loadPersistedSynth(): Record<string, { at: number; value: SynthResult }> {
+  try {
+    return JSON.parse(sessionStorage.getItem(SYNTH_CACHE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function readSynthCache(key: string): SynthResult | null {
+  const now = Date.now();
+  const hit = synthMemCache.get(key) ?? loadPersistedSynth()[key];
+  if (!hit || now - hit.at > SYNTH_CACHE_TTL_MS) return null;
+  synthMemCache.set(key, hit);
+  return hit.value;
+}
+
+function writeSynthCache(key: string, value: SynthResult): void {
+  const entry = { at: Date.now(), value };
+  synthMemCache.set(key, entry);
+  try {
+    const all = { ...loadPersistedSynth(), [key]: entry };
+    const kept = Object.entries(all)
+      .filter(([, e]) => Date.now() - e.at <= SYNTH_CACHE_TTL_MS)
+      .sort((a, b) => b[1].at - a[1].at)
+      .slice(0, SYNTH_CACHE_MAX);
+    sessionStorage.setItem(SYNTH_CACHE_KEY, JSON.stringify(Object.fromEntries(kept)));
+  } catch {
+    /* storage full / blocked — the in-memory cache still covers this session */
+  }
+}
+
+/** Runs `task` after every previously queued synthesis call has settled, spaced SYNTH_MIN_GAP_MS apart. */
+function enqueueSynth<T>(task: () => Promise<T>): Promise<T> {
+  const run = synthQueueTail.then(async () => {
+    const gap = SYNTH_MIN_GAP_MS - (Date.now() - synthLastStartedAt);
+    if (gap > 0) await new Promise((r) => setTimeout(r, gap));
+    synthLastStartedAt = Date.now();
+    return task();
+  });
+  synthQueueTail = run.catch(() => undefined);
+  return run;
 }
 
 interface SynthResult {
@@ -445,7 +507,7 @@ function readHookOptions(raw: unknown): StoryHookOption[] {
 
 /** Call the synth endpoint for one source; returns the raw SynthSlide[] (plus any cover-hook
  * alternatives) or throws a descriptive (Hebrew) error the caller can show and fall back on. */
-async function requestSynthesis(
+async function requestSynthesisUncached(
   src: SlideSource,
   opts: { apiBase: string; adminSecret?: string }
 ): Promise<SynthResult> {
@@ -472,6 +534,25 @@ async function requestSynthesis(
     throw new Error('מנוע ה-AI לא החזיר מספיק שקופיות תקינות');
   }
   return { slides: data.slides, hookOptions: readHookOptions(data.hookOptions) };
+}
+
+/** Cached, de-duplicated, queued front door to requestSynthesisUncached. Failures are never
+ * cached, so the next attempt after a quota recovers goes straight to the endpoint. */
+function requestSynthesis(src: SlideSource, opts: { apiBase: string; adminSecret?: string }): Promise<SynthResult> {
+  const key = synthKey(src);
+  const cached = readSynthCache(key);
+  if (cached) return Promise.resolve(cached);
+  const pending = synthInFlight.get(key);
+  if (pending) return pending;
+  const p = enqueueSynth(async () => {
+    const again = readSynthCache(key);
+    if (again) return again;
+    const value = await requestSynthesisUncached(src, opts);
+    writeSynthCache(key, value);
+    return value;
+  }).finally(() => synthInFlight.delete(key));
+  synthInFlight.set(key, p);
+  return p;
 }
 
 /**

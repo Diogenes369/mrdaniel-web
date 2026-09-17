@@ -52,21 +52,68 @@ export const TRANSIENT_UPSTREAM = /\b50[0-3]\b|INTERNAL|UNAVAILABLE|overloaded|d
 
 export interface RateLimitInfo {
   retryAfterSeconds: number;
+  /**
+   * Which 429 this is — they share a status code and RESOURCE_EXHAUSTED, but only one is worth
+   * waiting out:
+   *   - `rate`        per-minute RPM/TPM throttle; clears in seconds, safe to back off and retry.
+   *   - `daily_quota` a per-day quota; nothing clears it before Google's daily reset.
+   *   - `billing`     the project's prepaid credits are spent (or billing is off). Seen in prod on
+   *                   2026-09-17 as "Your prepayment credits are depleted" on a PAID key — every
+   *                   retry fails identically until someone tops up in AI Studio.
+   */
+  kind: 'rate' | 'daily_quota' | 'billing';
+  /** Google's own RetryInfo.retryDelay, when the error carried one. */
+  retryDelaySeconds: number | null;
 }
 
-/** Detects a Gemini free-tier 429 (RESOURCE_EXHAUSTED/quota-exceeded) from a caught error — the
- * @google/genai SDK throws a plain Error whose message embeds the underlying Google API error JSON,
- * so this checks the message text rather than a typed error class. When Google's error includes a
- * RetryInfo.retryDelay (e.g. `"retryDelay":"35s"`), that exact value is used; otherwise a
- * conservative fixed estimate is returned, since the free tier's actual reset window isn't always
- * present on every 429. Returns null for any other kind of error (network, malformed response,
- * etc.) so callers only special-case genuine rate-limiting. */
+const BILLING_EXHAUSTED = /prepay(?:ment)?\s+credits?|credits? (?:are|is) depleted|billing (?:account|is not|has not|disabled)|check your plan and billing/i;
+const DAILY_QUOTA = /PerDay|per[ _-]?day|daily (?:limit|quota)/i;
+
+/** Detects a Gemini 429 (RESOURCE_EXHAUSTED) from a caught error — the @google/genai SDK throws an
+ * ApiError whose message embeds the underlying Google API error JSON, so this checks the message
+ * text rather than a typed error class. When Google's error includes a RetryInfo.retryDelay
+ * (e.g. `"retryDelay":"35s"`), that exact value is used; otherwise a conservative estimate. Returns
+ * null for any other kind of error so callers only special-case genuine quota exhaustion. */
 export function detectGeminiRateLimit(err: unknown): RateLimitInfo | null {
   const message = err instanceof Error ? err.message : String(err);
-  if (!/\b429\b|RESOURCE_EXHAUSTED|quota/i.test(message)) return null;
+  const status = (err as { status?: unknown })?.status;
+  // `quota` alone used to match too, which let any error text that merely mentioned quotas be
+  // reported as a rate limit. Require the status or Google's status string.
+  if (status !== 429 && !/\b429\b|RESOURCE_EXHAUSTED/.test(message)) return null;
   const match = message.match(/retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/i);
-  const retryAfterSeconds = match ? Math.max(5, Math.ceil(parseFloat(match[1]))) : 60;
-  return { retryAfterSeconds };
+  const kind: RateLimitInfo['kind'] = BILLING_EXHAUSTED.test(message) ? 'billing' : DAILY_QUOTA.test(message) ? 'daily_quota' : 'rate';
+  const retryDelaySeconds = match ? Math.max(1, Math.ceil(parseFloat(match[1]))) : null;
+  const retryAfterSeconds = retryDelaySeconds ?? (kind === 'rate' ? 30 : 3600);
+  return { retryAfterSeconds, kind, retryDelaySeconds };
+}
+
+/** One structured line per failed model call: HTTP status, Google's status string and message, and
+ *  any retryDelay/quota metric — the facts needed to tell a billing block from a throttle without
+ *  digging a stack trace out of the function log. */
+export function logGeminiFailure(context: string, err: unknown, attempt: number): void {
+  const message = err instanceof Error ? err.message : String(err);
+  let google: { code?: number; status?: string; message?: string; details?: unknown } | undefined;
+  const jsonStart = message.indexOf('{');
+  if (jsonStart >= 0) {
+    try {
+      google = (JSON.parse(message.slice(jsonStart)) as { error?: typeof google }).error;
+    } catch {
+      /* not JSON — the raw message below is all there is */
+    }
+  }
+  const rate = detectGeminiRateLimit(err);
+  console.warn(
+    `[gemini] ${context} failed`,
+    JSON.stringify({
+      attempt,
+      httpStatus: (err as { status?: unknown })?.status ?? google?.code ?? null,
+      googleStatus: google?.status ?? null,
+      rateLimitKind: rate?.kind ?? null,
+      retryAfterSeconds: rate?.retryAfterSeconds ?? null,
+      message: (google?.message ?? message).slice(0, 500),
+      details: google?.details ?? null,
+    })
+  );
 }
 
 type GenContentReq = Parameters<GoogleGenAI['models']['generateContent']>[0];
@@ -87,28 +134,48 @@ function scrubResponse(res: GenContentRes): GenContentRes {
   return res;
 }
 
-/** Up to two retries (0.7s then 1.8s) for a transient upstream 5xx from Gemini Flash — INTERNAL /
- * UNAVAILABLE / "overloaded" / deadline / reset. A 429 is NOT retried here (surfaced so the
- * endpoint can return its structured rate-limit response); a genuine 4xx/parse error is not
- * retried either. */
+/** Transient 5xx: two retries with a short widening gap. */
+const TRANSIENT_WAITS_MS = [700, 1800];
+/** Per-minute 429: three retries at 2s, 4s, 8s (plus jitter), stretched to Google's own retryDelay
+ *  when it names a longer one — but only up to this cap, so a long wait is surfaced, not slept on. */
+const RATE_WAITS_MS = [2000, 4000, 8000];
+const MAX_RATE_WAIT_MS = 15000;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const withJitter = (ms: number) => Math.round(ms * (0.8 + Math.random() * 0.4));
+
+/**
+ * One model call with the shared retry policy:
+ *   - transient upstream 5xx (INTERNAL / UNAVAILABLE / overloaded / reset) → up to 2 retries;
+ *   - per-minute 429 throttle → up to 3 retries with exponential backoff + jitter;
+ *   - billing / daily-quota 429 → thrown immediately: nothing clears either within a request, and
+ *     retrying only adds load and latency before the same answer;
+ *   - any other 4xx / parse error → thrown immediately.
+ * Every failed attempt is logged with its status and Google's error payload (logGeminiFailure).
+ */
 export async function generateContentWithRetry(params: GenContentReq) {
   if (!genAI) throw new Error(engineConfigReason() ?? 'GEMINI_API_KEY not configured');
-  let lastErr: unknown;
-  // Two retries with a widening gap: a Gemini INTERNAL/UNAVAILABLE blip usually clears inside a
-  // second, and this is the difference between the operator seeing a 500 and seeing their deck.
-  for (const waitMs of [0, 700, 1800]) {
-    if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
+  let transientRetries = 0;
+  let rateRetries = 0;
+  for (let attempt = 1; ; attempt++) {
     try {
       return scrubResponse(await genAI.models.generateContent(params));
     } catch (err) {
-      lastErr = err;
-      // A quota error is surfaced immediately - retrying it only burns the remaining budget.
-      if (detectGeminiRateLimit(err)) throw err;
+      logGeminiFailure(`generateContent(${params.model})`, err, attempt);
+      const rate = detectGeminiRateLimit(err);
+      if (rate) {
+        if (rate.kind !== 'rate' || rateRetries >= RATE_WAITS_MS.length) throw err;
+        const waitMs = Math.max(RATE_WAITS_MS[rateRetries], (rate.retryDelaySeconds ?? 0) * 1000);
+        if (waitMs > MAX_RATE_WAIT_MS) throw err;
+        rateRetries++;
+        await sleep(withJitter(waitMs));
+        continue;
+      }
       const msg = err instanceof Error ? err.message : String(err);
-      if (!TRANSIENT_UPSTREAM.test(msg)) throw err;
+      if (!TRANSIENT_UPSTREAM.test(msg) || transientRetries >= TRANSIENT_WAITS_MS.length) throw err;
+      await sleep(TRANSIENT_WAITS_MS[transientRetries++]);
     }
   }
-  throw lastErr;
 }
 
 // ─── response contract ───────────────────────────────────────────────────────────────────────

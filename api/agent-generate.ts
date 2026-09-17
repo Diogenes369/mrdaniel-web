@@ -787,6 +787,8 @@ ${typeof notes === 'string' ? notes : ''}`);
 
     console.error(`[api/agent-generate] action=${action ?? 'unknown'} code=${failure.code} status=${failure.status}:`, err);
 
+    if (failure.retryAfterSeconds) res.setHeader('Retry-After', String(failure.retryAfterSeconds));
+
     if (failure.code === 'rate_limited') {
       // Unchanged shape - the dashboard clients already special-case this exact response.
       res.status(429).json({
@@ -805,6 +807,7 @@ ${typeof notes === 'string' ? notes : ''}`);
       error: failure.code,
       message: failure.message,
       retryable: failure.retryable,
+      ...(failure.retryAfterSeconds ? { retryAfterSeconds: failure.retryAfterSeconds } : {}),
       detail,
     });
   }

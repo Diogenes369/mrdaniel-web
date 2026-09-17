@@ -227,6 +227,8 @@ export interface GeminiFailure {
   /** Stable machine-readable cause, for the dashboard to branch on. */
   code:
     | 'rate_limited'
+    | 'quota_exhausted'
+    | 'billing_exhausted'
     | 'invalid_api_key'
     | 'model_not_found'
     | 'safety_blocked'
@@ -245,11 +247,29 @@ export function classifyGeminiError(err: unknown): GeminiFailure {
   const raw = err instanceof Error ? err.message : String(err);
 
   const rateLimit = detectGeminiRateLimit(err);
+  if (rateLimit?.kind === 'billing') {
+    // 402, not 429: every dashboard client auto-retries a 429, and this one cannot clear by waiting.
+    return {
+      status: 402,
+      code: 'billing_exhausted',
+      message: 'קרדיט התשלום המוקדם של פרויקט Gemini אזל — Google חוסמת כל קריאה עד להטענה. יש להוסיף קרדיט ב-AI Studio (ai.studio/projects → Billing).',
+      retryable: false,
+    };
+  }
+  if (rateLimit?.kind === 'daily_quota') {
+    return {
+      status: 429,
+      code: 'quota_exhausted',
+      message: 'המכסה היומית של מפתח Gemini נוצלה — היא מתאפסת ביום הבא, או שניתן להגדיל אותה ב-Google AI Studio.',
+      retryable: false,
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+    };
+  }
   if (rateLimit) {
     return {
       status: 429,
       code: 'rate_limited',
-      message: 'הגעת למגבלת ה-API החינמית של Gemini לשעה זו — נסו שוב מאוחר יותר או שדרגו את המפתח.',
+      message: 'Gemini הגביל את קצב הבקשות (מגבלה לדקה) — נסו שוב בעוד רגע.',
       retryable: true,
       retryAfterSeconds: rateLimit.retryAfterSeconds,
     };

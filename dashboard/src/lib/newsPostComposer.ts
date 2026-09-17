@@ -1,5 +1,5 @@
 import { GENERIC_ENGAGEMENT_LINE, SITE_PROMO_FOOTER, type NewsItem, type NewsTopic, type SocialPlatform } from './newsAgentTypes';
-import { describeAiError } from './aiErrors';
+import { describeAiError, aiRetryDelayMs } from './aiErrors';
 import { adminSecretHeader } from './adminSecret';
 import { stripMetaPhrases } from './storySlides';
 import { resolveArticleText } from './articleText';
@@ -427,16 +427,10 @@ export async function synthesizeNewsPost(
     articleText,
   });
 
-  // Retry once on a 429 (Gemini free-tier hourly cap) after a short bounded wait.
+  // Retry once on a per-minute 429 throttle. A spent quota / depleted credits is not retried.
   let res = await fetch(url, { method: 'POST', headers, body: reqBody });
-  if (res.status === 429) {
-    let waitMs = 6000;
-    try {
-      const j = (await res.clone().json()) as { retryAfterSeconds?: number };
-      if (typeof j.retryAfterSeconds === 'number') waitMs = Math.min(12000, Math.max(3000, j.retryAfterSeconds * 1000));
-    } catch {
-      /* keep default wait */
-    }
+  const waitMs = await aiRetryDelayMs(res);
+  if (waitMs !== null) {
     await new Promise((r) => setTimeout(r, waitMs));
     res = await fetch(url, { method: 'POST', headers, body: reqBody });
   }

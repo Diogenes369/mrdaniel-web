@@ -1,7 +1,7 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import type { NewsItem } from './newsAgentTypes';
 import { getAdminSecret } from './adminSecret';
-import { describeAiError } from './aiErrors';
+import { describeAiError, aiRetryDelayMs } from './aiErrors';
 
 /**
  * Tech Tips & Motion Studio — content layer.
@@ -278,13 +278,9 @@ async function post(body: Record<string, unknown>, timeoutMs = 90000): Promise<R
     }
     if (attempt >= 1) return res;
     if (res.status === 429) {
-      let waitMs = 6000;
-      try {
-        const j = (await res.clone().json()) as { retryAfterSeconds?: number };
-        if (typeof j.retryAfterSeconds === 'number') waitMs = Math.min(12000, Math.max(3000, j.retryAfterSeconds * 1000));
-      } catch {
-        /* keep default */
-      }
+      // Only a per-minute throttle is worth waiting out; a spent quota or depleted credits is not.
+      const waitMs = await aiRetryDelayMs(res, attempt);
+      if (waitMs === null) return res;
       await new Promise((r) => setTimeout(r, waitMs));
       continue;
     }
