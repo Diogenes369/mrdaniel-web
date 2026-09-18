@@ -70,6 +70,19 @@ export async function exportViaPlugin({ nodeId, format = 'PNG', scale = 2, outDi
   return { nodeId, name: result.name, format: result.format, bytes: bytes.length, path: `${dirRel.replace(/\\/g, '/')}/${name}` };
 }
 
+/**
+ * Rename a layer and pin the name so injection cannot rewrite it.
+ *
+ * Template prep. A TEXT layer named for what it says rather than what it is ("TEST", or the copy
+ * itself) cannot be targeted by name on the next run, because Figma's autoRename rewrites it on
+ * every edit. Naming it "headline" through here clears that flag for good.
+ */
+export async function setLayerName({ nodeId, name, port } = {}) {
+  if (!nodeId) throw new Error('nodeId is required');
+  if (!name?.trim()) throw new Error('name is required');
+  return figmaPluginCommand('set_layer_name', { nodeId, name }, { port });
+}
+
 /** Switch a component instance to another variant, e.g. { Theme: 'Dark' }. */
 export async function setVariant({ nodeId, properties, port } = {}) {
   if (!nodeId) throw new Error('nodeId is required');

@@ -43,6 +43,8 @@ async function run(command, params) {
       return swapImage(params);
     case 'set_variant':
       return setVariant(params);
+    case 'set_layer_name':
+      return setLayerName(params);
     case 'export_node':
       return exportNode(params);
     default:
@@ -94,6 +96,8 @@ function describeText(node) {
   return {
     id: node.id,
     name: node.name,
+    // false means the name is pinned and safe to match on; true means Figma will rewrite it on edit.
+    autoRename: node.autoRename,
     characters: node.characters,
     fontSize: node.fontSize === figma.mixed ? 'mixed' : node.fontSize,
     width: Math.round(node.width),
@@ -117,9 +121,23 @@ async function setText(params) {
 
   await loadFontsFor(node);
   const before = node.characters;
-  node.characters = params.text;
+  applyText(node, params.text);
   if (params.autoResize) node.textAutoResize = params.autoResize; // NONE | HEIGHT | WIDTH_AND_HEIGHT
   return { id: node.id, name: node.name, before: before, after: node.characters };
+}
+
+/**
+ * Set a text node's content without letting Figma rename the layer.
+ *
+ * A TEXT layer whose name was never set by hand has `autoRename` on, and Figma re-derives the layer
+ * name from its content on every edit. Injecting into a layer called "headline" therefore renames it
+ * to whatever was injected, and the *next* run cannot find "headline" any more — the name-matching
+ * contract destroys itself after one pass. Turning autoRename off first pins the name, which is
+ * exactly what a template needs.
+ */
+function applyText(node, text) {
+  node.autoRename = false;
+  node.characters = text;
 }
 
 /**
@@ -151,7 +169,7 @@ async function setTexts(params) {
     }
     await loadFontsFor(node);
     const before = node.characters;
-    node.characters = String(entry.text);
+    applyText(node, String(entry.text));
     applied.push({ id: node.id, name: node.name, before: before, after: node.characters });
   }
   return { root: root.name, applied: applied, missing: missing, appliedCount: applied.length };
@@ -187,6 +205,22 @@ async function swapImage(params) {
   ];
   const size = await image.getSizeAsync();
   return { id: node.id, name: node.name, imageHash: image.hash, width: size.width, height: size.height };
+}
+
+/**
+ * Rename a layer and pin the name.
+ *
+ * Template prep: a TEXT layer must be named for what it *is* ("headline"), not what it currently
+ * says, before a content run can target it. Renaming through the API also clears autoRename, so the
+ * name survives the first injection.
+ */
+async function setLayerName(params) {
+  const node = await mustGetNode(params.nodeId);
+  if (typeof params.name !== 'string' || !params.name.trim()) throw new Error('name is required');
+  const before = node.name;
+  node.name = params.name;
+  if (node.type === 'TEXT') node.autoRename = false;
+  return { id: node.id, before: before, after: node.name, autoRename: node.type === 'TEXT' ? node.autoRename : undefined };
 }
 
 /** Switch a component instance to another variant, e.g. { Size: 'Large', Theme: 'Dark' }. */

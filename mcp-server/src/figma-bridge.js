@@ -43,6 +43,7 @@ export const PLUGIN_COMMANDS = [
   'set_texts',
   'swap_image',
   'set_variant',
+  'set_layer_name',
   'export_node',
 ];
 

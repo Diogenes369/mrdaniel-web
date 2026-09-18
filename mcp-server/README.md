@@ -56,6 +56,7 @@ claude mcp add mrdaniel-ops -- node "C:\Projects\My Website\mcp-server\src\serve
 | `figma_export` | Render nodes to PNG/SVG/JPG into the workspace (what Figma has **saved**) |
 | `figma_bridge_status` | Is the plugin bridge up, and is the plugin attached? |
 | `figma_inject_text` / `figma_swap_image` / `figma_set_variant` | Writes, through the plugin. REST cannot do these |
+| `figma_set_layer_name` | Rename a layer and pin the name. Template prep — see the autoRename note below |
 | `figma_plugin_export` | Render through the plugin — sees unsaved edits, so use it straight after an injection |
 | `figma_render_slides` | Inject + export per slide. Deck in, PNGs on disk out |
 
@@ -115,6 +116,17 @@ stay open — closing it kills the socket.
 
 Layer **names** are the contract, not node ids: `figma_inject_text` fills by name so one template
 frame can be duplicated per slide without re-reading ids every time.
+
+For that to hold, a text layer must be named for what it **is** (`headline`, `body`, `cta`), not for
+what it currently says. Figma gives every text layer you never renamed by hand `autoRename: true`
+and re-derives its name from its content on each edit — so injecting into `headline` renames it to
+the headline text, and the next run cannot find `headline` at all. The plugin clears `autoRename`
+before every write, and `figma_set_layer_name` clears it when naming a layer, so a template only has
+to be set up once. `get_text_nodes` reports the flag per layer: `false` means the name is pinned and
+safe to match on.
+
+Changing the plugin's `code.js` needs the plugin re-run in Figma; changing the bridge's command
+whitelist needs `npm run figma:bridge` restarted. They are separate processes and reload separately.
 
 ## Figma → video
 

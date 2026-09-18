@@ -11,7 +11,7 @@ import { businessMetrics, generateDraft, checkHealth } from './tasks.js';
 import { ollamaHealth, ollamaGenerate, ollamaJson, ollamaTranslate } from './ollama.js';
 import { figmaWhoami, figmaReadFile, figmaExport, figmaReadStyles, figmaReadComponents } from './figma.js';
 import { figmaBridgeStatus } from './figma-bridge.js';
-import { injectText, swapImage, exportViaPlugin, setVariant, renderSlides } from './figma-inject.js';
+import { injectText, swapImage, exportViaPlugin, setVariant, setLayerName, renderSlides } from './figma-inject.js';
 import { CAPTION_RULES, captionSystemPrompt, checkCaption } from './copy-rules.js';
 
 /**
@@ -450,6 +450,18 @@ server.registerTool(
     annotations: { destructiveHint: true },
   },
   guard(async (args) => json(await setVariant(args)))
+);
+
+server.registerTool(
+  'figma_set_layer_name',
+  {
+    title: 'Rename a Figma layer',
+    description:
+      'Rename a layer and pin the name. Template prep: Figma auto-renames a TEXT layer to its own content on every edit, so a layer must be named for what it IS ("headline", "cta") before figma_inject_text can target it by name on more than one run.',
+    inputSchema: { nodeId: z.string().min(1), name: z.string().min(1).describe('What the layer is, not what it says') },
+    annotations: { destructiveHint: true },
+  },
+  guard(async (args) => json(await setLayerName(args)))
 );
 
 server.registerTool(
