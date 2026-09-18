@@ -9,6 +9,7 @@
  *
  *   brief    → a code brief for the target modules / commit range, so a run starts from facts
  *   scaffold → a HyperFrames project in the run directory, at the right resolution
+ *   figma    → stage Figma exports into the composition's assets + a manifest with pixel sizes
  *   check    → the single gate that must pass before a render
  *   render   → local render (headless Chrome + FFmpeg, no HeyGen account) + poster frame
  *   publish  → copy the mp4/jpg where the dashboard can serve it
@@ -235,6 +236,93 @@ function cmdScaffold(args) {
   return runDir;
 }
 
+/**
+ * figma → stage exported Figma assets into a run's composition and write a manifest.
+ *
+ * The MCP Figma tools (`figma_export`, `figma_plugin_export`) drop renders in
+ * `video-projects/_figma-assets/` by default. HyperFrames only serves files that live inside the
+ * composition directory, so a render referencing `../../_figma-assets/x.png` loads in a browser
+ * preview and then comes out blank in the headless render. Copying is therefore not a convenience,
+ * it is what makes the asset reachable at render time.
+ *
+ * The manifest exists because a composition has to know each asset's pixel size to lay it out
+ * without a layout shift on the first frame, and reading PNG/SVG headers is not something a
+ * composition author should be doing by hand.
+ *
+ *   node scripts/generate-code-video.mjs figma --run <dir> [--from video-projects/_figma-assets]
+ */
+function cmdFigma(args) {
+  const runDir = resolveRun(args);
+  const comp = composition(runDir);
+  if (!fs.existsSync(comp)) die('no composition in that run — scaffold it first');
+
+  const from = path.resolve(ROOT, String(args.from && args.from !== true ? args.from : path.join(RUNS_DIR, '_figma-assets')));
+  if (!fs.existsSync(from)) die(`no such source directory: ${path.relative(ROOT, from).replace(/\\/g, '/')} — export from Figma first`);
+
+  const files = fs.readdirSync(from, { withFileTypes: true }).filter((e) => e.isFile() && /\.(png|jpe?g|svg)$/i.test(e.name));
+  if (!files.length) die(`no png/jpg/svg files in ${path.relative(ROOT, from).replace(/\\/g, '/')}`);
+
+  const dest = path.join(comp, 'assets', 'figma');
+  fs.mkdirSync(dest, { recursive: true });
+
+  const entries = [];
+  for (const file of files.sort((a, b) => a.name.localeCompare(b.name))) {
+    const src = path.join(from, file.name);
+    fs.copyFileSync(src, path.join(dest, file.name));
+    const bytes = fs.statSync(src).size;
+    entries.push({ file: `assets/figma/${file.name}`, bytes, ...readImageSize(src) });
+  }
+
+  const manifest = { generatedAt: new Date().toISOString(), source: path.relative(ROOT, from).replace(/\\/g, '/'), count: entries.length, assets: entries };
+  fs.writeFileSync(path.join(dest, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+
+  console.log(`✓ figma   ${entries.length} asset(s) → ${path.relative(ROOT, dest).replace(/\\/g, '/')}`);
+  for (const e of entries) console.log(`  ${e.file}  ${e.width && e.height ? `${e.width}×${e.height}` : 'vector'}  ${(e.bytes / 1024).toFixed(0)} KB`);
+  console.log(`  manifest assets/figma/manifest.json — reference assets by the "file" path from the composition root`);
+  return manifest;
+}
+
+/**
+ * Pixel dimensions straight from the file header — no image library.
+ *
+ * PNG: width and height are two big-endian uint32s at a fixed offset inside the IHDR chunk, which
+ * the spec requires to be first. JPEG: walk the segment chain to the SOFn frame header. SVG has no
+ * intrinsic pixel size, so the viewBox is reported instead when it is there.
+ */
+function readImageSize(file) {
+  const ext = path.extname(file).toLowerCase();
+  try {
+    if (ext === '.svg') {
+      const text = fs.readFileSync(file, 'utf8').slice(0, 2000);
+      const viewBox = text.match(/viewBox\s*=\s*["']\s*[\d.-]+\s+[\d.-]+\s+([\d.]+)\s+([\d.]+)/i);
+      return viewBox ? { width: Math.round(+viewBox[1]), height: Math.round(+viewBox[2]), format: 'svg' } : { format: 'svg' };
+    }
+    const buf = fs.readFileSync(file);
+    if (ext === '.png') {
+      if (buf.length < 24 || buf.readUInt32BE(0) !== 0x89504e47) return { format: 'png' };
+      return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20), format: 'png' };
+    }
+    // JPEG: 0xFFD8, then length-prefixed segments until a start-of-frame marker carries the size.
+    let offset = 2;
+    while (offset + 9 < buf.length) {
+      if (buf[offset] !== 0xff) {
+        offset += 1;
+        continue;
+      }
+      const marker = buf[offset + 1];
+      // SOF0-SOF15, skipping the four markers in that range that are not frame headers.
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+        return { height: buf.readUInt16BE(offset + 5), width: buf.readUInt16BE(offset + 7), format: 'jpeg' };
+      }
+      offset += 2 + buf.readUInt16BE(offset + 2);
+    }
+    return { format: 'jpeg' };
+  } catch {
+    // A size we cannot read is not worth failing a copy over; the file is still staged.
+    return {};
+  }
+}
+
 function cmdCheck(args) {
   const comp = composition(resolveRun(args));
   if (!fs.existsSync(comp)) die(`no composition in that run — scaffold it first`);
@@ -311,7 +399,7 @@ function cmdStart(args) {
   void file;
 }
 
-const COMMANDS = { doctor: cmdDoctor, brief: cmdBrief, scaffold: cmdScaffold, check: cmdCheck, render: cmdRender, publish: cmdPublish, list: cmdList, start: cmdStart };
+const COMMANDS = { doctor: cmdDoctor, brief: cmdBrief, scaffold: cmdScaffold, figma: cmdFigma, check: cmdCheck, render: cmdRender, publish: cmdPublish, list: cmdList, start: cmdStart };
 
 const args = parseArgs(process.argv.slice(2));
 const cmd = args._[0];
@@ -322,6 +410,7 @@ if (!cmd || args.help) {
       `  start    --paths <a,b> [--since <rev>]   brief + scaffold a new run\n` +
       `  brief    --paths <a,b> [--since <rev>]   (re)write the code brief only\n` +
       `  scaffold --run <dir> [--format vertical] scaffold the HyperFrames project\n` +
+      `  figma    --run <dir> [--from <dir>]      stage Figma exports into the composition\n` +
       `  check    --run <dir>                     the pre-render gate\n` +
       `  render   --run <dir> [--publish]         render locally, then optionally publish\n` +
       `  publish  --run <dir> [--name <slug>]     copy mp4/jpg to dashboard/public/generated-videos\n` +

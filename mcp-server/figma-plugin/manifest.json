@@ -1,0 +1,13 @@
+{
+  "name": "mrdaniel content bridge",
+  "id": "mrdaniel-content-bridge",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["ws://127.0.0.1:3055", "ws://localhost:3055"],
+    "reasoning": "Connects to the local mrdaniel content bridge so the MCP server can inject copy and swap images into this file. Loopback only; nothing leaves the machine."
+  }
+}

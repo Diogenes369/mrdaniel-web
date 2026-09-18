@@ -46,6 +46,21 @@ export const config = {
   stateDir: path.resolve(clean(process.env.AGENT_STATE_DIR) || path.join(PKG_ROOT, '.agent-state')),
   /** Optional: a Telegram/WhatsApp/Slack-style webhook the worker POSTs `{ text }` to on alerts. */
   notifyWebhook: clean(process.env.AGENT_NOTIFY_WEBHOOK),
+  /** Local Ollama. No key: it is an unauthenticated loopback server. Empty model = first installed. */
+  ollama: {
+    url: clean(process.env.OLLAMA_URL) || 'http://127.0.0.1:11434',
+    model: clean(process.env.OLLAMA_MODEL),
+  },
+  /**
+   * Figma. `token` is a personal access token (X-Figma-Token) and only ever reads: the REST API has
+   * no endpoint that mutates a node, so text injection and fill swaps go through the plugin bridge.
+   */
+  figma: {
+    token: clean(process.env.FIGMA_TOKEN),
+    fileKey: clean(process.env.FIGMA_FILE_KEY),
+    /** Port the plugin's WebSocket bridge listens on (loopback only). */
+    bridgePort: Number(process.env.FIGMA_BRIDGE_PORT) || 3055,
+  },
   schedule: {
     healthEveryMin: Number(process.env.AGENT_HEALTH_EVERY_MIN) || 15,
     metricsEveryMin: Number(process.env.AGENT_METRICS_EVERY_MIN) || 360,

@@ -22,7 +22,7 @@ export { stripCodeFence, requireText, parseJsonOrThrow, ModelOutputError };
 export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
-import { EXPERT_VOICE_RULES } from './expertVoice.js';
+import { EXPERT_VOICE_RULES, shortCaptionRules } from './expertVoice.js';
 import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode, PromptCard, ImageOverlayBox } from './types.js';
 
 
@@ -357,12 +357,15 @@ export async function generateSocialContent(platform: Platform, topic: string, f
 - שקף 1 (Hook/כותרת): משפט קליטה אחד שעוצר גלילה — שאלה חדה או סטטמנט שנוגד אינטואיציה, קשור ישירות לנושא. עד 12 מילה, ייקרא ככותרת מרכזית.
 - שקפי גוף (5-7 שקפים): כל שקף הוא פסקה מלאה של 3-4 משפטים, 50-70 מילה — תת-נושא ממוקד אחד מתוך הנושא הכללי, מוסבר לעומק עם דוגמה או הבחנה טכנית אמיתית, לא רק כותרת מורחבת. חובה: כל שקף ממשיך את קו המחשבה מהשקף שלפניו (מבוא → מנגנון → יישום/הבדל מעשי → משמעות) כך שקריאת כל השקפים ברצף מרגישה כמו כתבה אחת, לא כמו רשימת "5 עובדות". בכל פסקה, סמן בדיוק ביטוי מפתח אחד (2-6 מילים, החלק החזק/המפתיע ביותר) בעטיפת כוכביות כפולות בפורמט **הביטוי המודגש** — זה ירונדר כטקסט מודגש בעיצוב, בדיוק כמו ההדגשה האמצע-פסקה בציטוטים של ice.co.il. אל תדגיש יותר מביטוי אחד לשקף.
 - שקף אחרון (CTA): קריאה לפעולה ברורה וחזקה, קצרה (עד 15 מילה) — תגובה/שמירה/פנייה, לא מכירתי אגרסיבי. אפשר לסמן מילה אחת ב-** אם רלוונטי.
-החזר כל שקף בשורה נפרדת, בפורמט "שקף N: <טקסט השקף>". אחרי השקף האחרון, ורק אחריו, הוסף שורת caption מלאה ומפורטת ל-${platformName} (2-4 משפטים, מרחיבה על הנושא מעבר לשקפים עצמם) בפורמט "כיתוב: <הטקסט>", ולבסוף שורת ההאשטגים המחייבת. שום טקסט נוסף מעבר לזה.`
+החזר כל שקף בשורה נפרדת, בפורמט "שקף N: <טקסט השקף>". אחרי השקף האחרון, ורק אחריו, הוסף שורת caption ל-${platformName} בפורמט "כיתוב: <הטקסט>", ולבסוף שורת ההאשטגים המחייבת. שום טקסט נוסף מעבר לזה.
+
+${platform === 'linkedin' ? 'הכיתוב ל-LinkedIn: 2-4 משפטים שמרחיבים על הנושא מעבר לשקפים.' : shortCaptionRules(true)}`
       : format === 'post' && (platform === 'instagram' || platform === 'tiktok')
-        ? `כתוב caption/תיאור פוסט מפורט וממיר במיוחד עבור ${platformName}, ברמת קופירייטינג גבוהה:
-- Hook פותח בשורה הראשונה — עוצר גלילה תוך שנייה, לא קלישאתי.
-- גוף הטקסט: תובנה טכנית אמיתית ומעניינת על הנושא (לא רק תיאור שטחי) — ${platform === 'tiktok' ? 'קצר וקולע, עד 70 מילה' : "עד 150 מילה, פורמט דינמי עם שורות קצרות ורווחים בין רעיונות, אימוג'ים מדודים במקומות טבעיים"}.
-- CTA ברור וממיר בסיום (תגובה/שמירה/עוקבים/פנייה בדיוק לפי ההקשר, לא מכירתי אגרסיבי).`
+        ? `כתוב caption לפוסט בודד עבור ${platformName}.
+
+${shortCaptionRules(false)}
+
+- התובנה חייבת להיות טכנית ואמיתית, לא תיאור שטחי של הנושא.`
         : `כתוב פוסט בודד המתאים ל-${
             platform === 'linkedin' ? 'LinkedIn (טון מקצועי-ארגוני, עד 200 מילה, פסקאות קצרות עם שורות ריקות ביניהן לקריאות)' : platform === 'tiktok' ? 'כיתוב TikTok (קצר וקולע, עד 60 מילה, hook חד בשורה הראשונה)' : "Instagram (טון נגיש יותר, עד 120 מילה, אפשר אימוג'ים מדודים)"
           } כולל Hook פותח חזק ו-CTA ברור בסיום.`;

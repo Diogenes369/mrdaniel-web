@@ -11,13 +11,17 @@
     "pm2:start": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop mrdaniel-agent",
     "pm2:logs": "pm2 logs mrdaniel-agent",
-    "selftest": "node src/selftest.js"
+    "selftest": "node src/selftest.js",
+    "figma:bridge": "node start-bridge.js",
+    "test:bridge": "node src/figma-bridge.selftest.js",
+    "test:copy": "node src/copy-rules.selftest.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "dotenv": "^17.4.2",
     "firebase": "^12.19.0",
     "firebase-admin": "^14.4.0",
+    "ws": "^8.21.3",
     "zod": "^4.6.5"
   }
 }

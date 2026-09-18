@@ -24,6 +24,27 @@ export const EXPERT_VOICE_RULES = `קול הכותב — כלל אדום:
 - אסור לחלוטין (נמחק אוטומטית גם אם ייכתב): "בעידן הדיגיטלי", "בעידן ה-AI", "בעולם של היום", "חשוב לציין", "חשוב לזכור", "בואו נצלול", "מהפכני/ת", "פורץ/ת דרך", "משנה את כללי המשחק", "לסיכום", "הנה כמה דרכים", "ללא ספק", "לשלב הבא".
 - אין פתיח ואין סיכום. לא "במאמר הזה נסקור", לא "לסיכום, ראינו ש". הנקודה האחרונה היא הסוף.`;
 
+/**
+ * The caption half of the voice, for Instagram and TikTok.
+ *
+ * Added when the carousel renderer took over the teaching: slides now carry 30–60 word paragraphs,
+ * so a caption that also explains the topic competes with them and the post gets scrolled past. The
+ * caption's only job is to earn the swipe. Limits are numeric on purpose — "short and punchy" gets
+ * 150 words back from every model, "3 sentences, 45 words, then stop" gets 3 sentences.
+ *
+ * LinkedIn deliberately does not use this: it is a long-form feed and a 3-sentence post underperforms
+ * there. Mirrored for the local Ollama path in `mcp-server/src/copy-rules.js`.
+ */
+export function shortCaptionRules(hasCarousel: boolean): string {
+  return `כללי כיתוב — כלל אדום:
+- 3 משפטים קצרים לכל היותר, ואז CTA אחד. סך הכל עד 45 מילים. זו תקרה, לא יעד.
+- המשפט הראשון עוצר גלילה בכוחות עצמו: אמירה חדה, מספר, או הטעות שכולם עושים. לא שאלה גנרית ולא "רוצים לדעת איך".
+${hasCarousel ? '- התוכן הכבד יושב בשקפים. הכיתוב לא מסביר אותם, לא מסכם אותם ולא חוזר על ההוק — הוא רק גורם למישהו להחליק ימינה.' : '- אין קרוסלה, ולכן המשפטים חייבים לעמוד לבד. עדיין עד המגבלה למעלה — משפט אחד חד עדיף על שלושה כלליים.'}
+- CTA אחד בלבד בסוף, קונקרטי (שמרו / כתבו לי X / קישור בביו). לא שניים ולא שלושה.
+- בלי קישורים ובלי URL בגוף הכיתוב (אינסטגרם לא הופכת אותם ללחיצים ממילא).
+- אימוג'י אחד לכל היותר, ורק אם הוא מוסיף. לא אימוג'י לכל שורה.`;
+}
+
 /** A banned phrase and what replaces it. Replacements are chosen so the sentence around them stays
  *  grammatical Hebrew — removal where the phrase is pure filler, a plain synonym where it carries
  *  meaning (an adjective can't just vanish from "גישה מהפכנית"). */

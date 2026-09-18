@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        margin: 0;
+        padding: 14px 16px;
+        font: 12px/1.5 Inter, -apple-system, system-ui, sans-serif;
+        color: #1a1a1a;
+        background: #fff;
+      }
+      h1 {
+        margin: 0 0 2px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .sub {
+        color: #8c8c8c;
+        margin-bottom: 12px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #d0d0d0;
+        flex: none;
+      }
+      .dot.on {
+        background: #14ae5c;
+      }
+      .dot.off {
+        background: #e5484d;
+      }
+      #log {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #ececec;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 10px;
+        color: #8c8c8c;
+        max-height: 78px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>mrdaniel content bridge</h1>
+    <div class="sub">Keep this window open while the agent works.</div>
+    <div class="row"><span class="dot" id="dot"></span><span id="status">connecting…</span></div>
+    <div id="log"></div>
+
+    <script>
+      // This iframe has the network; the sandbox (code.js) has the Figma API. We are the socket.
+      const URL_ = 'ws://127.0.0.1:3055';
+      const dot = document.getElementById('dot');
+      const status = document.getElementById('status');
+      const logEl = document.getElementById('log');
+
+      let socket = null;
+      let retry = 1000;
+
+      function log(line) {
+        const time = new Date().toTimeString().slice(0, 8);
+        logEl.textContent = (time + '  ' + line + '\n' + logEl.textContent).split('\n').slice(0, 40).join('\n');
+      }
+
+      function setState(state, text) {
+        dot.className = 'dot' + (state ? ' ' + state : '');
+        status.textContent = text;
+      }
+
+      function connect() {
+        setState('', 'connecting…');
+        socket = new WebSocket(URL_);
+
+        socket.onopen = () => {
+          retry = 1000;
+          setState('on', 'connected to the bridge');
+          socket.send(JSON.stringify({ type: 'register', role: 'plugin', name: 'mrdaniel content bridge' }));
+          log('connected');
+        };
+
+        socket.onmessage = (event) => {
+          let msg;
+          try {
+            msg = JSON.parse(event.data);
+          } catch (err) {
+            return log('bad frame');
+          }
+          if (msg.type === 'command') {
+            log('→ ' + msg.command);
+            // Hand it to the sandbox; the result comes back through window.onmessage below.
+            parent.postMessage({ pluginMessage: { type: 'command', id: msg.id, command: msg.command, params: msg.params } }, '*');
+          }
+        };
+
+        socket.onclose = () => {
+          setState('off', 'bridge offline — retrying');
+          // Backoff caps at 10s: the bridge restarts often during development and we want a fast
+          // reattach, but not a tight reconnect loop when it is simply not running.
+          setTimeout(connect, retry);
+          retry = Math.min(retry * 2, 10000);
+        };
+
+        socket.onerror = () => log('socket error');
+      }
+
+      window.onmessage = (event) => {
+        const msg = event.data && event.data.pluginMessage;
+        if (!msg || msg.type !== 'result') return;
+        log((msg.ok ? '✓ ' : '✗ ') + (msg.error || 'done'));
+        if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg));
+      };
+
+      connect();
+    </script>
+  </body>
+</html>
