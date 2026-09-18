@@ -93,8 +93,18 @@ The plugin is sandboxed and cannot listen on a socket, so it dials *out* to a lo
 figma-plugin (Figma desktop)  ──ws──▶  bridge :3055  ◀──ws──  MCP tools
 ```
 
+Port 3055 is pinned in three places — `figma-plugin/manifest.json`, `figma-plugin/ui.html` and
+`FIGMA_BRIDGE_PORT`. A Figma manifest is static and its UI is a sandboxed iframe, so the plugin
+cannot read the env var; change the port and you must edit all three, or the plugin dials a port
+nothing answers on. `npm run figma:bridge` warns when they disagree.
+
+The manifest says `ws://localhost:3055`, with the hostname spelled out: Figma rejects an IP literal
+in `allowedDomains` ("must be a valid URL"). `localhost` resolves to `::1` before `127.0.0.1` on
+Windows, so the bridge binds **both** loopback addresses rather than trusting the client to fall
+back.
+
 ```powershell
-npm run figma:bridge     # start the relay (loopback only; keep it running)
+npm run figma:bridge     # start the relay (both loopback addresses; keep it running)
 npm run test:bridge      # 11 protocol checks against a mock plugin — no Figma needed
 npm run test:copy        # 24 caption-rule checks
 ```

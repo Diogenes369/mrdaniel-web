@@ -59,7 +59,10 @@
 
     <script>
       // This iframe has the network; the sandbox (code.js) has the Figma API. We are the socket.
-      const URL_ = 'ws://127.0.0.1:3055';
+      // The hostname must match manifest.json's devAllowedDomains exactly, and Figma rejects an IP
+      // literal there ("must be a valid URL") — so this is `localhost`, never 127.0.0.1. The bridge
+      // binds both loopback addresses so it answers whichever one localhost resolves to.
+      const URL_ = 'ws://localhost:3055';
       const dot = document.getElementById('dot');
       const status = document.getElementById('status');
       const logEl = document.getElementById('log');

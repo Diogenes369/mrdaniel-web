@@ -14,6 +14,20 @@ t('status: no bridge -> ok:false + hint', s.ok === false && /npm run figma:bridg
 
 const bridge = await startBridge({ port: PORT, log: () => {} });
 
+// Both loopback spellings must reach it. `localhost` resolves to ::1 first on Windows, and the
+// plugin UI can only use the hostname (Figma's manifest rejects an IP literal), so a bridge bound
+// to IPv4 alone would leave the plugin dialling a port nothing answers on.
+for (const host of ['127.0.0.1', 'localhost', '[::1]']) {
+  const reached = await new Promise((resolve) => {
+    const s = new WebSocket(`ws://${host}:${PORT}`);
+    const done = (v) => { clearTimeout(timer); try { s.close(); } catch { /* already closing */ } resolve(v); };
+    const timer = setTimeout(() => done(false), 3000);
+    s.on('open', () => done(true));
+    s.on('error', () => done(false));
+  });
+  t(`reachable via ${host}`, reached);
+}
+
 // 2. status with bridge, no plugin
 s = await figmaBridgeStatus({ port: PORT });
 t('status: bridge up, no plugin', s.ok === true && s.pluginConnected === false, JSON.stringify(s));

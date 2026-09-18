@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { config } from './env.js';
 
@@ -18,7 +19,15 @@ import { config } from './env.js';
  * be bound to 0.0.0.0.
  */
 
-const HOST = '127.0.0.1';
+/**
+ * Both loopback addresses, because `localhost` resolves to `::1` first on Windows while a server
+ * bound only to `127.0.0.1` never hears it. Node's own client papers over that with Happy Eyeballs;
+ * the plugin UI is a browser iframe and is not guaranteed to. Binding both removes the question.
+ * Still loopback only — anything that reaches this port can edit the open Figma file.
+ */
+const HOSTS = ['127.0.0.1', '::1'];
+/** What controllers and the plugin UI dial. A hostname, since Figma's manifest rejects an IP literal. */
+const HOST = 'localhost';
 const PROTOCOL_VERSION = 1;
 
 /** A plugin call that never answers must not hang the MCP tool forever. */
@@ -40,7 +49,8 @@ export const PLUGIN_COMMANDS = [
 // ─── server ─────────────────────────────────────────────────────────────────────────────────
 
 export function startBridge({ port = config.figma.bridgePort, log = () => {} } = {}) {
-  const wss = new WebSocketServer({ host: HOST, port });
+  // One protocol handler, fed by an HTTP listener per loopback address.
+  const wss = new WebSocketServer({ noServer: true });
   /** The single connected Figma plugin. Last one to register wins — reloading the plugin reconnects. */
   let plugin = null;
   /** id → controller socket, so a result goes back only to whoever asked. */
@@ -113,16 +123,53 @@ export function startBridge({ port = config.figma.bridgePort, log = () => {} } =
     });
   });
 
+  return listenAll(port, wss, log);
+}
+
+/**
+ * Bring up one HTTP listener per loopback address and hand their upgrades to the shared handler.
+ *
+ * IPv4 is required; `::1` is best-effort, since a machine with IPv6 disabled has no such address and
+ * that is not a reason to fail. EADDRINUSE on the first address is still fatal — it means a bridge
+ * is already running, and silently becoming a second one would split the plugin's connections.
+ */
+function listenAll(port, wss, log) {
+  const servers = [];
+  const close = () =>
+    Promise.all(servers.map((s) => new Promise((r) => s.close(r)))).then(() => new Promise((r) => wss.close(r)));
+
   return new Promise((resolve, reject) => {
-    wss.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        reject(new Error(`port ${port} is already in use — a bridge is probably already running (that is fine; use it)`));
-      } else reject(err);
-    });
-    wss.on('listening', () => {
-      log(`bridge listening on ws://${HOST}:${port}`);
-      resolve({ wss, port, close: () => new Promise((r) => wss.close(r)) });
-    });
+    let pending = HOSTS.length;
+    let bound = 0;
+
+    for (const host of HOSTS) {
+      const server = http.createServer((_req, res) => {
+        res.writeHead(426, { 'Content-Type': 'text/plain' });
+        res.end('this port speaks WebSocket only — see mcp-server/README.md\n');
+      });
+      server.on('upgrade', (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req)));
+      server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          servers.forEach((s) => s.close());
+          return reject(new Error(`port ${port} is already in use — a bridge is probably already running (that is fine; use it)`));
+        }
+        // ::1 is unavailable when IPv6 is off. Note it and carry on with IPv4.
+        log(`could not bind ${host}: ${err.code ?? err.message}`);
+        if (--pending === 0) finish();
+        return undefined;
+      });
+      server.listen(port, host, () => {
+        servers.push(server);
+        bound += 1;
+        if (--pending === 0) finish();
+      });
+    }
+
+    function finish() {
+      if (!bound) return reject(new Error(`could not bind port ${port} on any loopback address`));
+      log(`bridge listening on ws://${HOST}:${port} (${servers.length} loopback address${servers.length === 1 ? '' : 'es'})`);
+      return resolve({ wss, port, servers, close });
+    }
   });
 }
 
