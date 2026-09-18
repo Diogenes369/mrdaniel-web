@@ -17,3 +17,6 @@ __pycache__/
 carousel-bridge/output/
 
 .env*
+
+# Video showcase runs — briefs, compositions and unpublished renders (scripts/generate-code-video.mjs)
+video-projects/

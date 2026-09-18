@@ -38,6 +38,7 @@ Run from the **repo root** for the site, from **`dashboard/`** for the dashboard
 | Full preflight (mirrors + tsc + build, both apps) | `npm run ship` (`-- --scrapers`, `-- --deploy`) | — |
 | Type-mirror drift (`src/` ↔ `dashboard/`) | `npm run check:mirrors` | — |
 | Threads scraper live regression | `npm run check:scrapers` | — |
+| Code → showcase video (`docs/CODE_VIDEO.md`) | `npm run video:doctor` · `video:start` · `video:render` | — |
 
 **Always** run `npx tsc --noEmit` **and** `npm run build` for every project you touched before calling a change done. `tsc` covers `src`, `api`, `server.ts`, `netlify` at root; `src` in the dashboard.
 
