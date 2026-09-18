@@ -105,8 +105,8 @@ back.
 
 ```powershell
 npm run figma:bridge     # start the relay (both loopback addresses; keep it running)
-npm run test:bridge      # 11 protocol checks against a mock plugin — no Figma needed
-npm run test:copy        # 24 caption-rule checks
+npm run test:bridge      # 14 protocol checks against a mock plugin — no Figma needed
+npm run test:copy        # 34 caption-rule checks
 ```
 
 Then in Figma desktop: **Plugins → Development → Import plugin from manifest…** → pick
