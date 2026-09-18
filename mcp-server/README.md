@@ -65,17 +65,34 @@ Prompt: `morning_ops_brief`.
 
 Nothing here posts to a social network or emails a lead. Those stay one human click away in the dashboard.
 
-## Local models — what they are and are not for
+## Which model does what
 
-`OLLAMA_MODEL=qwen2.5`. Use the local model for JSON structuring, English drafting, and dry-running
-a prompt before spending Gemini quota.
+| Work | Goes to |
+|---|---|
+| Hebrew for publication | `content_generate_draft` → the live Gemini engine |
+| Structural logic, JSON shaping, English copy, prompt dry-runs | Ollama (`OLLAMA_MODEL=qwen2.5`) |
 
-**Do not ship Hebrew from it.** Measured on this machine, both installed models mangle Hebrew badly
-enough to be unpublishable — `llama3:8b` produces broken word order, and `qwen2.5:7b` corrupts
-tokens outright (`הצ'*אט봇ים`, `ש]={`, `המ?>>וטטים` are all real output from the caption test).
-`caption_check` now flags those as `garbled` and `caption_write` returns `ok:false`, so nothing
-silently reaches the queue, but the fix is the model, not the checker. Hebrew for publication goes
-through `content_generate_draft` → the live Gemini engine, which carries the voice rules.
+Gemini-only routing for publication is structural, not a convention: `GEMINI_API_KEY` is a
+Vercel-only secret, so `content_generate_draft` posts to the deployed `/api/agent-generate` and the
+local models are never in that path. The voice rules, the AI-phrase scrubber and the queue write all
+live there too.
+
+What the local models *cannot* do is Hebrew. Measured here, both mangle it past use:
+
+| Model | Real output |
+|---|---|
+| `llama3:8b` | broken word order (`אתם מה עושים?`) |
+| `qwen2.5:7b` | `הצ'*אט봇ים` (Hangul mid-word), `ש]={`, `המ?>>וטטים`, `הגCPPות` |
+
+So every `ollama_*` result carrying Hebrew comes back tagged `publicationSafe: false` with the
+reason. The text is still returned — it is useful for drafting and for reading a source — but
+nothing can mistake it for finished copy. `caption_write` is a draft aid by description and never
+reports `publicationSafe: true` for Hebrew, however cleanly it scores: `caption_check` measures
+*shape*, and mangled words are shaped fine. `caption_check` separately flags `garbled` tokens
+(foreign scripts, code punctuation, mid-word script changes) while leaving real mixed-script copy
+like `Wi-Fi 7`, `ה-AI` and `Full-Stack` alone.
+
+The same models are genuinely good at the other half — English and JSON come back clean.
 
 ## Figma
 

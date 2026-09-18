@@ -230,7 +230,7 @@ server.registerTool(
   {
     title: 'Generate text locally',
     description:
-      'Free-text generation on the local model. Nothing leaves the machine and it costs no Gemini quota, so use it for drafting, rewriting and dry-running a prompt. Content meant for publication should still go through content_generate_draft, which carries the live voice rules.',
+      'Free-text generation on the local model. Nothing leaves the machine and costs no Gemini quota: use it for structural logic, English copy, and dry-running a prompt. Hebrew output is returned tagged publicationSafe:false — local models mangle it. Publication copy comes from content_generate_draft.',
     inputSchema: {
       prompt: z.string().min(1),
       system: z.string().optional().describe('System instruction — voice, role, constraints'),
@@ -265,7 +265,8 @@ server.registerTool(
   'ollama_translate',
   {
     title: 'Translate locally',
-    description: 'Translate text, preserving line breaks, emoji, @handles and #hashtags. Defaults to Hebrew, the house language.',
+    description:
+      'Translate text, preserving line breaks, emoji, @handles and #hashtags. Defaults to Hebrew. Translation INTO Hebrew is for reading a source, not for publishing — it comes back tagged publicationSafe:false.',
     inputSchema: {
       text: z.string().min(1),
       to: z.string().default('Hebrew'),
@@ -299,7 +300,7 @@ server.registerTool(
   {
     title: 'Write a short caption locally',
     description:
-      'Draft an Instagram/TikTok caption on the local model under the short-form rules, then check it and retry once if it breaks them. The heavy content belongs in the carousel slides, not here.',
+      'DRAFT AID, not publication copy. Writes a caption on the local model under the short-form rules, then checks it and retries once. Hebrew from a local model is not shippable (see publicationSafe) — use this to explore angles and to exercise the rules, then generate the real thing with content_generate_draft.',
     inputSchema: {
       topic: z.string().min(1).describe('What the post is about, or the carousel hook'),
       platform: z.enum(['instagram', 'tiktok']).default('instagram'),
@@ -326,7 +327,19 @@ server.registerTool(
       best = { text, check, model: result.model };
       if (check.ok) break;
     }
-    return json({ ok: best.check.ok, caption: best.text, stats: best.check.stats, issues: best.check.issues, rules: CAPTION_RULES, attempts });
+    // Hebrew from a local model never counts as ready, however cleanly it scores against the rules:
+    // the checker measures shape, and the failure mode here is mangled words that are shaped fine.
+    const hebrew = /[֐-׿]/.test(best.text);
+    return json({
+      ok: best.check.ok,
+      publicationSafe: !hebrew,
+      ...(hebrew ? { warning: 'draft only — regenerate Hebrew for publication with content_generate_draft (the live Gemini engine)' } : {}),
+      caption: best.text,
+      stats: best.check.stats,
+      issues: best.check.issues,
+      rules: CAPTION_RULES,
+      attempts,
+    });
   })
 );
 

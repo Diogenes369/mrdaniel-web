@@ -11,6 +11,32 @@ import { config } from './env.js';
  * Nothing here writes to Firebase. Callers decide what to do with the text.
  */
 
+/**
+ * The division of labour, enforced rather than documented.
+ *
+ * Local models do structure, JSON and English. Hebrew for publication goes through
+ * `content_generate_draft` → the live Gemini engine, which is where the voice rules, the AI-phrase
+ * scrubber and the queue writes live. That routing is already structural — GEMINI_API_KEY is a
+ * Vercel-only secret, so nothing here could call Gemini even if it wanted to — but nothing stopped
+ * a caller from lifting Hebrew out of an `ollama_*` result and treating it as finished copy.
+ *
+ * Measured on this machine, that copy is not publishable: llama3:8b breaks word order and qwen2.5:7b
+ * corrupts tokens outright (`הצ'*אט봇ים`, `ש]={`, `המ?>>וטטים` are real output). So every result that
+ * contains Hebrew is tagged `publicationSafe: false` with the reason attached. The text is still
+ * returned — it is useful for drafting and for understanding a source — but nothing can now read a
+ * local Hebrew result as ready to ship without stepping over an explicit flag.
+ */
+const HEBREW_RANGE = /[֐-׿]/;
+
+const PUBLICATION_POLICY =
+  'local models mangle Hebrew — draft only. Publication copy comes from content_generate_draft (the live Gemini engine with the voice rules).';
+
+/** Tag a result with whether its text may be published as-is. */
+function withPublicationSafety(result) {
+  const hasHebrew = HEBREW_RANGE.test(result.text ?? '');
+  return hasHebrew ? { ...result, publicationSafe: false, warning: PUBLICATION_POLICY } : { ...result, publicationSafe: true };
+}
+
 const DEFAULT_URL = 'http://127.0.0.1:11434';
 
 /** Ollama keeps a model resident for `keep_alive` after a call; the first call of the day still pays the load. */
@@ -112,10 +138,10 @@ async function chat({ prompt, system, model, temperature, maxTokens, format, tim
   };
 }
 
-/** Free-text generation. */
+/** Free-text generation. Hebrew output comes back tagged `publicationSafe: false`. */
 export async function ollamaGenerate({ prompt, system, model, temperature = 0.7, maxTokens, timeoutMs }) {
   if (!prompt?.trim()) throw new Error('prompt is required');
-  return chat({ prompt, system, model, temperature, maxTokens, timeoutMs });
+  return withPublicationSafety(await chat({ prompt, system, model, temperature, maxTokens, timeoutMs }));
 }
 
 /**
@@ -136,7 +162,9 @@ export async function ollamaJson({ prompt, system, schema, model, temperature = 
     format: schema,
     timeoutMs,
   });
-  return { ...result, data: parseJson(result.text) };
+  // Structure is what local models are for, so the JSON shape is trusted; the *strings* inside it
+  // are still local output and inherit the same Hebrew caveat.
+  return { ...withPublicationSafety(result), data: parseJson(result.text) };
 }
 
 function parseJson(text) {
@@ -200,5 +228,5 @@ export async function ollamaTranslate({ text, to = 'Hebrew', from, model, timeou
     'Never transliterate a word you can translate. Never add, explain or summarise anything.',
     'Output the translation only.',
   ].join(' ');
-  return chat({ prompt: text, system, model, temperature: 0.2, timeoutMs });
+  return withPublicationSafety(await chat({ prompt: text, system, model, temperature: 0.2, timeoutMs }));
 }
