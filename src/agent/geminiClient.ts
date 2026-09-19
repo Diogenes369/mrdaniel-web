@@ -203,14 +203,39 @@ let lastCallStartedAt = 0;
 /** Serialises the waiters, so N concurrent callers space out instead of all reading the same gap. */
 let throttleChain: Promise<void> = Promise.resolve();
 
+/**
+ * How long a caller may be made to wait for its slot before the call is refused instead.
+ *
+ * Sleeping until the slot is free is only safe when the caller has the time. `/api/news/analyze`
+ * runs under a 45s maxDuration, and pacing turned a fast 429 into a 504: cold start + a 13s wait +
+ * generation overran the function and the user got a gateway timeout, which is strictly worse than
+ * an honest "busy, retry in Ns". So a wait longer than this is reported, not slept through.
+ *
+ * The cap sits just above one full spacing interval, so a caller that merely queued behind one
+ * other request still waits it out; only genuine pile-ups are refused.
+ */
+const MAX_PACING_WAIT_MS = envNumber('GEMINI_MAX_PACING_WAIT_MS') ?? MIN_CALL_SPACING_MS + 2000;
+
+/** Thrown when pacing would block longer than the caller can afford. Carries a retry hint. */
+export class GeminiPacedOutError extends Error {
+  readonly retryAfterSeconds: number;
+  constructor(waitMs: number) {
+    super(`gemini pacing: next free slot is ${Math.ceil(waitMs / 1000)}s away, which exceeds the ${Math.ceil(MAX_PACING_WAIT_MS / 1000)}s wait budget — refused rather than risking a function timeout`);
+    this.name = 'GeminiPacedOutError';
+    this.retryAfterSeconds = Math.ceil(waitMs / 1000);
+  }
+}
+
 function reserveCallSlot(): Promise<void> {
   if (MIN_CALL_SPACING_MS <= 0) return Promise.resolve();
   const slot = throttleChain.then(async () => {
     const waitMs = MIN_CALL_SPACING_MS - (Date.now() - lastCallStartedAt);
+    if (waitMs > MAX_PACING_WAIT_MS) throw new GeminiPacedOutError(waitMs);
     if (waitMs > 0) await sleep(waitMs);
     lastCallStartedAt = Date.now();
   });
-  // The chain must never reject, or every subsequent caller inherits the rejection.
+  // The chain must never reject, or every subsequent caller inherits the rejection. A refused
+  // caller also must not advance lastCallStartedAt — it never sent anything.
   throttleChain = slot.catch(() => undefined);
   return slot;
 }

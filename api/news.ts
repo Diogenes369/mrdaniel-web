@@ -108,8 +108,15 @@ async function handleAnalyze(req: any, res: any) {
   } catch (err) {
     console.error('[api/news?action=analyze] failed to generate article insights:', err);
     const message = err instanceof Error ? err.message : 'unknown error';
-    const rateLimited = /429|quota|rate.?limit|RESOURCE_EXHAUSTED/i.test(message);
-    res.status(rateLimited ? 429 : 502).json({ error: message, available: false, rateLimited });
+    // A locally paced-out call is a 429 too: same meaning to the client ("too fast, retry"), but it
+    // comes back immediately instead of burning the function's remaining time on a wait.
+    const pacedOut = /gemini pacing:/.test(message);
+    const rateLimited = pacedOut || /429|quota|rate.?limit|RESOURCE_EXHAUSTED/i.test(message);
+    if (pacedOut) {
+      const seconds = Number(message.match(/is (\d+)s away/)?.[1]);
+      if (Number.isFinite(seconds)) res.setHeader('Retry-After', String(seconds));
+    }
+    res.status(rateLimited ? 429 : 502).json({ error: message, available: false, rateLimited, pacedOut });
   }
 }
 

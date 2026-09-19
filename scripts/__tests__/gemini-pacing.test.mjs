@@ -77,6 +77,20 @@ t('blank RPM var falls back to the default', pacingFor({ GEMINI_MAX_RPM: '' }).m
 t('garbage RPM var falls back to the default', pacingFor({ GEMINI_MAX_RPM: 'fast' }).minSpacingMs === 13000);
 t('blank budget var falls back to the default', pacingFor({ GEMINI_DAILY_CALL_BUDGET: '' }).dailyBudget === 200);
 
+// Pacing must refuse rather than sleep past what the caller can afford. A 13s wait inside a 45s
+// function turned a fast 429 into a 504 in production; failing fast is strictly better. Run in a
+// child process so the huge spacing it needs cannot leak into the timings measured above.
+const pacedOut = JSON.parse(
+  spawnSync('npx tsx scripts/__tests__/paced-out.mjs', { cwd: new URL('../..', import.meta.url), shell: true, encoding: 'utf8' })
+    .stdout.trim()
+    .split(/\r?\n/)
+    .pop()
+);
+t('a long wait is refused, not slept through', pacedOut.refused === true, JSON.stringify(pacedOut));
+t('refusal is immediate', pacedOut.failedFast === true, `${pacedOut.elapsedMs}ms`);
+t('refusal carries a retry hint', pacedOut.retryAfterSeconds === 60);
+t('refused call never reached Google (paced out)', pacedOut.sent === 1, `sent=${pacedOut.sent}`);
+
 for (const [s, l, d] of results) console.log(`${s} ${l}${d ? ` — ${d}` : ''}`);
 const failed = results.filter(([s]) => s === 'FAIL').length;
 console.log(`\n${results.length - failed} passed, ${failed} failed`);

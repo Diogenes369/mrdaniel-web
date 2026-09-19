@@ -1,36 +1,96 @@
 {
   "rewrites": [
-    { "source": "/api/health", "destination": "/api/health.ts" },
-    { "source": "/api/news", "destination": "/api/news.ts" },
-    { "source": "/api/news/item/:slug", "destination": "/api/news-item.ts?slug=:slug" },
-    { "source": "/api/news/analyze", "destination": "/api/news.ts?action=analyze" },
-    { "source": "/api/download/:guideId", "destination": "/api/news.ts?action=download&guideId=:guideId" },
-    { "source": "/api/ai-news", "destination": "/api/ai-news.ts" },
-    { "source": "/api/leads", "destination": "/api/leads.ts" },
-    { "source": "/api/chat", "destination": "/api/chat.ts" },
-    { "source": "/api/agent-generate", "destination": "/api/agent-generate.ts" },
-    { "source": "/api/agent-whatsapp-webhook", "destination": "/api/agent-whatsapp-webhook.ts" },
-    { "source": "/api/generate-weekly-plan", "destination": "/api/generate-weekly-plan.ts" },
-    { "source": "/api/generate-video", "destination": "/api/generate-video.ts" },
-    { "source": "/api/pexels-search", "destination": "/api/pexels-search.ts" },
-    { "source": "/api/img-proxy", "destination": "/api/img-proxy.ts" },
-    { "source": "/((?!guides/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/health",
+      "destination": "/api/health.ts"
+    },
+    {
+      "source": "/api/news",
+      "destination": "/api/news.ts"
+    },
+    {
+      "source": "/api/news/item/:slug",
+      "destination": "/api/news-item.ts?slug=:slug"
+    },
+    {
+      "source": "/api/news/analyze",
+      "destination": "/api/news.ts?action=analyze"
+    },
+    {
+      "source": "/api/download/:guideId",
+      "destination": "/api/news.ts?action=download&guideId=:guideId"
+    },
+    {
+      "source": "/api/ai-news",
+      "destination": "/api/ai-news.ts"
+    },
+    {
+      "source": "/api/leads",
+      "destination": "/api/leads.ts"
+    },
+    {
+      "source": "/api/chat",
+      "destination": "/api/chat.ts"
+    },
+    {
+      "source": "/api/agent-generate",
+      "destination": "/api/agent-generate.ts"
+    },
+    {
+      "source": "/api/agent-whatsapp-webhook",
+      "destination": "/api/agent-whatsapp-webhook.ts"
+    },
+    {
+      "source": "/api/generate-weekly-plan",
+      "destination": "/api/generate-weekly-plan.ts"
+    },
+    {
+      "source": "/api/generate-video",
+      "destination": "/api/generate-video.ts"
+    },
+    {
+      "source": "/api/pexels-search",
+      "destination": "/api/pexels-search.ts"
+    },
+    {
+      "source": "/api/img-proxy",
+      "destination": "/api/img-proxy.ts"
+    },
+    {
+      "source": "/((?!guides/).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/guides/(.*)",
       "headers": [
-        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
       ]
     }
   ],
   "crons": [
-    { "path": "/api/agent-generate", "schedule": "0 8 * * *" }
+    {
+      "path": "/api/agent-generate",
+      "schedule": "0 8 * * *"
+    }
   ],
   "functions": {
-    "api/generate-video.ts": { "maxDuration": 60 },
-    "api/news.ts": { "maxDuration": 45 },
-    "api/agent-generate.ts": { "maxDuration": 120 }
+    "api/generate-video.ts": {
+      "maxDuration": 60
+    },
+    "api/news.ts": {
+      "maxDuration": 90
+    },
+    "api/agent-generate.ts": {
+      "maxDuration": 120
+    }
   }
 }
