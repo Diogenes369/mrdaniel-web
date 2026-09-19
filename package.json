@@ -19,7 +19,8 @@
     "video:doctor": "node scripts/generate-code-video.mjs doctor",
     "video:start": "node scripts/generate-code-video.mjs start",
     "video:render": "node scripts/generate-code-video.mjs render",
-    "video:list": "node scripts/generate-code-video.mjs list"
+    "video:list": "node scripts/generate-code-video.mjs list",
+    "test:pacing": "tsx scripts/__tests__/gemini-pacing.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

@@ -27,7 +27,11 @@ export const GEMINI_TEXT_MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3.6
  * a quoted empty string, a shell-expanded blank) used to pass the truthy check and then fail at
  * Google with 400/API_KEY_INVALID on every call — which surfaced as an indistinguishable 500.
  * Treating it as "not configured" makes the endpoint answer 503 with the real reason instead.
- * Google's keys are ~39 chars; 20 is a floor no real key falls under.
+ *
+ * Two live formats as of September 2026: the legacy Standard key (`AIza…`, 39 chars), which Google
+ * now rejects outright, and the Auth key (`AQ.Ab…`, ~53 chars) that AI Studio issues by default.
+ * The check is deliberately a length floor rather than a prefix match — a prefix allowlist written
+ * against one format is exactly what broke third-party tools through this transition.
  */
 const RAW_GEMINI_KEY = process.env.GEMINI_API_KEY?.trim().replace(/^["']|["']$/g, '') ?? '';
 const KEY_LOOKS_REAL = RAW_GEMINI_KEY.length >= 20 && !/^(?:your|placeholder|changeme|xxx|todo|<)/i.test(RAW_GEMINI_KEY);
@@ -137,12 +141,118 @@ function scrubResponse(res: GenContentRes): GenContentRes {
 /** Transient 5xx: two retries with a short widening gap. */
 const TRANSIENT_WAITS_MS = [700, 1800];
 /** Per-minute 429: three retries at 2s, 4s, 8s (plus jitter), stretched to Google's own retryDelay
- *  when it names a longer one — but only up to this cap, so a long wait is surfaced, not slept on. */
+ *  when it names a longer one — but only up to this cap, so a long wait is surfaced, not slept on.
+ *
+ *  The cap is 30s because the free tier's real ceiling is 5 RPM, and a genuine collision there comes
+ *  back asking for ~22s (measured in production). At the old 15s cap that request was abandoned one
+ *  second before the wait Google actually wanted, turning a recoverable collision into a user-facing
+ *  error. Anything past 30s is a quota problem, not a throttle, and still surfaces. */
 const RATE_WAITS_MS = [2000, 4000, 8000];
-const MAX_RATE_WAIT_MS = 15000;
+const MAX_RATE_WAIT_MS = 30000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const withJitter = (ms: number) => Math.round(ms * (0.8 + Math.random() * 0.4));
+
+/**
+ * Free-tier pacing: never let two model calls leave this runtime close enough to trip the RPM quota.
+ *
+ * The budget is expressed as RPM rather than as a delay because the delay is a consequence, and
+ * guessing it wrong is silent. Measured against production on 2026-09-19, the free tier allows
+ * **5 requests per minute** for gemini-3.6-flash, not the widely-quoted 15:
+ *
+ *   quotaId: GenerateRequestsPerMinutePerProjectPerModel-FreeTier, value: 5, retryDelay: 22s
+ *
+ * So the floor is 60s/5 = 12s, plus a second of headroom because the window is Google's, not ours,
+ * and a call that lands on the boundary counts against the older window. A 5s delay would have felt
+ * like a fix and still run at 12 RPM — more than double the real ceiling.
+ *
+ * Calls queue rather than reject: the caller waits instead of getting a 429 to interpret.
+ *
+ * Scope, stated plainly: this is per *runtime instance*. Fluid Compute reuses an instance across
+ * concurrent requests, so one instance's calls are genuinely serialised — but two instances know
+ * nothing about each other, and at a ceiling of 5 RPM that matters more than it would at 15. The
+ * daily cron overlapping a dashboard session can still produce a 429; the retry path below handles
+ * it. This is a large reduction in RPM pressure, not a distributed rate limiter.
+ *
+ * GEMINI_MAX_RPM=0 disables pacing (paid keys, tests). GEMINI_MIN_SPACING_MS overrides the derived
+ * value outright when a specific spacing is wanted.
+ */
+/**
+ * Read a non-negative number from the environment, treating unset/blank/garbage as absent.
+ *
+ * `Number('')` is 0, not NaN — so a plain `Number(process.env.X)` check reads an *empty* variable as
+ * a deliberate zero. For these two settings zero means "no pacing at all", which would have turned
+ * an empty Vercel env var into silently unlimited request rate. Blank must mean unset.
+ */
+function envNumber(name: string): number | null {
+  const raw = process.env[name]?.trim();
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+const MIN_CALL_SPACING_MS = (() => {
+  const explicit = envNumber('GEMINI_MIN_SPACING_MS');
+  if (explicit !== null) return explicit;
+  const rpm = envNumber('GEMINI_MAX_RPM') ?? 5;
+  if (rpm === 0) return 0;
+  return Math.ceil(60_000 / rpm) + 1000;
+})();
+
+let lastCallStartedAt = 0;
+/** Serialises the waiters, so N concurrent callers space out instead of all reading the same gap. */
+let throttleChain: Promise<void> = Promise.resolve();
+
+function reserveCallSlot(): Promise<void> {
+  if (MIN_CALL_SPACING_MS <= 0) return Promise.resolve();
+  const slot = throttleChain.then(async () => {
+    const waitMs = MIN_CALL_SPACING_MS - (Date.now() - lastCallStartedAt);
+    if (waitMs > 0) await sleep(waitMs);
+    lastCallStartedAt = Date.now();
+  });
+  // The chain must never reject, or every subsequent caller inherits the rejection.
+  throttleChain = slot.catch(() => undefined);
+  return slot;
+}
+
+/**
+ * Free-tier daily budget. The RPM floor above says nothing about requests-per-day, which is the
+ * limit an unattended loop actually walks into — and a 429 for a spent daily quota reads exactly
+ * like a throttle while being unrecoverable until Google's reset.
+ *
+ * Refusing locally turns that into an immediate, honest error instead of four retries and a 15s
+ * wait per call. Same instance-scoped caveat as the throttle: a soft guard, not an accountant.
+ */
+/** A self-imposed ceiling, NOT a measured Google limit — only the 5 RPM quota was observed directly.
+ *  200 is chosen against ~2 posts/day of real use, leaving generous headroom; tune it with evidence
+ *  from geminiPacingStatus() rather than by guessing upward when something gets refused. */
+const DAILY_CALL_BUDGET = envNumber('GEMINI_DAILY_CALL_BUDGET') ?? 200;
+
+let budgetDay = '';
+let callsToday = 0;
+
+/** UTC day, matching how Google resets free-tier daily quota. */
+const utcDay = () => new Date().toISOString().slice(0, 10);
+
+function consumeDailyBudget(context: string): void {
+  if (DAILY_CALL_BUDGET <= 0) return;
+  const today = utcDay();
+  if (today !== budgetDay) {
+    budgetDay = today;
+    callsToday = 0;
+  }
+  if (callsToday >= DAILY_CALL_BUDGET) {
+    throw new Error(
+      `gemini daily call budget exhausted (${callsToday}/${DAILY_CALL_BUDGET} for ${today}) — refused locally before calling Google. Raise GEMINI_DAILY_CALL_BUDGET or wait for the UTC reset. [context: ${context}]`
+    );
+  }
+  callsToday += 1;
+}
+
+/** What the pacing layer has done in this runtime — for health checks and debugging. */
+export function geminiPacingStatus(): { minSpacingMs: number; dailyBudget: number; callsToday: number; day: string } {
+  return { minSpacingMs: MIN_CALL_SPACING_MS, dailyBudget: DAILY_CALL_BUDGET, callsToday, day: budgetDay || utcDay() };
+}
 
 /**
  * One model call with the shared retry policy:
@@ -158,6 +268,11 @@ export async function generateContentWithRetry(params: GenContentReq) {
   let transientRetries = 0;
   let rateRetries = 0;
   for (let attempt = 1; ; attempt++) {
+    // Pacing sits inside the retry loop on purpose: a retry is another request against the same
+    // per-minute limit, so it waits its turn exactly like a first attempt. Both are outside the
+    // try, because a locally refused call is not a Gemini failure and must not be logged as one.
+    consumeDailyBudget(String(params.model));
+    await reserveCallSlot();
     try {
       return scrubResponse(await genAI.models.generateContent(params));
     } catch (err) {
