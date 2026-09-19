@@ -54,8 +54,9 @@ const pacingFor = (env) => {
     cwd: new URL('../..', import.meta.url),
     shell: true, // npx is npx.cmd on Windows
     encoding: 'utf8',
-    // An inherited GEMINI_MIN_SPACING_MS would silently win over the RPM being tested.
-    env: { ...process.env, GEMINI_MIN_SPACING_MS: '', ...env },
+    // This file sets both vars at the top for its own timing tests. Inheriting them would let the
+    // harness' values silently stand in for the defaults these cases are meant to check.
+    env: { ...process.env, GEMINI_MIN_SPACING_MS: '', GEMINI_DAILY_CALL_BUDGET: '', ...env },
   });
   const last = (r.stdout ?? '').trim().split(/\r?\n/).pop();
   try {
@@ -75,7 +76,9 @@ t('explicit spacing overrides RPM', pacingFor({ GEMINI_MAX_RPM: '5', GEMINI_MIN_
 t('blank spacing var falls back to RPM', pacingFor({ GEMINI_MAX_RPM: '5', GEMINI_MIN_SPACING_MS: '   ' }).minSpacingMs === 13000);
 t('blank RPM var falls back to the default', pacingFor({ GEMINI_MAX_RPM: '' }).minSpacingMs === 13000);
 t('garbage RPM var falls back to the default', pacingFor({ GEMINI_MAX_RPM: 'fast' }).minSpacingMs === 13000);
-t('blank budget var falls back to the default', pacingFor({ GEMINI_DAILY_CALL_BUDGET: '' }).dailyBudget === 200);
+// 18, deliberately under the measured free-tier ceiling of 20 requests/day/project/model.
+t('blank budget var falls back to the default', pacingFor({ GEMINI_DAILY_CALL_BUDGET: '' }).dailyBudget === 18);
+t('default budget sits under the real 20/day ceiling', pacingFor({}).dailyBudget === 18 && pacingFor({}).dailyBudget < 20);
 
 // Pacing must refuse rather than sleep past what the caller can afford. A 13s wait inside a 45s
 // function turned a fast 429 into a 504 in production; failing fast is strictly better. Run in a

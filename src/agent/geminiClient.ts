@@ -248,10 +248,20 @@ function reserveCallSlot(): Promise<void> {
  * Refusing locally turns that into an immediate, honest error instead of four retries and a 15s
  * wait per call. Same instance-scoped caveat as the throttle: a soft guard, not an accountant.
  */
-/** A self-imposed ceiling, NOT a measured Google limit — only the 5 RPM quota was observed directly.
- *  200 is chosen against ~2 posts/day of real use, leaving generous headroom; tune it with evidence
- *  from geminiPacingStatus() rather than by guessing upward when something gets refused. */
-const DAILY_CALL_BUDGET = envNumber('GEMINI_DAILY_CALL_BUDGET') ?? 200;
+/**
+ * The free tier's real daily ceiling, measured in production on 2026-09-19:
+ *
+ *   quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier, value: 20, model: gemini-3.6-flash
+ *
+ * Twenty calls per day for the whole project — not per user, not per endpoint. That is the limit
+ * that actually bites; the 5 RPM ceiling is merely the one hit first on a busy minute.
+ *
+ * The default is 18 rather than 20 so the last two calls are ours to spend deliberately: a run that
+ * discovers the limit by having Google reject it has already lost the ability to finish whatever it
+ * was doing, whereas a local refusal leaves room for a retry after a human decides what matters.
+ * Raise it only for a paid key, where it should simply be set high or to 0.
+ */
+const DAILY_CALL_BUDGET = envNumber('GEMINI_DAILY_CALL_BUDGET') ?? 18;
 
 let budgetDay = '';
 let callsToday = 0;
