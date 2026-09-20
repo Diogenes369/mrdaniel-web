@@ -23,6 +23,8 @@ export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
 import { AUDIENCE_RULES, EXPERT_VOICE_RULES, shortCaptionRules } from './expertVoice.js';
+import { enforceDeck, STORY_CAROUSEL_SYSTEM_INSTRUCTION, type StoryCarouselDeck } from './storyCarousel.js';
+import { planDeck, type SlidePlan } from './figmaTemplates.js';
 import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode, PromptCard, ImageOverlayBox } from './types.js';
 
 
@@ -946,6 +948,69 @@ function cleanCarouselList(v: unknown, maxItems: number, maxLen: number): string
     .map((x) => stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(x ?? '').trim()))).slice(0, maxLen))
     .filter((x) => x.length > 1)
     .slice(0, maxItems);
+}
+
+/**
+ * The tight Title / Subtitle / Body carousel, matching the operator's reference template.
+ *
+ * Sits beside synthesizeCarouselDeck rather than replacing it: that one feeds the dashboard's
+ * `carousel-studio` action and a different, much roomier layout set. The limits, the layer map and
+ * the enforcement pass all live in storyCarousel.ts, so the prompt and the renderer cannot drift
+ * apart on what fits.
+ */
+export interface StoryCarouselRequest {
+  title: string;
+  source: string;
+  topic: string;
+  brief: string;
+  slideCount?: number;
+  /** Registered Figma template id. Omitted → DEFAULT_TEMPLATE_ID. Hermes passes this to pick a look. */
+  templateId?: string | null;
+}
+
+export interface StoryCarouselResult extends StoryCarouselDeck {
+  templateId: string;
+  /** Ready to hand straight to the Figma bridge — no further mapping needed by the caller. */
+  figmaPlan: SlidePlan[];
+}
+
+export async function synthesizeStoryCarousel(input: StoryCarouselRequest): Promise<StoryCarouselResult> {
+  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  const { clean } = sanitizeInput(input.brief.slice(0, 9000));
+  if (clean.trim().length < 40) throw new Error('brief too thin to build a carousel');
+  // 5–9 total: the reference runs 12, but a single news article rarely carries twelve distinct,
+  // specific facts, and padding to a slide count is exactly how the generic filler gets in.
+  const count = Math.min(9, Math.max(5, Math.round(input.slideCount ?? 6)));
+
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: `כותרת המקור: ${input.title}
+מקור: ${input.source}
+נושא: ${input.topic}
+
+בנה קרוסלה של ${count} שקופיות בדיוק (שער + ${count - 2} שקופיות תוכן + סיום).
+
+טקסט המקור המלא (הבסיס היחיד לתוכן):
+"""
+${clean}
+"""`,
+          },
+        ],
+      },
+    ],
+    config: { systemInstruction: STORY_CAROUSEL_SYSTEM_INSTRUCTION, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
+  });
+
+  const deck = enforceDeck(parseJsonOrThrow(stripCodeFence(requireText(response)), 'synthesizeStoryCarousel'));
+  // Planned here rather than at the call site so every caller — endpoint, Hermes, a test — gets the
+  // same node-id mapping, and an unknown templateId fails loudly at generation time.
+  const { template, slides: figmaPlan } = planDeck(deck, input.templateId);
+  return { ...deck, templateId: template.id, figmaPlan };
 }
 
 export async function synthesizeCarouselDeck(input: {

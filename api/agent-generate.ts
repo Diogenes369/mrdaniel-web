@@ -1,4 +1,6 @@
-import { classifyGeminiError, engineConfigReason, generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck } from '../src/agent/SocialAgentEngine.js';
+import { classifyGeminiError, engineConfigReason, generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeStoryCarousel, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck } from '../src/agent/SocialAgentEngine.js';
+import { toFigmaSlides } from '../src/agent/storyCarousel.js';
+import { listTemplates, DEFAULT_TEMPLATE_ID } from '../src/agent/figmaTemplates.js';
 import { importUrlContent } from '../src/server/contentImport.js';
 import { optimizeForGrowth, flattenGrowthResult, GROWTH_OPS, type GrowthOp } from '../src/server/igGrowthStrategy.js';
 import { importThreadContent, parseThreadRawText, isThreadsUrl, type ImportedThread, type ThreadPost } from '../src/server/threadsThreadFetcher.js';
@@ -626,6 +628,57 @@ ${typeof notes === 'string' ? notes : ''}`);
         return;
       }
       res.status(200).json({ ok: true, imported });
+      return;
+    }
+
+    // Discovery for external callers (Hermes): which templates exist, before choosing one.
+    // Deliberately needs no Gemini key — it is a registry read, not a generation.
+    if (action === 'list-templates') {
+      res.status(200).json({ ok: true, templates: listTemplates(), default: DEFAULT_TEMPLATE_ID });
+      return;
+    }
+
+    // The tight Title/Subtitle/Body format wired to the Figma template. Separate action from
+    // 'carousel-studio' because the slide shape differs and the dashboard reads them differently.
+    if (action === 'story-carousel') {
+      const NL = String.fromCharCode(10);
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
+        return;
+      }
+      const { title, source, topic, brief, slideCount, templateId } = req.body ?? {};
+      if (typeof brief !== 'string' || brief.trim().length < 40) {
+        rejectThinInput(res, 'brief (>= 40 chars) required', 'הבריף קצר מדי לבניית קרוסלה (נדרשים לפחות 40 תווים)');
+        return;
+      }
+      // An unregistered templateId is the caller's mistake, not a server fault, and Hermes needs to
+      // be able to tell those apart — so it answers 400 with the valid ids rather than a 500.
+      let storyDeck;
+      try {
+        storyDeck = await synthesizeStoryCarousel({
+          title: String(title ?? ''),
+          source: String(source ?? ''),
+          topic: String(topic ?? 'general'),
+          brief,
+          slideCount: Number(slideCount) || undefined,
+          templateId: templateId ? String(templateId) : undefined,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/unknown figma template/.test(msg)) {
+          res.status(400).json({ ok: false, code: 'unknown_template', error: msg, templates: listTemplates() });
+          return;
+        }
+        throw err;
+      }
+      const storySecurity = sanitizeOutput(
+        storyDeck.slides.map((s) => [s.title, s.subtitle, ...s.bodyLines].filter(Boolean).join(NL)).join(NL + NL)
+      );
+      if (!storySecurity.passed) {
+        res.status(200).json({ ok: true, blocked: true, security: storySecurity });
+        return;
+      }
+      res.status(200).json({ ok: true, templateId: storyDeck.templateId, deck: storyDeck.slides, warnings: storyDeck.warnings, figmaPlan: storyDeck.figmaPlan, figmaSlides: toFigmaSlides(storyDeck) });
       return;
     }
 

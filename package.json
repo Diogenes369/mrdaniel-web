@@ -23,7 +23,9 @@
     "test:pacing": "tsx scripts/__tests__/gemini-pacing.test.mjs",
     "test:voice": "tsx scripts/__tests__/expert-voice.test.mjs",
     "test:prompt": "tsx scripts/__tests__/verify-prompt.mjs",
-    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt"
+    "test:carousel": "tsx scripts/__tests__/story-carousel.test.mjs",
+    "test:figma": "tsx scripts/__tests__/figma-templates.test.mjs",
+    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
