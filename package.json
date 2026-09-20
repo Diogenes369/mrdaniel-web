@@ -14,6 +14,7 @@
     "ship": "node scripts/ship.mjs",
     "check:mirrors": "node scripts/check-mirrors.mjs",
     "check:scrapers": "tsx scripts/scraper-watch.ts",
+    "sync:higgsfield": "node scripts/sync-openhiggsfield.mjs",
     "deploy:dashboard": "cd dashboard && vercel --prod",
     "deploy:all": "npm run deploy && npm run deploy:dashboard",
     "video:doctor": "node scripts/generate-code-video.mjs doctor",
@@ -26,7 +27,8 @@
     "test:carousel": "tsx scripts/__tests__/story-carousel.test.mjs",
     "test:figma": "tsx scripts/__tests__/figma-templates.test.mjs",
     "test:bidi": "tsx scripts/__tests__/hebrew-bidi.test.mjs",
-    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma && npm run test:bidi"
+    "test:higgsfield": "tsx scripts/__tests__/openhiggsfield-bridge.test.mjs",
+    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma && npm run test:bidi && npm run test:higgsfield"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

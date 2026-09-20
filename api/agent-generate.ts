@@ -9,6 +9,7 @@ import { optimizeForGrowth, flattenGrowthResult, GROWTH_OPS, type GrowthOp } fro
 import { importThreadContent, parseThreadRawText, isThreadsUrl, type ImportedThread, type ThreadPost } from '../src/server/threadsThreadFetcher.js';
 import { buildThreadDeck, detectTool } from '../src/server/agents/threadsThreadAgent.js';
 import { buildImageCarouselDeck } from '../src/server/agents/imageTranslatorAgent.js';
+import { isHiggsfieldAction } from '../src/server/openHiggsfieldActions.js';
 import { sanitizeOutput } from '../src/agent/AgentSecurityGuard.js';
 import { buildMediaFrames } from '../src/agent/MediaTemplateRenderer.js';
 import { pushQueueItem, readAgentMode, readAgentWebhooks, readStrategicContext, writeAutoPilotRunTimestamp, agentFirebaseConfigured } from '../src/agent/firebaseServer.js';
@@ -192,6 +193,17 @@ export default async function handler(req: any, res: any) {
   const { action } = req.body ?? {};
 
   try {
+    // Image/video generation over the OpenHiggsfield catalog (38 models). Dynamically imported so
+    // the catalog and its mapper never load for the 20-odd Gemini actions that share this function,
+    // the same way news.ts defers its analyze branch. See src/server/openHiggsfieldActions.ts and
+    // docs/openhiggsfield-bridge.md.
+    if (isHiggsfieldAction(action)) {
+      const { handleHiggsfieldAction } = await import('../src/server/openHiggsfieldActions.js');
+      const { status, payload } = await handleHiggsfieldAction(action, req.body ?? {});
+      res.status(status).json(payload);
+      return;
+    }
+
     if (action === 'score-lead') {
       const { query } = req.body ?? {};
       if (typeof query !== 'string' || !query.trim()) {

@@ -43,6 +43,7 @@ import {
 import { runAutoPublishCycle, dispatchPublish } from './src/server/autoPublish';
 import { generateEmailCampaign, isCopywriterConfigured } from './src/server/emailCopywriter';
 import leadsHandler from './api/leads';
+import { isHiggsfieldAction, handleHiggsfieldAction } from './src/server/openHiggsfieldActions';
 
 const PORT = Number(process.env.PORT) || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -285,6 +286,14 @@ app.post('/api/agent-generate', async (req: Request, res: Response) => {
   const { action } = req.body ?? {};
 
   try {
+    // OpenHiggsfield image/video generation — the same module api/agent-generate.ts calls, so the
+    // catalog, the field mapping and the key checks are identical in dev and production.
+    if (isHiggsfieldAction(action)) {
+      const { status, payload } = await handleHiggsfieldAction(action, req.body ?? {});
+      res.status(status).json(payload);
+      return;
+    }
+
     if (action === 'score-lead') {
       const { query } = req.body ?? {};
       if (typeof query !== 'string' || !query.trim()) {

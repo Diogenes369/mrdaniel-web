@@ -13,6 +13,7 @@ import { figmaWhoami, figmaReadFile, figmaExport, figmaReadStyles, figmaReadComp
 import { figmaBridgeStatus } from './figma-bridge.js';
 import { injectText, swapImage, exportViaPlugin, setVariant, setLayerName, renderSlides } from './figma-inject.js';
 import { CAPTION_RULES, captionSystemPrompt, checkCaption } from './copy-rules.js';
+import { higgsfieldModels, higgsfieldGenerate, higgsfieldStatus } from './openhiggsfield.js';
 
 /**
  * mrdaniel.co.il ops over MCP (stdio). Register in Claude Desktop / Claude Code — see README.md.
@@ -515,6 +516,66 @@ server.registerTool(
     annotations: { destructiveHint: true },
   },
   guard(async (args) => json(await renderSlides(args)))
+);
+
+// ─── OpenHiggsfield (image + video generation) ───────────────────────────────────────────────
+
+const HF_MEDIA = z
+  .object({
+    start: z.union([z.string(), z.array(z.string())]).optional().describe('Start / first frame'),
+    end: z.union([z.string(), z.array(z.string())]).optional().describe('End / last frame'),
+    reference: z.union([z.string(), z.array(z.string())]).optional().describe('Style or subject references'),
+    video: z.union([z.string(), z.array(z.string())]).optional().describe('Source video (edit / extend / motion models)'),
+    audio: z.union([z.string(), z.array(z.string())]).optional(),
+  })
+  .describe('Public http(s) URLs per input role. Roles the model does not declare are refused, not ignored.');
+
+server.registerTool(
+  'higgsfield_models',
+  {
+    title: 'OpenHiggsfield model catalog',
+    description:
+      'The 38 image and video models available for generation (Soul, Seedance, Kling, Wan, Flux, LTX, MiniMax, PixVerse, Grok, Qwen, Recraft, Ideogram …), each with the exact settings and input roles it accepts. Call this before higgsfield_generate — the ids and the settings allow-list come from here, never from memory. Also reports whether the site holds the platform keys.',
+    inputSchema: {
+      surface: z.enum(['image', 'video']).optional(),
+      search: z.string().optional().describe('Matches id and label, e.g. "kling" or "seedance"'),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  guard(async (args) => json(await higgsfieldModels(args)))
+);
+
+server.registerTool(
+  'higgsfield_generate',
+  {
+    title: 'Generate an image or video',
+    description:
+      'Generate media from a prompt with one catalog model — the visual side of a carousel, story or reel. BILLABLE on the generation platform, one charge per run, so do not call it speculatively or in a loop. Waits for the result by default and returns its URL(s); pass wait:false for long video runs and poll higgsfield_status with the requestId. Prompts are best written in English even when the post is Hebrew: these are visual models, and no slide text should be baked into the image (see the caption rules).',
+    inputSchema: {
+      model: z.string().min(1).describe('Model id from higgsfield_models, e.g. "soul-2" or "kling-3-std"'),
+      prompt: z.string().min(1),
+      media: HF_MEDIA.optional(),
+      settings: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Per-model overrides, e.g. { aspectRatio: "9:16", resolution: "1080p", duration: 5 }. Anything outside the allow-list the model declares is rejected.'),
+      wait: z.boolean().default(true).describe('false returns the requestId immediately'),
+      timeoutSeconds: z.number().int().min(10).max(85).default(85).describe('Blocking wait cap. The site function itself stops at 120s, so a longer video run belongs on wait:false + higgsfield_status'),
+    },
+    annotations: { openWorldHint: true },
+  },
+  guard(async (args) => json(await higgsfieldGenerate(args)))
+);
+
+server.registerTool(
+  'higgsfield_status',
+  {
+    title: 'Poll a generation',
+    description: 'One status poll for a requestId from higgsfield_generate. Returns the media URLs once the run completes, or the reason the platform gave when it failed or was flagged NSFW.',
+    inputSchema: { requestId: z.string().min(1) },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  guard(async (args) => json(await higgsfieldStatus(args)))
 );
 
 // ─── resources ──────────────────────────────────────────────────────────────────────────────

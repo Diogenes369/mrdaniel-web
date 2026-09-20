@@ -20,3 +20,6 @@ carousel-bridge/output/
 
 # Video showcase runs — briefs, compositions and unpublished renders (scripts/generate-code-video.mjs)
 video-projects/
+
+# Cloned upstream repos (vendor/open-higgsfield — re-clone with the URL in docs/openhiggsfield-bridge.md)
+vendor/

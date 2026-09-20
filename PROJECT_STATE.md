@@ -97,7 +97,7 @@ Quick tunnel (`cloudflared tunnel --url http://localhost:8787`), chosen 2026-09-
 
 ### 1.4 Hard constraint: the 12-function cap
 
-`api/` holds **exactly 12** `.ts` functions. Vercel Hobby caps a deployment at 12 Serverless Functions. **Adding any new file to `api/` will fail the deploy.** This is why `news.ts` hosts `?action=analyze` behind a dynamic import and why `agent-generate.ts` multiplexes ~17 actions. Any new endpoint must fold into an existing function as an action or query flag. Directly governs §5.
+`api/` holds **exactly 12** `.ts` functions. Vercel Hobby caps a deployment at 12 Serverless Functions. **Adding any new file to `api/` will fail the deploy.** This is why `news.ts` hosts `?action=analyze` behind a dynamic import and why `agent-generate.ts` multiplexes ~17 actions — including the four `higgsfield-*` media-generation actions added 2026-09-20 (§5D), which were built as a standalone `api/openhiggsfield.ts` first and folded in once this cap was re-read. Any new endpoint must fold into an existing function as an action or query flag. Directly governs §5.
 
 ---
 
@@ -650,6 +650,32 @@ there published the capability.
 Bridge `GUIDE_TTL_MS` defaults to 0 (§5.2). The guide published on 2026-09-08 keeps its original
 2026-09-15 expiry — existing records are not migrated.
 
+## 5D. OpenHiggsfield media generation (2026-09-20)
+
+38 image/video models (8 image, 30 video) behind one brief — the visual layer for carousels, stories
+and reels, and Hermes's `higgsfield_*` tools. Full detail in `docs/openhiggsfield-bridge.md`.
+
+- **Upstream** `https://github.com/wide-trace/open-higgsfield` (OpenHiggsfield AI, Next 16 / React 19),
+  cloned to `vendor/open-higgsfield` — gitignored, `pnpm install` + `pnpm build` verified, never deployed.
+  Run `pnpm dev` there for the studio UI itself.
+- **Vendored**, not imported: the framework-free generation layer (catalog, `to-platform.ts`,
+  `platform.ts`) is copied into `src/agent/openhiggsfield/` by `npm run sync:higgsfield`
+  (`-- --check` fails on drift, and the script refuses any file that grows a `next`/`react`/store
+  import). `vendor/` never reaches Vercel, so a function importing from it would fail at build.
+- **Ours**: `src/agent/OpenHiggsfieldEngine.ts` (keys, validation, submit, poll) →
+  `src/server/openHiggsfieldActions.ts` (the four actions) → `api/agent-generate.ts` + `server.ts`.
+  27 no-key/no-network tests in `scripts/__tests__/openhiggsfield-bridge.test.mjs` (`npm run
+  test:higgsfield`, wired into `npm test`) cover the catalog, the submit-path mapping and every refusal.
+- **Actions** (POST `/api/agent-generate`, admin-gated): `higgsfield-models`, `higgsfield-model`,
+  `higgsfield-generate` (`wait` capped at 90 s under that function's 120 s ceiling), `higgsfield-status`.
+- **Hermes**: `higgsfield_models` / `higgsfield_generate` / `higgsfield_status` — 32 MCP tools now.
+  They go through `callAgent()`, so `HF_API_KEY` never lands on this machine.
+- **Not configured yet**: `HF_API_BASE_URL` + `HF_API_KEY` are unset everywhere (see §6). Until they
+  are, every generate/status call answers 503 with the missing names and attempts nothing. This is a
+  separate platform from the five `VideoGenerationEngine.ts` providers, which are untouched.
+
+---
+
 ## 6. Open Items
 
 | Item | State |
@@ -668,6 +694,7 @@ Bridge `GUIDE_TTL_MS` defaults to 0 (§5.2). The guide published on 2026-09-08 k
 | Dashboard publish button | Deployed; the copied link is `/g/<guideId>` since 2026-09-11. |
 | Bridge restart (no-expiry) | **Pending** — the PM2 daemon runs elevated, so `pm2 restart carousel-bridge` must come from an admin shell. Until then new publishes still get the old 7-day TTL. |
 | Lead PII exposure | **Still open; the server half shipped 2026-09-11.** Unauthenticated REST can read and delete `leads`, `newsletter_signups` and `email_templates` (probed 2026-09-11: 7 / 1 / 0 records readable). **Done:** the browser no longer writes `leads`; `api/leads.ts` validates every field and writes through `privilegedDb()` (firebase-admin when `FIREBASE_SERVICE_ACCOUNT` is set, the anonymous client until then). **Pending:** (1) create a JSON key for `firebase-adminsdk-fbsvc@mrdaniel-web.iam.gserviceaccount.com` (two console attempts on 2026-09-11 failed with "Unknown error"; the key-creation org policy is inactive) and set it on the **site** project as `FIREBASE_SERVICE_ACCOUNT`, then redeploy; (2) read the live rules and set `.read`/`.write` on `leads`, `newsletter_signups`, `email_config`, `email_templates` to `auth != null && root.child('admins').child(auth.uid).val() === true`, then seed `admins/<owner uid>`. Do not use `auth != null` alone: Email/Password sign-up through the public API key would let anyone get a session. Deploy the rules only after the key is live, or ManyChat, site-lead storage and campaigns break. |
+| `HF_API_BASE_URL` / `HF_API_KEY` | **Absent — OpenHiggsfield (§5D) generates nothing until both are set.** The upstream repo never names the platform; its wire contract (`Authorization: Key <id>:<secret>`, `POST /{model}`, `GET /requests/{id}/status`, paths like `higgsfield-ai/soul/v2/standard`) is fal.ai's queue API, i.e. `https://queue.fal.run` with a key from `https://fal.ai/dashboard/keys` — **inferred, not confirmed by upstream.** Verify against whoever issues the key before pointing production at it. |
 | Tips & Guides publishing | Not possible yet — canvas-rendered, no bridge job. |
 | Bridge restart (2nd pending) | Slide previews now serve `inline` instead of `attachment` — on disk, not live. |
 | Cover thumbnails | Preview is the full ~1.1 MB slide; no downscaled variant exists. |
