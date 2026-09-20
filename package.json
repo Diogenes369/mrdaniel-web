@@ -25,7 +25,8 @@
     "test:prompt": "tsx scripts/__tests__/verify-prompt.mjs",
     "test:carousel": "tsx scripts/__tests__/story-carousel.test.mjs",
     "test:figma": "tsx scripts/__tests__/figma-templates.test.mjs",
-    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma"
+    "test:bidi": "tsx scripts/__tests__/hebrew-bidi.test.mjs",
+    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma && npm run test:bidi"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

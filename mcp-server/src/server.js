@@ -431,8 +431,9 @@ server.registerTool(
     description:
       'Fill a template frame\'s TEXT layers by layer name, e.g. [{ "name": "headline", "text": "…" }]. Matching on names, not node ids, is what lets one template be duplicated per slide. Needs the bridge and the plugin (figma_bridge_status).',
     inputSchema: {
-      entries: z.array(z.object({ name: z.string().optional(), nodeId: z.string().optional(), text: z.string() })).min(1),
+      entries: z.array(z.object({ name: z.string().optional(), nodeId: z.string().optional(), text: z.string(), font: z.object({ family: z.string(), style: z.string() }).optional() })).min(1),
       rootId: z.string().optional().describe('Frame to search within. Defaults to the current page'),
+      font: z.object({ family: z.string(), style: z.string() }).optional().describe('Substitute font, used only when the node own font cannot be loaded — commercial or Mac-only faces, and any Latin display face that has no Hebrew glyphs'),
     },
     annotations: { destructiveHint: true },
   },
@@ -504,8 +505,9 @@ server.registerTool(
     inputSchema: {
       rootId: z.string().min(1).describe('The template frame to fill and render'),
       slides: z
-        .array(z.object({ name: z.string().optional(), rootId: z.string().optional(), entries: z.array(z.object({ name: z.string().optional(), nodeId: z.string().optional(), text: z.string() })) }))
+        .array(z.object({ name: z.string().optional(), rootId: z.string().optional(), entries: z.array(z.object({ name: z.string().optional(), nodeId: z.string().optional(), text: z.string(), font: z.object({ family: z.string(), style: z.string() }).optional() })) }))
         .min(1),
+      font: z.object({ family: z.string(), style: z.string() }).optional().describe('Substitute font, used only when the node own font cannot be loaded — commercial or Mac-only faces, and any Latin display face that has no Hebrew glyphs'),
       format: z.enum(['PNG', 'JPG']).default('PNG'),
       scale: z.number().min(0.5).max(4).default(2),
       outDir: z.string().default('video-projects/_figma-assets'),

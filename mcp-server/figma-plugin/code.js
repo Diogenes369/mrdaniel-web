@@ -119,11 +119,12 @@ async function setText(params) {
   if (node.type !== 'TEXT') throw new Error('node ' + params.nodeId + ' is a ' + node.type + ', not TEXT');
   if (typeof params.text !== 'string') throw new Error('text must be a string');
 
-  await loadFontsFor(node);
+  const sub = await loadFontsFor(node, params.font, params.forceFont);
   const before = node.characters;
-  applyText(node, params.text);
+  if (sub) node.fontName = sub.fallback;
+  applyText(node, params.text, params);
   if (params.autoResize) node.textAutoResize = params.autoResize; // NONE | HEIGHT | WIDTH_AND_HEIGHT
-  return { id: node.id, name: node.name, before: before, after: node.characters };
+  return { id: node.id, name: node.name, before: before, after: node.characters, fontSubstituted: sub || undefined };
 }
 
 /**
@@ -135,9 +136,16 @@ async function setText(params) {
  * contract destroys itself after one pass. Turning autoRename off first pins the name, which is
  * exactly what a template needs.
  */
-function applyText(node, text) {
+function applyText(node, text, opts) {
   node.autoRename = false;
   node.characters = text;
+  // Hebrew in a frame authored for Latin stays left-aligned unless told otherwise, which puts every
+  // line's ragged edge on the wrong side and reads as broken to a Hebrew reader. The template's own
+  // nodes are all textAlignHorizontal=LEFT.
+  if (opts && opts.align) node.textAlignHorizontal = opts.align;
+  // The composed block carries more text than the template's sample copy, so a per-template size
+  // override is how a deck stays inside the frame instead of overflowing it.
+  if (opts && opts.fontSize) node.fontSize = opts.fontSize;
 }
 
 /**
@@ -167,17 +175,62 @@ async function setTexts(params) {
       missing.push(entry.nodeId || entry.name);
       continue;
     }
-    await loadFontsFor(node);
+    let sub = null;
+    try {
+      sub = await loadFontsFor(node, entry.font || params.font, entry.forceFont != null ? entry.forceFont : params.forceFont);
+    } catch (err) {
+      // One unloadable node must not discard the rest of the deck's writes.
+      missing.push((entry.nodeId || entry.name) + ': ' + (err && err.message ? err.message : String(err)));
+      continue;
+    }
     const before = node.characters;
-    applyText(node, String(entry.text));
-    applied.push({ id: node.id, name: node.name, before: before, after: node.characters });
+    if (sub) node.fontName = sub.fallback;
+    applyText(node, String(entry.text), {
+      align: entry.align || params.align,
+      fontSize: entry.fontSize || params.fontSize,
+    });
+    applied.push({ id: node.id, name: node.name, before: before, after: node.characters, fontSubstituted: sub ? sub.fallback.family + ' ' + sub.fallback.style : undefined });
   }
   return { root: root.name, applied: applied, missing: missing, appliedCount: applied.length };
 }
 
-async function loadFontsFor(node) {
+/**
+ * Load every font a node uses, falling back to a substitute when one is unavailable.
+ *
+ * Figma refuses to touch `characters` until every font in the node is loaded, and `loadFontAsync`
+ * rejects for a font the editor does not have. Third-party templates hit this constantly: the
+ * human-deluxe template is set in Champion HTF-Bantamweight (a commercial Hoefler face) and
+ * Helvetica (Mac-only), so on a Windows editor neither loads and every injection failed with
+ * `The font "..." could not be loaded`.
+ *
+ * Returning the fallback rather than applying it here keeps the decision with the caller: the
+ * substitution is visible in the response, so a render that quietly changed typeface can be seen
+ * rather than discovered in the exported PNG. A Latin display face also has no Hebrew glyphs at
+ * all, so for Hebrew copy the substitution is required for the text to render, not merely to load.
+ */
+async function loadFontsFor(node, fallback, force) {
+  // `force` substitutes even when the node's own font loads fine. Needed because "loads" and
+  // "can render this script" are different questions: Inter loaded happily on the meta layers and
+  // then drew Hebrew reversed, because it has no Hebrew coverage and the shaper fell back badly.
+  if (force && fallback && fallback.family) {
+    await figma.loadFontAsync(fallback);
+    return { fallback: fallback, replaced: ['forced'] };
+  }
   const fonts = node.getRangeAllFontNames(0, Math.max(node.characters.length, 1));
-  for (const font of fonts) await figma.loadFontAsync(font);
+  const failed = [];
+  for (const font of fonts) {
+    try {
+      await figma.loadFontAsync(font);
+    } catch (err) {
+      failed.push(font.family + ' ' + font.style);
+    }
+  }
+  if (!failed.length) return null;
+  if (!fallback || !fallback.family) {
+    throw new Error('missing fonts (' + failed.join(', ') + ') and no fallback font was supplied');
+  }
+  await figma.loadFontAsync(fallback);
+  return { fallback: fallback, replaced: failed };
 }
 
 /**

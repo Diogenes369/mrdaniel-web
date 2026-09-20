@@ -18,17 +18,22 @@ const IMAGE_TYPES = { '.png': 'PNG', '.jpg': 'JPEG', '.jpeg': 'JPEG', '.gif': 'G
 /**
  * Fill a template's TEXT layers by layer name.
  *
- * Layer names are the contract, not node ids: duplicating a template frame in Figma gives every
- * copy new ids but keeps the names, so a pipeline keyed on names survives the duplication that
- * producing N carousel slides requires.
+ * Layer names OR node ids. Names survive duplicating a template frame (the copies get new ids but
+ * keep the names), which is why they were the original contract. Third-party templates broke that
+ * assumption: Figma's autoRename names every TEXT layer after its own content, so a downloaded
+ * template has no stable semantic names to match on and `nodeId` is the only reliable target. See
+ * src/agent/figmaTemplates.ts, which keys entirely on ids for that reason.
+ *
+ * `font` is the substitute applied when a node's own font cannot be loaded — see loadFontsFor in
+ * figma-plugin/code.js.
  */
-export async function injectText({ rootId, entries, port } = {}) {
+export async function injectText({ rootId, entries, font, port } = {}) {
   if (!Array.isArray(entries) || !entries.length) throw new Error('entries is required: [{ name, text }]');
   for (const entry of entries) {
     if (!entry?.name && !entry?.nodeId) throw new Error('each entry needs a name or a nodeId');
     if (typeof entry.text !== 'string') throw new Error(`entry "${entry.name ?? entry.nodeId}" has no text string`);
   }
-  const result = await figmaPluginCommand('set_texts', { rootId, entries }, { port });
+  const result = await figmaPluginCommand('set_texts', { rootId, entries, font }, { port });
   // A missing layer is reported, not thrown: one stale name should not discard nine good injections.
   return { ...result, ok: (result.missing ?? []).length === 0 };
 }
@@ -96,11 +101,11 @@ export async function setVariant({ nodeId, properties, port } = {}) {
  * Sequential by necessity: the plugin mutates one shared document, so overlapping slide renders
  * would race each other's text into the wrong frame.
  */
-export async function renderSlides({ rootId, slides, format = 'PNG', scale = 2, outDir, port } = {}) {
+export async function renderSlides({ rootId, slides, format = 'PNG', scale = 2, outDir, font, port } = {}) {
   if (!Array.isArray(slides) || !slides.length) throw new Error('slides is required: [{ name, entries: [{ name, text }] }]');
   const rendered = [];
   for (const [index, slide] of slides.entries()) {
-    const injected = await injectText({ rootId: slide.rootId ?? rootId, entries: slide.entries, port });
+    const injected = await injectText({ rootId: slide.rootId ?? rootId, entries: slide.entries, font, port });
     const asset = await exportViaPlugin({
       nodeId: slide.rootId ?? rootId,
       format,

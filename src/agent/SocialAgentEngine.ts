@@ -970,6 +970,8 @@ export interface StoryCarouselRequest {
 
 export interface StoryCarouselResult extends StoryCarouselDeck {
   templateId: string;
+  /** Substitute font for the bridge — the template's own faces often cannot be loaded. */
+  figmaFont: { family: string; style: string };
   /** Ready to hand straight to the Figma bridge — no further mapping needed by the caller. */
   figmaPlan: SlidePlan[];
 }
@@ -1009,8 +1011,8 @@ ${clean}
   const deck = enforceDeck(parseJsonOrThrow(stripCodeFence(requireText(response)), 'synthesizeStoryCarousel'));
   // Planned here rather than at the call site so every caller — endpoint, Hermes, a test — gets the
   // same node-id mapping, and an unknown templateId fails loudly at generation time.
-  const { template, slides: figmaPlan } = planDeck(deck, input.templateId);
-  return { ...deck, templateId: template.id, figmaPlan };
+  const { template, font, slides: figmaPlan } = planDeck(deck, input.templateId);
+  return { ...deck, templateId: template.id, figmaFont: font, figmaPlan };
 }
 
 export async function synthesizeCarouselDeck(input: {

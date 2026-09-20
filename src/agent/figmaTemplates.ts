@@ -30,7 +30,7 @@
  * Adding a template: append a FigmaTemplate. Nothing else in the pipeline needs to know about it —
  * `synthesizeStoryCarousel` takes a templateId, and Hermes can pass one to pick a look per topic.
  */
-import type { StoryCarouselSlide, StoryCarouselDeck } from './storyCarousel.js';
+import { visibleLength as visibleLen, type StoryCarouselSlide, type StoryCarouselDeck } from './storyCarousel.js';
 
 /** One fillable frame: the frame to render, its single content TEXT node, and its meta line nodes. */
 export interface TemplateFrame {
@@ -68,6 +68,39 @@ export interface FigmaTemplate {
   frames: Record<FrameArchetype, TemplateFrame[]>;
   /** Byline text written into every frame's meta block, replacing the template's placeholders. */
   meta: { handle: string; hashtag: string; year: string };
+  /**
+   * Substitute font, applied only when a node's own font cannot be loaded.
+   *
+   * Required for every third-party template carrying Hebrew, for two independent reasons. The
+   * licensing one: human-deluxe is set in Champion HTF-Bantamweight (commercial Hoefler) and
+   * Helvetica (Mac-only), and Figma could load neither on this editor — every injection failed
+   * with `The font "..." could not be loaded` until this existed. The typographic one is worse and
+   * buying the font would not have fixed it: both are Latin-only faces with no Hebrew glyphs, so
+   * Hebrew set in them renders as fallback boxes.
+   *
+   * Heebo is a Google font, so Figma serves it to any editor with no local install.
+   */
+  fontFallback: { family: string; style: string };
+  /**
+   * Apply fontFallback even when the node's own font loads.
+   *
+   * "Loads" and "can render this script" are different questions. The meta byline is set in Inter,
+   * which loaded fine and then drew "דניאל בן ברוך" reversed in the export, because it carries no
+   * Hebrew coverage and the shaper fell back badly. Forcing a Hebrew face is the only way the
+   * byline renders at all.
+   */
+  forceFont: boolean;
+  /** Hebrew needs RIGHT; every node in this template ships as LEFT. */
+  align: 'LEFT' | 'RIGHT' | 'CENTER';
+  /**
+   * Per-archetype font size override, and the budget the composed block must fit.
+   *
+   * The template's copy frame holds ~116 characters of Latin at 110px in a 940x940 box. The
+   * single-block composition puts title + subtitle + body into that one node, so it carries
+   * noticeably more than the sample it was designed around — the first render overflowed the frame.
+   * `maxChars` is enforced on the composed string; `fontSize` buys the rest of the room.
+   */
+  archetypeStyle: Partial<Record<FrameArchetype, { box: { w: number; h: number }; maxFontSize: number; maxChars?: number }>>;
 }
 
 /**
@@ -87,6 +120,20 @@ export const HUMAN_DELUXE: FigmaTemplate = {
   compose: 'single-block',
   roleFrames: { cover: 'longTitle', item: 'copy', cta: 'cta' },
   meta: { handle: 'דניאל בן ברוך\n@mrdaniel', hashtag: '#סייבר_ו_AI', year: '20\n26' },
+  fontFallback: { family: 'Heebo', style: 'Bold' },
+  forceFont: true,
+  align: 'RIGHT',
+  // Every text box in this template is 940x940. The sizes are FITTED per slide rather than fixed
+  // (see fitFontSize): a fixed size overflowed, because the deck's hard line breaks are sized for a
+  // 42-character line and at 130px this box fits about fourteen Hebrew characters per line, so
+  // every body line wrapped to two or three and the frame ran over. maxFontSize is the ceiling the
+  // template's own design implies, not the size actually used.
+  archetypeStyle: {
+    longTitle: { box: { w: 940, h: 940 }, maxFontSize: 150, maxChars: 130 },
+    copy: { box: { w: 940, h: 940 }, maxFontSize: 110, maxChars: 190 },
+    cta: { box: { w: 940, h: 940 }, maxFontSize: 110, maxChars: 150 },
+    title: { box: { w: 940, h: 940 }, maxFontSize: 220, maxChars: 60 },
+  },
   frames: {
     longTitle: [
       { frameId: '1:346', textNodeId: '1:357', handle: '1:350', hashtag: '1:351', year: '1:352' },
@@ -171,12 +218,57 @@ export function composeSingleBlock(slide: StoryCarouselSlide): string {
   return parts.join('\n\n');
 }
 
+/**
+ * Drop whole trailing blocks until the composed string fits the frame's budget.
+ *
+ * Block-wise rather than character-wise: the parts are separated by blank lines, and cutting one
+ * mid-sentence would leave a visibly truncated slide. Losing the last body line is survivable;
+ * losing the title is not, so the first block is always kept.
+ */
+export function capComposed(composed: string, maxChars: number): string {
+  if (composed.length <= maxChars) return composed;
+  const BLOCK = '\n\n';
+  const blocks = composed.split(BLOCK);
+  while (blocks.length > 1 && blocks.join(BLOCK).length > maxChars) {
+    const last = blocks[blocks.length - 1];
+    const lines = last.split('\n');
+    if (lines.length > 1) blocks[blocks.length - 1] = lines.slice(0, -1).join('\n');
+    else blocks.pop();
+  }
+  return blocks.join(BLOCK);
+}
+
+/**
+ * Pick a font size that keeps the composed block inside its box.
+ *
+ * A fixed per-archetype size does not work here, and the first render showed why: the deck's body
+ * lines are broken at ~42 characters (a limit from a different template), while this template's
+ * 940-wide box fits roughly fourteen Hebrew characters at 130px. Every line wrapped to two or three
+ * and the text ran past the frame — with the copy still perfectly correct in the node, which is why
+ * reading the text back could not catch it and only the exported PNG did.
+ *
+ * The two constants are approximations of Heebo Bold, not exact metrics: Figma does not expose text
+ * measurement to this pipeline, so the size is derived from the longest line and the line count and
+ * then clamped. Erring small is deliberate — slightly small text is a design nit, overflowing text
+ * is an unusable slide. If a render still clips, lower MAX_ADVANCE.
+ */
+const AVG_ADVANCE = 0.62; // fraction of the em an average Hebrew glyph occupies
+const LINE_HEIGHT = 1.3;
+
+export function fitFontSize(text: string, box: { w: number; h: number }, maxFontSize: number): number {
+  const lines = text.split('\n');
+  const longest = Math.max(1, ...lines.map((l) => visibleLen(l)));
+  const byWidth = box.w / (AVG_ADVANCE * longest);
+  const byHeight = box.h / (LINE_HEIGHT * Math.max(1, lines.length));
+  return Math.max(24, Math.floor(Math.min(maxFontSize, byWidth, byHeight)));
+}
+
 /** One slide's write plan: the frame to fill and every node→text pair inside it. */
 export interface SlidePlan {
   index: number;
   role: StoryCarouselSlide['role'];
   frameId: string;
-  entries: Array<{ nodeId: string; text: string }>;
+  entries: Array<{ nodeId: string; text: string; align?: string; fontSize?: number; forceFont?: boolean }>;
 }
 
 /**
@@ -186,18 +278,31 @@ export interface SlidePlan {
  * template's "Your Name / @your_username" in a rendered slide is the single most obvious way to
  * publish something that looks unfinished.
  */
-export function planDeck(deck: StoryCarouselDeck, templateId?: string | null): { template: FigmaTemplate; slides: SlidePlan[] } {
+export function planDeck(deck: StoryCarouselDeck, templateId?: string | null): { template: FigmaTemplate; font: { family: string; style: string }; slides: SlidePlan[] } {
   const tpl = getTemplate(templateId);
   const slides = deck.slides.map((slide): SlidePlan => {
     const frame = pickFrame(tpl, slide);
-    const entries: Array<{ nodeId: string; text: string }> = [];
+    const archetype = tpl.roleFrames[slide.role];
+    const style = tpl.archetypeStyle[archetype];
+    const entries: SlidePlan['entries'] = [];
     if (frame.textNodeId) {
-      entries.push({ nodeId: frame.textNodeId, text: tpl.compose === 'single-block' ? composeSingleBlock(slide) : slide.title });
+      const raw = tpl.compose === 'single-block' ? composeSingleBlock(slide) : slide.title;
+      const composed = style?.maxChars ? capComposed(raw, style.maxChars) : raw;
+      entries.push({
+        nodeId: frame.textNodeId,
+        text: composed,
+        align: tpl.align,
+        fontSize: style ? fitFontSize(composed, style.box, style.maxFontSize) : undefined,
+        forceFont: tpl.forceFont,
+      });
     }
-    if (frame.handle) entries.push({ nodeId: frame.handle, text: tpl.meta.handle });
-    if (frame.hashtag) entries.push({ nodeId: frame.hashtag, text: tpl.meta.hashtag });
-    if (frame.year) entries.push({ nodeId: frame.year, text: tpl.meta.year });
+    // The meta lines keep the template's own size — only the font and alignment change, because
+    // Inter cannot draw Hebrew (see forceFont).
+    const meta = { align: tpl.align, forceFont: tpl.forceFont };
+    if (frame.handle) entries.push({ nodeId: frame.handle, text: tpl.meta.handle, ...meta });
+    if (frame.hashtag) entries.push({ nodeId: frame.hashtag, text: tpl.meta.hashtag, ...meta });
+    if (frame.year) entries.push({ nodeId: frame.year, text: tpl.meta.year, ...meta });
     return { index: slide.index, role: slide.role, frameId: frame.frameId, entries };
   });
-  return { template: tpl, slides };
+  return { template: tpl, font: tpl.fontFallback, slides };
 }
