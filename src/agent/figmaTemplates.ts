@@ -300,6 +300,7 @@ export function fitFontSize(text: string, box: { w: number; h: number }, maxFont
  * leave every line after the first back on first-strong detection.
  */
 const RLI = '⁧';
+const RLM = '‏';
 const PDI = '⁩';
 const ALL_BIDI_MARKS = /[‎‏؜⁦-⁩‪-‮]/g;
 
@@ -308,7 +309,19 @@ export function prepareForFigma(text: string): string {
     .split('\n')
     .map((line) => {
       const plain = line.replace(ALL_BIDI_MARKS, '').trim();
-      return plain ? `${RLI}${plain}${PDI}` : '';
+      if (!plain) return '';
+      // A line opening on a NEUTRAL character (a hashtag's "#", a bullet, an opening bracket) has
+      // no direction of its own, so inside the isolate it takes the paragraph's — which is what we
+      // want, but only because the isolate sets one. The RLM pins it explicitly rather than relying
+      // on that inference, and costs nothing: it is zero-width and only added when the line really
+      // does start with a neutral.
+      //
+      // Defensive, not a fix for an observed break — the hashtag renders correctly with or without
+      // it. Recorded honestly because the render was misread as broken once already: Hebrew glyph
+      // order in an exported PNG reads right-to-left, and transcribing it left-to-right makes
+      // correct text look reversed.
+      const lead = /^[\p{L}\p{N}]/u.test(plain) ? '' : RLM;
+      return `${RLI}${lead}${plain}${PDI}`;
     })
     .join('\n');
 }
