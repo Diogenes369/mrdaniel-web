@@ -6,6 +6,7 @@
 // the first. Product names ending in a version number are everywhere in this content.
 // Run: npx tsx scripts/__tests__/hebrew-bidi.test.mjs
 import { sanitizeHebrewText } from '../../src/agent/hebrewTextSanitizer.ts';
+import { sanitizeHebrewText as clientSanitize } from '../../dashboard/src/lib/hebrewTextSanitizer.ts';
 
 const RLM = '‏';
 const LRI = '⁦';
@@ -56,6 +57,35 @@ const strip = (s) => s.replace(/[‎‏؜⁦-⁩‪-‮]/g, '');
 for (const c of corpus) {
   t(`no visible change: "${c}"`, strip(sanitizeHebrewText(c)) === c, `${strip(sanitizeHebrewText(c))} vs ${c}`);
 }
+
+// ─── the dashboard mirror ─────────────────────────────────────────────────────────────────────
+// dashboard/src/lib/hebrewTextSanitizer.ts is a hand-copy (the two apps share no package), and it
+// had silently fallen three fixes behind: no dotted-version Latin run, no grouped-number isolate
+// and no protectedSplit idempotency guard. So the dashboard rendered "Claude 4.5" and "20,000"
+// differently from the server that generated them — and, once the X importer landed, a
+// hand-corrected subtitle cue produced a different SRT than the burned-in video.
+// `check:mirrors` only compares TYPE declarations, so the BEHAVIOUR is compared here.
+const mirrorCases = [
+  'Claude Opus 5',
+  'GPT-6',
+  'Claude 4.5',
+  'מודל Claude Opus 5 חדש',
+  'ב-30 יום',
+  'מעל 20,000 דולר',
+  'גידול של 12.9 אחוז',
+  'הקישור mrdaniel.co.il פעיל',
+  'פותחים את Gemini ובוחרים Canvas',
+];
+for (const input of mirrorCases) {
+  const server = sanitizeHebrewText(input);
+  const client = clientSanitize(input);
+  t(`mirror: "${input}" matches the dashboard copy`, server === client, `${show(server)} !== ${show(client)}`);
+}
+t(
+  'mirror: the dashboard copy is idempotent too',
+  mirrorCases.every((i) => clientSanitize(clientSanitize(i)) === clientSanitize(i)),
+  mirrorCases.filter((i) => clientSanitize(clientSanitize(i)) !== clientSanitize(i)).join(' | ')
+);
 
 for (const [state, label, detail] of results) console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);
 const failed = results.filter((r) => r[0] === 'FAIL').length;

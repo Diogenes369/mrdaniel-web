@@ -71,7 +71,7 @@ Single POST endpoint, **action-dispatched** (`{ action, ...params }`). Auth: `x-
 
 Client libs in `dashboard/src/lib/*Api.ts` follow one rule: **never throw** — on 429/503/network/thin output they fall back to a deterministic local builder so content generation never fully stops.
 
-Actions incl.: `generate-content`, `draft-engagement`, `story-synthesize`, `post-synthesize`, `import-url`, `slides-edit`, `trend-radar`, `engagement-replies`, `growth-optimize`, `carousel-studio`, `reel-script-synthesize`, `reel-tts`, `tech-tip-deck`, `email-generate`, `auto-publish-run`.
+Actions incl.: `generate-content`, `draft-engagement`, `story-synthesize`, `post-synthesize`, `import-url`, `slides-edit`, `trend-radar`, `engagement-replies`, `growth-optimize`, `carousel-studio`, `reel-script-synthesize`, `reel-tts`, `tech-tip-deck`, `email-generate`, `auto-publish-run`, `parse-x-post`, `x-subtitles`, `x-post-deck`.
 
 ### IG Growth Strategy Engine (organic, white-hat)
 - **Prompts** — `HOOK_RETENTION_RULES` + `SAVE_SHARE_RULES` in `SocialAgentEngine.ts` feed the story deck, Carousel Studio, reel and auto-pilot prompts. `story-synthesize` and `reel-script-synthesize` also return `hookOptions` (3 first-3-seconds openers: `line` + `visual` pattern interrupt + `pattern`), additive to the old response shape.
@@ -168,6 +168,70 @@ the model for numbering/themes produced a deck that drifted every run.
 - The agent falls back to a source-faithful deck only for **unusable model output**; a rate limit or
   a missing key still surfaces as the retryable 429/503 it is (`synthesized:false` + `fallbackReason`
   ride back to the dashboard's amber badge).
+
+### X / Twitter → carousel + Hebrew-subtitled video (dashboard tab "ייבוא מ-X / Twitter")
+
+Three actions on `/api/agent-generate`, all dynamically imported so none of this loads for the
+Hebrew content actions that share the function: `parse-x-post` → `x-subtitles` → `x-post-deck`.
+
+- `src/server/xPostFetcher.ts` — the post's text, images, mp4 renditions and (when the pasted link
+  is the tail of a thread) the author's own **ancestor** posts. Source is
+  `cdn.syndication.twimg.com/tweet-result`, the keyless JSON behind X's own embed widget — the v2 X
+  API is paid at every tier that returns a tweet by id. The required `token` query parameter is a
+  checksum of the post id (`syndicationToken`), reproduced from X's embed script; it is not a
+  credential. `publish.twitter.com/oembed` runs in parallel as a text-only fallback. Never throws:
+  a deleted/protected post returns `ok:false` + a Hebrew `note` and the UI opens the paste box.
+  URL normalisation keeps the **path only**, so `?s=`/`?t=`/`utm_*` are dropped by construction;
+  `twitter.com`, `mobile.`, `/i/status/`, `/photo/1` and the fxtwitter/vxtwitter/nitter mirrors all
+  fold to one canonical `x.com` post URL. **Syndication exposes a post's PARENT, never its children**
+  — so what is recoverable is the chain *above* the pasted link, which is the useful direction (the
+  link people share is the punchline at the bottom of a tutorial thread).
+- `src/server/xSubtitles.ts` — Gemini reads the **mp4 directly** and returns timed Hebrew cues:
+  transcription, translation and cue timing in one call, `videoMetadata: { fps: 1 }` to hold the
+  visual sampling down. There is deliberately **no FFmpeg and no ASR vendor**: FFmpeg is a ~70 MB
+  binary and a multi-minute CPU burn on a 120 s function shared with twenty other actions, and every
+  hosted ASR with usable Hebrew is paid. Limits: `MAX_VIDEO_BYTES` 12 MB (base64 expansion has to
+  stay under Gemini's 20 MB request ceiling) and `MAX_VIDEO_SECONDS` 600.
+  `normalizeCues()` repairs what no prompt reliably prevents — cues out of order, overlapping,
+  ending before they start, running past the clip, or longer than 7 s — and wraps each to ≤2 lines
+  of ≤42 chars with a **leading RLM per line**, without which a cue opening on a Latin product name
+  is laid out left-to-right and throws the Hebrew after it to the wrong side.
+- `src/server/agents/xPostAgent.ts` — deliberately thin. It owns only what is different about X:
+  the video transcript is **first-class deck source** (an AI-tool tutorial is a screencast with a
+  one-line post above it, and the post text alone is not a deck), and `segmentTranscript()` cuts it
+  into slide-sized units on sentence boundaries *before* the model sees it. Everything else — theme
+  scoring, badges, `n / N` numbering, prompt boxes, CTA rules, the source-faithful fallback — is the
+  **Threads agent's `layOutDeck`, reused**, which is why that function was written against the
+  structural `DeckSource` contract rather than against `ImportedThread`.
+
+Client side (`dashboard/src/lib/`):
+
+- `xImportApi.ts` reuses `threadsImportApi.ts`'s `postToAgent` (one bounded 429 retry, one 5xx
+  retry) and `buildLocalDeck` rather than re-implementing them. Deck synthesis **never throws**;
+  import and subtitles **do** — there is no honest local fallback for "what was said in this clip",
+  and inventing one would put fabricated Hebrew on a published video.
+- `xSubtitleFormat.ts` mirrors the server's cue formatter because the operator EDITS the cue list
+  and every edit must re-emit a valid SRT/VTT with no round-trip. `check:mirrors` only compares type
+  declarations, so `scripts/__tests__/x-import.test.mjs` runs **both copies over the same cues** and
+  fails on any difference.
+- `xSubtitleBurner.ts` burns the cues into the picture **in the operator's browser** (Canvas →
+  WebCodecs → `mp4-muxer`, the same pipeline as `motionStudioService.ts`), so the download costs the
+  server nothing. Two live facts make it possible (verified 2026-09-21): `video.twimg.com` reflects
+  the requesting origin in `Access-Control-Allow-Origin`, so the canvas does **not** taint, and it
+  honours range requests. Frames are captured via `requestVideoFrameCallback` and timestamped from
+  `mediaTime`, not from the capture rate — a dropped frame shortens the list without shifting
+  anything after it. The cost: capture runs in **real time** and a backgrounded tab throttles it, so
+  `MAX_BURN_SECONDS` is 300 and the UI says to keep the tab in front. Audio is decoded from the same
+  downloaded bytes and re-encoded to AAC independently.
+
+The video is **not** proxied through `/api/img-proxy` (images are): that relay is `image/*`-only,
+and routing a 12 MB mp4 through a serverless function per render would spend the function budget for
+nothing. `isXVideoUrl()` pins every video URL to `video.twimg.com/*.mp4` on both sides, so neither
+the endpoint nor the browser can be talked into fetching an arbitrary host.
+
+Live regression: `npm run check:scrapers` covers X alongside Threads — a syndication payload change
+that silently drops the mp4 renditions shows up there, not as a subtitle button that does nothing.
+
 
 ---
 

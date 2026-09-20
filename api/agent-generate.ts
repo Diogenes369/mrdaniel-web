@@ -534,6 +534,168 @@ ${typeof notes === 'string' ? notes : ''}`);
       return;
     }
 
+    if (action === 'parse-x-post') {
+      // X (Twitter) → carousel + Hebrew-subtitled video, step 1. Same soft contract as
+      // `parse-thread`: a deleted, protected or rate-limited post answers 200 with ok:false + a
+      // Hebrew note, and the dashboard switches to the manual-paste path rather than showing an
+      // error. `rawText` alone (no fetch at all) is a first-class input.
+      //
+      // Dynamically imported so the X fetcher, its cheerio use and the subtitle module never load
+      // for the twenty-odd Hebrew content actions that share this function.
+      const { url, rawText } = req.body ?? {};
+      const pastedText = typeof rawText === 'string' ? rawText.trim() : '';
+      const rawTarget = typeof url === 'string' ? url.trim() : '';
+
+      if (!pastedText && !rawTarget) {
+        rejectThinInput(res, 'url or rawText required', 'לא הועברה כתובת מקור ולא טקסט גולמי לייבוא');
+        return;
+      }
+
+      const { importXPost, parseXRawText, isXUrl } = await import('../src/server/xPostFetcher.js');
+      const post = pastedText
+        ? parseXRawText(pastedText, rawTarget)
+        : isXUrl(rawTarget)
+          ? await importXPost(rawTarget)
+          : null;
+
+      if (!post) {
+        rejectThinInput(res, 'valid x.com / twitter.com post url required', 'הכתובת אינה קישור תקין לפוסט ב-X / Twitter');
+        return;
+      }
+
+      const security = sanitizeOutput(post.text.slice(0, 6000));
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({ ok: true, post });
+      return;
+    }
+
+    if (action === 'x-subtitles') {
+      // X → Hebrew subtitles, step 2 (optional). Gemini reads the mp4 directly — transcription,
+      // translation and cue timing in one call — because every alternative (FFmpeg on the function,
+      // a hosted ASR vendor) is either a paid dependency or does not fit the Hobby runtime. See the
+      // header of src/server/xSubtitles.ts for the full reasoning.
+      //
+      // Only `videoUrl` is taken from the body, and it is re-validated against video.twimg.com here
+      // rather than trusted: an unchecked URL would make this endpoint fetch an arbitrary host on
+      // the operator's behalf and hand the bytes to the model.
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
+        return;
+      }
+      const { videoUrl, durationMs, width, height, notes } = req.body ?? {};
+      const { isXVideoUrl } = await import('../src/server/xPostFetcher.js');
+      if (typeof videoUrl !== 'string' || !isXVideoUrl(videoUrl)) {
+        res.status(400).json({ ok: false, error: 'valid video.twimg.com mp4 url required', message: 'לא התקבלה כתובת וידאו תקינה מהפוסט ב-X.' });
+        return;
+      }
+      const { transcribeXVideo, buildSrt, buildVtt, MAX_VIDEO_SECONDS } = await import('../src/server/xSubtitles.js');
+      const clipMs = Math.max(0, Math.round(Number(durationMs) || 0));
+      if (clipMs > MAX_VIDEO_SECONDS * 1000) {
+        res.status(400).json({
+          ok: false,
+          error: `video too long: ${Math.round(clipMs / 1000)}s`,
+          message: `הסרטון ארוך מדי לתמלול (${Math.round(clipMs / 60000)} דקות). המגבלה היא ${MAX_VIDEO_SECONDS / 60} דקות.`,
+        });
+        return;
+      }
+      const track = await transcribeXVideo({
+        variant: {
+          url: videoUrl,
+          bitrate: 0,
+          width: Math.max(0, Math.round(Number(width) || 0)),
+          height: Math.max(0, Math.round(Number(height) || 0)),
+        },
+        durationMs: clipMs,
+        notes: typeof notes === 'string' ? notes.slice(0, 400) : undefined,
+      });
+      // The transcript is someone else's speech about to be burned onto a video this account
+      // publishes, so it goes through the same guard every other generated Hebrew string does.
+      const security = sanitizeOutput(track.transcript.slice(0, 8000));
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({
+        ok: true,
+        track,
+        srt: buildSrt(track.cues),
+        vtt: buildVtt(track.cues),
+      });
+      return;
+    }
+
+    if (action === 'x-post-deck') {
+      // X → carousel, step 3. Runs through the dedicated agent (src/server/agents/xPostAgent.ts),
+      // which folds the video's Hebrew transcript in as deck source material and then reuses the
+      // Threads agent's layout pass for the theme, badges, step indicators and CTA.
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
+        return;
+      }
+      const { post, transcript, notes } = req.body ?? {};
+      const src = (post && typeof post === 'object' ? post : {}) as Record<string, unknown>;
+      const cleanPosts = (Array.isArray(src.posts) ? src.posts : [])
+        .map((p: unknown) => String(p ?? '').trim())
+        .filter(Boolean)
+        .slice(0, 30);
+      const cleanTranscript = typeof transcript === 'string' ? transcript.slice(0, 20000).trim() : '';
+      // A video post legitimately carries almost no written text — the transcript is its content —
+      // so the floor is applied to the two sources combined, not to the post text alone.
+      if (`${cleanPosts.join('\n')}\n${cleanTranscript}`.trim().length < 40) {
+        rejectThinInput(res, 'posts or transcript (>= 40 chars total) required', 'אין מספיק טקסט מקור לעיבוד AI (נדרשים לפחות 40 תווים) — הדביקו את טקסט הפוסט או הפיקו קודם כתוביות');
+        return;
+      }
+      // Images must already be same-origin-proxied by the fetcher. Re-checking here rather than
+      // trusting the body means a crafted request cannot plant an arbitrary URL in a slide that the
+      // renderer would then fetch on the operator's behalf.
+      const proxied = (v: unknown): string[] =>
+        (Array.isArray(v) ? v : [])
+          .map((u: unknown) => String(u ?? ''))
+          .filter((u) => u.startsWith('https://mrdaniel.co.il/api/img-proxy?url='))
+          .slice(0, 4);
+      const items = Array.isArray(src.items) && src.items.length === cleanPosts.length
+        ? cleanPosts.map((text, i) => ({ text, images: proxied((src.items as { images?: unknown }[])[i]?.images) }))
+        : cleanPosts.map((text) => ({ text, images: [] as string[] }));
+      const { buildXDeck } = await import('../src/server/agents/xPostAgent.js');
+      const result = await buildXDeck({
+        post: {
+          ok: true,
+          url: typeof src.url === 'string' ? src.url.slice(0, 300) : '',
+          id: typeof src.id === 'string' ? src.id.slice(0, 25) : '',
+          author: typeof src.author === 'string' ? src.author.slice(0, 60) : '',
+          authorName: typeof src.authorName === 'string' ? src.authorName.slice(0, 60) : '',
+          posts: cleanPosts,
+          items,
+          images: [...new Set(items.flatMap((p) => p.images))].slice(0, 20),
+          replyCount: Math.max(0, cleanPosts.length - 1),
+          text: cleanPosts.join('\n\n'),
+          via: 'manual',
+        },
+        transcript: cleanTranscript || undefined,
+        notes: typeof notes === 'string' ? notes.slice(0, 600) : undefined,
+      });
+      // Same carve-out as thread-deck: the guard's heuristics flag ordinary source code as a leak,
+      // so only the Hebrew prose is checked.
+      const prose = result.deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
+      const security = sanitizeOutput(prose);
+      if (!security.passed) {
+        res.status(200).json({ ok: true, blocked: true, security });
+        return;
+      }
+      res.status(200).json({
+        ok: true,
+        deck: result.deck,
+        topic: result.topic,
+        synthesized: result.synthesized,
+        fallbackReason: result.fallbackReason,
+        transcriptSegments: result.transcriptSegments,
+      });
+      return;
+    }
+
     if (action === 'image-carousel-deck') {
       // Direct carousel image upload → translated, rebranded carousel. Replaces the old
       // parse-instagram/instagram-deck pair: there is no URL to fetch and no caption to translate —

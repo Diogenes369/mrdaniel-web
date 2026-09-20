@@ -29,7 +29,8 @@
     "test:bidi": "tsx scripts/__tests__/hebrew-bidi.test.mjs",
     "test:higgsfield": "tsx scripts/__tests__/openhiggsfield-bridge.test.mjs",
     "test:screenshot": "tsx scripts/__tests__/screenshot-to-code.test.mjs",
-    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma && npm run test:bidi && npm run test:higgsfield && npm run test:screenshot"
+    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma && npm run test:bidi && npm run test:higgsfield && npm run test:screenshot && npm run test:x",
+    "test:x": "tsx scripts/__tests__/x-import.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
