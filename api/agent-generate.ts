@@ -1,6 +1,9 @@
 import { classifyGeminiError, engineConfigReason, generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, generateImageGenerationPrompt, synthesizeStorySlides, synthesizeNewsPost, editSlideDeck, analyzeTrendRadar, generateEngagementReplies, synthesizeCarouselDeck, synthesizeStoryCarousel, synthesizeReelScript, synthesizeSpeech, synthesizeTechTipDeck } from '../src/agent/SocialAgentEngine.js';
 import { toFigmaSlides } from '../src/agent/storyCarousel.js';
 import { listTemplates, DEFAULT_TEMPLATE_ID } from '../src/agent/figmaTemplates.js';
+
+/** Valid contentKind values, echoed by list-templates so Hermes can discover them. */
+const CAROUSEL_KINDS = ['news', 'thread', 'comparison'];
 import { importUrlContent } from '../src/server/contentImport.js';
 import { optimizeForGrowth, flattenGrowthResult, GROWTH_OPS, type GrowthOp } from '../src/server/igGrowthStrategy.js';
 import { importThreadContent, parseThreadRawText, isThreadsUrl, type ImportedThread, type ThreadPost } from '../src/server/threadsThreadFetcher.js';
@@ -634,7 +637,7 @@ ${typeof notes === 'string' ? notes : ''}`);
     // Discovery for external callers (Hermes): which templates exist, before choosing one.
     // Deliberately needs no Gemini key — it is a registry read, not a generation.
     if (action === 'list-templates') {
-      res.status(200).json({ ok: true, templates: listTemplates(), default: DEFAULT_TEMPLATE_ID });
+      res.status(200).json({ ok: true, templates: listTemplates(), default: DEFAULT_TEMPLATE_ID, contentKinds: CAROUSEL_KINDS });
       return;
     }
 
@@ -646,7 +649,7 @@ ${typeof notes === 'string' ? notes : ''}`);
         res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
         return;
       }
-      const { title, source, topic, brief, slideCount, templateId } = req.body ?? {};
+      const { title, source, topic, brief, slideCount, templateId, contentKind } = req.body ?? {};
       if (typeof brief !== 'string' || brief.trim().length < 40) {
         rejectThinInput(res, 'brief (>= 40 chars) required', 'הבריף קצר מדי לבניית קרוסלה (נדרשים לפחות 40 תווים)');
         return;
@@ -662,6 +665,7 @@ ${typeof notes === 'string' ? notes : ''}`);
           brief,
           slideCount: Number(slideCount) || undefined,
           templateId: templateId ? String(templateId) : undefined,
+          contentKind: CAROUSEL_KINDS.includes(String(contentKind)) ? (String(contentKind) as 'news' | 'thread' | 'comparison') : undefined,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -678,7 +682,7 @@ ${typeof notes === 'string' ? notes : ''}`);
         res.status(200).json({ ok: true, blocked: true, security: storySecurity });
         return;
       }
-      res.status(200).json({ ok: true, templateId: storyDeck.templateId, deck: storyDeck.slides, warnings: storyDeck.warnings, figmaPlan: storyDeck.figmaPlan, figmaSlides: toFigmaSlides(storyDeck) });
+      res.status(200).json({ ok: true, templateId: storyDeck.templateId, contentKind: storyDeck.contentKind, deck: storyDeck.slides, warnings: storyDeck.warnings, figmaPlan: storyDeck.figmaPlan, figmaSlides: toFigmaSlides(storyDeck) });
       return;
     }
 

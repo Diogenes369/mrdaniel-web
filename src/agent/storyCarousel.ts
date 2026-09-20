@@ -179,10 +179,56 @@ export function normalizeBodyLines(raw: unknown, warnings: string[], maxLines: n
 }
 
 /**
+ * What kind of source this deck is built from.
+ *
+ * The slot limits and the voice are identical across all three — the template does not care where
+ * the words came from. What differs is how the source DECOMPOSES into slides, and getting that
+ * wrong produces a technically correct deck that misses the point:
+ *
+ *   news        one event. Slides are its facets: what happened, the mechanism, the consequence.
+ *   thread      an argument already written in order by its author. The slides must follow that
+ *               order rather than re-sorting it by importance, or the argument stops landing.
+ *   comparison  two or more things held against each other. Every slide has to keep comparing;
+ *               the failure mode is a deck that describes A, then describes B, and never contrasts.
+ *
+ * Kept as data rather than three separate prompts so the truth rules, voice and limits cannot drift
+ * apart between them — that divergence is exactly what happened between the post and slide
+ * generators before, and is why two different word ceilings ended up in one prompt.
+ */
+export type CarouselContentKind = 'news' | 'thread' | 'comparison';
+
+export const CONTENT_KIND_RULES: Record<CarouselContentKind, string> = {
+  news: `סוג המקור: ידיעה חדשותית אחת.
+- פרק את האירוע להיבטים: מה קרה, איך זה עבד, מי מעורב, ומה זה מלמד. שקופית להיבט.
+- סדר השקופיות הוא סדר ההבנה: קודם מה קרה, אחר כך המנגנון, ורק בסוף המשמעות.
+- אסור לפרק לפי פסקאות הכתבה. הכתבה כתובה לקריאה רציפה, הקרוסלה נקראת בהחלקות.`,
+
+  thread: `סוג המקור: שרשור פוסטים (Threads/טוויטר) שנכתב על ידי מחבר אחד, ברצף מכוון.
+- הרצף הוא הטיעון. שמור על סדר הפוסטים המקורי — אל תמיין מחדש לפי מה שנראה לך חזק יותר, כי הטיעון נבנה צעד אחר צעד ומאבד את הכוח שלו כשמערבבים.
+- פוסט אחד בשרשור = שקופית אחת, אלא אם שני פוסטים סמוכים אומרים דבר אחד — אז אחד; או שפוסט אחד מכיל שתי נקודות נפרדות — אז שניים.
+- ה-title של כל שקופית הוא הרעיון של אותו שלב בטיעון, לא ציטוט מהפוסט.
+- אסור להזכיר שזה שרשור, לצטט את המחבר, או להשתמש ב-@ או בשם משתמש. התוכן מוצג כידע, לא כציטוט.
+- אם השרשור מגיע למסקנה — היא שקופית ה-item האחרונה, לפני ה-CTA. אל תפזר אותה על פני כמה שקופיות.`,
+
+  comparison: `סוג המקור: השוואה בין שני מודלים / כלים / גישות או יותר.
+- כל שקופית item מחזיקה ציר השוואה אחד (מחיר, מהירות, חלון הקשר, איכות בעברית, פרטיות, קלות הטמעה) ואומרת מי עדיף בו ולמה — לפי הנתונים במקור בלבד.
+- ה-title הוא ציר ההשוואה עצמו, לא שם של מודל. ה-subtitle אומר מי מנצח בציר הזה.
+- כל שורת body חייבת להזכיר לפחות שניים מהמשווים, או מספר מפורש מהמקור. שורה שמתארת רק צד אחד היא לא השוואה — כתוב אותה מחדש.
+- אסור להכריז על מנצח כולל אם המקור לא מכריז. מותר ורצוי לומר "תלוי במה שחשוב לך, וזה מה שמשנה".
+- אם אין במקור נתון לציר מסוים — אל תמציא אותו ואל תכלול את הציר.`,
+};
+
+/**
  * The prompt. Structure and limits are stated as numbers, and the anti-generic rule is stated as a
  * test the model can apply to its own draft ("could this line sit on a different article?") — the
  * phrasing that already works for the hook rules in SocialAgentEngine.
  */
+export function storyCarouselInstruction(kind: CarouselContentKind = 'news'): string {
+  return `${STORY_CAROUSEL_SYSTEM_INSTRUCTION}
+
+${CONTENT_KIND_RULES[kind]}`;
+}
+
 export const STORY_CAROUSEL_SYSTEM_INSTRUCTION = `אתה כותב קרוסלת אינסטגרם בעברית עבור דניאל בן ברוך, לפי תבנית עיצוב קבועה ונוקשה.
 
 ${EXPERT_VOICE_RULES}

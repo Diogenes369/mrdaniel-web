@@ -23,7 +23,7 @@ export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
 import { AUDIENCE_RULES, EXPERT_VOICE_RULES, shortCaptionRules } from './expertVoice.js';
-import { enforceDeck, STORY_CAROUSEL_SYSTEM_INSTRUCTION, type StoryCarouselDeck } from './storyCarousel.js';
+import { enforceDeck, storyCarouselInstruction, type CarouselContentKind, type StoryCarouselDeck } from './storyCarousel.js';
 import { planDeck, type SlidePlan } from './figmaTemplates.js';
 import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode, PromptCard, ImageOverlayBox } from './types.js';
 
@@ -966,10 +966,19 @@ export interface StoryCarouselRequest {
   slideCount?: number;
   /** Registered Figma template id. Omitted → DEFAULT_TEMPLATE_ID. Hermes passes this to pick a look. */
   templateId?: string | null;
+  /**
+   * How the source decomposes into slides. Defaults to 'news'.
+   *
+   * The limits and voice are identical across kinds — only the decomposition differs, and getting
+   * it wrong yields a correct-looking deck that misses the point (a thread re-sorted out of its
+   * argument order, or a comparison that describes each side without ever contrasting them).
+   */
+  contentKind?: CarouselContentKind | null;
 }
 
 export interface StoryCarouselResult extends StoryCarouselDeck {
   templateId: string;
+  contentKind: CarouselContentKind;
   /** Substitute font for the bridge — the template's own faces often cannot be loaded. */
   figmaFont: { family: string; style: string };
   /** Ready to hand straight to the Figma bridge — no further mapping needed by the caller. */
@@ -983,6 +992,7 @@ export async function synthesizeStoryCarousel(input: StoryCarouselRequest): Prom
   // 5–9 total: the reference runs 12, but a single news article rarely carries twelve distinct,
   // specific facts, and padding to a slide count is exactly how the generic filler gets in.
   const count = Math.min(9, Math.max(5, Math.round(input.slideCount ?? 6)));
+  const kind: CarouselContentKind = input.contentKind ?? 'news';
 
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,
@@ -1005,14 +1015,14 @@ ${clean}
         ],
       },
     ],
-    config: { systemInstruction: STORY_CAROUSEL_SYSTEM_INSTRUCTION, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
+    config: { systemInstruction: storyCarouselInstruction(kind), temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
   });
 
   const deck = enforceDeck(parseJsonOrThrow(stripCodeFence(requireText(response)), 'synthesizeStoryCarousel'));
   // Planned here rather than at the call site so every caller — endpoint, Hermes, a test — gets the
   // same node-id mapping, and an unknown templateId fails loudly at generation time.
   const { template, font, slides: figmaPlan } = planDeck(deck, input.templateId);
-  return { ...deck, templateId: template.id, figmaFont: font, figmaPlan };
+  return { ...deck, templateId: template.id, contentKind: kind, figmaFont: font, figmaPlan };
 }
 
 export async function synthesizeCarouselDeck(input: {

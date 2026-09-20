@@ -116,6 +116,19 @@ try {
     const injected = await bridge.send('set_texts', { rootId: copy.frameId, font: deck.figmaFont, entries });
     if (injected.missing?.length) throw new Error(`slide ${plan.index}: missing nodes ${JSON.stringify(injected.missing)}`);
 
+    // Repaint after the text: set_texts can replace a node's font, and doing the colour last means
+    // the fill is applied to whatever the node ended up as.
+    let repainted = 0;
+    if (plan.fills?.length) {
+      const fills = plan.fills.map((f) => ({ ...f, nodeId: copy.idMap[f.nodeId] })).filter((f) => f.nodeId);
+      if (fills.length) {
+        const painted = await bridge.send('set_fills', { entries: fills });
+        repainted = painted.appliedCount ?? 0;
+        // A node with no visible solid fill is reported, not fatal — the copy is still correct text.
+        if (painted.missing?.length) console.warn(`    slide ${plan.index}: fill skipped on ${painted.missing.join(', ')}`);
+      }
+    }
+
     let file = null;
     if (!args.get('no-export')) {
       const shot = await bridge.send('export_node', { nodeId: copy.frameId, format: 'PNG', scale: 2 });
@@ -123,8 +136,8 @@ try {
       file = path.join(OUT_DIR, `${stamp}-${String(plan.index).padStart(2, '0')}-${plan.role}.png`);
       fs.writeFileSync(file, Buffer.from(shot.base64, 'base64'));
     }
-    rendered.push({ index: plan.index, role: plan.role, master: plan.frameId, copy: copy.frameId, applied: injected.appliedCount, file });
-    console.log(`  slide ${plan.index}: master ${plan.frameId} -> copy ${copy.frameId}, ${injected.appliedCount} nodes${file ? `, ${file}` : ''}`);
+    rendered.push({ index: plan.index, role: plan.role, master: plan.frameId, copy: copy.frameId, applied: injected.appliedCount, repainted, file });
+    console.log(`  slide ${plan.index}: master ${plan.frameId} -> copy ${copy.frameId}, ${injected.appliedCount} nodes, ${repainted} repainted${file ? `, ${file}` : ''}`);
   }
 } finally {
   bridge.close();

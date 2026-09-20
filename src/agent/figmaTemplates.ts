@@ -31,7 +31,7 @@
  * `synthesizeStoryCarousel` takes a templateId, and Hermes can pass one to pick a look per topic.
  */
 import { visibleLength as visibleLen, type StoryCarouselSlide, type StoryCarouselDeck } from './storyCarousel.js';
-import { BRAND_FONTS, BRAND_META, brandHandleBlock } from './brandIdentity.js';
+import { BRAND_COLORS, BRAND_FONTS, BRAND_META, brandHandleBlock, hexToFigmaRgb } from './brandIdentity.js';
 
 /** One fillable frame: the frame to render, its single content TEXT node, and its meta line nodes. */
 export interface TemplateFrame {
@@ -103,6 +103,15 @@ export interface FigmaTemplate {
   /** Hebrew needs RIGHT; every node in this template ships as LEFT. */
   align: 'LEFT' | 'RIGHT' | 'CENTER';
   /**
+   * Repaint the template's own accent with ours.
+   *
+   * human-deluxe ships its dark variants with the designer's accents on the byline text — #db3e1b
+   * orange on two of them, #bd3074 pink on another. Those colours are not ours, and a slide wearing
+   * them reads as someone else's template with our words in it, which is the exact failure the
+   * dark-only filter was already guarding against. `null` leaves a template's own palette alone.
+   */
+  accentColor: string | null;
+  /**
    * Per-archetype font size override, and the budget the composed block must fit.
    *
    * The template's copy frame holds ~116 characters of Latin at 110px in a 940x940 box. The
@@ -133,6 +142,7 @@ export const HUMAN_DELUXE: FigmaTemplate = {
   fontFallback: BRAND_FONTS.figmaFallback,
   forceFont: true,
   align: 'RIGHT',
+  accentColor: BRAND_COLORS.brand500,
   // Every text box in this template is 940x940. The sizes are FITTED per slide rather than fixed
   // (see fitFontSize): a fixed size overflowed, because the deck's hard line breaks are sized for a
   // 42-character line and at 130px this box fits about fourteen Hebrew characters per line, so
@@ -332,6 +342,8 @@ export interface SlidePlan {
   role: StoryCarouselSlide['role'];
   frameId: string;
   entries: Array<{ nodeId: string; text: string; align?: string; fontSize?: number; forceFont?: boolean }>;
+  /** Solid fills to repaint on this frame, applied after the text is written. */
+  fills: Array<{ nodeId: string; color: { r: number; g: number; b: number } }>;
 }
 
 /**
@@ -368,7 +380,14 @@ export function planDeck(deck: StoryCarouselDeck, templateId?: string | null): {
     if (frame.hashtag) entries.push({ nodeId: frame.hashtag, text: prepareForFigma(tpl.meta.hashtag), ...meta });
     // The year is digits only — an isolate on it would be noise, and it has no direction to get wrong.
     if (frame.year) entries.push({ nodeId: frame.year, text: tpl.meta.year, ...meta });
-    return { index: slide.index, role: slide.role, frameId: frame.frameId, entries };
+    // The accent lives on the byline text, which is the only place this template exposes the
+    // designer's own colour. Repainting the greys (avatar placeholder, progress bar) would be
+    // wrong — they are neutral chrome, not accent.
+    const accent = tpl.accentColor ? hexToFigmaRgb(tpl.accentColor) : null;
+    const fills = accent
+      ? [frame.handle, frame.hashtag, frame.year].filter((id): id is string => Boolean(id)).map((nodeId) => ({ nodeId, color: accent }))
+      : [];
+    return { index: slide.index, role: slide.role, frameId: frame.frameId, entries, fills };
   });
   return { template: tpl, font: tpl.fontFallback, slides };
 }

@@ -14,6 +14,9 @@ import {
   toFigmaSlides,
   visibleLength,
   FIGMA_LAYER_MAP,
+  CONTENT_KIND_RULES,
+  storyCarouselInstruction,
+  STORY_CAROUSEL_SYSTEM_INSTRUCTION,
 } from '../../src/agent/storyCarousel.ts';
 
 const results = [];
@@ -94,6 +97,26 @@ t('banned phrases are scrubbed on the way in', !scrubbed.slides[0].bodyLines.joi
 let threw = false;
 try { enforceDeck({ slides: [] }); } catch { threw = true; }
 t('an empty deck throws', threw);
+
+// -- Content kinds ------------------------------------------------------------------------------
+// The limits and the voice are identical across kinds; only the decomposition differs. Getting that
+// wrong produces a technically correct deck that misses the point -- a thread re-sorted out of its
+// argument order, or a comparison that describes each side and never contrasts them.
+const KINDS = ['news', 'thread', 'comparison'];
+t('every kind has rules', KINDS.every((k) => CONTENT_KIND_RULES[k]?.length > 80), JSON.stringify(Object.keys(CONTENT_KIND_RULES)));
+t('default instruction is the news one', storyCarouselInstruction() === storyCarouselInstruction('news'));
+for (const k of KINDS) {
+  const ins = storyCarouselInstruction(k);
+  t(`${k}: base rules are still present`, ins.includes(STORY_CAROUSEL_SYSTEM_INSTRUCTION), `len ${ins.length}`);
+  t(`${k}: its own rules are appended`, ins.includes(CONTENT_KIND_RULES[k]));
+  t(`${k}: slot limits survive`, ins.includes(String(SLOT_LIMITS.bodyLineMax)) && ins.includes(String(SLOT_LIMITS.titleMax)));
+  t(`${k}: specificity rule survives`, ins.includes('מבחן ההחלפה'));
+}
+t('kind rules are distinct', new Set(KINDS.map((k) => CONTENT_KIND_RULES[k])).size === 3);
+t('thread rules pin the original order', CONTENT_KIND_RULES.thread.includes('סדר הפוסטים המקורי'));
+t('thread rules ban quoting the author', CONTENT_KIND_RULES.thread.includes('@'));
+t('comparison rules require an axis per slide', CONTENT_KIND_RULES.comparison.includes('ציר השוואה אחד'));
+t('comparison rules reject one-sided lines', CONTENT_KIND_RULES.comparison.includes('רק צד אחד'));
 
 for (const [state, label, detail] of results) console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);
 const failed = results.filter((r) => r[0] === 'FAIL').length;

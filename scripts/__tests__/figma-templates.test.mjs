@@ -14,6 +14,7 @@ import {
   planDeck,
   prepareForFigma,
 } from '../../src/agent/figmaTemplates.ts';
+import { BRAND_COLORS, hexToFigmaRgb } from '../../src/agent/brandIdentity.ts';
 import { enforceDeck } from '../../src/agent/storyCarousel.ts';
 
 const results = [];
@@ -103,7 +104,34 @@ t(
 );
 t('every archetype has at least one dark variant', ['longTitle', 'title', 'copy', 'cta'].every((a) => HUMAN_DELUXE.frames[a].some((f) => f.dark)));
 
+// ── Brand recolour ────────────────────────────────────────────────────────────────────────────
+// The template ships its designer's accents (#db3e1b orange, #bd3074 pink) on the byline text. A
+// slide wearing those reads as someone else's deck with our words in it.
+t('hex converts to Figma 0..1 floats, not bytes', (() => {
+  const c = hexToFigmaRgb('#76B900');
+  return Math.abs(c.r - 118 / 255) < 1e-9 && Math.abs(c.g - 185 / 255) < 1e-9 && c.b === 0;
+})(), JSON.stringify(hexToFigmaRgb('#76B900')));
+t('short hex expands', JSON.stringify(hexToFigmaRgb('#fff')) === JSON.stringify(hexToFigmaRgb('#ffffff')));
+t('every channel stays within 0..1', Object.values(hexToFigmaRgb('#76B900')).every((v) => v >= 0 && v <= 1));
+let badHex = false;
+try { hexToFigmaRgb('nope'); } catch { badHex = true; }
+t('a non-hex value throws rather than painting something random', badHex);
+
+t('every slide carries fill entries', plan.slides.every((s) => Array.isArray(s.fills) && s.fills.length === 3), JSON.stringify(plan.slides.map((s) => s.fills?.length)));
+t('fills target the meta nodes only', plan.slides.every((s) => {
+  const frame = allFrames.find((f) => f.frameId === s.frameId);
+  const meta = new Set([frame.handle, frame.hashtag, frame.year]);
+  return s.fills.every((f) => meta.has(f.nodeId));
+}), JSON.stringify(plan.slides[0].fills));
+t('fills never touch the content text node', plan.slides.every((s) => {
+  const frame = allFrames.find((f) => f.frameId === s.frameId);
+  return s.fills.every((f) => f.nodeId !== frame.textNodeId);
+}));
+t('fill colour is the brand green', plan.slides.every((s) => s.fills.every((f) => JSON.stringify(f.color) === JSON.stringify(hexToFigmaRgb(BRAND_COLORS.brand500)))), JSON.stringify(plan.slides[0].fills[0]));
+t('template declares the brand accent', HUMAN_DELUXE.accentColor === BRAND_COLORS.brand500, String(HUMAN_DELUXE.accentColor));
+
 for (const [state, label, detail] of results) console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);
 const failed = results.filter((r) => r[0] === 'FAIL').length;
-console.log(`\n${results.length - failed} passed, ${failed} failed`);
+console.log(`
+${results.length - failed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

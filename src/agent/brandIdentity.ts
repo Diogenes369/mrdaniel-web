@@ -68,6 +68,21 @@ export const BRAND_META = {
 export const brandHandleBlock = (): string => `${BRAND_META.name}\n${BRAND_META.handle}`;
 
 /**
+ * Hex to Figma's 0..1 RGB. Figma's plugin API takes components as floats, not bytes, and passing
+ * 0..255 silently clamps every channel to 1 — a white slide that looks like a render bug.
+ */
+export function hexToFigmaRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '').trim();
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) throw new Error(`not a hex colour: ${hex}`);
+  return {
+    r: parseInt(full.slice(0, 2), 16) / 255,
+    g: parseInt(full.slice(2, 4), 16) / 255,
+    b: parseInt(full.slice(4, 6), 16) / 255,
+  };
+}
+
+/**
  * Is this background dark enough to be on-brand?
  *
  * Relative luminance, not a hex allowlist, so it keeps working when a template ships a shade the

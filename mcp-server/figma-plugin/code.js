@@ -41,6 +41,8 @@ async function run(command, params) {
       return setTexts(params);
     case 'duplicate_frame':
       return duplicateFrame(params);
+    case 'set_fills':
+      return setFills(params);
     case 'swap_image':
       return swapImage(params);
     case 'set_variant':
@@ -256,6 +258,52 @@ async function loadFontsFor(node, fallback, force) {
  * Placement: to the right of everything currently on the page, on a row, so repeated runs
  * accumulate left-to-right instead of stacking on top of each other. `x` can be passed to override.
  */
+/**
+ * Recolour solid fills — how a third-party template stops looking like a third-party template.
+ *
+ * human-deluxe ships its dark variants with the designer's own accents (#db3e1b orange, #bd3074
+ * pink) on the byline text. Those are not our brand, and a slide carrying them reads as someone
+ * else's deck with our words in it. This repaints them with the site's green.
+ *
+ * Only SOLID paints are touched, and only the ones already visible: an image or gradient fill is
+ * left alone rather than being flattened to a colour, and a hidden paint stays hidden. Opacity and
+ * blend mode are preserved so a deliberately faded element stays faded.
+ *
+ * `entries` is [{ nodeId, color: { r, g, b } }] with components in 0..1, Figma's own scale.
+ */
+async function setFills(params) {
+  const entries = params.entries || [];
+  if (!entries.length) throw new Error('entries is required: [{ nodeId, color: { r, g, b } }]');
+
+  const applied = [];
+  const missing = [];
+  for (const entry of entries) {
+    const node = await figma.getNodeByIdAsync(entry.nodeId);
+    if (!node || !('fills' in node)) {
+      missing.push(entry.nodeId);
+      continue;
+    }
+    const current = node.fills;
+    if (current === figma.mixed || !Array.isArray(current)) {
+      missing.push(entry.nodeId + ': mixed or unreadable fills');
+      continue;
+    }
+    let changed = 0;
+    const next = current.map(function (paint) {
+      if (paint.type !== 'SOLID' || paint.visible === false) return paint;
+      changed++;
+      return Object.assign({}, paint, { color: { r: entry.color.r, g: entry.color.g, b: entry.color.b } });
+    });
+    if (!changed) {
+      missing.push(entry.nodeId + ': no visible solid fill');
+      continue;
+    }
+    node.fills = next;
+    applied.push({ id: node.id, name: node.name, solidsRepainted: changed });
+  }
+  return { applied: applied, missing: missing, appliedCount: applied.length };
+}
+
 async function duplicateFrame(params) {
   const source = await mustGetNode(params.nodeId);
   if (typeof source.clone !== 'function') throw new Error('node ' + params.nodeId + ' (' + source.type + ') cannot be cloned');
