@@ -53,7 +53,7 @@ Env (root `.env.local` for dev, Vercel project env for production — both docum
 | Variable | Needed for | Notes |
 | --- | --- | --- |
 | `HF_API_BASE_URL` | every run | The platform origin. **Currently `https://queue.fal.run`, which is the wrong gateway — see "The origin is still unresolved".** |
-| `HF_API_KEY` | every run | `id:secret`. A key without the colon is reported missing, not sent. The configured key is a valid fal.ai key. |
+| `HF_API_KEY` | every run | `id:secret`. A key without the colon is reported missing, not sent. **Removed from Vercel Production on 2026-09-20** while the integration is paused; it is still in the local root `.env.local`. Removing it from Vercel does not revoke it — rotate it at the provider if it has been shared anywhere. |
 | `ADMIN_API_SECRET` | every action | These actions live on `/api/agent-generate`, which gates the whole endpoint. Runs are billable, so that gate is the point. |
 | `HIGGSFIELD_ENABLED` | `higgsfield-generate` | **Unset = paused**, which is today's state. `1`/`true`/`on` re-arms the billable action. |
 | `SITE_ORIGIN` | optional | `mcp-server/.env` only — point Hermes at `http://localhost:3099` to drive a local dev server. |
@@ -69,7 +69,9 @@ HeyGen, Replicate or Kling (`VideoGenerationEngine.ts`). Those five stay exactly
 ## Paused (2026-09-20)
 
 `higgsfield-generate` is **off by default** and answers `503 code: "paused"` without submitting
-anything. Re-arm with `HIGGSFIELD_ENABLED=1` (or `true`/`on`) on the project — no code change, no
+anything. Live in production since 2026-09-20, with `HF_API_KEY` also removed from the Production
+environment — so the billable path is closed twice over: the flag refuses first, and there is no key
+behind it. Restoring it means re-adding the key *and* setting the flag. Re-arm with `HIGGSFIELD_ENABLED=1` (or `true`/`on`) on the project — no code change, no
 redeploy needed once the var is set. `higgsfield-models`, `higgsfield-model` and `higgsfield-status`
 keep working: the catalog is local data and a poll is free, and a paused bridge should not look like a
 broken one.

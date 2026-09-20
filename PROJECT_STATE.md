@@ -673,7 +673,12 @@ and reels, and Hermes's `higgsfield_*` tools. Full detail in `docs/openhiggsfiel
 - **Configured and deployed** on the site project (Production only) — `higgsfield-models` answers
   `configured: true` on mrdaniel.co.il. This is a separate platform from the five
   `VideoGenerationEngine.ts` providers, which are untouched.
-- **PAUSED 2026-09-20 by request** — `higgsfield-generate` is gated behind `HIGGSFIELD_ENABLED`
+- **PAUSED 2026-09-20 by request, live in production** (`main`, deployed; `HF_API_KEY` also removed
+  from the Production env, so the path is closed twice: the flag refuses before the key check, and no
+  key remains behind it — the key is still in the local `.env.local`, and removing it from Vercel does
+  not revoke it at the provider). Verified on mrdaniel.co.il: `higgsfield-generate` → 503 `paused`,
+  `higgsfield-models` → 200 `configured:false` (missing `HF_API_KEY` only), `parse-thread` and
+  `story-carousel` unaffected, `health_check` all five green. `higgsfield-generate` is gated behind `HIGGSFIELD_ENABLED`
   (unset = paused, answers 503 `code: paused`, submits nothing); catalog reads and status polls stay
   open. The carousel pipeline never called this bridge, and the bridge test now fails if
   `storyCarousel.ts`, `figmaTemplates.ts`, `SocialAgentEngine.ts`, `threadsThreadAgent.ts` or
@@ -710,7 +715,7 @@ and reels, and Hermes's `higgsfield_*` tools. Full detail in `docs/openhiggsfiel
 | Dashboard publish button | Deployed; the copied link is `/g/<guideId>` since 2026-09-11. |
 | Bridge restart (no-expiry) | **Pending** — the PM2 daemon runs elevated, so `pm2 restart carousel-bridge` must come from an admin shell. Until then new publishes still get the old 7-day TTL. |
 | Lead PII exposure | **Still open; the server half shipped 2026-09-11.** Unauthenticated REST can read and delete `leads`, `newsletter_signups` and `email_templates` (probed 2026-09-11: 7 / 1 / 0 records readable). **Done:** the browser no longer writes `leads`; `api/leads.ts` validates every field and writes through `privilegedDb()` (firebase-admin when `FIREBASE_SERVICE_ACCOUNT` is set, the anonymous client until then). **Pending:** (1) create a JSON key for `firebase-adminsdk-fbsvc@mrdaniel-web.iam.gserviceaccount.com` (two console attempts on 2026-09-11 failed with "Unknown error"; the key-creation org policy is inactive) and set it on the **site** project as `FIREBASE_SERVICE_ACCOUNT`, then redeploy; (2) read the live rules and set `.read`/`.write` on `leads`, `newsletter_signups`, `email_config`, `email_templates` to `auth != null && root.child('admins').child(auth.uid).val() === true`, then seed `admins/<owner uid>`. Do not use `auth != null` alone: Email/Password sign-up through the public API key would let anyone get a session. Deploy the rules only after the key is live, or ManyChat, site-lead storage and campaigns break. |
-| `HF_API_BASE_URL` / `HF_API_KEY` | **Set on the site project (Production) 2026-09-20; generation still 404s.** The key is a valid fal.ai key with an *exhausted balance*, and `https://queue.fal.run` is not the gateway the catalog targets (`higgsfield-ai/soul/*`, `kling-video/v3.0/*` do not exist there; the bare `/requests/{id}/status` route 405s). Either obtain the real `HF_API_BASE_URL` from upstream or write a fal adapter — both, with the probe evidence, in `docs/openhiggsfield-bridge.md`. Top up fal billing either way. |
+| `HF_API_BASE_URL` / `HF_API_KEY` | **Paused 2026-09-20: `HF_API_KEY` removed from Production, `HIGGSFIELD_ENABLED` unset. `HF_API_BASE_URL` still set.** When it resumes, note that generation 404s as wired. The key is a valid fal.ai key with an *exhausted balance*, and `https://queue.fal.run` is not the gateway the catalog targets (`higgsfield-ai/soul/*`, `kling-video/v3.0/*` do not exist there; the bare `/requests/{id}/status` route 405s). Either obtain the real `HF_API_BASE_URL` from upstream or write a fal adapter — both, with the probe evidence, in `docs/openhiggsfield-bridge.md`. Top up fal billing either way. |
 | Tips & Guides publishing | Not possible yet — canvas-rendered, no bridge job. |
 | Bridge restart (2nd pending) | Slide previews now serve `inline` instead of `attachment` — on disk, not live. |
 | Cover thumbnails | Preview is the full ~1.1 MB slide; no downscaled variant exists. |
