@@ -1,4 +1,4 @@
-import { videoModel } from "./defaults";
+import { videoModel } from "./defaults.js";
 
 export const kling25 = videoModel("kling-2.5", "Kling 2.5", { start: 1 }, {
   image: "kling-video/v2.5-turbo/standard/image-to-video",

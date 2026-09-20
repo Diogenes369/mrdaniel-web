@@ -49,8 +49,9 @@ async function main() {
   }
 
   for (const rel of sources.sort()) {
-    const body = await fs.readFile(path.join(FROM, rel), 'utf8');
-    assertPure(rel, body);
+    const raw = await fs.readFile(path.join(FROM, rel), 'utf8');
+    assertPure(rel, raw);
+    const body = await withJsExtensions(rel, raw);
     const target = path.join(TO, rel);
     const existing = await fs.readFile(target, 'utf8').catch(() => null);
     if (existing === body) continue;
@@ -79,6 +80,45 @@ async function main() {
       ? `already up to date — ${sources.length} files`
       : `synced ${changed.length} of ${sources.length} files:\n  ${changed.join('\n  ')}`
   );
+}
+
+/**
+ * Upstream is bundled by Next and writes extensionless relative imports (`from "./types"`). This
+ * repo's functions are plain ESM on Node — every relative import inside src/ carries an explicit
+ * `.js`, and an extensionless one throws ERR_MODULE_NOT_FOUND at runtime, which surfaces as a
+ * FUNCTION_INVOCATION_FAILED on the whole endpoint rather than as a build error. So the specifiers
+ * are rewritten on the way in: `./types` -> `./types.js`, and a directory import like `./catalog`
+ * -> `./catalog/index.js`. The rewrite is checked against the upstream tree, so a specifier that
+ * resolves to neither is left alone and fails loudly at typecheck instead of silently.
+ */
+async function withJsExtensions(rel, body) {
+  const dir = path.dirname(path.join(FROM, rel));
+  const out = [];
+  let last = 0;
+  const pattern = /(from\s*["'])(\.[^"']*)(["'])/g;
+  for (const match of body.matchAll(pattern)) {
+    const [whole, head, spec, tail] = match;
+    let resolved = spec;
+    // Not `path.extname(spec)`: half the catalog is versioned (`./kling-2.5`, `./ltx-2.5-pro`,
+    // `./grok-imagine-video-1.5`) and that reads `.5` as the extension. What matters is whether the
+    // specifier already names a module file, so ask the upstream tree instead.
+    if (!/\.(?:js|mjs|cjs|json)$/.test(spec)) {
+      if (await exists(path.resolve(dir, `${spec}.ts`))) resolved = `${spec}.js`;
+      else if (await exists(path.resolve(dir, spec, 'index.ts'))) resolved = `${spec}/index.js`;
+    }
+    if (resolved === spec) continue;
+    out.push(body.slice(last, match.index), head, resolved, tail);
+    last = match.index + whole.length;
+  }
+  out.push(body.slice(last));
+  return out.join('');
+}
+
+function exists(file) {
+  return fs
+    .access(file)
+    .then(() => true)
+    .catch(() => false);
 }
 
 /** A file that reaches for Next, React or a Zustand store cannot run inside a Vercel function
@@ -113,6 +153,11 @@ These are the framework-free modules of the studio's generation layer: the 38-mo
 per-model settings allow-lists, the request mapper (\`to-platform.ts\`) and the queue client
 (\`platform.ts\`). Our wrapper is \`src/agent/OpenHiggsfieldEngine.ts\`; nothing else in this repo
 should import these files directly.
+
+One transform is applied on the way in: relative import specifiers gain an explicit \`.js\`
+(\`./types\` -> \`./types.js\`, \`./catalog\` -> \`./catalog/index.js\`). Upstream is bundled by Next and
+does not need them; these functions are plain ESM on Node and fail at runtime without them. The
+file contents are otherwise byte-identical to upstream.
 
 Edits belong upstream. \`npm run sync:higgsfield -- --check\` fails if this copy has drifted, which
 is what a refresh of vendor/open-higgsfield looks like from here.

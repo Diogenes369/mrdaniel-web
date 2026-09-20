@@ -1,4 +1,4 @@
-import { t2v, videoModel } from "./defaults";
+import { t2v, videoModel } from "./defaults.js";
 
 export const minimaxHailuo23 = videoModel(
   "minimax-hailuo-2.3",

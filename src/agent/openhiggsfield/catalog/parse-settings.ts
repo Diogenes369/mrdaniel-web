@@ -1,4 +1,4 @@
-import type { ModelEntry } from "./types";
+import type { ModelEntry } from "./types.js";
 
 export function parseSettings(
   model: ModelEntry,

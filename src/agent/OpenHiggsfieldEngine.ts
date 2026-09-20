@@ -1,7 +1,7 @@
-import { MODELS, getModel, parseSettings } from './openhiggsfield/catalog/index';
-import type { GenerationPlane, MediaItem, MediaRole, ModelEntry, Surface } from './openhiggsfield/catalog/types';
-import { PlatformError, createPlatformClient } from './openhiggsfield/platform';
-import { toPlatform } from './openhiggsfield/to-platform';
+import { MODELS, getModel, parseSettings } from './openhiggsfield/catalog/index.js';
+import type { GenerationPlane, MediaItem, MediaRole, ModelEntry, Surface } from './openhiggsfield/catalog/types.js';
+import { PlatformError, createPlatformClient } from './openhiggsfield/platform.js';
+import { toPlatform } from './openhiggsfield/to-platform.js';
 
 /**
  * Image and video generation through OpenHiggsfield AI's platform layer — 38 models (8 image,

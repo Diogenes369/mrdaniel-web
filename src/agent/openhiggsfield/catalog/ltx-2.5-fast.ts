@@ -1,4 +1,4 @@
-import { t2v, videoModel } from "./defaults";
+import { t2v, videoModel } from "./defaults.js";
 
 export const ltx25Fast = videoModel(
   "ltx-2.5-fast",

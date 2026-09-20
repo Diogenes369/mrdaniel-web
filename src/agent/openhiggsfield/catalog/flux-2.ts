@@ -1,3 +1,3 @@
-import { imageModel } from "./defaults";
+import { imageModel } from "./defaults.js";
 
 export const flux2 = imageModel("flux-2", "Flux 2", { text: "flux-2-pro" });

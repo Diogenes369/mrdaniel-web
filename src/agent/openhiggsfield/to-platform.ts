@@ -1,5 +1,5 @@
-import { getModel } from "./catalog";
-import type { GenerationPlane, PlatformPaths } from "./catalog/types";
+import { getModel } from "./catalog/index.js";
+import type { GenerationPlane, PlatformPaths } from "./catalog/types.js";
 
 type Mapped = { path: string; body: Record<string, unknown> };
 type Mapper = (plane: GenerationPlane) => Mapped;

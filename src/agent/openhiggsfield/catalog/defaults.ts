@@ -1,4 +1,4 @@
-import type { MediaRole, ModelEntry, PlatformPaths } from "./types";
+import type { MediaRole, ModelEntry, PlatformPaths } from "./types.js";
 
 const IMAGE_ASPECT = ["auto", "1:1", "4:3", "3:4", "16:9", "9:16"] as const;
 const VIDEO_ASPECT = ["16:9", "9:16", "1:1"] as const;

@@ -1,4 +1,4 @@
-import type { ModelEntry } from "./types";
+import type { ModelEntry } from "./types.js";
 
 const klingTurboSettings = {
   aspectRatio: { type: "enum", values: ["16:9", "9:16", "1:1"], default: "16:9" },

@@ -1,5 +1,5 @@
-import type { ModelEntry } from "./types";
-import { SEEDANCE_ASPECT } from "./tokens";
+import type { ModelEntry } from "./types.js";
+import { SEEDANCE_ASPECT } from "./tokens.js";
 
 const seedanceRoles = { start: 1, end: 1, reference: 9, video: 3, audio: 3 } as const;
 

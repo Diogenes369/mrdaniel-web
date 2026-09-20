@@ -1,5 +1,5 @@
-import type { ModelEntry } from "./types";
-import { SEEDANCE_ASPECT } from "./tokens";
+import type { ModelEntry } from "./types.js";
+import { SEEDANCE_ASPECT } from "./tokens.js";
 
 const seedance25Settings = {
   resolution: { type: "enum", values: ["480p", "720p"], default: "720p" },

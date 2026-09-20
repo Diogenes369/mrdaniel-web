@@ -1,4 +1,4 @@
-import { toAuthorizationHeader } from "./credentials";
+import { toAuthorizationHeader } from "./credentials.js";
 
 const MODEL_ID = /^[a-z0-9][a-z0-9._/-]*$/i;
 

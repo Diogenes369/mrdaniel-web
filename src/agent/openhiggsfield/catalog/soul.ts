@@ -1,5 +1,5 @@
-import type { ModelEntry } from "./types";
-import { SOUL_ASPECT } from "./tokens";
+import type { ModelEntry } from "./types.js";
+import { SOUL_ASPECT } from "./tokens.js";
 
 const soulSettings = {
   aspectRatio: { type: "enum", values: SOUL_ASPECT, default: "1:1" },

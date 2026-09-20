@@ -1,4 +1,4 @@
-import { videoModel } from "./defaults";
+import { videoModel } from "./defaults.js";
 
 export const grokImagineVideo15 = videoModel(
   "grok-imagine-video-1.5",

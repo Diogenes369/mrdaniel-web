@@ -11,5 +11,10 @@ per-model settings allow-lists, the request mapper (`to-platform.ts`) and the qu
 (`platform.ts`). Our wrapper is `src/agent/OpenHiggsfieldEngine.ts`; nothing else in this repo
 should import these files directly.
 
+One transform is applied on the way in: relative import specifiers gain an explicit `.js`
+(`./types` -> `./types.js`, `./catalog` -> `./catalog/index.js`). Upstream is bundled by Next and
+does not need them; these functions are plain ESM on Node and fail at runtime without them. The
+file contents are otherwise byte-identical to upstream.
+
 Edits belong upstream. `npm run sync:higgsfield -- --check` fails if this copy has drifted, which
 is what a refresh of vendor/open-higgsfield looks like from here.

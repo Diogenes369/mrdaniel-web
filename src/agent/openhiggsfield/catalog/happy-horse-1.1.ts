@@ -1,4 +1,4 @@
-import { t2v, videoModel } from "./defaults";
+import { t2v, videoModel } from "./defaults.js";
 
 export const happyHorse11 = videoModel(
   "happy-horse-1.1",

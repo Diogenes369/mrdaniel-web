@@ -10,7 +10,7 @@ import {
   type HiggsfieldBrief,
   type MediaRole,
   type Surface,
-} from '../agent/OpenHiggsfieldEngine';
+} from '../agent/OpenHiggsfieldEngine.js';
 
 /**
  * The `higgsfield-*` actions of /api/agent-generate — image and video generation over the

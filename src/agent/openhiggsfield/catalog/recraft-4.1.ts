@@ -1,4 +1,4 @@
-import { imageModel } from "./defaults";
+import { imageModel } from "./defaults.js";
 
 export const recraft41 = imageModel("recraft-4.1", "Recraft 4.1", {
   text: "recraft/v4.1/text-to-image",
