@@ -52,8 +52,8 @@ Env (root `.env.local` for dev, Vercel project env for production — both docum
 
 | Variable | Needed for | Notes |
 | --- | --- | --- |
-| `HF_API_BASE_URL` | every run | The platform origin. Upstream ships it blank; the wire contract is fal.ai's queue API (`https://queue.fal.run`) — confirm before relying on it. |
-| `HF_API_KEY` | every run | `id:secret`. A key without the colon is reported missing, not sent. |
+| `HF_API_BASE_URL` | every run | The platform origin. **Currently `https://queue.fal.run`, which is the wrong gateway — see "The origin is still unresolved".** |
+| `HF_API_KEY` | every run | `id:secret`. A key without the colon is reported missing, not sent. The configured key is a valid fal.ai key. |
 | `ADMIN_API_SECRET` | every action | These actions live on `/api/agent-generate`, which gates the whole endpoint. Runs are billable, so that gate is the point. |
 | `SITE_ORIGIN` | optional | `mcp-server/.env` only — point Hermes at `http://localhost:3099` to drive a local dev server. |
 
@@ -64,6 +64,38 @@ key in its "Add key" modal rather than from env.
 
 Nothing here reuses an existing key in this repo: this is a different platform from Gemini, Runway,
 HeyGen, Replicate or Kling (`VideoGenerationEngine.ts`). Those five stay exactly as they were.
+
+## The origin is still unresolved (2026-09-20)
+
+Everything in this bridge is live in production **except the generation itself**: `higgsfield-models`
+answers `configured: true`, and `higgsfield-generate` comes back `404 Application "soul" not found`
+from the platform. `https://queue.fal.run` is not the gateway this catalog was written for. Probed
+directly against that origin with the configured key:
+
+| Probe | Answer | Reading |
+| --- | --- | --- |
+| `POST /fal-ai/__no_such_model__`, wrong key | `401 invalid key credentials` | The key really is a fal.ai key… |
+| same, configured key | `404 Application "__no_such_model__" not found` | …and it authenticates. |
+| `POST /fal-ai/flux/dev` | `403 User is locked. Reason: Exhausted balance` | **The fal account has no balance.** |
+| `POST /higgsfield-ai/soul/v2/standard` | `404 Application "soul" not found` | The catalog's Soul path does not exist on fal. |
+| `POST /kling-video/v3.0/std/text-to-video` | `404 Application "v3.0" not found` | Nor its Kling 3 path. |
+| `POST /bytedance/seedance-2.0/fast/text-to-video` | `403` (balance) | Some paths do route — the namespaces only partly overlap. |
+| `GET /requests/<id>/status` | `405` | The path `platform.ts` builds is not a route; fal needs the app prefix (`/{app}/requests/{id}/status`). |
+
+The catalog's owners (`alibaba/`, `blackforestlabs/`, `kling-video/`, `minimax/`, `pixverse/`, `xai/`,
+`z-image/`, `higgsfield-ai/`) are not fal app paths, and upstream's client expects lowercase statuses
+with results inline, which is not fal's queue shape either. So upstream expects a normalizing
+gateway of its own; its repo never publishes the value (grep: the var appears only in `.env.example`,
+`README.md` and `actions.ts`).
+
+Two ways forward, whichever you prefer:
+
+1. **Get the real origin** — ask upstream (the hosted studio at openhiggsfield.ai holds it in a server
+   action, so it is not observable from the browser) and set `HF_API_BASE_URL` to it. No code changes.
+2. **Write a fal adapter** — map catalog ids to real fal app paths, poll the `status_url` that submit
+   returns instead of rebuilding the path, and read results from `response_url` with fal's uppercase
+   statuses. That lives in `OpenHiggsfieldEngine.ts` (never in the vendored copy). The fal account
+   needs a balance either way.
 
 ## HTTP
 

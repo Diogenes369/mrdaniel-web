@@ -670,9 +670,19 @@ and reels, and Hermes's `higgsfield_*` tools. Full detail in `docs/openhiggsfiel
   `higgsfield-generate` (`wait` capped at 90 s under that function's 120 s ceiling), `higgsfield-status`.
 - **Hermes**: `higgsfield_models` / `higgsfield_generate` / `higgsfield_status` — 32 MCP tools now.
   They go through `callAgent()`, so `HF_API_KEY` never lands on this machine.
-- **Not configured yet**: `HF_API_BASE_URL` + `HF_API_KEY` are unset everywhere (see §6). Until they
-  are, every generate/status call answers 503 with the missing names and attempts nothing. This is a
-  separate platform from the five `VideoGenerationEngine.ts` providers, which are untouched.
+- **Configured and deployed** on the site project (Production only) — `higgsfield-models` answers
+  `configured: true` on mrdaniel.co.il. This is a separate platform from the five
+  `VideoGenerationEngine.ts` providers, which are untouched.
+- **Generation still does not run**: `HF_API_BASE_URL=https://queue.fal.run` is the wrong gateway.
+  `higgsfield-generate` returns `404 Application "soul" not found`. The key is a genuine fal.ai key
+  and authenticates, but the catalog's app paths mostly do not exist on fal, fal's status route needs
+  the app prefix that upstream's client omits, and **the fal account's balance is exhausted** (`403
+  User is locked`). Evidence table + the two ways forward are in `docs/openhiggsfield-bridge.md`
+  ("The origin is still unresolved"). See §6.
+- **Deploy footgun, fixed**: the first production deploy took `/api/agent-generate` down entirely
+  (FUNCTION_INVOCATION_FAILED on *every* action) because the new modules used extensionless relative
+  imports. These functions are plain ESM on Node — every relative import inside `src/` needs `.js`.
+  The sync script now rewrites specifiers on the way in, and preview-then-promote caught the fix.
 
 ---
 
@@ -694,7 +704,7 @@ and reels, and Hermes's `higgsfield_*` tools. Full detail in `docs/openhiggsfiel
 | Dashboard publish button | Deployed; the copied link is `/g/<guideId>` since 2026-09-11. |
 | Bridge restart (no-expiry) | **Pending** — the PM2 daemon runs elevated, so `pm2 restart carousel-bridge` must come from an admin shell. Until then new publishes still get the old 7-day TTL. |
 | Lead PII exposure | **Still open; the server half shipped 2026-09-11.** Unauthenticated REST can read and delete `leads`, `newsletter_signups` and `email_templates` (probed 2026-09-11: 7 / 1 / 0 records readable). **Done:** the browser no longer writes `leads`; `api/leads.ts` validates every field and writes through `privilegedDb()` (firebase-admin when `FIREBASE_SERVICE_ACCOUNT` is set, the anonymous client until then). **Pending:** (1) create a JSON key for `firebase-adminsdk-fbsvc@mrdaniel-web.iam.gserviceaccount.com` (two console attempts on 2026-09-11 failed with "Unknown error"; the key-creation org policy is inactive) and set it on the **site** project as `FIREBASE_SERVICE_ACCOUNT`, then redeploy; (2) read the live rules and set `.read`/`.write` on `leads`, `newsletter_signups`, `email_config`, `email_templates` to `auth != null && root.child('admins').child(auth.uid).val() === true`, then seed `admins/<owner uid>`. Do not use `auth != null` alone: Email/Password sign-up through the public API key would let anyone get a session. Deploy the rules only after the key is live, or ManyChat, site-lead storage and campaigns break. |
-| `HF_API_BASE_URL` / `HF_API_KEY` | **Absent — OpenHiggsfield (§5D) generates nothing until both are set.** The upstream repo never names the platform; its wire contract (`Authorization: Key <id>:<secret>`, `POST /{model}`, `GET /requests/{id}/status`, paths like `higgsfield-ai/soul/v2/standard`) is fal.ai's queue API, i.e. `https://queue.fal.run` with a key from `https://fal.ai/dashboard/keys` — **inferred, not confirmed by upstream.** Verify against whoever issues the key before pointing production at it. |
+| `HF_API_BASE_URL` / `HF_API_KEY` | **Set on the site project (Production) 2026-09-20; generation still 404s.** The key is a valid fal.ai key with an *exhausted balance*, and `https://queue.fal.run` is not the gateway the catalog targets (`higgsfield-ai/soul/*`, `kling-video/v3.0/*` do not exist there; the bare `/requests/{id}/status` route 405s). Either obtain the real `HF_API_BASE_URL` from upstream or write a fal adapter — both, with the probe evidence, in `docs/openhiggsfield-bridge.md`. Top up fal billing either way. |
 | Tips & Guides publishing | Not possible yet — canvas-rendered, no bridge job. |
 | Bridge restart (2nd pending) | Slide previews now serve `inline` instead of `attachment` — on disk, not live. |
 | Cover thumbnails | Preview is the full ~1.1 MB slide; no downscaled variant exists. |
