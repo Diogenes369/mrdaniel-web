@@ -39,6 +39,8 @@ async function run(command, params) {
       return setText(params);
     case 'set_texts':
       return setTexts(params);
+    case 'duplicate_frame':
+      return duplicateFrame(params);
     case 'swap_image':
       return swapImage(params);
     case 'set_variant':
@@ -239,6 +241,56 @@ async function loadFontsFor(node, fallback, force) {
  * Figma uploads the bytes and hands back a hash; the fill is then rewritten pointing at it. The
  * existing fill's scaleMode and opacity are preserved so a template's crop behaviour survives.
  */
+/**
+ * Clone a master frame, park the copy on the canvas, and return the copy's node ids.
+ *
+ * Why this exists: filling the template frames in place meant every run overwrote the masters, so a
+ * second carousel destroyed the first and the pristine template was gone after one render. The copy
+ * is what gets filled; the master is never touched again after being read.
+ *
+ * The id remap is the whole trick. `clone()` gives every descendant a NEW id, so the registry's
+ * node ids — which address the MASTER — cannot address the copy. Walking both trees in the same
+ * order pairs them up positionally, which is reliable because a clone is structurally identical to
+ * its source by construction. The caller then translates its planned ids through `idMap`.
+ *
+ * Placement: to the right of everything currently on the page, on a row, so repeated runs
+ * accumulate left-to-right instead of stacking on top of each other. `x` can be passed to override.
+ */
+async function duplicateFrame(params) {
+  const source = await mustGetNode(params.nodeId);
+  if (typeof source.clone !== 'function') throw new Error('node ' + params.nodeId + ' (' + source.type + ') cannot be cloned');
+
+  const copy = source.clone();
+  copy.name = params.name || source.name + ' (copy)';
+
+  // Park it clear of existing content unless the caller places it explicitly.
+  const siblings = figma.currentPage.children.filter(function (n) { return n.id !== copy.id; });
+  const rightEdge = siblings.reduce(function (max, n) { return Math.max(max, n.x + n.width); }, 0);
+  copy.x = typeof params.x === 'number' ? params.x : rightEdge + (params.gap == null ? 200 : params.gap);
+  copy.y = typeof params.y === 'number' ? params.y : source.y;
+  figma.currentPage.appendChild(copy);
+
+  // Pair master ids to copy ids by walking both trees in the same order.
+  const idMap = {};
+  const walk = function (a, b) {
+    idMap[a.id] = b.id;
+    const ac = a.children || [];
+    const bc = b.children || [];
+    for (let i = 0; i < ac.length && i < bc.length; i++) walk(ac[i], bc[i]);
+  };
+  walk(source, copy);
+
+  return {
+    sourceId: source.id,
+    frameId: copy.id,
+    name: copy.name,
+    x: copy.x,
+    y: copy.y,
+    idMap: idMap,
+    mappedCount: Object.keys(idMap).length,
+  };
+}
+
 async function swapImage(params) {
   const node = await mustGetNode(params.nodeId);
   if (!('fills' in node)) throw new Error('node ' + params.nodeId + ' (' + node.type + ') cannot have fills');

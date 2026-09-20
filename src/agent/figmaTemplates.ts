@@ -31,10 +31,20 @@
  * `synthesizeStoryCarousel` takes a templateId, and Hermes can pass one to pick a look per topic.
  */
 import { visibleLength as visibleLen, type StoryCarouselSlide, type StoryCarouselDeck } from './storyCarousel.js';
+import { BRAND_FONTS, BRAND_META, brandHandleBlock } from './brandIdentity.js';
 
 /** One fillable frame: the frame to render, its single content TEXT node, and its meta line nodes. */
 export interface TemplateFrame {
   frameId: string;
+  /**
+   * Is this variant's background dark enough to be on-brand?
+   *
+   * The site is dark-only and permanently so (index.css records that a light theme was tried and
+   * rolled back), so a white or yellow slide is off-brand rather than a style choice. The light
+   * variants stay in the table as data — a future template might want them — but pickFrame only
+   * draws from the dark pool. Classified by relative luminance off the live file, not by eye.
+   */
+  dark?: boolean;
   /** The content TEXT node. `null` on image-only frames, which carry no copy. */
   textNodeId: string | null;
   /** "Your Name / @your_username" — the byline block. */
@@ -119,8 +129,8 @@ export const HUMAN_DELUXE: FigmaTemplate = {
   aspect: '1080x1350',
   compose: 'single-block',
   roleFrames: { cover: 'longTitle', item: 'copy', cta: 'cta' },
-  meta: { handle: 'דניאל בן ברוך\n@mrdaniel', hashtag: '#סייבר_ו_AI', year: '20\n26' },
-  fontFallback: { family: 'Heebo', style: 'Bold' },
+  meta: { handle: brandHandleBlock(), hashtag: BRAND_META.hashtag, year: BRAND_META.year },
+  fontFallback: BRAND_FONTS.figmaFallback,
   forceFont: true,
   align: 'RIGHT',
   // Every text box in this template is 940x940. The sizes are FITTED per slide rather than fixed
@@ -136,40 +146,40 @@ export const HUMAN_DELUXE: FigmaTemplate = {
   },
   frames: {
     longTitle: [
-      { frameId: '1:346', textNodeId: '1:357', handle: '1:350', hashtag: '1:351', year: '1:352' },
-      { frameId: '1:620', textNodeId: '1:631', handle: '1:624', hashtag: '1:625', year: '1:626' },
-      { frameId: '1:422', textNodeId: '1:433', handle: '1:426', hashtag: '1:427', year: '1:428' },
-      { frameId: '1:695', textNodeId: '1:706', handle: '1:699', hashtag: '1:700', year: '1:701' },
-      { frameId: '1:471', textNodeId: '1:482', handle: '1:475', hashtag: '1:476', year: '1:477' },
-      { frameId: '1:520', textNodeId: '1:531', handle: '1:524', hashtag: '1:525', year: '1:526' },
-      { frameId: '1:569', textNodeId: '1:580', handle: '1:573', hashtag: '1:574', year: '1:575' },
+      { frameId: '1:346', textNodeId: '1:357', handle: '1:350', hashtag: '1:351', year: '1:352' , dark: true },
+      { frameId: '1:620', textNodeId: '1:631', handle: '1:624', hashtag: '1:625', year: '1:626'  },
+      { frameId: '1:422', textNodeId: '1:433', handle: '1:426', hashtag: '1:427', year: '1:428' , dark: true },
+      { frameId: '1:695', textNodeId: '1:706', handle: '1:699', hashtag: '1:700', year: '1:701' , dark: true },
+      { frameId: '1:471', textNodeId: '1:482', handle: '1:475', hashtag: '1:476', year: '1:477'  },
+      { frameId: '1:520', textNodeId: '1:531', handle: '1:524', hashtag: '1:525', year: '1:526'  },
+      { frameId: '1:569', textNodeId: '1:580', handle: '1:573', hashtag: '1:574', year: '1:575'  },
     ],
     title: [
-      { frameId: '1:206', textNodeId: '1:217', handle: '1:379', hashtag: '1:380', year: '1:381' },
-      { frameId: '1:608', textNodeId: '1:611', handle: '1:613', hashtag: '1:614', year: '1:615' },
-      { frameId: '1:410', textNodeId: '1:413', handle: '1:415', hashtag: '1:416', year: '1:417' },
-      { frameId: '1:683', textNodeId: '1:686', handle: '1:688', hashtag: '1:689', year: '1:690' },
-      { frameId: '1:459', textNodeId: '1:462', handle: '1:464', hashtag: '1:465', year: '1:466' },
-      { frameId: '1:508', textNodeId: '1:511', handle: '1:513', hashtag: '1:514', year: '1:515' },
-      { frameId: '1:557', textNodeId: '1:560', handle: '1:562', hashtag: '1:563', year: '1:564' },
+      { frameId: '1:206', textNodeId: '1:217', handle: '1:379', hashtag: '1:380', year: '1:381' , dark: true },
+      { frameId: '1:608', textNodeId: '1:611', handle: '1:613', hashtag: '1:614', year: '1:615'  },
+      { frameId: '1:410', textNodeId: '1:413', handle: '1:415', hashtag: '1:416', year: '1:417' , dark: true },
+      { frameId: '1:683', textNodeId: '1:686', handle: '1:688', hashtag: '1:689', year: '1:690' , dark: true },
+      { frameId: '1:459', textNodeId: '1:462', handle: '1:464', hashtag: '1:465', year: '1:466'  },
+      { frameId: '1:508', textNodeId: '1:511', handle: '1:513', hashtag: '1:514', year: '1:515'  },
+      { frameId: '1:557', textNodeId: '1:560', handle: '1:562', hashtag: '1:563', year: '1:564'  },
     ],
     copy: [
-      { frameId: '1:222', textNodeId: '1:233', handle: '1:395', hashtag: '1:396', year: '1:397' },
-      { frameId: '1:632', textNodeId: '1:635', handle: '1:637', hashtag: '1:638', year: '1:639' },
-      { frameId: '1:434', textNodeId: '1:437', handle: '1:439', hashtag: '1:440', year: '1:441' },
-      { frameId: '1:707', textNodeId: '1:710', handle: '1:712', hashtag: '1:713', year: '1:714' },
-      { frameId: '1:483', textNodeId: '1:486', handle: '1:488', hashtag: '1:489', year: '1:490' },
-      { frameId: '1:532', textNodeId: '1:535', handle: '1:537', hashtag: '1:538', year: '1:539' },
-      { frameId: '1:581', textNodeId: '1:584', handle: '1:586', hashtag: '1:587', year: '1:588' },
+      { frameId: '1:222', textNodeId: '1:233', handle: '1:395', hashtag: '1:396', year: '1:397' , dark: true },
+      { frameId: '1:632', textNodeId: '1:635', handle: '1:637', hashtag: '1:638', year: '1:639'  },
+      { frameId: '1:434', textNodeId: '1:437', handle: '1:439', hashtag: '1:440', year: '1:441' , dark: true },
+      { frameId: '1:707', textNodeId: '1:710', handle: '1:712', hashtag: '1:713', year: '1:714' , dark: true },
+      { frameId: '1:483', textNodeId: '1:486', handle: '1:488', hashtag: '1:489', year: '1:490'  },
+      { frameId: '1:532', textNodeId: '1:535', handle: '1:537', hashtag: '1:538', year: '1:539'  },
+      { frameId: '1:581', textNodeId: '1:584', handle: '1:586', hashtag: '1:587', year: '1:588'  },
     ],
     cta: [
-      { frameId: '1:358', textNodeId: '1:369', handle: '1:403', hashtag: '1:404', year: '1:405' },
-      { frameId: '1:644', textNodeId: '1:647', handle: '1:649', hashtag: '1:650', year: '1:651' },
-      { frameId: '1:446', textNodeId: '1:449', handle: '1:451', hashtag: '1:452', year: '1:453' },
-      { frameId: '1:719', textNodeId: '1:722', handle: '1:724', hashtag: '1:725', year: '1:726' },
-      { frameId: '1:495', textNodeId: '1:498', handle: '1:500', hashtag: '1:501', year: '1:502' },
-      { frameId: '1:544', textNodeId: '1:547', handle: '1:549', hashtag: '1:550', year: '1:551' },
-      { frameId: '1:593', textNodeId: '1:596', handle: '1:598', hashtag: '1:599', year: '1:600' },
+      { frameId: '1:358', textNodeId: '1:369', handle: '1:403', hashtag: '1:404', year: '1:405' , dark: true },
+      { frameId: '1:644', textNodeId: '1:647', handle: '1:649', hashtag: '1:650', year: '1:651'  },
+      { frameId: '1:446', textNodeId: '1:449', handle: '1:451', hashtag: '1:452', year: '1:453' , dark: true },
+      { frameId: '1:719', textNodeId: '1:722', handle: '1:724', hashtag: '1:725', year: '1:726' , dark: true },
+      { frameId: '1:495', textNodeId: '1:498', handle: '1:500', hashtag: '1:501', year: '1:502'  },
+      { frameId: '1:544', textNodeId: '1:547', handle: '1:549', hashtag: '1:550', year: '1:551'  },
+      { frameId: '1:593', textNodeId: '1:596', handle: '1:598', hashtag: '1:599', year: '1:600'  },
     ],
     image: [{ frameId: '1:656', textNodeId: null, handle: null, hashtag: null, year: null }],
   },
@@ -200,9 +210,13 @@ export function listTemplates(): Array<{ id: string; label: string; aspect: stri
  */
 export function pickFrame(tpl: FigmaTemplate, slide: StoryCarouselSlide): TemplateFrame {
   const archetype = tpl.roleFrames[slide.role];
-  const pool = tpl.frames[archetype];
-  if (!pool?.length) throw new Error(`template ${tpl.id} has no frames for archetype '${archetype}'`);
-  return pool[(slide.index - 1) % pool.length];
+  const all = tpl.frames[archetype];
+  if (!all?.length) throw new Error(`template ${tpl.id} has no frames for archetype '${archetype}'`);
+  // On-brand variants only; fall back to the full pool rather than throwing, so a template with no
+  // dark variant still renders instead of failing the whole deck.
+  const pool = all.filter((f) => f.dark);
+  const from = pool.length ? pool : all;
+  return from[(slide.index - 1) % from.length];
 }
 
 /**
@@ -263,6 +277,42 @@ export function fitFontSize(text: string, box: { w: number; h: number }, maxFont
   return Math.max(24, Math.floor(Math.min(maxFontSize, byWidth, byHeight)));
 }
 
+/**
+ * Prepare one string for a Figma TEXT node: drop the canvas bidi marks, force RTL per line.
+ *
+ * Two separate corrections, both established by rendering the same sentence four ways into the live
+ * template and exporting each:
+ *
+ *   1. The RLM marks sanitizeHebrewText inserts are a workaround for a renderer that draws text
+ *      token-by-token WITHOUT paragraph-level bidi (see that file's header — it names
+ *      carouselTemplateRenderer's drawRunsLine). Figma resolves bidi properly, so the marks buy
+ *      nothing there and actively cost: with the Latin run at a line edge, the RLM sat between the
+ *      word and its following space and the space was trimmed as trailing whitespace, which is what
+ *      printed "את" flush against "CLAUDE".
+ *
+ *   2. Figma takes a paragraph's base direction from its first strong character, so any line
+ *      opening on a Latin product name — "Claude סייע…", and product names open these titles
+ *      constantly — was laid out LTR, putting the Hebrew in the wrong order. A leading RLM does NOT
+ *      fix this (tested, it does not); an explicit RTL isolate does. RLI…PDI rather than RLE…PDF
+ *      because an isolate cannot leak its direction into neighbouring text.
+ *
+ * Per line, because a newline ends a bidi paragraph — one wrapper around the whole block would
+ * leave every line after the first back on first-strong detection.
+ */
+const RLI = '⁧';
+const PDI = '⁩';
+const ALL_BIDI_MARKS = /[‎‏؜⁦-⁩‪-‮]/g;
+
+export function prepareForFigma(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => {
+      const plain = line.replace(ALL_BIDI_MARKS, '').trim();
+      return plain ? `${RLI}${plain}${PDI}` : '';
+    })
+    .join('\n');
+}
+
 /** One slide's write plan: the frame to fill and every node→text pair inside it. */
 export interface SlidePlan {
   index: number;
@@ -290,8 +340,10 @@ export function planDeck(deck: StoryCarouselDeck, templateId?: string | null): {
       const composed = style?.maxChars ? capComposed(raw, style.maxChars) : raw;
       entries.push({
         nodeId: frame.textNodeId,
-        text: composed,
+        text: prepareForFigma(composed),
         align: tpl.align,
+        // Sized on the composed text; prepareForFigma only adds zero-width marks, which
+        // visibleLength ignores, so the fit is unaffected either way.
         fontSize: style ? fitFontSize(composed, style.box, style.maxFontSize) : undefined,
         forceFont: tpl.forceFont,
       });
@@ -299,8 +351,9 @@ export function planDeck(deck: StoryCarouselDeck, templateId?: string | null): {
     // The meta lines keep the template's own size — only the font and alignment change, because
     // Inter cannot draw Hebrew (see forceFont).
     const meta = { align: tpl.align, forceFont: tpl.forceFont };
-    if (frame.handle) entries.push({ nodeId: frame.handle, text: tpl.meta.handle, ...meta });
-    if (frame.hashtag) entries.push({ nodeId: frame.hashtag, text: tpl.meta.hashtag, ...meta });
+    if (frame.handle) entries.push({ nodeId: frame.handle, text: prepareForFigma(tpl.meta.handle), ...meta });
+    if (frame.hashtag) entries.push({ nodeId: frame.hashtag, text: prepareForFigma(tpl.meta.hashtag), ...meta });
+    // The year is digits only — an isolate on it would be noise, and it has no direction to get wrong.
     if (frame.year) entries.push({ nodeId: frame.year, text: tpl.meta.year, ...meta });
     return { index: slide.index, role: slide.role, frameId: frame.frameId, entries };
   });

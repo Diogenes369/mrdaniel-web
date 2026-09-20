@@ -41,6 +41,7 @@ export const PLUGIN_COMMANDS = [
   'get_text_nodes',
   'set_text',
   'set_texts',
+  'duplicate_frame',
   'swap_image',
   'set_variant',
   'set_layer_name',

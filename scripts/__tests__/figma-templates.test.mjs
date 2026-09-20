@@ -12,6 +12,7 @@ import {
   pickFrame,
   composeSingleBlock,
   planDeck,
+  prepareForFigma,
 } from '../../src/agent/figmaTemplates.ts';
 import { enforceDeck } from '../../src/agent/storyCarousel.ts';
 
@@ -67,12 +68,40 @@ t('plan covers every slide', plan.slides.length === 3);
 t('plan reports the template', plan.template.id === 'human-deluxe');
 t('every entry targets a nodeId, never a name', plan.slides.every((s) => s.entries.every((e) => /^\d+:\d+$/.test(e.nodeId) && !('name' in e))), JSON.stringify(plan.slides[0].entries[0]));
 t('each slide writes content plus three meta nodes', plan.slides.every((s) => s.entries.length === 4), JSON.stringify(plan.slides.map((s) => s.entries.length)));
-t('template placeholders are overwritten', plan.slides.every((s) => s.entries.some((e) => e.text === HUMAN_DELUXE.meta.handle)));
+// planDeck runs every string through prepareForFigma, so compare on the visible text: the RLI/PDI
+// isolates it adds are the RTL fix, not content.
+const bare = (s) => s.replace(/[‎‏؜⁦-⁩‪-‮]/g, '');
+t(
+  'template placeholders are overwritten',
+  plan.slides.every((s) => s.entries.some((e) => bare(e.text) === bare(HUMAN_DELUXE.meta.handle))),
+  JSON.stringify(plan.slides[0].entries.map((e) => bare(e.text)))
+);
 t('no placeholder text survives', !JSON.stringify(plan.slides).includes('your_username') && !JSON.stringify(plan.slides).includes('DesignEveryDay'));
 const contentTexts = plan.slides.map((s) => s.entries[0].text);
-t('cover content is the composed block', contentTexts[0].startsWith('כותרת שער\n\n'), JSON.stringify(contentTexts[0]));
-t('item content carries the subtitle block', contentTexts[1].includes('\n\nחטיפת סוכנים\n\n'), JSON.stringify(contentTexts[1]));
+t('cover content is the composed block', bare(contentTexts[0]).startsWith('כותרת שער\n\n'), JSON.stringify(bare(contentTexts[0])));
+t('item content carries the subtitle block', bare(contentTexts[1]).includes('\n\nחטיפת סוכנים\n\n'), JSON.stringify(bare(contentTexts[1])));
 t('slides target distinct frames', new Set(plan.slides.map((s) => s.frameId)).size === 3);
+
+// The RTL isolate is the contract now. Figma takes a paragraph's base direction from its first
+// strong character, so any line opening on a Latin product name — which is most titles here — laid
+// out LTR until each line was wrapped. A bare RLM prefix does not fix it; an isolate does.
+t(
+  'every non-empty line is RTL-isolated',
+  contentTexts.every((txt) => txt.split('\n').filter(Boolean).every((l) => l.startsWith('⁧') && l.endsWith('⁩'))),
+  JSON.stringify(contentTexts[1])
+);
+t('prepareForFigma strips the canvas RLM marks', !prepareForFigma('‏Claude‏ סייע').includes('‏'));
+t('prepareForFigma keeps the visible text intact', bare(prepareForFigma('‏Claude‏ סייע')) === 'Claude סייע', prepareForFigma('‏Claude‏ סייע'));
+t('blank separator lines stay blank', prepareForFigma('א\n\nב').split('\n')[1] === '');
+
+// Dark-only: the site has no light theme (index.css records one being tried and rolled back), so a
+// white or yellow variant is off-brand rather than a style choice.
+t(
+  'only dark variants are picked',
+  plan.slides.every((s) => allFrames.find((f) => f.frameId === s.frameId)?.dark === true),
+  JSON.stringify(plan.slides.map((s) => s.frameId))
+);
+t('every archetype has at least one dark variant', ['longTitle', 'title', 'copy', 'cta'].every((a) => HUMAN_DELUXE.frames[a].some((f) => f.dark)));
 
 for (const [state, label, detail] of results) console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);
 const failed = results.filter((r) => r[0] === 'FAIL').length;
