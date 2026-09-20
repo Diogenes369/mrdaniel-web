@@ -295,6 +295,22 @@ export function geminiPacingStatus(): { minSpacingMs: number; dailyBudget: numbe
 }
 
 /**
+ * Per-call switches for `generateContentWithRetry`.
+ *
+ * `scrub: false` opts out of `scrubResponse`. Every caller that generates Hebrew *prose* wants the
+ * scrubber and gets it by default; a caller that generates **source code** must not have it, because
+ * `scrubAiPhrases` finishes by collapsing runs of spaces and tabs (`/[ 	]{2,}/ -> ' '`). That is
+ * harmless in a paragraph and destroys a file: a screenshot carrying any Hebrew UI text produces a
+ * component with Hebrew string literals, `HEBREW.test()` then passes for the whole answer, and every
+ * level of indentation in the returned TSX collapses to a single space. Opting out is therefore not
+ * a style preference — it is the difference between valid output and mangled output.
+ */
+export interface GenerateOptions {
+  /** Default true. Set false when the response is code, not prose — see above. */
+  scrub?: boolean;
+}
+
+/**
  * One model call with the shared retry policy:
  *   - transient upstream 5xx (INTERNAL / UNAVAILABLE / overloaded / reset) → up to 2 retries;
  *   - per-minute 429 throttle → up to 3 retries with exponential backoff + jitter;
@@ -303,7 +319,7 @@ export function geminiPacingStatus(): { minSpacingMs: number; dailyBudget: numbe
  *   - any other 4xx / parse error → thrown immediately.
  * Every failed attempt is logged with its status and Google's error payload (logGeminiFailure).
  */
-export async function generateContentWithRetry(params: GenContentReq) {
+export async function generateContentWithRetry(params: GenContentReq, options: GenerateOptions = {}) {
   if (!genAI) throw new Error(engineConfigReason() ?? 'GEMINI_API_KEY not configured');
   let transientRetries = 0;
   let rateRetries = 0;
@@ -314,7 +330,8 @@ export async function generateContentWithRetry(params: GenContentReq) {
     consumeDailyBudget(String(params.model));
     await reserveCallSlot();
     try {
-      return scrubResponse(await genAI.models.generateContent(params));
+      const res = await genAI.models.generateContent(params);
+      return options.scrub === false ? res : scrubResponse(res);
     } catch (err) {
       logGeminiFailure(`generateContent(${params.model})`, err, attempt);
       const rate = detectGeminiRateLimit(err);

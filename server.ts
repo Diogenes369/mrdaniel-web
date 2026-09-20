@@ -391,6 +391,39 @@ app.post('/api/agent-generate', async (req: Request, res: Response) => {
       return;
     }
 
+    // Screenshot / design mock -> React + Tailwind component. Mirrors the production branch in
+    // api/agent-generate.ts, including the dynamic import — see src/server/agents/screenshotCodeAgent.ts.
+    if (action === 'screenshot-to-code') {
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured' });
+        return;
+      }
+      const { images, instructions, componentName, variant } = req.body ?? {};
+      if (!Array.isArray(images) || images.length === 0) {
+        res.status(400).json({ ok: false, error: 'missing images' });
+        return;
+      }
+      const { generateComponentFromScreenshot, validateScreenshotImage, MAX_SCREENSHOTS } = await import('./src/server/agents/screenshotCodeAgent.js');
+      if (images.length > MAX_SCREENSHOTS) {
+        res.status(400).json({ ok: false, error: 'too many images' });
+        return;
+      }
+      const checked = images.map((img: unknown) => validateScreenshotImage(img));
+      const bad = checked.findIndex((c) => !c.ok);
+      if (bad >= 0) {
+        res.status(400).json({ ok: false, error: `image ${bad + 1}: ${(checked[bad] as { ok: false; reason: string }).reason}` });
+        return;
+      }
+      const result = await generateComponentFromScreenshot({
+        images: checked.map((c) => (c as { ok: true; image: { mimeType: string; data: string } }).image),
+        instructions: typeof instructions === 'string' ? instructions : undefined,
+        componentName: typeof componentName === 'string' ? componentName : undefined,
+        variant: variant === 'jsx' ? 'jsx' : 'tsx',
+      });
+      res.json({ ok: true, ...result });
+      return;
+    }
+
     res.status(400).json({ ok: false, error: 'unknown action' });
   } catch (err) {
     const failure = classifyGeminiError(err);

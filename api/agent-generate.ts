@@ -844,6 +844,56 @@ ${typeof notes === 'string' ? notes : ''}`);
       return;
     }
 
+    if (action === 'screenshot-to-code') {
+      // Screenshot / design mock -> a React + Tailwind component. The vision prompt is ported from
+      // abi/screenshot-to-code; the agent module explains exactly what was kept and what was
+      // dropped. Folded in here rather than given its own route for the same reason as every other
+      // action on this endpoint: the Hobby plan is at its 12-function ceiling.
+      //
+      // Dynamically imported, like the Higgsfield branch, so the screenshot prompt corpus never
+      // loads for the twenty-odd Hebrew content actions that share this function.
+      if (!isEngineConfigured()) {
+        res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
+        return;
+      }
+      const { images, instructions, componentName, variant } = req.body ?? {};
+      if (!Array.isArray(images) || images.length === 0) {
+        res.status(400).json({ ok: false, error: 'missing images', message: 'לא צורפה תמונת מסך. העלו או הדביקו צילום מסך אחד לפחות.' });
+        return;
+      }
+      const {
+        generateComponentFromScreenshot,
+        validateScreenshotImage,
+        MAX_SCREENSHOTS,
+      } = await import('../src/server/agents/screenshotCodeAgent.js');
+      if (images.length > MAX_SCREENSHOTS) {
+        res.status(400).json({ ok: false, error: 'too many images', message: `אפשר לשלוח עד ${MAX_SCREENSHOTS} צילומי מסך בבקשה אחת.` });
+        return;
+      }
+      // Every frame is checked before the call, and one bad frame fails the request rather than
+      // being silently dropped: a component generated from 2 of the 3 screenshots the operator
+      // uploaded looks like a model failure, not like the upload problem it actually is.
+      const checked = images.map((img: unknown) => validateScreenshotImage(img));
+      const bad = checked.findIndex((c) => !c.ok);
+      if (bad >= 0) {
+        const reason = (checked[bad] as { ok: false; reason: string }).reason;
+        res.status(400).json({ ok: false, error: `image ${bad + 1}: ${reason}`, message: `תמונה ${bad + 1} נדחתה: ${reason}` });
+        return;
+      }
+      const result = await generateComponentFromScreenshot({
+        images: checked.map((c) => (c as { ok: true; image: { mimeType: string; data: string } }).image),
+        instructions: typeof instructions === 'string' ? instructions : undefined,
+        componentName: typeof componentName === 'string' ? componentName : undefined,
+        variant: variant === 'jsx' ? 'jsx' : 'tsx',
+      });
+      // Deliberately NOT run through sanitizeOutput(): that guard exists for Hebrew copy about to
+      // be published to a social account, and its prompt-injection and unverified-claim patterns
+      // fire on ordinary source code (a numeric literal reads as an unverified stat). Nothing here
+      // is published anywhere — the operator copies the file into their own editor.
+      res.status(200).json({ ok: true, ...result });
+      return;
+    }
+
     res.status(400).json({ ok: false, error: 'unknown action' });
   } catch (err) {
     // Every failure below this endpoint used to collapse into the same opaque 500, so the

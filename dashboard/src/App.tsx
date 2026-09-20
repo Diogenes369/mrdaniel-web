@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp, LayoutTemplate, GraduationCap, AtSign, ImagePlus } from 'lucide-react';
+import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp, LayoutTemplate, GraduationCap, AtSign, ImagePlus, Code2 } from 'lucide-react';
 import { useAuthUser, logout } from './lib/auth';
 import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
 import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
@@ -26,15 +26,16 @@ import IgGrowthAgent from './components/IgGrowthAgent';
 import TechTipsStudio from './components/TechTipsStudio';
 import ThreadsImporter from './components/ThreadsImporter';
 import ImageCarouselUploader from './components/ImageCarouselUploader';
+import ScreenshotToCode from './components/ScreenshotToCode';
 import EmailManagerPanel from './components/EmailManagerPanel';
 import WeeklyPlanCalendar from './components/WeeklyPlanCalendar';
 import ErrorBoundary from './components/ErrorBoundary';
 import AdminAuthGate from './components/AdminAuthGate';
 
-type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'repurpose' | 'carousel-studio' | 'tech-tips' | 'threads-import' | 'image-carousel' | 'ig-growth' | 'auto-publisher' | 'email' | 'weekly-plan';
+type Tab = 'overview' | 'visitors' | 'events' | 'leads' | 'security' | 'agent' | 'news-agent' | 'story' | 'repurpose' | 'carousel-studio' | 'tech-tips' | 'threads-import' | 'image-carousel' | 'screenshot-code' | 'ig-growth' | 'auto-publisher' | 'email' | 'weekly-plan';
 
 /**
- * Tab groups. Sixteen equal-weight pills in one row read as a wall of options, so they are grouped
+ * Tab groups. Eighteen equal-weight pills in one row read as a wall of options, so they are grouped
  * by what the operator is trying to do. Ids, labels and icons are untouched — this only adds a
  * `group` field for rendering, so every existing route, panel and API binding is unaffected.
  */
@@ -58,6 +59,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutGrid; group: GroupId }[
   { id: 'tech-tips', label: 'טיפים ומדריכים', icon: GraduationCap, group: 'create' },
   { id: 'threads-import', label: 'יבוא מ-Threads', icon: AtSign, group: 'create' },
   { id: 'image-carousel', label: 'תרגום ומיתוג קרוסלות (תמונות)', icon: ImagePlus, group: 'create' },
+  { id: 'screenshot-code', label: 'מסך לקוד (React + Tailwind)', icon: Code2, group: 'create' },
   { id: 'agent', label: 'סוכן AI חברתי', icon: Bot, group: 'growth' },
   { id: 'ig-growth', label: 'סוכן צמיחה באינסטגרם', icon: TrendingUp, group: 'growth' },
   { id: 'auto-publisher', label: 'אוטונומיה', icon: Rocket, group: 'growth' },
@@ -273,6 +275,12 @@ export default function App() {
         {tab === 'image-carousel' && (
           <ErrorBoundary label="תרגום ומיתוג קרוסלות (תמונות)">
             <ImageCarouselUploader />
+          </ErrorBoundary>
+        )}
+
+        {tab === 'screenshot-code' && (
+          <ErrorBoundary label="מסך לקוד (React + Tailwind)">
+            <ScreenshotToCode />
           </ErrorBoundary>
         )}
 
