@@ -49,11 +49,17 @@ const CTA_PATTERNS = [
   cta('שאלו|תשאלו'),
 ];
 
-/** The AI tells that survive the Gemini scrubber and that a local 8B model reaches for constantly. */
-const BANNED = [
+/** The AI tells that survive the Gemini scrubber and that a local 8B model reaches for constantly.
+ *  Hebrew entries first, then the English equivalents — `captionSystemPrompt` splits on that.
+ *  Mirrors the banned list in src/agent/expertVoice.ts; add a phrase to both or it is only
+ *  blocked on one of the two paths that write Hebrew (expert-voice.test.mjs checks this). */
+export const BANNED_PHRASES = [
   'בעידן הדיגיטלי',
   'בעידן ה-AI',
   'בעולם של היום',
+  'בעולם הדינמי',
+  'בעולם המשתנה',
+  'עידן חדש',
   'חשוב לציין',
   'חשוב לזכור',
   'בואו נצלול',
@@ -80,6 +86,11 @@ const BANNED = [
  * Written as hard numeric limits rather than adjectives: "short and punchy" produces 150 words from
  * every model tried, "3 sentences, 45 words, then stop" produces 3 sentences.
  */
+/** The Hebrew half of BANNED_PHRASES, for the Hebrew prompt. Derived rather than sliced by index:
+ *  the old `.slice(0, 11)` silently dropped the last three Hebrew phrases the moment a phrase was
+ *  added to the middle of the list, which is exactly what happened on 2026-09-20. */
+const HEBREW_BANNED = BANNED_PHRASES.filter((p) => /[֐-׿]/.test(p));
+
 export function captionSystemPrompt({ platform = 'instagram', hasCarousel = true } = {}) {
   const name = platform === 'tiktok' ? 'TikTok' : platform === 'linkedin' ? 'LinkedIn' : 'Instagram';
   return `כללי כיתוב ל-${name} — כלל אדום:
@@ -89,7 +100,7 @@ export function captionSystemPrompt({ platform = 'instagram', hasCarousel = true
 ${hasCarousel ? '- התוכן הכבד יושב בשקפים של הקרוסלה. הכיתוב לא מסביר אותם ולא מסכם אותם — הוא רק גורם למישהו להחליק ימינה.' : '- אין קרוסלה, ולכן המשפטים חייבים לעמוד לבד. עדיין עד המגבלה למעלה.'}
 - CTA אחד בלבד בסוף, קונקרטי (שמרו / כתבו לי X / קישור בביו). לא שניים, ולא "עקבו + שמרו + שתפו".
 - בלי קישורים ובלי כתובות URL בגוף הכיתוב.
-- אסור: ${BANNED.slice(0, 11).join(', ')}.`;
+- אסור: ${HEBREW_BANNED.join(', ')}.`;
 }
 
 /**
@@ -114,7 +125,7 @@ export function checkCaption(text, { platform = 'instagram' } = {}) {
   const hasCta = CTA_PATTERNS.some((re) => re.test(caption));
   if (CAPTION_RULES.ctaRequired && !hasCta) issues.push('no CTA found — end with one concrete ask');
 
-  const banned = BANNED.filter((phrase) => caption.toLowerCase().includes(phrase.toLowerCase()));
+  const banned = BANNED_PHRASES.filter((phrase) => caption.toLowerCase().includes(phrase.toLowerCase()));
   if (banned.length) issues.push(`banned phrases: ${banned.join(', ')}`);
 
   // Instagram strips links from captions entirely, so one in the text is dead pixels that also

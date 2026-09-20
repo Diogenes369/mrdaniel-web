@@ -154,28 +154,32 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const withJitter = (ms: number) => Math.round(ms * (0.8 + Math.random() * 0.4));
 
 /**
- * Free-tier pacing: never let two model calls leave this runtime close enough to trip the RPM quota.
+ * Client-side pacing: never let two model calls leave this runtime close enough to trip the RPM quota.
  *
  * The budget is expressed as RPM rather than as a delay because the delay is a consequence, and
- * guessing it wrong is silent. Measured against production on 2026-09-19, the free tier allows
- * **5 requests per minute** for gemini-3.6-flash, not the widely-quoted 15:
+ * guessing it wrong is silent. `MIN_CALL_SPACING_MS` derives the delay from whatever ceiling is in
+ * force, adding a second of headroom because the window is Google's, not ours, and a call landing
+ * on the boundary counts against the older window.
  *
- *   quotaId: GenerateRequestsPerMinutePerProjectPerModel-FreeTier, value: 5, retryDelay: 22s
+ * **The project moved to the paid / pay-as-you-go tier on 2026-09-20, so pacing is OFF by default.**
+ * The free tier's measured ceilings were 5 RPM and 20 requests/day (see the daily-budget note
+ * below), which forced a 13s gap between every call — a tax that no longer buys anything. Paid
+ * Tier 1 for gemini-3.6-flash is three orders of magnitude above that, and a 13s client-side gap
+ * would now be the slowest thing in the request by a wide margin.
  *
- * So the floor is 60s/5 = 12s, plus a second of headroom because the window is Google's, not ours,
- * and a call that lands on the boundary counts against the older window. A 5s delay would have felt
- * like a fix and still run at 12 RPM — more than double the real ceiling.
- *
- * Calls queue rather than reject: the caller waits instead of getting a 429 to interpret.
+ * What is deliberately kept rather than deleted:
+ *   - the whole mechanism, one env var away from returning. Billing lapses, keys get swapped back
+ *     to a free project, and a new quota ceiling is a config change, not a code change.
+ *   - the 429 retry path below, which is the real backstop. Paid tiers still have ceilings, and
+ *     nothing here is a distributed limiter — see the scope note.
  *
  * Scope, stated plainly: this is per *runtime instance*. Fluid Compute reuses an instance across
- * concurrent requests, so one instance's calls are genuinely serialised — but two instances know
- * nothing about each other, and at a ceiling of 5 RPM that matters more than it would at 15. The
- * daily cron overlapping a dashboard session can still produce a 429; the retry path below handles
- * it. This is a large reduction in RPM pressure, not a distributed rate limiter.
+ * concurrent requests, so one instance's calls would be genuinely serialised — but two instances
+ * know nothing about each other. That mattered at 5 RPM; at paid-tier ceilings it does not.
  *
- * GEMINI_MAX_RPM=0 disables pacing (paid keys, tests). GEMINI_MIN_SPACING_MS overrides the derived
- * value outright when a specific spacing is wanted.
+ * GEMINI_MAX_RPM=0 (the default) disables pacing. Set it to the tier's real RPM to switch pacing
+ * back on — e.g. GEMINI_MAX_RPM=5 restores the free-tier 13s floor. GEMINI_MIN_SPACING_MS overrides
+ * the derived value outright when a specific spacing is wanted.
  */
 /**
  * Read a non-negative number from the environment, treating unset/blank/garbage as absent.
@@ -194,7 +198,7 @@ function envNumber(name: string): number | null {
 const MIN_CALL_SPACING_MS = (() => {
   const explicit = envNumber('GEMINI_MIN_SPACING_MS');
   if (explicit !== null) return explicit;
-  const rpm = envNumber('GEMINI_MAX_RPM') ?? 5;
+  const rpm = envNumber('GEMINI_MAX_RPM') ?? 0;
   if (rpm === 0) return 0;
   return Math.ceil(60_000 / rpm) + 1000;
 })();
@@ -241,27 +245,27 @@ function reserveCallSlot(): Promise<void> {
 }
 
 /**
- * Free-tier daily budget. The RPM floor above says nothing about requests-per-day, which is the
- * limit an unattended loop actually walks into — and a 429 for a spent daily quota reads exactly
- * like a throttle while being unrecoverable until Google's reset.
+ * Daily call budget — a local ceiling on requests-per-day, OFF by default since the move to the
+ * paid tier on 2026-09-20.
  *
- * Refusing locally turns that into an immediate, honest error instead of four retries and a 15s
- * wait per call. Same instance-scoped caveat as the throttle: a soft guard, not an accountant.
- */
-/**
- * The free tier's real daily ceiling, measured in production on 2026-09-19:
+ * Why it existed: the free tier's real daily ceiling, measured in production on 2026-09-19, was
  *
  *   quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier, value: 20, model: gemini-3.6-flash
  *
- * Twenty calls per day for the whole project — not per user, not per endpoint. That is the limit
- * that actually bites; the 5 RPM ceiling is merely the one hit first on a busy minute.
+ * Twenty calls per day for the whole project — not per user, not per endpoint. A 429 for a spent
+ * daily quota reads exactly like a throttle while being unrecoverable until Google's UTC reset, so
+ * refusing locally turned that into an immediate honest error instead of four retries per call.
  *
- * The default is 18 rather than 20 so the last two calls are ours to spend deliberately: a run that
- * discovers the limit by having Google reject it has already lost the ability to finish whatever it
- * was doing, whereas a local refusal leaves room for a retry after a human decides what matters.
- * Raise it only for a paid key, where it should simply be set high or to 0.
+ * Why it is now 0: on pay-as-you-go there is no daily cap to protect, and a hard local ceiling is
+ * strictly a way to break a working product at call 19. Overspend is a billing concern, and the
+ * place to bound it is Google's own budget alert, which can see every instance — this counter only
+ * ever saw one (same instance-scoped caveat as the throttle: a soft guard, never an accountant).
+ *
+ * Set GEMINI_DAILY_CALL_BUDGET to a positive number to re-arm it — for a free key, or as a
+ * deliberate spend fuse. The counter still runs, so `geminiPacingStatus()` reports callsToday
+ * either way.
  */
-const DAILY_CALL_BUDGET = envNumber('GEMINI_DAILY_CALL_BUDGET') ?? 18;
+const DAILY_CALL_BUDGET = envNumber('GEMINI_DAILY_CALL_BUDGET') ?? 0;
 
 let budgetDay = '';
 let callsToday = 0;
@@ -270,13 +274,14 @@ let callsToday = 0;
 const utcDay = () => new Date().toISOString().slice(0, 10);
 
 function consumeDailyBudget(context: string): void {
-  if (DAILY_CALL_BUDGET <= 0) return;
   const today = utcDay();
   if (today !== budgetDay) {
     budgetDay = today;
     callsToday = 0;
   }
-  if (callsToday >= DAILY_CALL_BUDGET) {
+  // Counting is unconditional so geminiPacingStatus() still reports the day's usage with the budget
+  // disabled; only the refusal is gated. Observability shouldn't switch off with the fuse.
+  if (DAILY_CALL_BUDGET > 0 && callsToday >= DAILY_CALL_BUDGET) {
     throw new Error(
       `gemini daily call budget exhausted (${callsToday}/${DAILY_CALL_BUDGET} for ${today}) — refused locally before calling Google. Raise GEMINI_DAILY_CALL_BUDGET or wait for the UTC reset. [context: ${context}]`
     );

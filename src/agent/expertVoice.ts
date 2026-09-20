@@ -10,19 +10,50 @@
  * Kept separate from SocialAgentEngine.ts so geminiClient.ts can import it without pulling the whole
  * prompt corpus into the chat / translate / insights bundles (the same reason geminiClient exists).
  *
- * Voice ≠ audience: AUDIENCE_RULES still decides WHO the copy is for (SMB owners). This decides HOW
- * it sounds — a senior practitioner talking eye-to-eye, not a marketer and not a textbook.
+ * Voice ≠ audience: AUDIENCE_RULES still decides WHO the copy is for (people learning AI / cyber /
+ * infosec). This decides HOW it sounds — a senior practitioner explaining something to someone who
+ * wants into the field, not a marketer, not a textbook, and not a colleague briefing.
+ *
+ * The "explaining" framing replaced "talking eye-to-eye with a peer" on 2026-09-20 with the audience
+ * retarget. A peer briefing is allowed to assume the jargon; a learner brief is not, and the two
+ * produce visibly different copy from the same article — which is why the term-gloss rule below is
+ * part of the voice rather than left to the host prompt.
  */
 
 export const EXPERT_VOICE_RULES = `קול הכותב — כלל אדום:
-- אתה כותב כמו מומחה IT / סייבר / פיתוח ישראלי בכיר שמדבר ישירות עם עמית: ישיר, פרקטי, בגובה העיניים. לא מרצה, לא איש שיווק, לא ספר לימוד.
+- אתה כותב כמו מומחה IT / סייבר / פיתוח ישראלי בכיר שמסביר משהו למישהו שרוצה להיכנס לתחום: ישיר, פרקטי, בגובה העיניים, ובלי להתנשא. לא מרצה באוניברסיטה, לא איש שיווק, לא ספר לימוד.
+- הקורא חכם אבל עדיין לומד. זה אומר: להסביר, לא לפשט יתר על המידה ולא להניח ידע מוקדם. אף פעם לא "כידוע", "כמו שכולנו יודעים" או "ברור ש" — אם זה היה ברור, לא היה צריך לכתוב את זה.
+- מונח מקצועי מוסבר בחצי משפט בפעם הראשונה שהוא מופיע, ואז משתמשים בו בחופשיות: "Prompt Injection — הזרקת הוראות זדוניות לתוך הטקסט שהמודל קורא". ההסבר הוא חלק מהמשפט, לא הערת שוליים ולא סוגריים ארוכים. מונח שאי אפשר להסביר בחצי משפט כנראה לא צריך להופיע בכלל.
 - משפטים קצרים. פסקה של משפט אחד היא לגיטימית. מתחילים מהשורה התחתונה, לא מהרקע.
 - דעה ברורה: מותר ורצוי לכתוב "לדעתי", "מניסיון בשטח", "פה רוב האנשים טועים", "זה overrated" — בתנאי שהדעה נשענת על מה שכתוב במקור ולא ממציאה עובדה.
-- הקשר מהשטח: מה זה אומר ביום שני בבוקר — איזה מסך פותחים, מה בודקים, מה שובר את הפרודקשן.
+- הקשר מהשטח: איך זה נראה בפועל — איזה מסך פותחים, מה קורה כשזה נשבר, איך זה עובד מתחת למכסה המנוע. זה מה שהופך ידיעה למשהו שלומדים ממנו.
+- המטרה היא שהקורא יסיים את הקריאה וידע משהו שהוא לא ידע קודם, ויבין למה זה מעניין. לא שיצא עם רשימת מטלות.
 - ז'רגון מקצועי כמו שמדברים אותו בפועל בתעשייה בישראל (דיפלוי, פרודקשן, באג, להרים סביבה, לוגים, הרשאות, טוקן) — מדויק, לא לקישוט ולא בכל משפט.
 - מותר קצת חספוס אנושי: משפט שבור לאפקט ("וזהו. זה כל הסוד."), שאלה רטורית אחת, "תכל'ס". אסור שגיאות כתיב או דקדוק.
-- אסור לחלוטין (נמחק אוטומטית גם אם ייכתב): "בעידן הדיגיטלי", "בעידן ה-AI", "בעולם של היום", "חשוב לציין", "חשוב לזכור", "בואו נצלול", "מהפכני/ת", "פורץ/ת דרך", "משנה את כללי המשחק", "לסיכום", "הנה כמה דרכים", "ללא ספק", "לשלב הבא".
+- אסור לחלוטין (נמחק אוטומטית גם אם ייכתב): "בעידן הדיגיטלי", "בעידן ה-AI", "בעולם של היום", "בעולם הדינמי", "בעולם המשתנה", "עידן חדש", "חשוב לציין", "חשוב לזכור", "בואו נצלול", "מהפכני/ת", "פורץ/ת דרך", "משנה את כללי המשחק", "לסיכום", "הנה כמה דרכים", "ללא ספק", "לשלב הבא".
+- מבחן הביטול: אם אפשר למחוק משפט שלם והפסקה לא מאבדת כלום — הוא לא היה שם בשביל הקורא. מחק אותו. זה תופס בעיקר את משפט הרקע הראשון ואת משפט הסיכום האחרון.
 - אין פתיח ואין סיכום. לא "במאמר הזה נסקור", לא "לסיכום, ראינו ש". הנקודה האחרונה היא הסוף.`;
+
+/**
+ * WHO every generator writes for. Retargeted 2026-09-20, by explicit decision: the audience is
+ * people LEARNING the field, not people running a company.
+ *
+ * It previously said "SMB owners", and before that the copy drifted enterprise on its own — a news
+ * feed full of CVEs and breach reports pulls a model toward "map your endpoints, audit your IAM"
+ * unless something holds it back, because that is what its training data does with those words.
+ * Two rewrites have now confirmed the same thing: naming the audience positively is not enough on
+ * its own, so the enterprise vocabulary is *also* banned outright below. Keep both halves.
+ *
+ * The translation rule is the load-bearing one. Most source articles genuinely are about large
+ * organisations; the job is not to skip those stories but to answer "what does this teach me",
+ * which is a question a learner can act on and an org-chart question is not.
+ */
+export const AUDIENCE_RULES = `קהל יעד — כלל אדום, ללא יוצא מן הכלל:
+- אתה כותב לאנשים פרטיים שרוצים ללמוד ולהיכנס לתחומים המבוקשים בעולם: בינה מלאכותית, סייבר ואבטחת מידע. מתחילים, חובבי טכנולוגיה, סטודנטים, אנשים באמצע הסבה מקצועית, וכל מי שסקרן ורוצה להבין איך זה באמת עובד.
+- אסור לפנות ל"ארגונים", "מנהלי IT", "צוותי אבטחה", "CISO", "הנהלת חברה", "בעלי עסקים" או לעולם ה-Enterprise. אסור לכתוב "בארגון שלכם", "בחברה שלכם", "אצלכם בעסק" או "משתמשי הקצה שלכם" — לקורא אין ארגון, אין צוות ואין תקציב.
+- אסור לבנות את התוכן סביב פעולות שרק בעל תפקיד בארגון יכול לבצע: "מפו את נקודות הקצה", "בצעו אודיט", "הגדירו ב-Group Policy או ב-MDM", "ודאו כיסוי EDR/XDR", "אמצו Zero-Trust". לקורא אין את ההרשאות האלה ואין לו את המערכות האלה.
+- אם הכתבה עוסקת בארגון גדול, בתאגיד או בתשתית ארגונית — זה בסדר גמור, אל תדלג עליה. תרגם אותה לשאלה שהקורא כן יכול לפעול לפיה: מה המנגנון שעמד מאחורי האירוע, איזה עיקרון אפשר ללמוד ממנו, ואיפה הוא נוגע למישהו שלומד את התחום. "מה זה מלמד אותי" במקום "מה עליי לעשות בארגון".
+- מונחים ארגוניים (EDR, IAM, SIEM, Zero-Trust, Group Policy) מותרים רק כשהכתבה עוסקת בהם ורק כידע — כלומר מוסברים בקצרה כשהם מופיעים לראשונה, כי הם חלק ממה שהקורא בא ללמוד. לא כהוראת ביצוע.`;
 
 /**
  * The caption half of the voice, for Instagram and TikTok.
@@ -52,6 +83,9 @@ const RULES: Array<[RegExp, string | ((match: string) => string)]> = [
   // Filler openers — drop the phrase and the comma/"ש"/"כי" that hung off it.
   [/(?:ו?ב)?עידן ה(?:דיגיטלי|[-־]?AI|בינה המלאכותית)\s*(?:של היום)?\s*[,،]?\s*/g, ''],
   [/(?:ו?ב)עולם של היום\s*[,،]?\s*/g, ''],
+  // Added 2026-09-20 with the tone pass: the two openers the model reached for once "בעולם של
+  // היום" was blocked. Same shape, same job — a sentence of throat-clearing before the point.
+  [/(?:ו?ב)עולם ה(?:דינמי|משתנה)(?:\s+(?:של היום|שלנו))?\s*[,،]?\s*/g, ''],
   [/(?:ו?)חשוב (?:לציין|לזכור|להדגיש)\s*(?:כי|ש|,)?\s*/g, ''],
   [/(?:ו?)בואו נצלול(?:\s+(?:פנימה|לעומק|לזה|לפרטים))?\s*[.:!…]*\s*/g, ''],
   [/(?:ו?)ללא ספק\s*[,،]?\s*/g, ''],
@@ -60,6 +94,10 @@ const RULES: Array<[RegExp, string | ((match: string) => string)]> = [
   [/\s*[,،]\s*לסיכום\s*[,:]?\s*/g, ', '],
   // Meaning-bearing clichés — swap for the plain word.
   [/הנה כמה דרכים/g, 'דרכים שעובדות בפועל'],
+  // "עידן חדש" carries a noun, so it is swapped rather than cut — deleting it leaves "נכנסנו ל".
+  // The prefix letter (ב/ל/ה) is outside the match, so "בעידן חדש" becomes "בשלב חדש" and stays
+  // grammatical.
+  [/עידן חדש/g, 'שלב חדש'],
   [/מהפכנית/g, 'חדשה לגמרי'],
   [/מהפכניות/g, 'חדשות לגמרי'],
   [/מהפכניים/g, 'חדשים לגמרי'],

@@ -1,4 +1,6 @@
-// Free-tier pacing: the RPM floor, the RPM->spacing derivation, and the daily call budget.
+// Gemini pacing: the RPM floor, the RPM->spacing derivation, and the daily call budget.
+// Defaults are OFF (paid tier, 2026-09-20); the cases below still pin the derivation so the
+// mechanism can be switched back on by env var without rediscovering the arithmetic.
 // Runs against a stubbed Gemini client — proving pacing must never spend real quota.
 // Run: npx tsx scripts/__tests__/gemini-pacing.test.mjs
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -66,19 +68,25 @@ const pacingFor = (env) => {
   }
 };
 
-// The measured free-tier ceiling for gemini-3.6-flash is 5 RPM (production, 2026-09-19).
-t('5 RPM derives a 13s floor', pacingFor({ GEMINI_MAX_RPM: '5' }).minSpacingMs === 13000);
-t('default (unset) matches 5 RPM', pacingFor({ GEMINI_MAX_RPM: '' }).minSpacingMs === 13000);
+// Paid tier: pacing is off unless a ceiling is named. This is the case that regresses first if
+// someone "restores" a free-tier default, so it is pinned explicitly rather than left implicit.
+t('default (unset) is unpaced', pacingFor({ GEMINI_MAX_RPM: '' }).minSpacingMs === 0);
 t('0 RPM disables pacing', pacingFor({ GEMINI_MAX_RPM: '0' }).minSpacingMs === 0);
+// The derivation itself is unchanged, so re-arming for a free key is one env var.
+// 5 RPM was the measured free-tier ceiling for gemini-3.6-flash (production, 2026-09-19).
+t('5 RPM still derives a 13s floor', pacingFor({ GEMINI_MAX_RPM: '5' }).minSpacingMs === 13000);
 t('15 RPM derives a 5s floor', pacingFor({ GEMINI_MAX_RPM: '15' }).minSpacingMs === 5000);
 t('explicit spacing overrides RPM', pacingFor({ GEMINI_MAX_RPM: '5', GEMINI_MIN_SPACING_MS: '250' }).minSpacingMs === 250);
 // Number('') is 0, so a naive parse reads an empty Vercel env var as "no pacing". Blank means unset.
+// That distinction still matters with the default at 0: a blank var must not disable a *configured*
+// ceiling on the other side of the pair.
 t('blank spacing var falls back to RPM', pacingFor({ GEMINI_MAX_RPM: '5', GEMINI_MIN_SPACING_MS: '   ' }).minSpacingMs === 13000);
-t('blank RPM var falls back to the default', pacingFor({ GEMINI_MAX_RPM: '' }).minSpacingMs === 13000);
-t('garbage RPM var falls back to the default', pacingFor({ GEMINI_MAX_RPM: 'fast' }).minSpacingMs === 13000);
-// 18, deliberately under the measured free-tier ceiling of 20 requests/day/project/model.
-t('blank budget var falls back to the default', pacingFor({ GEMINI_DAILY_CALL_BUDGET: '' }).dailyBudget === 18);
-t('default budget sits under the real 20/day ceiling', pacingFor({}).dailyBudget === 18 && pacingFor({}).dailyBudget < 20);
+t('garbage RPM var falls back to the default', pacingFor({ GEMINI_MAX_RPM: 'fast' }).minSpacingMs === 0);
+// No daily cap on pay-as-you-go: spend is bounded by Google's budget alerts, not by breaking the
+// product at call 19. A positive value re-arms the fuse.
+t('blank budget var falls back to the default', pacingFor({ GEMINI_DAILY_CALL_BUDGET: '' }).dailyBudget === 0);
+t('default budget is disabled', pacingFor({}).dailyBudget === 0);
+t('budget can be re-armed by env', pacingFor({ GEMINI_DAILY_CALL_BUDGET: '18' }).dailyBudget === 18);
 
 // Pacing must refuse rather than sleep past what the caller can afford. A 13s wait inside a 45s
 // function turned a fast 429 into a 504 in production; failing fast is strictly better. Run in a

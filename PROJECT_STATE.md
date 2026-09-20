@@ -661,7 +661,7 @@ Bridge `GUIDE_TTL_MS` defaults to 0 (§5.2). The guide published on 2026-09-08 k
 | `/carousel/redesign` | Implemented, **never exercised end-to-end.** |
 | `output/` retention | **Implemented** — 48 h sweep; published guides are permanent by default since 2026-09-11 (§5.2). |
 | Dashboard `x-admin-secret` exposure | Structural; see §4.5. |
-| Gemini free tier | 429s after the hourly cap. Permanent fix = paid key. |
+| Gemini free tier | **Resolved 2026-09-20** — project moved to pay-as-you-go. Client-side pacing and the local daily budget are now off by default (`GEMINI_MAX_RPM`/`GEMINI_DAILY_CALL_BUDGET` = 0); set either to a positive number to re-arm for a free key. The 429 retry path in `geminiClient.ts` stays as the backstop. |
 | `CAROUSEL_BRIDGE_URL` on the **site** project | Set. Bridge guides still 503 whenever cloudflared is down (it was not running on 2026-09-10). Static guides (§5C) do not depend on it. |
 | ManyChat itself | Webhook + static guides live (§5C); no ManyChat flow configured yet. |
 | Public-route rate limiting | **Implemented** (§5.6). Needs a bridge restart to go live. |
