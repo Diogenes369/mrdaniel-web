@@ -673,6 +673,12 @@ and reels, and Hermes's `higgsfield_*` tools. Full detail in `docs/openhiggsfiel
 - **Configured and deployed** on the site project (Production only) — `higgsfield-models` answers
   `configured: true` on mrdaniel.co.il. This is a separate platform from the five
   `VideoGenerationEngine.ts` providers, which are untouched.
+- **PAUSED 2026-09-20 by request** — `higgsfield-generate` is gated behind `HIGGSFIELD_ENABLED`
+  (unset = paused, answers 503 `code: paused`, submits nothing); catalog reads and status polls stay
+  open. The carousel pipeline never called this bridge, and the bridge test now fails if
+  `storyCarousel.ts`, `figmaTemplates.ts`, `SocialAgentEngine.ts`, `threadsThreadAgent.ts` or
+  `imageTranslatorAgent.ts` imports a media-generation module. News/Thread/Comparison stay Gemini
+  text + internal layout → Figma; the only external media on that path is free Pexels photo search.
 - **Generation still does not run**: `HF_API_BASE_URL=https://queue.fal.run` is the wrong gateway.
   `higgsfield-generate` returns `404 Application "soul" not found`. The key is a genuine fal.ai key
   and authenticates, but the catalog's app paths mostly do not exist on fal, fal's status route needs

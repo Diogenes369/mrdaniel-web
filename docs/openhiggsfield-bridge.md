@@ -55,6 +55,7 @@ Env (root `.env.local` for dev, Vercel project env for production — both docum
 | `HF_API_BASE_URL` | every run | The platform origin. **Currently `https://queue.fal.run`, which is the wrong gateway — see "The origin is still unresolved".** |
 | `HF_API_KEY` | every run | `id:secret`. A key without the colon is reported missing, not sent. The configured key is a valid fal.ai key. |
 | `ADMIN_API_SECRET` | every action | These actions live on `/api/agent-generate`, which gates the whole endpoint. Runs are billable, so that gate is the point. |
+| `HIGGSFIELD_ENABLED` | `higgsfield-generate` | **Unset = paused**, which is today's state. `1`/`true`/`on` re-arms the billable action. |
 | `SITE_ORIGIN` | optional | `mcp-server/.env` only — point Hermes at `http://localhost:3099` to drive a local dev server. |
 
 The studio's own `.env.local` (`vendor/open-higgsfield/.env.local`) needs `HF_API_BASE_URL` and,
@@ -64,6 +65,22 @@ key in its "Add key" modal rather than from env.
 
 Nothing here reuses an existing key in this repo: this is a different platform from Gemini, Runway,
 HeyGen, Replicate or Kling (`VideoGenerationEngine.ts`). Those five stay exactly as they were.
+
+## Paused (2026-09-20)
+
+`higgsfield-generate` is **off by default** and answers `503 code: "paused"` without submitting
+anything. Re-arm with `HIGGSFIELD_ENABLED=1` (or `true`/`on`) on the project — no code change, no
+redeploy needed once the var is set. `higgsfield-models`, `higgsfield-model` and `higgsfield-status`
+keep working: the catalog is local data and a poll is free, and a paused bridge should not look like a
+broken one.
+
+This is a stop on *deliberate* calls from the dashboard or Hermes. It is not a correction of a
+default: the carousel pipeline never called this bridge. News, Thread and Comparison decks are Gemini
+text plus our own layout code (`storyCarousel.ts` → `figmaTemplates.ts` → the Figma plugin bridge),
+and `scripts/__tests__/openhiggsfield-bridge.test.mjs` now fails if `storyCarousel.ts`,
+`figmaTemplates.ts`, `SocialAgentEngine.ts`, `threadsThreadAgent.ts` or `imageTranslatorAgent.ts` ever
+imports a media-generation module. The only external media on the carousel path is Pexels **photo
+search** (free key, curated fallback pool) — a stock lookup, not generation.
 
 ## The origin is still unresolved (2026-09-20)
 

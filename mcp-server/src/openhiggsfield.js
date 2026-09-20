@@ -22,6 +22,9 @@ function unwrap(answer, what) {
       `${what}: admin secret rejected — it was probably rotated; update mcp-server/.env or dashboard/.env`
     );
   }
+  if (answer.status === 503 && answer.json?.code === 'paused') {
+    throw new Error(`${what}: ${detail}. ${answer.json.hint ?? ''}`.trim());
+  }
   if (answer.status === 503 && Array.isArray(answer.json?.missingKeys)) {
     throw new Error(`${what}: ${detail} — missing env on the site: ${answer.json.missingKeys.join('; ')}`);
   }

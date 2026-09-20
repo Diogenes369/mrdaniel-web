@@ -30,6 +30,8 @@ import {
  * Every caller is already past agent-generate's admin gate, so nothing re-checks it here. What this
  * module does enforce is the platform keys: with none configured it answers 503 and names the
  * missing env rather than attempting a run.
+ *
+ * PAUSED since 2026-09-20 by explicit request — see HIGGSFIELD_ENABLED below.
  */
 
 export const HIGGSFIELD_ACTIONS = [
@@ -44,6 +46,21 @@ export type HiggsfieldAction = (typeof HIGGSFIELD_ACTIONS)[number];
 export function isHiggsfieldAction(action: unknown): action is HiggsfieldAction {
   return typeof action === 'string' && (HIGGSFIELD_ACTIONS as readonly string[]).includes(action);
 }
+
+/**
+ * The billable half of this bridge is OFF by default.
+ *
+ * Paused 2026-09-20 by explicit request: the platform origin is still unresolved (see
+ * docs/openhiggsfield-bridge.md) and no paid media generation should be reachable while it is. The
+ * carousel pipeline never called this bridge in the first place — News/Thread/Comparison decks are
+ * Gemini text plus our own layout code, and scripts/__tests__/openhiggsfield-bridge.test.mjs asserts
+ * that — so this flag exists to stop a *deliberate* call from the dashboard or Hermes, not to
+ * correct a default.
+ *
+ * Re-arm without a deploy by setting HIGGSFIELD_ENABLED=1 (or true/on) on the project. The catalog
+ * reads stay available either way: they are local data and cost nothing.
+ */
+const HIGGSFIELD_ENABLED = /^(?:1|true|on)$/i.test((process.env.HIGGSFIELD_ENABLED ?? '').trim());
 
 const MEDIA_ROLES: MediaRole[] = ['start', 'end', 'reference', 'video', 'audio'];
 /** agent-generate's own ceiling is 120s (vercel.json), so a blocking run gets 90s and hands the
@@ -87,6 +104,20 @@ export async function handleHiggsfieldAction(
     } catch (err) {
       return bad(message(err));
     }
+  }
+
+  if (action === 'higgsfield-generate' && !HIGGSFIELD_ENABLED) {
+    console.warn('[openhiggsfield] generation is paused (HIGGSFIELD_ENABLED is not set) — nothing was submitted');
+    return {
+      status: 503,
+      payload: {
+        ok: false,
+        code: 'paused',
+        error: 'OpenHiggsfield generation is paused — nothing was submitted, and nothing was billed',
+        message: 'יצירת המדיה החיצונית מושהית כרגע. הקרוסלות נבנות מ-Gemini והלוגיקה הפנימית בלבד.',
+        hint: 'Set HIGGSFIELD_ENABLED=1 on the project to re-arm. See docs/openhiggsfield-bridge.md.',
+      },
+    };
   }
 
   const unconfigured = requireKeys();

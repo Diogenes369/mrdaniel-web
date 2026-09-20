@@ -550,7 +550,7 @@ server.registerTool(
   {
     title: 'Generate an image or video',
     description:
-      'Generate media from a prompt with one catalog model — the visual side of a carousel, story or reel. BILLABLE on the generation platform, one charge per run, so do not call it speculatively or in a loop. Waits for the result by default and returns its URL(s); pass wait:false for long video runs and poll higgsfield_status with the requestId. Prompts are best written in English even when the post is Hebrew: these are visual models, and no slide text should be baked into the image (see the caption rules).',
+      'Generate media from a prompt with one catalog model. PAUSED since 2026-09-20 — the site answers 503 code:paused and submits nothing, so do not reach for this as part of building a carousel: News/Thread/Comparison decks are Gemini text plus our own Figma layout and need no external media. It stays listed because the catalog is still useful and because re-arming is one env var (HIGGSFIELD_ENABLED=1). When live it is BILLABLE, one charge per run: never call it speculatively or in a loop. Waits for the result by default; pass wait:false for long video runs and poll higgsfield_status.',
     inputSchema: {
       model: z.string().min(1).describe('Model id from higgsfield_models, e.g. "soul-2" or "kling-3-std"'),
       prompt: z.string().min(1),

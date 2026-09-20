@@ -14,6 +14,8 @@ import {
 } from '../../src/agent/OpenHiggsfieldEngine.ts';
 import { MODELS, getModel, parseSettings } from '../../src/agent/openhiggsfield/catalog/index.ts';
 import { toPlatform } from '../../src/agent/openhiggsfield/to-platform.ts';
+import { handleHiggsfieldAction } from '../../src/server/openHiggsfieldActions.ts';
+import { readFileSync } from 'node:fs';
 
 const results = [];
 const t = (label, cond, detail = '') => results.push([cond ? 'PASS' : 'FAIL', label, cond ? '' : detail]);
@@ -111,6 +113,44 @@ if (!higgsfieldConfigured()) {
   await fails('a valid brief with no keys names the missing env', { model: 'soul-2', prompt: 'a lock' }, 'not configured');
 } else {
   t('a valid brief with no keys names the missing env', true, 'skipped — HF_API_* is configured in this shell');
+}
+
+// ─── paused: the billable action submits nothing ──────────────────────────────────────────────
+
+// The flag is read at import time, so this only describes a shell with it unset — which is the
+// deployed default. A shell that deliberately re-armed it is not a failing build.
+const rearmed = /^(?:1|true|on)$/i.test((process.env.HIGGSFIELD_ENABLED ?? '').trim());
+const paused = await handleHiggsfieldAction('higgsfield-generate', { model: 'soul-2', prompt: 'a lock' });
+if (rearmed) {
+  t('generate is paused by default', true, 'skipped — HIGGSFIELD_ENABLED is set in this shell');
+} else {
+  t('generate is paused by default', paused.status === 503 && paused.payload.code === 'paused', JSON.stringify(paused));
+  t('the pause says nothing was billed', String(paused.payload.error).includes('nothing was billed'), String(paused.payload.error));
+  t('the pause names the way back', String(paused.payload.hint).includes('HIGGSFIELD_ENABLED'), String(paused.payload.hint));
+}
+
+// The catalog is local data and costs nothing, so it stays readable while generation is paused —
+// otherwise a paused bridge would look identical to a broken one.
+const stillReadable = await handleHiggsfieldAction('higgsfield-models', {});
+t('the catalog still reads while paused', stillReadable.status === 200 && stillReadable.payload.ok === true);
+
+// ─── the carousel pipeline never reaches this bridge ──────────────────────────────────────────
+
+// News / Thread / Comparison decks are Gemini text plus our own layout code. If one of these
+// modules ever imports the media bridge or a paid video provider, that is a silent new cost on the
+// carousel path — the one thing this test exists to refuse.
+const PIPELINE = [
+  'src/agent/storyCarousel.ts',
+  'src/agent/figmaTemplates.ts',
+  'src/agent/SocialAgentEngine.ts',
+  'src/server/agents/threadsThreadAgent.ts',
+  'src/server/agents/imageTranslatorAgent.ts',
+];
+const FORBIDDEN_IMPORT = /from\s+['"][^'"]*(OpenHiggsfieldEngine|openHiggsfieldActions|openhiggsfield|VideoGenerationEngine)/;
+for (const file of PIPELINE) {
+  const body = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+  const hit = body.match(FORBIDDEN_IMPORT);
+  t(`${file} imports no media-generation module`, hit === null, hit?.[0] ?? '');
 }
 
 for (const [state, label, detail] of results) console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);
