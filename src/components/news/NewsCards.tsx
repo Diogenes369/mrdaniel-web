@@ -38,7 +38,7 @@ export function NewsHeroCard({ item, onOpen, className = '' }: { item: NewsItem;
         <div className="relative aspect-[16/9] w-full overflow-hidden md:aspect-[16/10]">
           <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
           <Icon className="pointer-events-none absolute -bottom-6 -left-4 h-40 w-40 text-white/[0.06]" aria-hidden="true" />
-          <NewsImage src={item.image} className="transition-transform duration-700 group-hover:scale-105" />
+          <NewsImage src={item.image} topic={item.topic} seed={item.id} className="transition-transform duration-700 group-hover:scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#06080c] via-transparent to-transparent md:bg-gradient-to-l" aria-hidden="true" />
         </div>
         <div className="flex min-w-0 flex-col justify-center gap-3 p-6 sm:p-8">
@@ -103,7 +103,7 @@ export function NewsGridCard({
       <div className="relative aspect-[16/9] min-h-[190px] w-full shrink-0 overflow-hidden">
         <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
         <Icon className="pointer-events-none absolute -bottom-4 -left-3 h-24 w-24 text-white/[0.06]" aria-hidden="true" />
-        <NewsImage src={item.image} className="transition-transform duration-700 group-hover:scale-105" />
+        <NewsImage src={item.image} topic={item.topic} seed={item.id} className="transition-transform duration-700 group-hover:scale-105" />
         <span className={`absolute right-2.5 top-2.5 z-[1] inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold backdrop-blur-md ${t.ring}`}>
           <Icon className="h-3 w-3" /> {t.label}
         </span>

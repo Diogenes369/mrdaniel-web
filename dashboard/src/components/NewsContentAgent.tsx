@@ -233,20 +233,32 @@ export default function NewsContentAgent() {
     }
   }, [item?.id]);
 
-  // Refresh the candidate list whenever the category changes (keeps the picker in sync with the chips).
+  // ─── Nothing is fetched until the operator asks ─────────────────────────────────────────────
+  //
+  // This used to do two things automatically: fetch on mount, and then re-poll `/api/news` every
+  // 4 minutes for as long as the tab stayed open. An admin who left the dashboard open overnight
+  // was firing ~360 unattended requests at the shared Vercel function per tab, none of which
+  // anyone was reading. Both are gone.
+  //
+  // What replaces them: the operator presses "רענן" (already in the toolbar below) for the first
+  // load. After that first explicit load, a CATEGORY SWITCH still refetches — the chips are a
+  // direct user action and a picker that keeps showing the previous category's stories is simply
+  // broken — but an untouched tab now makes no requests at all.
+  const loadedOnce = useRef(false);
   useEffect(() => {
+    if (!loadedOnce.current) return;
     void fetchNews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
-  // Real-time news stream — re-poll the live feed every 4 minutes so new stories appear through
-  // the day without a manual refresh (the /api/news edge cache serves this cheaply). Runs in
-  // `background` mode: it refreshes the list but never moves the selection or clears the deck.
-  useEffect(() => {
-    const id = window.setInterval(() => void fetchNews({ background: true }), 4 * 60 * 1000);
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
+  /** The operator-initiated load. Marks the tab as "live" so later category switches refetch. */
+  const loadNews = useCallback(
+    (opts?: { autoSelectLatest?: boolean }) => {
+      loadedOnce.current = true;
+      return fetchNews(opts);
+    },
+    [fetchNews]
+  );
 
   // ─── On-demand generation (token-saving) ────────────────────────────────────────────────────
   // Selecting / browsing a news item costs NOTHING — it only shows the article's own title,
@@ -707,15 +719,15 @@ export default function NewsContentAgent() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => fetchNews()}
+            onClick={() => loadNews()}
             disabled={loadingNews}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-zinc-200 text-sm font-bold cursor-pointer disabled:opacity-50 hover:bg-white/10"
           >
             {loadingNews ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            רענון רשימת הכתבות
+            {list.length ? 'רענון רשימת הכתבות' : 'טען את רשימת הכתבות'}
           </button>
           <button
-            onClick={() => fetchNews({ autoSelectLatest: true })}
+            onClick={() => loadNews({ autoSelectLatest: true })}
             disabled={loadingNews}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500 text-black text-sm font-bold cursor-pointer disabled:opacity-50"
           >

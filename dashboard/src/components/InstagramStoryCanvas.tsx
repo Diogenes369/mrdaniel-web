@@ -111,18 +111,27 @@ export default function InstagramStoryCanvas() {
     [category, item?.id]
   );
 
+  // ─── Nothing is fetched until the operator asks ─────────────────────────────────────────────
+  //
+  // Same change as NewsContentAgent: the mount fetch and the 4-minute background poll are both
+  // gone, so a Story Studio tab left open makes no requests at all. The first load comes from the
+  // "רענן" button in the toolbar; a category switch AFTER that refetches, because the chips are a
+  // direct user action and a stale picker would be wrong.
+  const loadedOnce = useRef(false);
   useEffect(() => {
+    if (!loadedOnce.current) return;
     void fetchNews(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
-  // Real-time news stream — re-poll every 4 minutes while in news mode.
-  useEffect(() => {
-    if (mode !== 'news') return;
-    const id = window.setInterval(() => void fetchNews(false), 4 * 60 * 1000);
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, mode]);
+  /** The operator-initiated load. Marks the tab as "live" so later category switches refetch. */
+  const loadNews = useCallback(
+    (autoSelectLatest: boolean) => {
+      loadedOnce.current = true;
+      return fetchNews(autoSelectLatest);
+    },
+    [fetchNews]
+  );
 
   const applyDeck = useCallback((s: number, deck: RenderedDeck) => {
     if (s !== seq.current) return;
@@ -316,15 +325,15 @@ export default function InstagramStoryCanvas() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => fetchNews(false)}
+                onClick={() => loadNews(false)}
                 disabled={loadingNews}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-zinc-200 text-sm font-bold cursor-pointer disabled:opacity-50 hover:bg-white/10"
               >
                 {loadingNews ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                רענון רשימת הכתבות
+                {list.length ? 'רענון רשימת הכתבות' : 'טען את רשימת הכתבות'}
               </button>
               <button
-                onClick={() => fetchNews(true)}
+                onClick={() => loadNews(true)}
                 disabled={loadingNews}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500 text-black text-sm font-bold cursor-pointer disabled:opacity-50"
               >

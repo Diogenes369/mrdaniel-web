@@ -196,8 +196,42 @@ const parser = new Parser({
 // `googleusercontent|gstatic|/logos/` catches the generic branding image that Google's consent
 // wall / News interstitial pages expose as their og:image — it was getting scraped off
 // `news.google.com` redirect links and pinned onto a dozen unrelated stories.
+//
+// `s.w.org/images/core/emoji` and the `/emoji/` path are the WordPress emoji sprite CDN. A
+// WordPress feed whose post body opens with an emoji (SPD Blog does this constantly) inlines it as
+// a 72×72 <img>, which `firstInlineImage` then picked up as the article's lead photo. It is a
+// perfectly valid, perfectly loading image URL, so nothing downstream rejected it: it passed the
+// server's URL check, passed the client's `isHebrewWithImage` gate, and only failed at the very
+// last step — `NewsImage`'s 400×300 floor — which renders nothing. The result was a card on the
+// homepage with a blank black image well. Measured against production on 2026-09-21: 3 of the
+// feed's items carried one. Dropping it here lets the og:image enrichment pass find the real photo
+// instead.
 const JUNK_IMAGE_RE =
-  /(feedburner|feedsportal|feeds\.wordpress|doubleclick|googlesyndication|scorecardresearch|googleusercontent\.com|gstatic\.com|\/logos?\/|\/pixel|pixel\.|1x1|blank\.(gif|png)|spacer\.(gif|png)|gravatar\.com\/avatar\/0{16}|\/wp-includes\/images\/)/i;
+  /(feedburner|feedsportal|feeds\.wordpress|doubleclick|googlesyndication|scorecardresearch|googleusercontent\.com|gstatic\.com|s\.w\.org\/images\/core\/emoji|\/emoji\/|\/logos?\/|\/pixel|pixel\.|1x1|blank\.(gif|png)|spacer\.(gif|png)|gravatar\.com\/avatar\/0{16}|\/wp-includes\/images\/)/i;
+
+/**
+ * Smallest lead image worth putting on a card, in pixels, when the URL itself declares its size.
+ *
+ * Mirrors the `MIN_W`/`MIN_H` floor in `src/components/news/NewsImage.tsx`. Many CDNs (and the
+ * WordPress emoji path above) encode the rendition size in the URL — `/72x72/`, `-150x150.jpg`,
+ * `?w=200` — so an image that is certainly too small can be rejected server-side, before it ever
+ * occupies a card slot, rather than client-side after it has already been chosen as the lead.
+ */
+const SMALL_IMAGE_HINT = /(?:^|[\/_-])(\d{2,4})x(\d{2,4})(?:[\/._-]|$)/;
+
+export function isTooSmallByUrl(url: string, minW = 400, minH = 300): boolean {
+  const m = SMALL_IMAGE_HINT.exec(String(url || ''));
+  if (m) {
+    const w = Number(m[1]);
+    const h = Number(m[2]);
+    // Only trust the hint when both numbers look like real pixel dimensions; a date path such as
+    // `/2026/09/14/` never matches this shape, but a version string like `17.0.2` must not be read
+    // as a size either — hence the explicit bounds rather than a bare digit match.
+    if (w >= 8 && h >= 8 && (w < minW || h < minH)) return true;
+  }
+  const q = /[?&](?:w|width)=(\d{1,4})\b/i.exec(String(url || ''));
+  return q ? Number(q[1]) < minW : false;
+}
 
 /**
  * Rewrites a thumbnail/low-res image URL to its highest-resolution rendition, so the dashboard's
@@ -255,7 +289,11 @@ function pickOgImage(html: string, baseUrl: string): string | undefined {
       }
     }
     if (!/^https?:\/\//i.test(candidate) || JUNK_IMAGE_RE.test(candidate)) continue;
-    return upscaleImageUrl(candidate);
+    // Checked AFTER upscaling: `upscaleImageUrl` rewrites a thumbnail URL to its full rendition, so
+    // testing the original would reject an image that is about to become large enough.
+    const upscaled = upscaleImageUrl(candidate);
+    if (isTooSmallByUrl(upscaled)) continue;
+    return upscaled;
   }
   return undefined;
 }
@@ -359,7 +397,8 @@ function extractImage(item: Record<string, any>): string | undefined {
     if (s.startsWith('//')) s = `https:${s}`;
     if (!/^https?:\/\//i.test(s)) return undefined;
     if (JUNK_IMAGE_RE.test(s)) return undefined;
-    return upscaleImageUrl(s);
+    const upscaled = upscaleImageUrl(s);
+    return isTooSmallByUrl(upscaled) ? undefined : upscaled;
   };
 
   const enc = item.enclosure;

@@ -36,10 +36,31 @@ const FOREIGN_SOURCE_RE =
  * blocklist AND by requiring the title/excerpt to be strongly Hebrew-dominant (≥ 2× the Latin
  * letter count), and drops text-only / no-image cards.
  */
+/**
+ * A lead image whose URL itself declares a rendition too small to fill a card.
+ *
+ * Mirrors `isTooSmallByUrl` in src/server/newsFeed.ts, which is where this is now rejected at the
+ * source. Kept here as well because `/api/news` is cached for 15 minutes: without this, a response
+ * that was already cached before the server fix shipped would still put a WordPress emoji sprite
+ * (72×72) on the homepage as a lead photo, where it loads fine and then fails NewsImage's 400×300
+ * floor — the blank-card bug. Dropping the item instead lets a real story take the slot.
+ */
+function tooSmallByUrl(url: string): boolean {
+  const m = /(?:^|[\/_-])(\d{2,4})x(\d{2,4})(?:[\/._-]|$)/.exec(url);
+  if (m) {
+    const w = Number(m[1]);
+    const h = Number(m[2]);
+    if (w >= 8 && h >= 8 && (w < 400 || h < 300)) return true;
+  }
+  const q = /[?&](?:w|width)=(\d{1,4})\b/i.exec(url);
+  return q ? Number(q[1]) < 400 : false;
+}
+
 export function isHebrewWithImage(item: NewsItem): boolean {
   if (FOREIGN_SOURCE_RE.test(item.source || '')) return false;
   const img = (item.image || '').trim();
   if (!/^https?:\/\/[^\s]+\.[^\s]+/i.test(img)) return false;
+  if (tooSmallByUrl(img)) return false;
   const text = `${item.title} ${item.excerpt || ''}`;
   const he = (text.match(HEBREW_RE) || []).length;
   const la = (text.match(LATIN_RE) || []).length;
