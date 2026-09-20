@@ -63,6 +63,19 @@ function protectedSplit(text: string): string[] {
 export function sanitizeHebrewText(raw: string): string {
   let text = raw;
 
+  // Unicode look-alikes first, or the bidi wrapping below silently does the wrong thing.
+  //
+  // A model may return U+2011 NON-BREAKING HYPHEN where a keyboard types "-" — the `gpt-oss`
+  // family on Groq does it constantly, Gemini occasionally. LATIN_RUN joins a run with `[-'’ ]`,
+  // an ASCII hyphen only, so "Wi‑Fi 7" was split into THREE runs (`Wi`, the orphan hyphen, `Fi 7`)
+  // and an RTL line orders the later runs to the LEFT of the earlier ones — rendering "Fi 7 ‑ Wi".
+  // NBSP does the same damage to every word-count clamp in the pipeline, and a zero-width joiner
+  // mid-token breaks the word boundary `\b` that LATIN_RUN anchors on.
+  //
+  // EN DASH and EM DASH are deliberately NOT touched: this project's Hebrew copy uses "—" as real
+  // punctuation throughout, and folding it to "-" would damage correct text to fix a different bug.
+  text = text.replace(/[‐‑‒−]/g, '-').replace(/ /g, ' ').replace(/[​‌‍﻿]/g, '');
+
   text = text.replace(/[ \t]+([,.:;!?])/g, '$1');
   text = text.replace(/^[,.:;!?]+\s*/, '');
 

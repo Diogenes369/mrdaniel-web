@@ -73,6 +73,41 @@ Client libs in `dashboard/src/lib/*Api.ts` follow one rule: **never throw** — 
 
 Actions incl.: `generate-content`, `draft-engagement`, `story-synthesize`, `post-synthesize`, `import-url`, `slides-edit`, `trend-radar`, `engagement-replies`, `growth-optimize`, `carousel-studio`, `reel-script-synthesize`, `reel-tts`, `tech-tip-deck`, `email-generate`, `auto-publish-run`, `parse-x-post`, `x-subtitles`, `x-post-deck`.
 
+### Two AI providers: Groq for text, Gemini for multimodal
+
+`src/agent/geminiClient.ts` · `generateContentWithRetry()` is the ONE choke point every generator
+in the repo already calls, so provider routing lives there and no call site changed.
+
+- **Groq is primary for TEXT** (`src/agent/groqClient.ts`, `openai/gpt-oss-120b`, overridable with
+  `GROQ_MODEL`). Gemini free tier throttles at a few RPM and `gemini-3.6-flash` returns
+  `503 high demand` often enough to be user-facing; Groq answers a full Hebrew deck in ~2s.
+- **Gemini stays for MULTIMODAL and TTS.** The split is decided **structurally** by
+  `isTextOnlyRequest()` — an `inlineData` part, a non-TEXT `responseModalities`, or a
+  `speechConfig` keeps the call on Gemini — never by an action allowlist, so a multimodal action
+  added later routes correctly with nothing to remember. TTS is the subtle case: its *input* is a
+  plain string, so an input-only check would send `synthesizeSpeech` to a chat endpoint.
+- **Fallback runs both ways.** Groq fails → Gemini serves it. Gemini 429 (any kind) or transient
+  5xx on a text call → Groq serves it. Both directions log `[ai-router]`, so a provider outage is
+  visible rather than showing up only as a latency change.
+- `GROQ_API_KEY` is optional: unset, every text call simply stays on Gemini.
+
+**Unicode hygiene is load-bearing, not cosmetic.** The `gpt-oss` family returns **U+2011
+NON-BREAKING HYPHEN** where a keyboard types `-` ("Wi‑Fi 7", "Retrieval‑Augmented Generation").
+`LATIN_RUN` in `hebrewTextSanitizer.ts` joins a run with `[-'’ ]` — an ASCII hyphen only — so that
+input split into THREE bidi runs and an RTL line orders the later ones to the LEFT: the slide
+rendered **"Fi 7 ‑ Wi"**. `normalizeModelUnicode()` folds U+2010/2011/2012/2212 → `-`, NBSP → space
+and strips zero-width joiners, applied in the Groq client *and* inside `sanitizeHebrewText` itself.
+EN/EM dashes are deliberately left alone — this repo's Hebrew copy uses "—" as real punctuation.
+
+**Groq quirks worth knowing** (all measured 2026-09-21): strict `response_format: json_object`
+rejects ~40% of large-deck generations with a 400 — the client retries once WITHOUT it and lets
+`stripCodeFence`/`parseJsonOrThrow` handle the answer, which is how the Gemini path has always
+worked. The free tier has its own **tokens-per-minute** limit, so Groq is not an unlimited bypass.
+`llama-3.3-70b-versatile` is **retired** and absent from `GET /openai/v1/models` — do not restore
+it. `qwen/qwen3.8-27b` is faster but rewrites Latin technical terms, which breaks source fidelity.
+
+---
+
 ### IG Growth Strategy Engine (organic, white-hat)
 - **Prompts** — `HOOK_RETENTION_RULES` + `SAVE_SHARE_RULES` in `SocialAgentEngine.ts` feed the story deck, Carousel Studio, reel and auto-pilot prompts. `story-synthesize` and `reel-script-synthesize` also return `hookOptions` (3 first-3-seconds openers: `line` + `visual` pattern interrupt + `pattern`), additive to the old response shape.
 - **`growth-optimize`** (`src/server/igGrowthStrategy.ts`) — `op: hooks | cheat-sheet | pack` over already-generated content. `pack` = Comment-to-DM lead magnet shaped for ManyChat (single bidi-free keyword + trigger variants, rotating public replies, DM text) + ≤5 blended hashtags (3 Israeli-niche Hebrew anchors + 2 high-volume English) + Instagram-search keywords.

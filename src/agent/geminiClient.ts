@@ -1,5 +1,17 @@
 import { GoogleGenAI } from '@google/genai';
 import { scrubAiPhrases } from './expertVoice.js';
+import {
+  groqGenerate,
+  isGroqConfigured,
+  groqConfigReason,
+  isTextOnlyRequest,
+  GROQ_TEXT_MODEL,
+  type GeminiLikeRequest,
+} from './groqClient.js';
+
+// Re-exported so endpoints and the health check can report which engines are live without
+// importing a second module.
+export { isGroqConfigured, groqConfigReason, GROQ_TEXT_MODEL };
 
 /**
  * The one Gemini client, and the one retry policy, for every model call in the codebase.
@@ -320,7 +332,38 @@ export interface GenerateOptions {
  * Every failed attempt is logged with its status and Google's error payload (logGeminiFailure).
  */
 export async function generateContentWithRetry(params: GenContentReq, options: GenerateOptions = {}) {
-  if (!genAI) throw new Error(engineConfigReason() ?? 'GEMINI_API_KEY not configured');
+  // ── provider routing ──────────────────────────────────────────────────────────────────────
+  //
+  // Groq is the primary engine for TEXT, Gemini for MULTIMODAL. The decision is made from the
+  // payload, never from an action name: a request carrying an `inlineData` part is an image, a PDF
+  // or an mp4, which Groq's chat endpoint cannot read. Deciding structurally means a multimodal
+  // action added later routes correctly with no list to remember to update.
+  //
+  // Why Groq first: Gemini's free tier throttles at a few requests per minute and
+  // `gemini-3.6-flash` returns `503 high demand` often enough to be user-facing (seen repeatedly in
+  // production on 2026-09-21). Groq answers the same Hebrew deck in under two seconds.
+  const textOnly = isTextOnlyRequest(params as GeminiLikeRequest);
+  if (textOnly && isGroqConfigured()) {
+    try {
+      return await groqGenerate(params as GeminiLikeRequest, options);
+    } catch (err) {
+      // Groq failing must never take the action down while Gemini is available — fall through and
+      // let the Gemini path below serve it. Logged, so a provider outage is visible rather than
+      // showing up only as a latency change.
+      if (!genAI) throw err;
+      console.warn('[ai-router] groq failed, falling back to gemini:', (err as Error)?.message?.slice(0, 200));
+    }
+  }
+
+  if (!genAI) {
+    // No Gemini key. For text that is only reachable when Groq is also unconfigured or already
+    // failed; for multimodal it is the real answer, and the reason should say which.
+    throw new Error(
+      textOnly
+        ? (groqConfigReason() ?? engineConfigReason() ?? 'no text engine configured')
+        : (engineConfigReason() ?? 'GEMINI_API_KEY not configured (required for image/video input)')
+    );
+  }
   let transientRetries = 0;
   let rateRetries = 0;
   for (let attempt = 1; ; attempt++) {
@@ -335,6 +378,22 @@ export async function generateContentWithRetry(params: GenContentReq, options: G
     } catch (err) {
       logGeminiFailure(`generateContent(${params.model})`, err, attempt);
       const rate = detectGeminiRateLimit(err);
+      // A text call that Gemini refuses — a 429 of ANY kind (per-minute throttle, spent daily
+      // quota, exhausted billing) or a transient outage — is served by Groq instead of surfacing.
+      // Only reached when Groq was not already tried above, i.e. when it is unconfigured or when
+      // its own attempt failed first; in both cases this is the last chance before the operator
+      // sees an error, so it is worth taking.
+      if (textOnly && isGroqConfigured()) {
+        const transient = TRANSIENT_UPSTREAM.test(err instanceof Error ? err.message : String(err));
+        if (rate || transient) {
+          try {
+            console.warn(`[ai-router] gemini ${rate ? `429/${rate.kind}` : 'transient'}, retrying on groq`);
+            return await groqGenerate(params as GeminiLikeRequest, options);
+          } catch (groqErr) {
+            console.warn('[ai-router] groq fallback also failed:', (groqErr as Error)?.message?.slice(0, 200));
+          }
+        }
+      }
       if (rate) {
         if (rate.kind !== 'rate' || rateRetries >= RATE_WAITS_MS.length) throw err;
         const waitMs = Math.max(RATE_WAITS_MS[rateRetries], (rate.retryDelaySeconds ?? 0) * 1000);
