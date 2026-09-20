@@ -43,6 +43,8 @@ async function run(command, params) {
       return duplicateFrame(params);
     case 'set_fills':
       return setFills(params);
+    case 'get_node_fills':
+      return getNodeFills(params);
     case 'swap_image':
       return swapImage(params);
     case 'set_variant':
@@ -258,6 +260,36 @@ async function loadFontsFor(node, fallback, force) {
  * Placement: to the right of everything currently on the page, on a row, so repeated runs
  * accumulate left-to-right instead of stacking on top of each other. `x` can be passed to override.
  */
+/**
+ * Read back the solid fills on given nodes, as hex.
+ *
+ * Verification, not plumbing: a write response saying "3 repainted" is the plugin reporting on
+ * itself, which proves the call ran, not that the document now holds the colour. This reads the
+ * committed state so a recolour can be checked against the brand value independently.
+ */
+async function getNodeFills(params) {
+  const ids = params.nodeIds || [];
+  if (!ids.length) throw new Error('nodeIds is required');
+  const toHex = function (c) {
+    const h = function (v) { return Math.round(v * 255).toString(16).padStart(2, '0'); };
+    return '#' + h(c.r) + h(c.g) + h(c.b);
+  };
+  const out = [];
+  for (const id of ids) {
+    const node = await figma.getNodeByIdAsync(id);
+    if (!node || !('fills' in node) || node.fills === figma.mixed || !Array.isArray(node.fills)) {
+      out.push({ id: id, solids: null });
+      continue;
+    }
+    out.push({
+      id: id,
+      name: node.name,
+      solids: node.fills.filter(function (f) { return f.type === 'SOLID' && f.visible !== false; }).map(function (f) { return toHex(f.color); }),
+    });
+  }
+  return { nodes: out };
+}
+
 /**
  * Recolour solid fills — how a third-party template stops looking like a third-party template.
  *

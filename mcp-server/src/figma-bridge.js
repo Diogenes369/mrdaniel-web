@@ -43,6 +43,7 @@ export const PLUGIN_COMMANDS = [
   'set_texts',
   'duplicate_frame',
   'set_fills',
+  'get_node_fills',
   'swap_image',
   'set_variant',
   'set_layer_name',

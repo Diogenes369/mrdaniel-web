@@ -117,17 +117,30 @@ let badHex = false;
 try { hexToFigmaRgb('nope'); } catch { badHex = true; }
 t('a non-hex value throws rather than painting something random', badHex);
 
-t('every slide carries fill entries', plan.slides.every((s) => Array.isArray(s.fills) && s.fills.length === 3), JSON.stringify(plan.slides.map((s) => s.fills?.length)));
-t('fills target the meta nodes only', plan.slides.every((s) => {
+t('every slide carries fill entries', plan.slides.every((s) => Array.isArray(s.fills) && s.fills.length === 4), JSON.stringify(plan.slides.map((s) => s.fills?.length)));
+t('fills target only nodes this frame declares', plan.slides.every((s) => {
+  const frame = allFrames.find((f) => f.frameId === s.frameId);
+  const known = new Set([frame.handle, frame.hashtag, frame.year, frame.textNodeId]);
+  return s.fills.every((f) => known.has(f.nodeId));
+}), JSON.stringify(plan.slides[0].fills));
+// The content node IS repainted, but with the text colour, never the accent. A variant that sets
+// its own body colour (the CTA frame uses #bd3074) otherwise keeps it through the whole pipeline —
+// found by reading fills back from a rendered deck, not by eye.
+t('content node is repainted with the body colour, not the accent', plan.slides.every((s) => {
+  const frame = allFrames.find((f) => f.frameId === s.frameId);
+  const body = s.fills.find((f) => f.nodeId === frame.textNodeId);
+  return body && JSON.stringify(body.color) === JSON.stringify(hexToFigmaRgb(BRAND_COLORS.textPrimary));
+}), JSON.stringify(plan.slides[0].fills));
+t('accent never lands on the content node', plan.slides.every((s) => {
+  const frame = allFrames.find((f) => f.frameId === s.frameId);
+  const body = s.fills.find((f) => f.nodeId === frame.textNodeId);
+  return JSON.stringify(body.color) !== JSON.stringify(hexToFigmaRgb(BRAND_COLORS.brand500));
+}));
+t('meta fills are the brand green', plan.slides.every((s) => {
   const frame = allFrames.find((f) => f.frameId === s.frameId);
   const meta = new Set([frame.handle, frame.hashtag, frame.year]);
-  return s.fills.every((f) => meta.has(f.nodeId));
-}), JSON.stringify(plan.slides[0].fills));
-t('fills never touch the content text node', plan.slides.every((s) => {
-  const frame = allFrames.find((f) => f.frameId === s.frameId);
-  return s.fills.every((f) => f.nodeId !== frame.textNodeId);
-}));
-t('fill colour is the brand green', plan.slides.every((s) => s.fills.every((f) => JSON.stringify(f.color) === JSON.stringify(hexToFigmaRgb(BRAND_COLORS.brand500)))), JSON.stringify(plan.slides[0].fills[0]));
+  return s.fills.filter((f) => meta.has(f.nodeId)).every((f) => JSON.stringify(f.color) === JSON.stringify(hexToFigmaRgb(BRAND_COLORS.brand500)));
+}), JSON.stringify(plan.slides[0].fills[0]));
 t('template declares the brand accent', HUMAN_DELUXE.accentColor === BRAND_COLORS.brand500, String(HUMAN_DELUXE.accentColor));
 
 for (const [state, label, detail] of results) console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);

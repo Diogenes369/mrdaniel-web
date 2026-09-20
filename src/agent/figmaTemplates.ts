@@ -112,6 +112,16 @@ export interface FigmaTemplate {
    */
   accentColor: string | null;
   /**
+   * Colour for the CONTENT text, separate from the accent.
+   *
+   * Found by reading fills back out of a rendered deck rather than by looking at it: the accent
+   * recolour covered the byline nodes, and 18 of 18 were correct — but the CTA variant sets its
+   * BODY text to #bd3074 pink, which the meta-only pass never touched. Body copy must not take the
+   * accent (green body text on a dark slide is garish and hurts legibility), so it gets the brand's
+   * text colour instead. `null` leaves the template's own body colour alone.
+   */
+  bodyColor: string | null;
+  /**
    * Per-archetype font size override, and the budget the composed block must fit.
    *
    * The template's copy frame holds ~116 characters of Latin at 110px in a 940x940 box. The
@@ -143,6 +153,7 @@ export const HUMAN_DELUXE: FigmaTemplate = {
   forceFont: true,
   align: 'RIGHT',
   accentColor: BRAND_COLORS.brand500,
+  bodyColor: BRAND_COLORS.textPrimary,
   // Every text box in this template is 940x940. The sizes are FITTED per slide rather than fixed
   // (see fitFontSize): a fixed size overflowed, because the deck's hard line breaks are sized for a
   // 42-character line and at 130px this box fits about fourteen Hebrew characters per line, so
@@ -387,6 +398,9 @@ export function planDeck(deck: StoryCarouselDeck, templateId?: string | null): {
     const fills = accent
       ? [frame.handle, frame.hashtag, frame.year].filter((id): id is string => Boolean(id)).map((nodeId) => ({ nodeId, color: accent }))
       : [];
+    // The content node too, or a variant's own body colour survives the recolour — the CTA frame
+    // ships its copy in #bd3074 pink, which the byline-only pass left in place.
+    if (tpl.bodyColor && frame.textNodeId) fills.push({ nodeId: frame.textNodeId, color: hexToFigmaRgb(tpl.bodyColor) });
     return { index: slide.index, role: slide.role, frameId: frame.frameId, entries, fills };
   });
   return { template: tpl, font: tpl.fontFallback, slides };
