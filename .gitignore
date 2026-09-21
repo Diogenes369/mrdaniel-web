@@ -23,3 +23,4 @@ video-projects/
 
 # Cloned upstream repos (vendor/open-higgsfield — re-clone with the URL in docs/openhiggsfield-bridge.md)
 vendor/
+scratch-*
