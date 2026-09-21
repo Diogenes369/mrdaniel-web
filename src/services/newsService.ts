@@ -27,7 +27,9 @@ interface NewsResponse {
 // English / off-topic items for up to 24h — and re-fetches the clean feed on the next load.
 // (v3 added the `topic` field.)
 const CACHE_KEY = 'dbb-news-feed-cache-v5';
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // refresh at most once a day per browser
+// Was 24h, which made a returning visitor see yesterday's feed while the server had fresh stories
+// (reported as "news stuck for days", 2026-09-22). 10 min matches the CDN's own max-age.
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
 interface NewsCacheShape {
   items: NewsItem[];

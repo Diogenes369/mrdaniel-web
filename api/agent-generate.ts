@@ -911,6 +911,25 @@ ${typeof notes === 'string' ? notes : ''}`);
       return;
     }
 
+    // ── X intelligence: why a post performed (free per-post data + one Groq read). src/server/xIntel.ts
+    if (action === 'x-intel') {
+      const { analyzeXPosts, X_INTEL_MAX_POSTS } = await import('../src/server/xIntel.js');
+      const urls = Array.isArray(req.body?.urls) ? req.body.urls.map((u: unknown) => String(u)) : [];
+      if (!urls.length) {
+        res.status(400).json({ ok: false, error: `urls (1-${X_INTEL_MAX_POSTS}) required`, message: 'הדביקו לפחות קישור אחד לפוסט ב-X' });
+        return;
+      }
+      res.status(200).json({ ok: true, ...(await analyzeXPosts(urls)) });
+      return;
+    }
+
+    // ── X writes: locked scaffold until the operator provides X Developer keys. src/server/xWriteClient.ts
+    if (action === 'x-write-status') {
+      const { xWriteStatus, X_DAILY_CAPS } = await import('../src/server/xWriteClient.js');
+      res.status(200).json({ ok: true, ...xWriteStatus(), caps: X_DAILY_CAPS });
+      return;
+    }
+
     if (action === 'grok-carousel') {
       const { runGrokCarouselAgent } = await import('../src/server/agents/grokCarouselAgent.js');
       const { describeXaiError } = await import('../src/server/xaiClient.js');

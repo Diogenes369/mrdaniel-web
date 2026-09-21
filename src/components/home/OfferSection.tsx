@@ -7,7 +7,7 @@ import PopHeadline from './PopHeadline';
 import ScrollLockRail from '../mobile/ScrollLockRail';
 import type { HomeOffer, OfferBullet } from '../../data/homeOffers';
 import { rtl } from '../../lib/rtl';
-import { smoothScrollTo } from '../../hooks/useLenis';
+import { LINKTREE_URL, X_URL } from '../SocialLinks';
 
 /** Hero-scale supporting card on the unified `.glass-panel` marketing surface. */
 function BulletCard({ bullet }: { bullet: OfferBullet }) {
@@ -74,10 +74,10 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
           <WebButton
             variant="ghost"
             onClick={
-              offer.secondary === 'community'
-                ? () => smoothScrollTo('#community')
-                : offer.secondary === 'x-feed'
-                  ? () => smoothScrollTo('#x-feed')
+              offer.secondary === 'linktree'
+                ? () => window.open(LINKTREE_URL, '_blank', 'noopener,noreferrer')
+                : offer.secondary === 'x'
+                  ? () => window.open(X_URL, '_blank', 'noopener,noreferrer')
                   : openLead
             }
             className="!px-6"

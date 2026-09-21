@@ -23,7 +23,7 @@ import {
  * hub. AI-only since 2026-09-21; guarded by scripts/__tests__/site-copy.test.mjs.
  * Each renders as an <OfferSection>
  * — a minimalist heading + a short scroll-lock rail of supporting points + a primary CTA to the
- * route and a secondary CTA (lead modal, or the community grid for the hub).
+ * route and a secondary CTA (lead modal, or an external channel link).
  */
 export interface OfferBullet {
   icon: LucideIcon;
@@ -43,9 +43,9 @@ export interface HomeOffer {
   ctaLabel: string;
   leadSubject: string;
   sourceSection: string;
-  /** Second CTA: 'lead' opens the lead modal, 'community' scrolls to the channels grid, 'x-feed'
-   *  scrolls to the live X feed. */
-  secondary: 'lead' | 'community' | 'x-feed';
+  /** Second CTA: 'lead' opens the lead modal, 'x' opens the X profile, 'linktree' opens every
+   *  channel. (The on-page X feed and channels grid were removed from the homepage 2026-09-22.) */
+  secondary: 'lead' | 'x' | 'linktree';
   secondaryLabel: string;
 }
 
@@ -87,8 +87,8 @@ export const HOME_OFFERS: HomeOffer[] = [
     ctaLabel: 'לפירוקי המודלים',
     leadSubject: 'ייעוץ בחירת מודל LLM',
     sourceSection: 'Home · LLM Lab',
-    secondary: 'x-feed',
-    secondaryLabel: 'לפיד שלי ב-X',
+    secondary: 'x',
+    secondaryLabel: 'עקבו ב-X',
   },
   {
     id: 'offer-ai-hub',
@@ -107,7 +107,7 @@ export const HOME_OFFERS: HomeOffer[] = [
     ctaLabel: 'לחדשות ולמדריכים',
     leadSubject: 'האב AI 2026',
     sourceSection: 'Home · 2026 AI Hub',
-    secondary: 'community',
+    secondary: 'linktree',
     secondaryLabel: 'עקבו ברשתות',
   },
 ];

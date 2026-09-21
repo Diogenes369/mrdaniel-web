@@ -500,7 +500,7 @@ const AI_AGENT_PATTERNS = [
 // Security-beat stories are off-brand for an AI-only feed even when they mention AI ("AI-powered
 // phishing", "a CVE in an AI SDK") — dropped outright by `sanitizeAndKeep`.
 const SECURITY_BEAT_PATTERNS = [
-  /סייבר/, /אבטחת מידע/, /האק(ר|רים|ינג)/, /כופרה/, /פישינג/, /פרצ(ת|ה) אבטחה/, /דלף מידע/,
+  /סייבר/, /אבטחת מידע/, /האק(ר|רים|ינג)/, /לפרוץ/, /פריצ(ה|ת|ות)/, /חוקרי אבטחה/, /כופרה/, /פישינג/, /פרצ(ת|ה) אבטחה/, /דלף מידע/,
   /malware/i, /ransomware/i, /phishing/i, /\bcve-?\d/i, /\bbreach(ed)?\b/i, /\bhack(ed|er|ing)?\b/i,
   /zero.?trust/i, /vulnerabilit/i, /exploit/i,
 ];
@@ -967,8 +967,47 @@ async function refreshAll(): Promise<NewsItem[]> {
     `[news] refreshed — ${items.length} items after translate (${deduped.length} deduped, ${raw.length} raw), ${withImg} with image · ${stats.join(' ')}`
   );
 
+  // A refresh that comes back empty (every feed timed out / got WAF-blocked at once) must never
+  // replace a good feed with nothing: keep the in-memory set, else fall back to the last snapshot.
+  if (items.length === 0) {
+    if (cache?.items.length) {
+      console.warn('[news] refresh returned 0 items — keeping the previous in-memory feed');
+      cache = { items: cache.items, fetchedAt: Date.now() - CACHE_TTL_MS + 60_000 }; // retry in ~1 min
+      return cache.items;
+    }
+    const snap = await settleWithin(loadSnapshot(), 3000);
+    if (snap?.items.length) {
+      console.warn(`[news] refresh returned 0 items — serving the Firebase snapshot from ${new Date(snap.fetchedAt).toISOString()}`);
+      cache = { items: snap.items, fetchedAt: Date.now() - CACHE_TTL_MS + 60_000 };
+      return snap.items;
+    }
+  }
+
   cache = { items, fetchedAt: Date.now() };
+  if (items.length) await settleWithin(saveSnapshot(cache), 2500);
   return items;
+}
+
+async function settleWithin<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([p, new Promise<undefined>((r) => { timer = setTimeout(() => r(undefined), ms); })]);
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Firebase is loaded lazily so the feed never pays for the SDK unless it needs the snapshot. */
+async function loadSnapshot(): Promise<{ items: NewsItem[]; fetchedAt: number } | null> {
+  const { readNewsSnapshot } = await import('../agent/firebaseServer.js');
+  return (await readNewsSnapshot()) as { items: NewsItem[]; fetchedAt: number } | null;
+}
+
+async function saveSnapshot(snapshot: { items: NewsItem[]; fetchedAt: number }): Promise<void> {
+  const { writeNewsSnapshot } = await import('../agent/firebaseServer.js');
+  await writeNewsSnapshot(snapshot);
 }
 
 export async function getNewsItems(

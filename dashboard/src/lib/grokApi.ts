@@ -142,3 +142,60 @@ export async function refreshXFeed(): Promise<{ ok: boolean; count: number; sour
     return { ok: false, count: 0, source: 'none' };
   }
 }
+
+// ─── X intelligence (`x-intel`) and the locked write scaffold (`x-write-status`) ────────────────
+
+export interface XIntelPost {
+  id: string;
+  url: string;
+  author: string;
+  authorName: string;
+  verified: boolean;
+  text: string;
+  createdAt: string;
+  ageHours: number;
+  likes: number;
+  replies: number;
+  photos: number;
+  hasVideo: boolean;
+  hasLink: boolean;
+  likesPerHour: number;
+  weightedEngagement: number;
+  report: XAlgorithmReport;
+  why: string[];
+}
+
+export interface XIntelResult {
+  ok: boolean;
+  posts: XIntelPost[];
+  failed: { url: string; reason: string }[];
+  pattern: string;
+  analyst: 'ai' | 'none';
+  error?: string;
+}
+
+/** Never throws: a failure comes back as `ok: false` with a Hebrew message. */
+export async function analyzeXPosts(urls: string[]): Promise<XIntelResult> {
+  const empty = { posts: [], failed: [], pattern: '', analyst: 'none' as const };
+  // No manual trackActivity: the fetch tap already lights Scout for `x-intel` (agentActivity.ts).
+  try {
+    const res = await post({ action: 'x-intel', urls }, 60_000);
+    if (res.status === 401) reportAuthFailure('x-intel');
+    const data = (await res.json().catch(() => null)) as (XIntelResult & { message?: string }) | null;
+    if (!res.ok || !data?.ok) return { ok: false, ...empty, error: data?.message || (await describeAiError(res)).message };
+    return data;
+  } catch (e) {
+    return { ok: false, ...empty, error: (e as Error).message || 'שגיאת רשת' };
+  }
+}
+
+export async function fetchXWriteStatus(): Promise<{ enabled: boolean; missing: string[] } | null> {
+  try {
+    const res = await post({ action: 'x-write-status' }, 15_000);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { enabled?: boolean; missing?: string[] };
+    return { enabled: Boolean(data.enabled), missing: data.missing ?? [] };
+  } catch {
+    return null;
+  }
+}

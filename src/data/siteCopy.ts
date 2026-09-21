@@ -12,12 +12,11 @@
  * cutting-edge models broken down and put to work, (3) the live AI news + practical guides hub.
  */
 
-export type ChannelId = 'instagram' | 'threads' | 'tiktok' | 'x' | 'linkedin' | 'spotify' | 'whatsapp';
-
 export const HERO_COPY = {
-  eyebrow: 'סוכני AI · LLM · חדשות AI',
-  h1Lead: 'ההאב שלכם ל-AI',
-  h1Accent: 'חדשות, מודלים וסוכנים שעובדים',
+  // No eyebrow chip since 2026-09-22. Headline drafted with Groq (gpt-oss-120b), picked by hand
+  // and moved to the site's plural voice: short, human, no buzzwords.
+  h1Lead: 'AI לשימוש יומי',
+  h1Accent: 'בידיים שלכם',
   sub: 'חדשות AI בזמן אמת, פירוק של מודלי השפה החדשים, ובניית סוכני AI אוטונומיים שאפשר להפעיל כבר השבוע.',
   ctaPrimary: 'בנו איתי סוכן AI',
   ctaSecondary: 'לחדשות ה-AI',
@@ -30,28 +29,6 @@ export const ROTATOR_TERMS: readonly string[] = [
   'חדשות AI בזמן אמת',
   'עוזר JARVIS בעברית',
 ];
-
-export const COMMUNITY_COPY: {
-  eyebrow: string;
-  lead: string;
-  accent: string;
-  sub: string;
-  channels: Record<ChannelId, string>;
-} = {
-  eyebrow: 'כל הערוצים',
-  lead: 'חדשות AI',
-  accent: 'בכל פלטפורמה',
-  sub: 'עדכונים, מדריכים קצרים וקשר ישיר איתי. בחרו איפה נוח לכם לעקוב.',
-  channels: {
-    instagram: 'קרוסלות ומדריכים יומיים',
-    threads: 'דיונים ופירוקים של חדשות AI',
-    tiktok: 'טיפים קצרים בסרטון',
-    x: 'חדשות AI ותובנות בזמן אמת',
-    linkedin: 'פירוקים מעמיקים של מודלים וכלים',
-    spotify: 'פסקול לעבודה ממוקדת',
-    whatsapp: 'שיחה ישירה איתי',
-  },
-};
 
 export const SERVICES_COPY = {
   lead: 'סוכני AI',

@@ -52,10 +52,10 @@ export interface ActivitySnapshot {
   events: ActivityEvent[];
 }
 
-export const AGENT_META: Record<AgentId, { name: string; role: string; color: string }> = {
-  scout: { name: 'Scout', role: 'סורק חדשות ופיד X', color: '#38bdf8' },
-  grok: { name: 'Grok', role: 'מנסח קרוסלות ושרשורים ל-X', color: '#a3e635' },
-  hermes: { name: 'Hermes', role: 'מאמת עובדות ומנתב', color: '#f59e0b' },
+export const AGENT_META: Record<AgentId, { name: string; role: string; color: string; /** The 3D office's floating label. */ heLabel: string }> = {
+  scout: { name: 'Scout', role: 'סורק חדשות ופיד X', color: '#38bdf8', heLabel: 'סקאוט - חוקר רשת' },
+  grok: { name: 'Grok', role: 'מנסח קרוסלות ושרשורים ל-X', color: '#a3e635', heLabel: 'גרוק - מנהל קריאייטיב' },
+  hermes: { name: 'Hermes', role: 'מאמת עובדות ומנתב', color: '#f59e0b', heLabel: 'הרמס - מבקר נתונים' },
 };
 
 const blank = (id: AgentId): AgentState => ({ id, status: 'idle', task: 'ממתין', active: 0, done: 0, errors: 0, lastAt: 0 });
@@ -125,6 +125,8 @@ const TASK_LABEL: Record<string, string> = {
   'grok-carousel': 'מנסח קרוסלה + שרשור ל-X',
   'grok-status': 'בודק חיבור ל-xAI',
   'x-score': 'מדרג שרשור מול האלגוריתם',
+  'x-intel': 'מנתח פוסטים ב-X',
+  'x-write-status': 'בודק הרשאות כתיבה ל-X',
   'import-url': 'מושך כתבה מקישור',
   'parse-x-post': 'קורא פוסט מ-X',
   'parse-thread': 'קורא שרשור מ-Threads',
@@ -135,7 +137,7 @@ const TASK_LABEL: Record<string, string> = {
   'growth-optimize': 'מדרג צמיחה',
 };
 
-const SCOUT_ACTIONS = new Set(['import-url', 'parse-x-post', 'parse-thread', 'trend-radar']);
+const SCOUT_ACTIONS = new Set(['import-url', 'parse-x-post', 'parse-thread', 'trend-radar', 'x-intel']);
 
 function classify(url: string, body: unknown): { agent: AgentId; task: string } | null {
   let path = url;

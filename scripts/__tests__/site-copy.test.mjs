@@ -6,7 +6,7 @@
 //   - a placeholder that never got filled,
 //   - rtl() output that is not idempotent or leaves a Latin run un-anchored.
 // Run: npx tsx scripts/__tests__/site-copy.test.mjs
-import { HERO_COPY, ROTATOR_TERMS, COMMUNITY_COPY, SERVICES_COPY, CONTACT_COPY, FOOTER_COPY, ABOUT_COPY } from '../../src/data/siteCopy.ts';
+import { HERO_COPY, ROTATOR_TERMS, SERVICES_COPY, CONTACT_COPY, FOOTER_COPY, ABOUT_COPY } from '../../src/data/siteCopy.ts';
 import { HOME_OFFERS } from '../../src/data/homeOffers.ts';
 import { SERVICES } from '../../src/data/homeServices.ts';
 import { rtl } from '../../src/lib/rtl.ts';
@@ -29,8 +29,6 @@ const add = (label, text, max) => fields.push([label, text, max]);
 
 Object.entries(HERO_COPY).forEach(([k, v]) => add(`hero.${k}`, v, k === 'sub' ? 26 : 7));
 ROTATOR_TERMS.forEach((v, i) => add(`rotator[${i}]`, v, 5));
-['eyebrow', 'lead', 'accent', 'sub'].forEach((k) => add(`community.${k}`, COMMUNITY_COPY[k], k === 'sub' ? 22 : 5));
-Object.entries(COMMUNITY_COPY.channels).forEach(([k, v]) => add(`community.channels.${k}`, v, 9));
 Object.entries(SERVICES_COPY).forEach(([k, v]) => add(`services.${k}`, v, ['sub', 'closing'].includes(k) ? 22 : 5));
 add('contact.headline', CONTACT_COPY.headline, 8);
 add('contact.sub', CONTACT_COPY.sub, 32);
@@ -78,7 +76,7 @@ const BANNED = [
 // The three pillars, in order. AI-only since 2026-09-21.
 t('offer order: AI agents, LLM lab, AI news hub', HOME_OFFERS.map((o) => o.id).join() === 'offer-ai-agents,offer-llm-lab,offer-ai-hub', HOME_OFFERS.map((o) => o.id).join());
 t('hub offer links to the news hub', HOME_OFFERS[2]?.route === '/news', HOME_OFFERS[2]?.route);
-t('hub offer second CTA goes to the community grid', HOME_OFFERS[2]?.secondary === 'community', HOME_OFFERS[2]?.secondary);
+t('hub offer second CTA opens every channel (Linktree)', HOME_OFFERS[2]?.secondary === 'linktree', HOME_OFFERS[2]?.secondary);
 
 // The retired cyber / enterprise offer must not creep back into the marketing copy.
 const RETIRED = /סייבר|אבטחת מידע|cyber|infosec|enterprise|אנטרפרייז|ארגונ|saas|zero[- ]?trust/i;

@@ -570,3 +570,34 @@ export async function writeXFeedSnapshot(payload: Record<string, unknown>): Prom
     console.error('[x-feed] failed to write snapshot:', (err as Error)?.message ?? err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// News snapshot (src/server/newsFeed.ts)
+// The last good /api/news refresh, so a cold instance whose refresh comes back empty (every feed
+// timing out, a WAF wave) still serves real stories instead of an empty grid. Public data only.
+// Needs a `news_snapshot` read/write rule; without it both calls degrade to no-ops.
+// ---------------------------------------------------------------------------
+
+export async function readNewsSnapshot(): Promise<{ items: unknown[]; fetchedAt: number } | null> {
+  const db = getServerDb();
+  if (!db) return null;
+  try {
+    const snap = await get(ref(db, 'news_snapshot'));
+    const val = snap.exists() ? (snap.val() as { items?: unknown[]; fetchedAt?: number }) : null;
+    return val && Array.isArray(val.items) && typeof val.fetchedAt === 'number' ? { items: val.items, fetchedAt: val.fetchedAt } : null;
+  } catch (err) {
+    console.error('[news] failed to read snapshot:', (err as Error)?.message ?? err);
+    return null;
+  }
+}
+
+export async function writeNewsSnapshot(payload: { items: unknown[]; fetchedAt: number }): Promise<void> {
+  const db = getServerDb();
+  if (!db) return;
+  try {
+    // RTDB rejects `undefined` anywhere in the tree; a JSON round-trip drops those keys.
+    await set(ref(db, 'news_snapshot'), JSON.parse(JSON.stringify(payload)));
+  } catch (err) {
+    console.error('[news] failed to write snapshot:', (err as Error)?.message ?? err);
+  }
+}

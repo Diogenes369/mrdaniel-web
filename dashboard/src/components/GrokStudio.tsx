@@ -7,6 +7,7 @@ import { fetchGrokStatus, synthesizeGrokCarousel, refreshXFeed, type GrokResult,
 import { scoreXThread, xWeightedLength, hasExternalLink, X_POST_LIMIT, X_RANKING_WEIGHTS as W } from '../lib/xAlgorithm';
 import { CATEGORY_LABEL, type NewsCategory, type NewsItem } from '../lib/newsAgentTypes';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
+import XIntelPanel from './XIntelPanel';
 
 /**
  * Grok · X Studio — scraped AI news → Grok → an X-algorithm-optimized carousel AND thread.
@@ -313,6 +314,7 @@ export default function GrokStudio() {
           )}
         </div>
       </div>
+      <XIntelPanel />
     </div>
   );
 }

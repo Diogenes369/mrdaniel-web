@@ -29,11 +29,6 @@ export default function Hero() {
           transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
           className="max-w-5xl mx-auto text-center px-4"
         >
-          <span className="glass-chip mb-7">
-            <span className="glass-chip__dot" aria-hidden="true" />
-            {rtl(c.eyebrow)}
-          </span>
-
           <h1 className="font-display text-fluid-hero font-black text-white mb-7 [text-shadow:0_2px_18px_rgba(0,0,0,0.85),0_6px_44px_rgba(0,0,0,0.75)]">
             {rtl(c.h1Lead)}
             <br />

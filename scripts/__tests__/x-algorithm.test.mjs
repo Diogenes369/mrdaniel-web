@@ -12,6 +12,7 @@ import {
   threadFromDeck,
 } from '../../src/server/xAlgorithm.ts';
 import { findUnverifiedNumbers, isXaiBillingFailure } from '../../src/server/agents/grokCarouselAgent.ts';
+import { xWriteStatus, checkEngagement, isOnTopic, X_DAILY_CAPS } from '../../src/server/xWriteClient.ts';
 import { parseGrokJson, describeXaiError, XaiNotConfiguredError, XaiHttpError } from '../../src/server/xaiClient.ts';
 
 const results = [];
@@ -92,6 +93,15 @@ t('fallback on 402 (no credits)', isXaiBillingFailure(new XaiHttpError(402, ''))
 t('fallback on 403 (team without credits — what xAI actually returns)', isXaiBillingFailure(new XaiHttpError(403, '')));
 t('no fallback on 429', !isXaiBillingFailure(new XaiHttpError(429, '')));
 t('no fallback on a parse error', !isXaiBillingFailure(new Error('xAI answer was not JSON')));
+
+// ─── X writes: locked without keys; every action passes the quality gate ─────────────────────────
+for (const k of ['X_API_KEY', 'X_API_SECRET', 'X_ACCESS_TOKEN', 'X_ACCESS_SECRET', 'X_WRITE_ENABLED']) delete process.env[k];
+t('writes are locked with no keys', !xWriteStatus().enabled && xWriteStatus().missing.length === 5);
+t('AI post is on-topic', isOnTopic('Claude 5 just shipped a new agent SDK'));
+t('off-topic post is refused', checkEngagement('like', 'Great game last night!', 0) !== null);
+t('daily cap enforced', checkEngagement('like', 'new LLM benchmark', X_DAILY_CAPS.like) !== null);
+t('low-effort reply refused', checkEngagement('reply', 'OpenAI agents launch', 0, 'great post') !== null);
+t('substantive on-topic reply allowed', checkEngagement('reply', 'OpenAI agents launch', 0, 'The interesting part is the tool-call budget, not the model size.') === null);
 
 for (const [state, label, detail] of results) if (state === 'FAIL') console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);
 const failed = results.filter((r) => r[0] === 'FAIL').length;

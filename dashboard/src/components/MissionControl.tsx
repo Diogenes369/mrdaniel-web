@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Radar, Activity, Play } from 'lucide-react';
 import { AGENT_META, useAgentActivity, type AgentId } from '../lib/agentActivity';
 import { fetchNewsList } from '../lib/newsFeedClient';
@@ -34,6 +34,15 @@ export default function MissionControl() {
   const [scanning, setScanning] = useState(false);
   const totals = useMemo(() => ORDER.reduce((n, id) => n + snap.agents[id].done, 0), [snap]);
 
+  // While this tab is open Scout re-reads the live feed every 3 minutes — a real request through the
+  // same fetch tap, so the office shows the pipeline breathing instead of sitting idle.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void fetchNewsList('all', 40).catch(() => undefined);
+    }, 180_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // A real Scout run — fetches the live AI feed — for when the operator wants to see the arena move.
   async function scan() {
     setScanning(true);
@@ -50,7 +59,7 @@ export default function MissionControl() {
     <div className="space-y-4" dir="rtl">
       <div className="dash-card flex flex-wrap items-center gap-3 p-4">
         <Radar className="h-5 w-5 text-lime-300" />
-        <h2 className="font-display text-lg font-black text-white">Mission Control</h2>
+        <h2 className="font-display text-lg font-black text-white">Mission Control · המשרד</h2>
         <span className="text-sm text-zinc-400">הסוכנים בזמן אמת — כל בקשה שהדשבורד שולח מאירה את הסוכן שמטפל בה</span>
         <span className="ms-auto font-mono text-xs text-zinc-500">{totals} משימות הושלמו בסשן</span>
         <button type="button" onClick={scan} disabled={scanning} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-bold text-sky-300 disabled:opacity-50">
