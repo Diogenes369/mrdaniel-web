@@ -1362,10 +1362,24 @@ export async function synthesizeNewsPost(input: {
   // ENGAGEMENT_RULES (folded into NEWS_POST_SYSTEM_INSTRUCTION) asks for, and on a direct conflict
   // a model follows the later instruction. Its own text also says it overrides, so the resolution
   // is explicit rather than positional luck.
+  // CONCISE_FACTUAL_RULES REPLACES ENGAGEMENT_RULES here rather than being appended after it.
+  //
+  // Appending was the obvious move and it was wrong twice over. First, the two blocks directly
+  // contradict: ENGAGEMENT_RULES mandates a closing open question to farm comments, and the whole
+  // point of the new block is that a reader of a security advisory should not be asked how it makes
+  // them feel. Relying on "the later instruction wins" is a coin flip, not a contract.
+  //
+  // Second, and the reason this is a correctness fix rather than a style one: the assembled
+  // instruction measured ~6.6k tokens, and Groq's free tier allows 8000 per MINUTE including the
+  // completion reservation. Every news-post call therefore 429'd on a completely full bucket and
+  // fell through to Gemini's 20-per-day cap — which is precisely the "429 blocks my copy" symptom.
+  // Dropping the superseded block is what makes the request fit the engine that is supposed to
+  // serve it.
   const baseInstruction = isWhatsapp
     ? WHATSAPP_POST_SYSTEM_INSTRUCTION
-    : NEWS_POST_SYSTEM_INSTRUCTION.replace('{FORMAT_SPEC}', formatSpec);
-  const systemInstruction = `${baseInstruction}\n\n${CONCISE_FACTUAL_RULES}`;
+    : NEWS_POST_SYSTEM_INSTRUCTION.replace('{FORMAT_SPEC}', formatSpec).replace(ENGAGEMENT_RULES, CONCISE_FACTUAL_RULES);
+  // WhatsApp's instruction never embedded ENGAGEMENT_RULES, so it still needs the block appended.
+  const systemInstruction = isWhatsapp ? `${baseInstruction}\n\n${CONCISE_FACTUAL_RULES}` : baseInstruction;
 
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,

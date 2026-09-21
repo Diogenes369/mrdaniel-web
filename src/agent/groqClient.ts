@@ -45,6 +45,90 @@ export const GROQ_TEXT_MODEL = process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss
 
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 
+/**
+ * Default completion ceiling.
+ *
+ * Sized to comfortably cover the largest thing this codebase asks for (a 12-slide deck measured
+ * ~3.2k completion tokens). It is NOT a rate-limit reservation — Groq bills the per-minute bucket
+ * on actual usage, verified by a ~7k-token prompt succeeding with max_tokens 8000 against an
+ * 8k/min limit. It exists only to stop a runaway generation, and to keep a truncated answer from
+ * looking like malformed JSON.
+ */
+const GROQ_MAX_OUTPUT_TOKENS = Number(process.env.GROQ_MAX_OUTPUT_TOKENS) || 4000;
+
+/** Groq's free-tier per-minute token allowance (`x-ratelimit-limit-tokens`, measured 2026-09-21).
+ *  Overridable for a paid tier, where the ceiling is far higher. */
+const GROQ_FREE_TPM = Number(process.env.GROQ_TPM_BUDGET) || 8000;
+
+/** Tokens held back so an estimate that is slightly low does not turn into a 429. */
+const TPM_SAFETY_MARGIN = 400;
+
+/**
+ * Characters per token, CALIBRATED against Groq's own `usage.prompt_tokens` on 2026-09-21 rather
+ * than assumed.
+ *
+ * Measured on `openai/gpt-oss-120b`: 108 characters of Hebrew prose counted 108 prompt tokens —
+ * one token per character — while Latin ran about 1.7. Every rule of thumb in circulation
+ * ("4 characters per token") is calibrated on English and is off by a factor of four here, which
+ * is exactly how a prompt that genuinely exceeds the per-minute bucket kept being estimated as
+ * comfortably inside it.
+ */
+const HEBREW_CHARS_PER_TOKEN = 1.0;
+const LATIN_CHARS_PER_TOKEN = 1.7;
+
+/**
+ * Rough token count for a prompt, weighted for Hebrew.
+ *
+ * The usual "4 characters per token" rule is calibrated on English and is off by a factor of four
+ * here: measured against Groq's own usage.prompt_tokens, Hebrew runs ~1 token per CHARACTER and
+ * Latin ~1.7. Used for the 429 diagnostic and to size max_tokens sensibly — never as a gate.
+ */
+export function estimateTokens(text: string): number {
+  const s = String(text ?? '');
+  let hebrew = 0;
+  for (const ch of s) {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp >= 0x0590 && cp <= 0x05ff) hebrew++;
+  }
+  const other = s.length - hebrew;
+  return Math.ceil(hebrew / HEBREW_CHARS_PER_TOKEN + other / LATIN_CHARS_PER_TOKEN);
+}
+
+/**
+ * Groq's free-tier ceilings, as the API itself reports them (2026-09-21):
+ *   - 1000 requests/minute, 8000 tokens/minute  (`x-ratelimit-*` headers)
+ *   - 200,000 tokens per DAY                    (only ever named in the 429 body, never a header)
+ *
+ * The daily one is the ceiling that actually bites, and it is invisible until you hit it: the
+ * per-minute headers keep reporting a full bucket (`8000/8000 remaining`) while every request
+ * 429s, because the limit being enforced is the one nothing advertises. That combination cost a
+ * long debugging detour and is why `describeGroqLimit` below exists.
+ */
+export const GROQ_FREE_TPD = 200_000;
+
+/** Turn a Groq 429 body into something that names the real limit. */
+export function describeGroqLimit(errorMessage: string): string {
+  const perDay = /tokens per day \(TPD\): Limit (\d+), Used (\d+)/i.exec(errorMessage);
+  if (perDay) {
+    return `Groq free-tier DAILY token budget spent (${perDay[2]}/${perDay[1]}). Resets on Groq's daily cycle; Gemini serves text until then.`;
+  }
+  if (/tokens per minute|TPM/i.test(errorMessage)) return 'Groq per-minute token budget hit — retrying shortly will clear it.';
+  if (/requests per/i.test(errorMessage)) return 'Groq request-rate limit hit — retrying shortly will clear it.';
+  return 'Groq rate limit hit.';
+}
+
+/**
+ * The completion ceiling this request may reserve without exceeding the per-minute bucket.
+ *
+ * Returns at least a usable floor: a request whose prompt alone nearly fills the bucket is going
+ * to 429 whatever we ask for, and clamping to 0 would just turn that into an empty answer instead
+ * of an honest error.
+ */
+export function budgetedMaxTokens(promptTokens: number, requested = GROQ_MAX_OUTPUT_TOKENS): number {
+  const room = GROQ_FREE_TPM - TPM_SAFETY_MARGIN - promptTokens;
+  return Math.max(512, Math.min(requested, room));
+}
+
 /** Same placeholder-tolerant check as the Gemini key: a `.env.example` value that is present but
  *  obviously not a key must read as "not configured", not fail at the provider on every call. */
 const RAW_GROQ_KEY = process.env.GROQ_API_KEY?.trim().replace(/^["']|["']$/g, '') ?? '';
@@ -246,10 +330,27 @@ export async function groqGenerate(
     temperature: typeof params.config?.temperature === 'number' ? params.config.temperature : 0.6,
   };
   if (typeof params.config?.topP === 'number') body.top_p = params.config.topP;
-  // A 12-slide deck runs ~3.2k completion tokens and the biggest prompts here go further. Groq's
-  // default ceiling truncates them mid-JSON, which surfaces as an unparseable answer rather than as
-  // the "ran out of room" it actually is, so a generous default is set when the caller names none.
-  body.max_tokens = typeof params.config?.maxOutputTokens === 'number' ? params.config.maxOutputTokens : 8000;
+  // `max_tokens` is a RESERVATION against the per-minute token bucket, not just a ceiling.
+  //
+  // This was set to 8000, which is exactly the free tier's whole TPM allowance
+  // (`x-ratelimit-limit-tokens: 8000`, measured 2026-09-21). Every call therefore claimed the
+  // entire minute's budget before it had generated a single token, so the FIRST request of any
+  // minute 429'd and fell through to Gemini — which is why text generation looked like it was
+  // still on Gemini even after the migration. A 12-slide deck measures ~3.2k completion tokens,
+  // so 4000 leaves real headroom for the answer AND room in the bucket for the prompt beside it.
+  // NOTE: no pre-flight size rejection here, deliberately.
+  //
+  // An earlier revision refused any prompt whose estimate exceeded the per-minute bucket, on the
+  // theory that `max_tokens` is reserved against it. That theory is WRONG: a ~7k-token deck prompt
+  // with `max_tokens: 8000` (15k notional against an 8k/min bucket) succeeded in production. Groq
+  // bills TPM on actual usage, not on the reservation, so refusing those calls only denied work
+  // that would have gone through. The estimate below is kept for the diagnostic and for sizing
+  // `max_tokens` sensibly — never as a gate.
+  const promptTokens = estimateTokens(messages.map((m) => m.content).join('\n'));
+  body.max_tokens = budgetedMaxTokens(
+    promptTokens,
+    typeof params.config?.maxOutputTokens === 'number' ? params.config.maxOutputTokens : GROQ_MAX_OUTPUT_TOKENS
+  );
   // Gemini's `responseMimeType: 'application/json'` is OpenAI's `response_format`. Carrying it over
   // is what keeps every `parseJsonOrThrow` caller working — without it the model wraps its JSON in
   // prose and every structured action fails at the parse step.
@@ -285,9 +386,25 @@ export async function groqGenerate(
 
     if (res.status === 429) {
       const retryAfter = Number(res.headers.get('retry-after')) || 0;
+      // The headers say exactly which bucket ran out and how much of it this request wanted.
+      // Without this the only symptom was "groq rate limit exceeded", which looks like external
+      // congestion and hid a self-inflicted over-reservation for an entire release.
+      console.warn(
+        `[groq] 429 — tokens ${res.headers.get('x-ratelimit-remaining-tokens') ?? '?'}/${
+          res.headers.get('x-ratelimit-limit-tokens') ?? GROQ_FREE_TPM
+        } left, requests ${res.headers.get('x-ratelimit-remaining-requests') ?? '?'}/${
+          res.headers.get('x-ratelimit-limit-requests') ?? '?'
+        }, this call reserved max_tokens=${body.max_tokens} for an estimated ${promptTokens}-token prompt, resets in ${
+          res.headers.get('x-ratelimit-reset-tokens') ?? `${retryAfter}s`
+        }`
+      );
+      const body429 = await res.clone().text().catch(() => '');
       if (rateRetries >= RATE_WAITS_MS.length) {
-        throw new GroqError('groq rate limit exceeded', 429, retryAfter || null);
+        throw new GroqError(describeGroqLimit(body429), 429, retryAfter || null);
       }
+      // A spent DAILY budget cannot clear inside this request — surface it at once so the router
+      // hands over to Gemini instead of sleeping through three pointless retries.
+      if (/tokens per day/i.test(body429)) throw new GroqError(describeGroqLimit(body429), 429, retryAfter || null);
       const waitMs = Math.max(RATE_WAITS_MS[rateRetries], retryAfter * 1000);
       if (waitMs > MAX_RATE_WAIT_MS) throw new GroqError('groq rate limit exceeded', 429, retryAfter || null);
       rateRetries++;

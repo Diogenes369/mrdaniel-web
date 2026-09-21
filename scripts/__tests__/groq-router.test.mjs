@@ -168,7 +168,13 @@ t('the retired llama model is not the default', !/llama-3\.3-70b-versatile['"]/.
 t('the default model is the measured-best available one', GROQ_TEXT_MODEL === 'openai/gpt-oss-120b', GROQ_TEXT_MODEL);
 t('the model is overridable by env', /process\.env\.GROQ_MODEL/.test(groq));
 t('strict JSON mode is retried without response_format on a 400', /delete body\.response_format;[\s\S]{0,40}continue;/.test(groq));
-t('a generous max_tokens default prevents mid-JSON truncation', /max_tokens = typeof params\.config\?\.maxOutputTokens/.test(groq));
+t('a generous max_tokens default prevents mid-JSON truncation', /body\.max_tokens = budgetedMaxTokens\(/.test(groq));
+// The daily budget is the limit that actually bites and the only one Groq never puts in a header,
+// so a 429 has to name it rather than reporting generic congestion.
+t('a 429 names the real limit', /describeGroqLimit\(/.test(groq));
+t('a spent DAILY budget is not slept through', /tokens per day\/i\.test\(body429\)|\/tokens per day\/i\.test\(body429\)/.test(groq));
+t('the token estimator is calibrated, not guessed', /HEBREW_CHARS_PER_TOKEN = 1\.0/.test(groq));
+t('no pre-flight size gate blocks calls that would succeed', !/fitsGroqBudget\(promptTokens\)/.test(groq));
 t('responseMimeType json maps to response_format', /response_format = \{ type: 'json_object' \}/.test(groq));
 t('output is normalised before anything downstream sees it', /normalizeModelUnicode\(choice\?\.message\?\.content/.test(groq));
 t('the scrub opt-out is honoured, so generated code keeps its indentation', /options\.scrub === false \? raw : scrubAiPhrases\(raw\)/.test(groq));
