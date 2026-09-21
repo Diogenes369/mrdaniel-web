@@ -285,9 +285,9 @@ export default function LeadForm() {
                       <div className="h-1 rounded-full bg-white/10 overflow-hidden">
                         <motion.div
                           initial={false}
-                          animate={{ width: idx <= step ? '100%' : '0%' }}
+                          animate={{ scaleX: idx <= step ? 1 : 0 }}
                           transition={{ duration: 0.4, ease: 'easeOut' }}
-                          className="h-full bg-brand-500 shadow-[0_0_8px_rgba(0,255,102,0.6)]"
+                          className="h-full w-full origin-right bg-brand-500 shadow-[0_0_8px_rgba(0,255,102,0.6)]"
                         />
                       </div>
                       <span className={`text-xs mt-1.5 block ${idx <= step ? 'text-zinc-300' : 'text-zinc-500'}`}>

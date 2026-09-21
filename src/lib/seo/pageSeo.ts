@@ -15,9 +15,9 @@ export type PageSeoConfig = Omit<SeoProps, 'noindex'> & { noindex?: boolean };
 
 export const PAGE_SEO: Record<string, PageSeoConfig> = {
   '/': {
-    title: 'דניאל בן ברוך — סוכני AI מותאמים אישית, סייבר ואבטחה, פיתוח ושיווק',
+    title: 'דניאל בן ברוך — סוכני AI, סייבר ומדריכי AI 2026',
     description:
-      'בניית סוכני בינה מלאכותית מותאמים אישית לעסקים ולפרטיים (פיננסים, תפעול, מכירות, שירות, אוטומציה), פתרונות אבטחת סייבר לעסקים קטנים ובינוניים ולארגונים, ופיתוח אתרים ואפליקציות עם קמפיינים דיגיטליים בעלי ROI גבוה.',
+      'סוכני AI ואוטומציה לעסקים קטנים ולפרטיים, סייבר Zero-Trust ואינטגרציות AI ל-SaaS ברמת Enterprise, וחדשות ומדריכי AI מעשיים לשנת 2026.',
     path: '/',
     // Organization + WebSite JSON-LD is already emitted statically in index.html (survives client
     // navigation) — no managed block needed here.
@@ -87,7 +87,7 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
     ],
   },
   '/news': {
-    title: 'חדשות סייבר, AI וטכנולוגיה — עדכון יומי בעברית | דניאל בן ברוך',
+    title: 'חדשות ומדריכי AI וסייבר 2026 — עדכון יומי בעברית | דניאל בן ברוך',
     description:
       'לוח חדשות אינטראקטיבי בזמן אמת: ריכוז הכתבות הטריות ביותר בסייבר, בינה מלאכותית וענן מגיקטיים, אנשים ומחשבים, Techtime ו-Israel Defense.',
     path: '/news',

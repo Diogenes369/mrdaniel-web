@@ -6,6 +6,18 @@
 const SITE_URL = 'https://mrdaniel.co.il';
 const ORG_NAME = 'MR. DANIEL';
 
+// Public profiles from the Linktree (linktr.ee/mrdaniel.ai). Kept literal rather than imported
+// from SocialLinks.tsx so this module stays dependency-free (pageSeo and NewsArticlePage both import it).
+const SAME_AS = [
+  'https://www.instagram.com/mrdaniel.ai/',
+  'https://www.threads.com/@mrdaniel.ai',
+  'https://www.tiktok.com/@mrdaniel.ai',
+  'https://x.com/mrdaniel_ai',
+  'https://www.linkedin.com/in/daniel-ben-baruch',
+  'https://open.spotify.com/user/312rrywayqttviksa5i5gxdtryhm',
+  'https://linktr.ee/mrdaniel.ai',
+];
+
 const publisher = {
   '@type': 'Organization',
   name: ORG_NAME,
@@ -23,8 +35,9 @@ export function organizationLd() {
     logo: `${SITE_URL}/logo.png`,
     image: `${SITE_URL}/og-image.png`,
     email: 'daniel@mrdaniel.co.il',
+    sameAs: SAME_AS,
     description:
-      'ארכיטקטורת סוכני בינה מלאכותית מותאמים אישית, אבטחת סייבר לעסקים קטנים ובינוניים ולארגונים, ופיתוח דיגיטלי ושיווק מתקדם.',
+      'סוכני AI ואוטומציה לעסקים קטנים ולפרטיים, סייבר ואינטגרציות AI ל-SaaS ברמת Enterprise, והאב מדריכים וחדשות AI לשנת 2026.',
     areaServed: { '@type': 'Country', name: 'Israel' },
     knowsLanguage: ['he', 'en'],
   };

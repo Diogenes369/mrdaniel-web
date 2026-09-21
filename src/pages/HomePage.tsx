@@ -6,12 +6,14 @@ import ServicesSection from '../components/home/ServicesSection';
 import TechMarquee from '../components/TechMarquee';
 import CyberNewsGrid from '../components/CyberNewsGrid';
 import ContactPortal from '../components/ContactPortal';
+import CommunitySection from '../components/home/CommunitySection';
 import { HOME_OFFERS } from '../data/homeOffers';
 
 /**
- * Homepage: hero → rotating headline → the three core offerings (custom AI agents, cyber & security,
- * web development + marketing) → interactive ROI calculator (lead magnet) → services bento →
- * tech-stack marquee → live news dashboard → contact.
+ * Homepage: hero → rotating headline → the three core offerings (custom AI agents + automation,
+ * enterprise cyber + SaaS AI integrations, the 2026 AI tutorials/news hub) → interactive ROI
+ * calculator (lead magnet) → services bento → tech-stack marquee → live news dashboard → community
+ * channels (every Linktree profile) → contact.
  *
  * Every section wrapper is fully transparent — no divider elements, no per-section backdrop — so
  * the fixed Scene3D particle/mesh layer (`.scene3d-layer`, z-0 in App.tsx) runs unobstructed from
@@ -30,6 +32,7 @@ export default function HomePage() {
       <ServicesSection />
       <TechMarquee />
       <CyberNewsGrid />
+      <CommunitySection />
       <ContactPortal />
     </>
   );

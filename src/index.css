@@ -280,23 +280,29 @@ body::before {
   box-shadow: 0 0 40px -22px rgba(118, 185, 0, 0.4);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, background-color 0.3s ease;
 }
-.cyber-glass--marketing:hover {
-  border-color: rgba(118, 185, 0, 0.5);
-  box-shadow: 0 0 60px -14px rgba(118, 185, 0, 0.55);
-  transform: translateY(-3px);
-  background-color: rgba(9, 9, 11, 0.34);
-}
-.cyber-glass--marketing:hover::before {
-  opacity: 1;
+/* Hover states only where a real hovering pointer exists. On touch, :hover sticks after a tap, so
+   a card stayed lifted and glowing until the user tapped somewhere else. */
+@media (hover: hover) and (pointer: fine) {
+  .cyber-glass--marketing:hover {
+    border-color: rgba(118, 185, 0, 0.5);
+    box-shadow: 0 0 60px -14px rgba(118, 185, 0, 0.55);
+    transform: translateY(-3px);
+    background-color: rgba(9, 9, 11, 0.34);
+  }
+  .cyber-glass--marketing:hover::before {
+    opacity: 1;
+  }
 }
 
 .cyber-glass--flagship {
   border-color: rgba(118, 185, 0, 0.32);
   box-shadow: 0 0 52px -16px rgba(118, 185, 0, 0.5);
 }
-.cyber-glass--flagship:hover {
-  border-color: rgba(118, 185, 0, 0.6);
-  box-shadow: 0 0 72px -12px rgba(118, 185, 0, 0.68);
+@media (hover: hover) and (pointer: fine) {
+  .cyber-glass--flagship:hover {
+    border-color: rgba(118, 185, 0, 0.6);
+    box-shadow: 0 0 72px -12px rgba(118, 185, 0, 0.68);
+  }
 }
 
 .cyber-glass--info {
@@ -945,4 +951,199 @@ html.a11y-large-cursor * {
 }
 .measure {
   max-width: 72ch;
+}
+
+
+/* ══ Web3 surface layer (2026-09 overhaul) ═══════════════════════════════════════════════════════
+   Everything below animates transform/opacity only. Glows are static box-shadows or pseudo-element
+   opacity fades, never an animated blur radius or an animated box-shadow, so a hover or a loop
+   never forces a repaint of the glass behind it. ─────────────────────────────────────────────── */
+
+/* Brand-green → cyan gradient ink for one accent phrase per headline. Static: no animated
+   background-position, which would repaint the text every frame. */
+.neon-text {
+  background: linear-gradient(95deg, #9fe870 0%, #76b900 38%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* The h1 carries a dark legibility text-shadow; inherited here it paints ON TOP of the clipped
+     gradient and turns the accent murky. The glow comes from drop-shadow below instead. */
+  text-shadow: none;
+  /* drop-shadow on clipped text is filtered once at raster time, then composited like an image. */
+  filter: drop-shadow(0 0 22px rgba(118, 185, 0, 0.28));
+}
+
+/* Glass eyebrow pill with a live-status dot. The dot pulses via opacity+scale on a pseudo-element,
+   the cheapest possible loop. */
+.glass-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(118, 185, 0, 0.35);
+  background: rgba(9, 9, 11, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 24px -10px rgba(118, 185, 0, 0.6);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+.glass-chip__dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #00ff66;
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.8);
+}
+.glass-chip__dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #00ff66;
+  animation: chip-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+}
+@keyframes chip-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* Primary-CTA sheen: a diagonal highlight that sweeps once per hover. Pure translateX on a
+   pseudo-element inside the button's own overflow:hidden. */
+.cta-sheen::after {
+  content: '';
+  position: absolute;
+  inset: -20% auto -20% -40%;
+  width: 35%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .cta-sheen:hover::after {
+    transform: translateX(520%) skewX(-18deg);
+    transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* Hero backdrop: a static perspective grid fading into the scene. Painted once; the mask keeps it
+   to the lower half so the headline sits on clean space. */
+.hero-grid {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 55%;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(118, 185, 0, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(118, 185, 0, 0.09) 1px, transparent 1px);
+  background-size: 56px 56px;
+  transform: perspective(700px) rotateX(58deg) translateZ(0);
+  transform-origin: center bottom;
+  mask-image: linear-gradient(to top, black 0%, transparent 85%);
+  -webkit-mask-image: linear-gradient(to top, black 0%, transparent 85%);
+}
+
+/* Community channel tile — glass, lifts on hover, neon rim fades in via ::after opacity. */
+.channel-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(9, 9, 11, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+  outline: none;
+}
+.channel-card::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(118, 185, 0, 0.18), transparent 60%),
+    radial-gradient(90% 80% at 0% 100%, rgba(34, 211, 238, 0.12), transparent 60%);
+  box-shadow: 0 0 36px -12px rgba(118, 185, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.channel-card:focus-visible {
+  border-color: rgba(143, 212, 0, 0.7);
+}
+.channel-card:focus-visible::after {
+  opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .channel-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(118, 185, 0, 0.45);
+  }
+  .channel-card:hover::after {
+    opacity: 1;
+  }
+}
+
+/* ══ Graceful degradation ═══════════════════════════════════════════════════════════════════════
+   html.perf-lite / html.motion-reduced are set once before first paint by src/lib/perfMode.ts. */
+
+/* Touch-first / Save-Data / weak hardware: backdrop blur is the dominant per-frame GPU cost while
+   scrolling past a stack of glass cards (every card re-samples and re-blurs what moves behind it).
+   Halve the radius and compensate with a denser fill so text contrast is unchanged, and drop the
+   feTurbulence grain — an SVG filter rasterized per tile, invisible at phone pixel density. */
+html.perf-lite .cyber-glass {
+  background-color: rgba(9, 9, 11, 0.58);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+html.perf-lite .cyber-glass::before {
+  background-image:
+    radial-gradient(62% 80% at 14% 0%, rgba(118, 185, 0, 0.11), transparent 72%),
+    radial-gradient(54% 66% at 100% 100%, rgba(56, 189, 248, 0.07), transparent 70%);
+  background-size: 100% 100%, 100% 100%;
+}
+html.perf-lite .cyber-glass--info::before {
+  background-image: radial-gradient(64% 72% at 50% 0%, rgba(118, 185, 0, 0.05), transparent 74%);
+  background-size: 100% 100%;
+}
+html.perf-lite .channel-card,
+html.perf-lite .glass-chip {
+  background-color: rgba(9, 9, 11, 0.72);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.perf-lite .neon-text {
+  filter: none;
+}
+
+/* Reduced motion: stop every loop this layer introduced, and flatten the grid (a perspective plane
+   sliding under the page reads as motion). Both the class (set by perfMode.ts) and the raw query,
+   so it holds even if JS has not run yet. */
+html.motion-reduced .glass-chip__dot::after,
+html.motion-reduced .cta-sheen::after {
+  display: none;
+}
+html.motion-reduced .hero-grid {
+  transform: none;
+  opacity: 0.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .glass-chip__dot::after,
+  .cta-sheen::after {
+    display: none;
+  }
+  .channel-card,
+  .cyber-glass--marketing {
+    transition: none;
+  }
 }

@@ -6,6 +6,7 @@ import SceneObjects from './SceneObjects';
 import { useDeviceTier, isIOSWebKit } from '../hooks/useDeviceTier';
 import { usePointerTracking } from '../hooks/usePointer';
 import { getA11yPrefs, subscribeA11y } from '../lib/a11yStore';
+import { isTouchFirst } from '../lib/perfMode';
 
 /** Live-tracks the accessibility widget's "stop animations" toggle so the canvas below can freeze
  * its render loop entirely (`frameloop="never"`) — the individual `useFrame` hooks throughout
@@ -78,6 +79,10 @@ export default function Scene3D() {
   const wireContextRecovery = useWebGLContextRecovery();
   // Computed once — the platform doesn't change mid-session, so no need for this to be reactive.
   const [onIOS] = useState(isIOSWebKit);
+  // Bloom is a full-screen multi-pass blur: the single most expensive thing on the page. On a
+  // phone it costs battery and scroll smoothness for a glow nobody can tell apart at that size, so
+  // every touch-first device (Android included, not just iOS) renders the scene without it.
+  const [touchFirst] = useState(isTouchFirst);
   // dpr={[1, dprCap]} lets R3F clamp the *real* window.devicePixelRatio into that range itself —
   // on a high-tier device (including capable high-DPI phones, e.g. iOS Retina) this renders at up
   // to native resolution (explicitly Math.min(2, devicePixelRatio) — capped at 2x to bound GPU
@@ -92,7 +97,7 @@ export default function Scene3D() {
   // documented WebKit GPU-driver weak point (not a raw-power one), so a brand-new iPhone hits it
   // exactly as much as an old one. Everything else (rotation, parallax, scroll reactivity, DPI)
   // stays fully enabled on iOS.
-  const richEffectsEnabled = deviceTier === 'high' && !degraded && !onIOS;
+  const richEffectsEnabled = deviceTier === 'high' && !degraded && !onIOS && !touchFirst;
   const stopMotion = useA11yStopMotion();
 
   return (

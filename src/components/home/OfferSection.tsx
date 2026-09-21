@@ -6,6 +6,8 @@ import DepthSection from './DepthSection';
 import PopHeadline from './PopHeadline';
 import ScrollLockRail from '../mobile/ScrollLockRail';
 import type { HomeOffer, OfferBullet } from '../../data/homeOffers';
+import { rtl } from '../../lib/rtl';
+import { smoothScrollTo } from '../../hooks/useLenis';
 
 /** Hero-scale supporting card on the unified `.cyber-glass` marketing surface. */
 function BulletCard({ bullet }: { bullet: OfferBullet }) {
@@ -15,8 +17,8 @@ function BulletCard({ bullet }: { bullet: OfferBullet }) {
       <div className="w-12 h-12 lg:w-14 lg:h-14 shrink-0 rounded-2xl bg-black/40 border border-white/12 flex items-center justify-center text-brand-300 mb-5 transition-colors group-hover/bc:border-brand-500/45">
         <Icon className="w-6 h-6 lg:w-7 lg:h-7" />
       </div>
-      <h3 className="font-display text-xl font-extrabold text-white mb-2.5 lg:text-2xl">{bullet.title}</h3>
-      <p className="text-base text-zinc-300 leading-relaxed lg:text-lg lg:leading-relaxed">{bullet.body}</p>
+      <h3 className="font-display text-xl font-extrabold text-white mb-2.5 lg:text-2xl">{rtl(bullet.title)}</h3>
+      <p className="text-base text-zinc-300 leading-relaxed lg:text-lg lg:leading-relaxed">{rtl(bullet.body)}</p>
     </div>
   );
 }
@@ -39,8 +41,8 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
       {/* Header sits ABOVE the depth plane so the pop-out title and the card-grid tilt don't stack. */}
       <div className="container-wide relative z-10">
         <div className="max-w-4xl mx-auto text-center mb-12 md:mb-16">
-          <PopHeadline lead={offer.title} accent={offer.accent} />
-          <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">{offer.intro}</p>
+          <PopHeadline lead={rtl(offer.title)} accent={rtl(offer.accent)} />
+          <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">{rtl(offer.intro)}</p>
         </div>
       </div>
 
@@ -63,12 +65,18 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
         </ScrollLockRail>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <WebButton variant="primary" onClick={() => navigate(offer.route)} className="!px-8">
-            {offer.ctaLabel}
+          <WebButton variant="primary" onClick={() => navigate(offer.route)} className="cta-sheen !px-8">
+            {rtl(offer.ctaLabel)}
             <ArrowLeft className="w-4 h-4" />
           </WebButton>
-          <WebButton variant="ghost" onClick={openLead} className="!px-6">
-            תיאום שיחת אפיון טכנולוגית
+          {/* The content hub has nothing to scope in a call — its second step is following the
+              channels, which keeps a not-yet-ready visitor in the funnel instead of bouncing. */}
+          <WebButton
+            variant="ghost"
+            onClick={offer.secondary === 'community' ? () => smoothScrollTo('#community') : openLead}
+            className="!px-6"
+          >
+            {rtl(offer.secondaryLabel)}
           </WebButton>
         </div>
       </DepthSection>

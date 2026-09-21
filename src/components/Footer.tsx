@@ -5,6 +5,8 @@ import { Mail, Check, Copy } from 'lucide-react';
 import SocialLinks from './SocialLinks';
 import Logo from './Logo';
 import { smoothScrollTo, scrollToTopSmooth } from '../hooks/useLenis';
+import { FOOTER_COPY } from '../data/siteCopy';
+import { rtl } from '../lib/rtl';
 
 const NAV_LINKS = [
   { name: 'אודות', to: '/about' },
@@ -107,14 +109,14 @@ export default function Footer() {
               <Logo className="mb-3" iconClassName="h-7 md:h-9 drop-shadow-[0_0_8px_rgba(0,255,102,0.35)]" textClassName="text-sm md:text-base" />
             </Link>
             <p className="text-zinc-400 text-sm font-light leading-relaxed max-w-xs mb-3">
-              ארכיטקטורת AI וסייבר ברמת Zero-Trust עבור ארגונים שדורשים חדשנות חסרת פשרות.
+              {rtl(FOOTER_COPY.tagline)}
             </p>
             <div className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
               <span className="relative flex h-1.5 w-1.5 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-400" />
               </span>
-              מערכות אבטחה ו-AI פעילות 2026
+              {rtl(FOOTER_COPY.status)}
             </div>
           </div>
 

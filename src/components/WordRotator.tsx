@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { prefersReducedMotion } from '../lib/gsap';
+import { ROTATOR_TERMS } from '../data/siteCopy';
 
 /**
  * Single-slot rotating headline with a retro terminal "backspace typing" effect: each phrase is
@@ -10,13 +11,10 @@ import { prefersReducedMotion } from '../lib/gsap';
  * Uses the site's PRIMARY font (var(--font-sans) — Heebo), matching the body/hero copy, rather than
  * a monospace face; the "terminal" character comes entirely from the caret + typing motion.
  */
-const TERMS = [
-  'סוכני AI שעובדים בשבילכם',
-  'אוטומציה שרצה 24/7',
-  'הגנת סייבר בלי פשרות',
-  'פיתוח פול-סטאק מקצה לקצה',
-  'נוכחות דיגיטלית שממירה',
-] as const;
+// Rendered char-by-char, so the bidi marks from rtl() would type out as invisible "keystrokes" and
+// stall the caret. These phrases are kept to Hebrew + at most one Latin term mid-phrase, which the
+// browser's own bidi pass places correctly without help (asserted in site-copy.test.mjs).
+const TERMS = ROTATOR_TERMS;
 
 const TYPE_MS = 58;      // per-character while typing
 const DELETE_MS = 30;    // per-character while deleting (a touch faster, like a held backspace)

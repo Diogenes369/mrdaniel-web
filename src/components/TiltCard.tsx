@@ -1,5 +1,6 @@
-import React, { useRef, type ReactNode } from 'react';
+import React, { useRef, useState, type ReactNode } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
+import { isReducedMotion, isTouchFirst } from '../lib/perfMode';
 
 interface TiltCardProps {
   children: ReactNode;
@@ -29,6 +30,12 @@ export default function TiltCard({ children, className = '', strength = 10 }: Ti
     px.set(0.5);
     py.set(0.5);
   };
+
+  // No precise hover pointer → nothing can drive the tilt, so skip the springs and the preserve-3d
+  // layer entirely: one fewer composited layer per card on phones, and a flat card for users who
+  // asked the OS for less motion. Hooks above still run unconditionally (rules of hooks).
+  const [inert] = useState(() => isTouchFirst() || isReducedMotion());
+  if (inert) return <div className={`relative h-full ${className}`}>{children}</div>;
 
   return (
     <div style={{ perspective: 1200 }} className={className}>

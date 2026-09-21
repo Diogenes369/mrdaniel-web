@@ -1,4 +1,6 @@
 import TitleUnderline from './TitleUnderline';
+import { CONTACT_COPY } from '../data/siteCopy';
+import { rtl } from '../lib/rtl';
 
 /**
  * Site outro: a bold closing question above a compact circular "בואו נדבר" CTA that opens the lead
@@ -21,7 +23,7 @@ export default function ContactPortal() {
           one; stays an <h2> for heading hierarchy. text-wrap:balance from the base rule. ── */}
       <div className="group relative z-10 inline-flex max-w-full flex-col items-center px-6">
         <h2 className="font-display font-black text-fluid-hero leading-[1.08] text-white max-w-[16ch] md:max-w-[22ch] [text-shadow:0_2px_22px_rgba(0,0,0,0.9)]">
-          יש לכם רעיון? בואו נהפוך אותו למערכת.
+          {rtl(CONTACT_COPY.headline)}
         </h2>
         <TitleUnderline className="w-full" base="w-12" />
       </div>
@@ -70,7 +72,7 @@ export default function ContactPortal() {
       {/* ── Expanded closing statement. Balanced onto ~3 even lines on desktop via the
           `#contact-portal p` rule in index.css; scales down cleanly on mobile. ── */}
       <p className="relative z-10 mt-16 md:mt-24 font-sans text-base md:text-lg text-zinc-400 max-w-[34rem] md:max-w-[42rem] mx-auto leading-relaxed md:leading-[1.75] px-6 sm:px-8">
-        מדבר איתכם אני — לא בוט ולא מוקד. מפתחים, עצמאים, יוצרים ועסקים קטנים: לייעוץ, לאפיון פרויקט או לשיחת פיתוח מעמיקה — שלחו הודעה ואחזור אליכם.
+        {rtl(CONTACT_COPY.sub)}
       </p>
     </section>
   );

@@ -150,9 +150,11 @@ function Stepper({ labels, step }: { labels: string[]; step: number }) {
     <div className="relative mt-6 px-2">
       <div className="absolute top-3.5 inset-x-6 h-0.5 bg-white/10 rounded-full" aria-hidden="true" />
       <motion.div
-        className="absolute top-3.5 right-6 h-0.5 bg-brand-500 rounded-full shadow-[0_0_8px_rgba(0,255,102,0.6)]"
+        // Same span as the track (inset-x-6), grown with scaleX from the RTL start edge: transform
+        // runs on the compositor, where the old animated `width` re-laid-out the row every frame.
+        className="absolute top-3.5 inset-x-6 h-0.5 origin-right bg-brand-500 rounded-full shadow-[0_0_8px_rgba(0,255,102,0.6)]"
         initial={false}
-        animate={{ width: `calc(${progressPct}% - ${(progressPct / 100) * 3}rem)` }}
+        animate={{ scaleX: progressPct / 100 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
         aria-hidden="true"
       />

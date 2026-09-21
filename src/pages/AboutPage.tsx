@@ -15,10 +15,15 @@ import {
 } from 'lucide-react';
 import { PageHero, SectionHeading, ServiceGrid, UnifiedCta } from '../components/content/ContentPrimitives';
 import SocialLinks from '../components/SocialLinks';
+import { ABOUT_COPY } from '../data/siteCopy';
+import { rtl } from '../lib/rtl';
+
+const PILLAR_ICONS = [Bot, Lock, Network, Rocket];
 
 const HUB_LINKS = [
   { icon: Lock, to: '/cyber', title: 'אבטחת סייבר', description: 'הגנה ברמת Zero-Trust, EDR/XDR ואבטחת מערכות AI' },
-  { icon: Rocket, to: '/digital', title: 'פיתוח דיגיטלי ו-Web3', description: 'פלטפורמות, אתרים ואפליקציות בלוקצ׳יין ברמה ארגונית' },
+  { icon: Rocket, to: '/digital', title: 'פיתוח דיגיטלי ו-Web3', description: 'אתרים, אפליקציות ו-dApps שנבנים להמרה ולביצועים' },
+  { icon: Terminal, to: '/news', title: 'חדשות ומדריכי AI', description: 'עדכוני AI וסייבר בזמן אמת ומדריכים מעשיים' },
   { icon: Bot, to: '/ai', title: 'בינה מלאכותית', description: 'סוכני AI אוטונומיים, RAG וחוברת הלימוד המלאה' },
   { icon: Network, to: '/architecture', title: 'ארכיטקטורת הגנה', description: 'תרשים ארבע השכבות ופריסת AI בטוחה בארגון' },
   { icon: LayoutGrid, to: '/capabilities', title: 'מטריצת יכולות', description: '18 יכולות מפורטות בשלושה תחומי הליבה' },
@@ -31,43 +36,33 @@ export default function AboutPage() {
         <PageHero
           badgeIcon={Terminal}
           badgeLabel="IT Management • Cyber Architecture • Agentic AI • Web3"
-          title="הופכים טכנולוגיה מורכבת לפתרון תחרותי"
-          subtitle="מנהל תשתיות ורשתות, ארכיטקט אבטחת סייבר ומומחה ליישום בינה מלאכותית ארגונית"
+          title={rtl(ABOUT_COPY.title)}
+          subtitle={rtl(ABOUT_COPY.subtitle)}
         />
 
         <div className="cyber-glass cyber-glass--info text-lg text-zinc-200 leading-[1.9] rounded-xl p-5 sm:p-6 lg:p-7 mb-14 max-w-4xl">
-          בעולם טכנולוגי שנע במהירות שיא, הפער בין אימוץ טכנולוגיה חדשה לבין יצירת יתרון עסקי אמיתי טמון בחיבור הנכון בין תשתיות רשת חזקות, הגנה היקפית מודרנית ואוטומציה חכמה מבוססת AI — לא בכל רכיב בנפרד.
+          {rtl(ABOUT_COPY.lede)}
         </div>
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="cyber-glass cyber-glass--info rounded-2xl p-6 sm:p-8 mb-16 max-w-4xl">
           <h2 className="flex items-center gap-3 font-display font-bold text-xl md:text-2xl text-white mb-5">
             <ShieldCheck className="w-6 h-6 text-brand-400" />
-            על הפעילות והחזון המקצועי
+            מי אני ומה אני בונה
           </h2>
           <div className="space-y-4 text-base md:text-lg text-zinc-300 leading-[1.85]">
-            <p>
-              אני <strong className="text-white">דניאל</strong>, מנהל רשת ותשתיות IT (IT Manager) עם רקע מעשי בניהול מערכות תקשורת ארגוניות בפועל — לא מתוך תיאוריה בלבד. על גבי הרקע הזה נבנתה התמחות מעמיקה בשלושה תחומים שמזינים זה את זה: ארכיטקטורת אבטחת סייבר ברמת Zero-Trust, יישום סוכני בינה מלאכותית אוטונומיים ברמה ארגונית, ופיתוח פלטפורמות דיגיטליות וטכנולוגיות Web3 מתקדמות.
-            </p>
-            <p>
-              השילוב הזה — ניהול תשתיות אמיתי, יחד עם AI מתקדם ואבטחה ברמה ארגונית — הוא ההבדל המרכזי מול "יועץ AI" גנרי או פרילנסר שמכיר רק שכבה אחת. כל מערכת נבנית מתוך הבנה איך היא באמת תתנהג ברשת ארגונית תחת עומס, ולא רק איך היא נראית ב-Demo.
-            </p>
-            <p>
-              החזון שלי מבוסס על גישה הנדסית, מעשית ומדויקת: לבנות מערכות שאינן רק מאובטחות ברמה הגבוהה ביותר, אלא כאלו המזניקות את היעילות התפעולית של העסק. החל מתכנון והקמת רשתות ארגוניות מתקדמות (כולל Wi-Fi 7 והשפעתו המעשית על ארכיטקטורת רשת), דרך הגנת סייבר אקטיבית במודל Zero-Trust — הגנה שכוללת גם את סוכני ה-AI עצמם מפני Prompt Injection ודליפת מידע — ועד להטמעת כלי אוטומציה ופיתוח פלטפורמות דיגיטליות מקצה לקצה, כולל Web3 וחוזים חכמים.
-            </p>
-            <p>
-              לצד העבודה הניהולית והטכנולוגית, אני מאמין בשיתוף ידע ובהנגשת המהפכה הטכנולוגית. דרך האתר, המגזינים וחוברות התוכן המקצועיות שאני מוציא לאור, אני מעניק לבעלי עסקים, מנהלים ומובילי טכנולוגיה את הכלים, הניתוחים והתובנות העדכניים ביותר — בדיוק כפי שהם קורים בשטח, לא כפי שהם מתוארים בפוסט שיווקי.
-            </p>
+            {ABOUT_COPY.paras.map((para) => (
+              <p key={para}>{rtl(para)}</p>
+            ))}
           </div>
         </motion.div>
 
-        <SectionHeading icon={Layout} title="ארבעת עמודי התווך" description="הפעילות המקצועית והפתרונות הטכנולוגיים שהאתר בנוי סביבם" />
+        <SectionHeading icon={Layout} title="ארבעת עמודי התווך" description="מה אני בונה, למי, ואיפה לומדים את זה לבד" />
         <ServiceGrid
-          items={[
-            { icon: Bot, title: 'בינה מלאכותית (Agentic AI)', description: 'הטמעת סוכנים אוטונומיים תחת שכבת Guardian Agents לממשל ובקרה, ארכיטקטורת RAG לניהול ידע ארגוני, וייעול שרשרת העבודה מקצה לקצה.' },
-            { icon: Lock, title: 'סייבר ואבטחת מידע ברמת Zero-Trust', description: 'הגנה אקטיבית שלעולם לא מניחה אמון מובנה — ניהול זהויות (IAM / Entra ID), הקשחת רשתות ארגוניות, EDR/XDR והגנה על מערכות ה-AI עצמן.' },
-            { icon: Rocket, title: 'פיתוח דיגיטלי ו-Web3', description: 'בניית פלטפורמות ואתרים ברמה ארגונית, dApps וחוזים חכמים מאובטחים, עם ארכיטקטורת ענן וקוד נקי מקצה לקצה.' },
-            { icon: Network, title: 'תשתיות רשת ארגוניות (כולל Wi-Fi 7)', description: 'תכנון וייעוץ רשתות ארגוניות ברמה גבוהה — רוחב פס, latency נמוך ואבטחת שכבת רשת, ישירות מתוך ניסיון ניהול תשתיות בשטח.' },
-          ]}
+          items={ABOUT_COPY.pillars.map((pillar, i) => ({
+            icon: PILLAR_ICONS[i % PILLAR_ICONS.length],
+            title: rtl(pillar.title),
+            description: rtl(pillar.description),
+          }))}
         />
 
         <div className="cyber-glass cyber-glass--info rounded-2xl p-5 sm:p-6 lg:p-8 mb-16">
@@ -108,7 +103,7 @@ export default function AboutPage() {
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="cyber-glass cyber-glass--flagship rounded-2xl p-8 md:p-12 text-center mb-16 max-w-4xl mx-auto">
           <p className="font-display text-xl md:text-2xl font-bold text-white leading-relaxed mb-4">
-            "טכנולוגיה איכותית אינה נמדדת בסיבוכיות שלה, אלא בשקט התפעולי ובערך העסקי שהיא מייצרת."
+            "{rtl(ABOUT_COPY.quote)}"
           </p>
           <span className="text-brand-400 font-medium">— דניאל</span>
         </motion.div>
@@ -127,7 +122,7 @@ export default function AboutPage() {
           </Link>
         </div>
 
-        <SectionHeading icon={ShieldCheck} title="מעוניינים בייעוץ, ליווי או שיתוף פעולה?" description="בואו נבחן יחד כיצד לחזק את התשתיות, להגן על הארגון ולהטמיע כלי AI מתקדמים בעסק שלכם" />
+        <SectionHeading icon={ShieldCheck} title={rtl(ABOUT_COPY.ctaTitle)} description={rtl(ABOUT_COPY.ctaDescription)} />
         <UnifiedCta
           mailSubject="ייעוץ אסטרטגי — AI, סייבר ותשתיות"
           whatsappMessage="שלום דניאל, אשמח לשיחת ייעוץ ראשונית על AI, סייבר או תשתיות עבור העסק שלי."

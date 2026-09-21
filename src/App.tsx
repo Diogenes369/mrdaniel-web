@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import NewsTicker from './components/NewsTicker';
@@ -16,6 +16,7 @@ import { useScrollRestoration } from './hooks/useScrollRestoration';
 import { useDeferredMount } from './hooks/useDeferredMount';
 import { ScrollTrigger } from './lib/gsap';
 import RouteSeo from './components/seo/RouteSeo';
+import { shouldMountScene } from './lib/perfMode';
 
 // The site's standard background: the R3F cosmic scene. Lazy so its Three.js/R3F bundle stays out
 // of the initial payload until the page is idle (see useDeferredMount).
@@ -68,6 +69,8 @@ export default function App() {
   useLenis();
   const location = useLocation();
   const sceneReady = useDeferredMount();
+  // Decided once: reduced motion, Save-Data and weak hardware never download the Three.js chunk.
+  const [sceneAllowed] = useState(shouldMountScene);
 
   useEffect(() => {
     loadTracker().then((t) => t.initTracker());
@@ -114,7 +117,7 @@ export default function App() {
     >
       <RouteScrollManager />
       <RouteSeo />
-      <Suspense fallback={null}>{sceneReady && <Scene3D />}</Suspense>
+      <Suspense fallback={null}>{sceneReady && sceneAllowed && <Scene3D />}</Suspense>
       <ScrollProgress />
       {/* Live headline ticker: very top of the layout, above the header, in normal document
           flow, DESKTOP ONLY (the component is `hidden md:block`). It scrolls away with the page;

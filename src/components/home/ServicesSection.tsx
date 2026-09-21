@@ -7,6 +7,8 @@ import TiltCard from '../TiltCard';
 import DepthSection from './DepthSection';
 import PopHeadline from './PopHeadline';
 import { SERVICES, type ServiceEntry } from '../../data/homeServices';
+import { SERVICES_COPY } from '../../data/siteCopy';
+import { rtl } from '../../lib/rtl';
 
 function openLead(subject: string) {
   window.dispatchEvent(
@@ -25,7 +27,7 @@ function FeatureChips({ chips, compact }: { chips: string[]; compact?: boolean }
             compact ? 'px-2.5 py-1 text-[11px] leading-none' : 'px-3 py-1 text-[11px] lg:text-xs'
           }`}
         >
-          {c}
+          {rtl(c)}
         </span>
       ))}
     </div>
@@ -49,7 +51,7 @@ function MetricBadge({ metric, compact }: { metric: NonNullable<ServiceEntry['me
         {metric.value}
       </span>
       <span className={`text-zinc-400 ${compact ? 'text-[11px] leading-snug' : 'text-xs leading-snug lg:text-[13px]'}`}>
-        {metric.label}
+        {rtl(metric.label)}
       </span>
     </div>
   );
@@ -77,7 +79,7 @@ function ProofPoints({ points, wide, compact }: { points: string[]; wide?: boole
           <Check
             className={`shrink-0 text-brand-400 ${compact ? 'mt-px h-3.5 w-3.5' : 'mt-0.5 h-4 w-4 lg:h-[18px] lg:w-[18px]'}`}
           />
-          <span>{p}</span>
+          <span>{rtl(p)}</span>
         </li>
       ))}
     </ul>
@@ -125,7 +127,7 @@ function ServiceTile({ s, compact }: { s: ServiceEntry; compact?: boolean }) {
               : 'text-xl lg:text-2xl'
         }`}
       >
-        {s.title}
+        {rtl(s.title)}
       </h3>
       <p
         className={`text-zinc-300 ${
@@ -137,7 +139,7 @@ function ServiceTile({ s, compact }: { s: ServiceEntry; compact?: boolean }) {
             : 'mt-2 text-sm leading-relaxed md:text-base lg:mt-2.5 lg:text-lg lg:leading-relaxed'
         }`}
       >
-        {s.blurb}
+        {rtl(s.blurb)}
       </p>
       {s.chips && s.chips.length > 0 && (
         // Compact caps at 3 chips: a 4th wrapped the row and cost 34px on exactly the two cards
@@ -242,10 +244,9 @@ export default function ServicesSection() {
     <section id="services" className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
         <div className="mx-auto mb-12 max-w-4xl text-center md:mb-16">
-          <PopHeadline lead="פתרונות AI ופיתוח" accent="לעצמאים ולעסקים קטנים" />
+          <PopHeadline lead={rtl(SERVICES_COPY.lead)} accent={rtl(SERVICES_COPY.accent)} />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
-            סוכני AI, אוטומציה ופיתוח למפתחים, לפרילנסרים, ליוצרים ולעסקים קטנים — נבנים בהתאמה אישית,
-            מתומחרים לפי הצורך האמיתי שלכם, לא לפי מחירון של תאגיד.
+            {rtl(SERVICES_COPY.sub)}
           </p>
         </div>
       </div>
@@ -285,15 +286,13 @@ export default function ServicesSection() {
         </div>
 
         <div className="mx-auto mt-12 max-w-2xl text-center md:mt-16">
-          <p className="mb-5 text-xs text-zinc-500">
-            לא בטוחים מאיפה להתחיל? שיחת אפיון קצרה — נמפה את הצורך, נגדיר היקף, ונחזור עם תוכנית עבודה ברורה.
-          </p>
+          <p className="mb-5 text-sm text-zinc-400">{rtl(SERVICES_COPY.closing)}</p>
           <WebButton
             variant="primary"
             onClick={() => openLead('אפיון פתרון טכנולוגי מותאם — שירותים')}
-            className="!px-8"
+            className="cta-sheen !px-8"
           >
-            בואו נאפיין את הפתרון שלכם
+            {rtl(SERVICES_COPY.cta)}
           </WebButton>
         </div>
       </DepthSection>
