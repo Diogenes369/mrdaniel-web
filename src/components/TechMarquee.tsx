@@ -1,21 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import {
-  ShieldHalf,
-  Server,
-  TerminalSquare,
-  Grid3x3,
-  KeyRound,
-  Radar,
-  ScanEye,
-  Braces,
-  Atom,
-  Plug,
-  CandlestickChart,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
+import { Sparkles, BrainCircuit, Eye, MessageSquare, Zap, Cpu, Plug, Database, Braces, Atom, X, type LucideIcon } from 'lucide-react';
 import { prefersReducedMotion } from '../lib/gsap';
 import PopHeadline from './home/PopHeadline';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
@@ -47,61 +33,16 @@ interface Tech {
 }
 
 const STACK: Tech[] = [
-  {
-    name: 'Fortinet',
-    icon: ShieldHalf,
-    detail: 'חומות אש מתקדמות (FortiGate), ניתוב VLAN, SSL-VPN וניהול איומים מאוחד (UTM).',
-  },
-  {
-    name: 'Entra ID / AD',
-    icon: KeyRound,
-    detail: 'ניהול זהויות, היררכיית Domain Controllers, אוטומציית GPO ו-SSO היברידי.',
-  },
-  {
-    name: 'Microsoft 365',
-    icon: Grid3x3,
-    detail: 'ניהול סביבת ענן, זרימת דואר ב-Exchange Online, אבטחת Defender ותאימות.',
-  },
-  {
-    name: 'PowerShell',
-    icon: TerminalSquare,
-    detail: 'סקריפטי אוטומציה מתקדמים, הרצה מרחוק ב-WinRM, תזמור מערכות ומיפוי כונני NAS.',
-  },
-  {
-    name: 'Windows Server',
-    icon: Server,
-    detail: 'תשתית דומיין ליבה, סנכרון PDC, ניהול DNS/DHCP והקשחת שרתים.',
-  },
-  {
-    name: 'Cyber 2.0',
-    icon: Radar,
-    detail: 'הגנת קצה מבוססת מצבי הגנה, מניעת בידוד רשת וגישת Zero-Trust.',
-  },
-  {
-    name: 'ESET PROTECT',
-    icon: ScanEye,
-    detail: 'זיהוי ותגובה בקצה מנוהלים בענן, מדיניות אנטי-תוכנה זדונית ומודיעין איומים יזום.',
-  },
-  {
-    name: 'Python',
-    icon: Braces,
-    detail: 'אוטומציה בהתאמה אישית, צנרות RAG, סוכנים אוטונומיים ואינטגרציות MCP.',
-  },
-  {
-    name: 'React',
-    icon: Atom,
-    detail: 'אפליקציות ווב מהירות, חוויית משתמש רספונסיבית ועיצוב Frontend מודרני.',
-  },
-  {
-    name: 'Claude MCP',
-    icon: Plug,
-    detail: 'חיבור סוכני AI לכלים ולמערכות דרך פרוטוקול MCP — סטנדרטי, מאובטח וקל לתחזוקה.',
-  },
-  {
-    name: 'MetaTrader 5',
-    icon: CandlestickChart,
-    detail: 'פיתוח בוטים (EA) בהתאמה אישית, הרצה אוטומטית ב-M1 וכתיבת אסטרטגיות שוק.',
-  },
+  { name: 'Grok', icon: Sparkles, detail: 'המודל של xAI: חד, עדכני ומחובר לזרם של X. משמש אצלי לניסוח קרוסלות ושרשורים.' },
+  { name: 'Claude', icon: BrainCircuit, detail: 'מודל חזק לכתיבה ארוכה, לקוד ולעבודה עם כלים. בסיס טוב לסוכנים שמריצים משימות מרובות צעדים.' },
+  { name: 'Gemini', icon: Eye, detail: 'מודל רב-מודלי של Google: קורא תמונות, וידאו ואודיו. משמש לתמלול, לקריאת שקפים ולהקראה.' },
+  { name: 'GPT', icon: MessageSquare, detail: 'משפחת המודלים של OpenAI, כולל gpt-oss הפתוח שרץ אצלי דרך Groq לטקסט מהיר.' },
+  { name: 'Groq', icon: Zap, detail: 'תשתית Inference מהירה במיוחד למודלים פתוחים. כאן רץ רוב הטקסט באתר.' },
+  { name: 'Ollama', icon: Cpu, detail: 'הרצת מודלים מקומיים על המחשב, בלי שהמידע יוצא החוצה. טוב למבנה, JSON ותרגום.' },
+  { name: 'Claude MCP', icon: Plug, detail: 'חיבור סוכני AI לכלים ולמערכות דרך פרוטוקול MCP: סטנדרטי וקל לתחזוקה.' },
+  { name: 'RAG', icon: Database, detail: 'שליפה מתוך המסמכים שלכם לפני שהמודל עונה, כדי שהתשובה תישען על מקור ולא על ניחוש.' },
+  { name: 'Python', icon: Braces, detail: 'אוטומציה בהתאמה אישית, צנרות RAG, סוכנים אוטונומיים ואינטגרציות MCP.' },
+  { name: 'React Three Fiber', icon: Atom, detail: 'ממשקים תלת-ממדיים בדפדפן, כמו חדר הבקרה שמציג את הסוכנים שלי בזמן אמת.' },
 ];
 
 interface Anchor {
@@ -116,7 +57,7 @@ const POP_HALF_WIDTH = 150;
  * Glass pill, ultra-minimal. The previous chip was a heavy card — 1.3rem extra-bold text, a solid
  * `bg-white/[0.05]` block, a brand-tinted border and a permanent double drop-shadow — which read as
  * eleven competing buttons rather than one calm band. This is a hairline-bordered, blurred pill
- * that is nearly invisible at rest and lights cyber-green only on hover/focus. No resting glow, no
+ * that is nearly invisible at rest and lights brand-green only on hover/focus. No resting glow, no
  * scale bounce: the only motion in the band is the scroll itself.
  */
 const CHIP_CLASS =

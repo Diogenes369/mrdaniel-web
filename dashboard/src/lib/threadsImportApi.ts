@@ -286,7 +286,7 @@ const MAX_BODY_WORDS = 30;
  * avoid a colourless deck, not to reproduce the agent's scoring. Keep the families in sync.
  */
 const LOCAL_THEMES: { theme: ThreadTheme; badge: string; re: RegExp }[] = [
-  { theme: 'security', badge: 'Cyber Security', re: /\b(security|cyber|vulnerab|exploit|ransomware|phishing|zero[- ]?trust|injection)\b|סייבר|אבטח/i },
+  { theme: 'security', badge: 'AI Safety', re: /\b(security|cyber|vulnerab|exploit|ransomware|phishing|zero[- ]?trust|injection)\b|סייבר|אבטח/i },
   { theme: 'web3', badge: 'Web3', re: /\b(web3|blockchain|solidity|ethereum|smart ?contract|nft|crypto)\b|בלוקצ|קריפטו/i },
   { theme: 'automation', badge: 'Automation', re: /\b(automation|automate|workflow|n8n|zapier|webhook|no-?code|zero[- ]?touch)\b|אוטומצ/i },
   { theme: 'ai', badge: 'AI & LLM', re: /\b(ai|llm|gpt|gemini|claude|openai|prompt|rag|embedding|agent|mcp)\b|בינה מלאכותית|פרומפט/i },

@@ -41,7 +41,7 @@ export default function AIPulseWidget() {
       </div>
 
       {/* ---- Live AI-tech feed ---- */}
-      <div className="cyber-glass cyber-glass--info flex min-h-[280px] flex-col rounded-2xl p-5 sm:p-6 lg:col-span-2">
+      <div className="glass-panel glass-panel--info flex min-h-[280px] flex-col rounded-2xl p-5 sm:p-6 lg:col-span-2">
         <h3 className={CARD_HEADING}>
           <Flame className="w-4 h-4 shrink-0 text-brand-400" />
           עדכוני AI חמים

@@ -1,6 +1,6 @@
 import { Users, Headset, Share2, BrainCog, Rocket, UserCog, type LucideIcon } from 'lucide-react';
 
-/** Who the agent is packaged for — drives the "עסקים וארגונים" / "פרילנסרים ואנשים פרטיים"
+/** Who the agent is packaged for — drives the "עסקים" / "פרילנסרים ואנשים פרטיים"
  * filter and the wizard's audience question. */
 export type AgentAudience = 'business' | 'individual';
 
@@ -73,11 +73,11 @@ export const AI_AGENTS: AiAgent[] = [
     coreCapability: 'מבין את היסטוריית הלקוח, עונה מתוך בסיס הידע שלכם, ומסלים לנציג אנושי עם סיכום מלא כשמדובר במקרה חריג.',
     roiEstimate: 'חוסך כ-70% מנפח הפניות השגרתיות לנציגים אנושיים, וזמינות מלאה 24/7 ללא עלות משמרות לילה.',
     integrations: ['WhatsApp', 'Zendesk / Freshdesk', 'צ׳אט אתר', 'REST API'],
-    useCase: 'חברות מסחר אלקטרוני, SaaS ונותני שירות עם נפח פניות תמיכה גבוה וחוזר על עצמו.',
+    useCase: 'חנויות אונליין ונותני שירות עם נפח פניות תמיכה גבוה וחוזר על עצמו.',
     price: 9400,
   },
   {
-    id: 'agent-enterprise-knowledge',
+    id: 'agent-knowledge-rag',
     name: 'סוכן ידע פנימי (RAG)',
     tagline: 'כל הידע של העסק — מדיניות, נהלים, מסמכים — במקום אחד, עם תשובה מדויקת ומצוטטת תוך שניות.',
     audience: ['business'],

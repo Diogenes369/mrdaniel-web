@@ -277,7 +277,7 @@ export interface AutoPublishConfig {
   /** UTC hours at which a cron tick should post — [] or absent = never. */
   slotsUTC?: number[];
   platform?: 'linkedin' | 'instagram' | 'all';
-  category?: 'cyber' | 'ai' | 'tech' | 'auto';
+  category?: 'ai' | 'ai_models' | 'ai_agents' | 'auto';
   mode?: 'full-auto' | 'drafts';
   publishWebhookUrl?: string;
 }

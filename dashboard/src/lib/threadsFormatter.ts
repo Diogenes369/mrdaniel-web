@@ -15,7 +15,7 @@
 
 export const THREADS_LIMIT = 500;
 
-const CTA_LINE = 'עקבו לניתוחים על סייבר, AI ו-IT בזמן אמת — ובאתר: mrdaniel.co.il';
+const CTA_LINE = 'עקבו לפירוקי AI בזמן אמת — ובאתר: mrdaniel.co.il';
 
 export interface ThreadsSinglePost {
   text: string;

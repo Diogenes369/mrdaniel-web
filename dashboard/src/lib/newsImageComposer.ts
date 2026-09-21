@@ -25,11 +25,9 @@ const LOGO_URL = '/logo.png';
 const ORIENTATION_FOR_ASPECT: Record<ImageAspect, PhotoOrientation> = { '1:1': 'square', '4:5': 'portrait' };
 
 export const TOPIC_KICKER: Record<NewsTopic, string> = {
-  cyber: 'סייבר ואבטחה',
   ai: 'בינה מלאכותית',
   ai_models: 'מודלי AI וחידושים',
-  cloud: 'ענן ותשתיות',
-  devops: 'ניהול מערכות ו-DevOps',
+  ai_agents: 'בינה מלאכותית',
   general: 'טכנולוגיה',
 };
 

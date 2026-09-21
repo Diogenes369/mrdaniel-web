@@ -4,7 +4,7 @@ import confetti from 'canvas-confetti';
 
 const STORAGE_KEY = 'cyber_cookie_consent';
 
-export default function CyberCookieBanner() {
+export default function CookieBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export default function CyberCookieBanner() {
               <span className="absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75 animate-ping" />
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-400 shadow-[0_0_8px_rgba(0,255,102,0.8)]" />
             </span>
-            <span className="font-cyber font-semibold text-xs tracking-widest text-brand-400 uppercase" dir="ltr">
+            <span className="font-tech font-semibold text-xs tracking-widest text-brand-400 uppercase" dir="ltr">
               PROTOCOL :: DATA_PACKETS_REQUIRED
             </span>
           </div>
@@ -67,10 +67,10 @@ export default function CyberCookieBanner() {
           </p>
 
           <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <span className="font-cyber text-xs tracking-wider text-zinc-300 border border-white/10 rounded-full px-2.5 py-1" dir="ltr">
+            <span className="font-tech text-xs tracking-wider text-zinc-300 border border-white/10 rounded-full px-2.5 py-1" dir="ltr">
               ENCRYPTION: AES-256
             </span>
-            <span className="font-cyber text-xs tracking-wider text-brand-400 border border-brand-500/30 rounded-full px-2.5 py-1 flex items-center gap-1.5" dir="ltr">
+            <span className="font-tech text-xs tracking-wider text-brand-400 border border-brand-500/30 rounded-full px-2.5 py-1 flex items-center gap-1.5" dir="ltr">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />
               STATUS: ACTIVE
             </span>

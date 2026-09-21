@@ -26,7 +26,7 @@ export function scrollToAndHighlight(selector: string) {
   badge.textContent = 'נמצא כאן 🎯';
   badge.setAttribute('dir', 'rtl');
   badge.className =
-    'fixed z-[200] -translate-x-1/2 px-3 py-1.5 rounded-full bg-[#0D0E12] border border-brand-500/50 text-brand-400 text-xs font-cyber font-semibold shadow-[0_0_20px_rgba(0,255,102,0.45)] pointer-events-none transition-opacity duration-300';
+    'fixed z-[200] -translate-x-1/2 px-3 py-1.5 rounded-full bg-[#0D0E12] border border-brand-500/50 text-brand-400 text-xs font-tech font-semibold shadow-[0_0_20px_rgba(0,255,102,0.45)] pointer-events-none transition-opacity duration-300';
   badge.style.opacity = '0';
   document.body.appendChild(badge);
 

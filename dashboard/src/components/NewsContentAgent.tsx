@@ -66,16 +66,14 @@ import { getAdminSecret, reportAuthFailure } from '../lib/adminSecret';
 import { resolveArticleText } from '../lib/articleText';
 
 
-const CATEGORIES: NewsCategory[] = ['cyber', 'cloud', 'ai', 'ai_models', 'devops', 'all'];
+const CATEGORIES: NewsCategory[] = ['ai', 'ai_models', 'ai_agents', 'all'];
 const PLATFORM_ICON: Record<SocialPlatform, typeof Linkedin> = { linkedin: Linkedin, instagram: Instagram };
 
 const TOPIC_LABEL: Record<string, string> = {
   ai: 'AI',
   ai_models: 'מודלי AI',
-  cyber: 'סייבר',
-  cloud: 'ענן / IT',
-  devops: 'DevOps',
-  general: 'גאדג׳טים / טק',
+  ai_agents: 'סוכני AI',
+  general: 'AI כללי',
 };
 
 const RELATIVE_TIME_HE = new Intl.RelativeTimeFormat('he', { numeric: 'auto' });
@@ -101,7 +99,7 @@ function timeLabel(iso: string): string {
 }
 
 export default function NewsContentAgent() {
-  const [category, setCategory] = useState<NewsCategory>('cyber');
+  const [category, setCategory] = useState<NewsCategory>('ai');
   const [platform, setPlatform] = useState<SocialPlatform>('linkedin');
   const [aspect, setAspect] = useState<ImageAspect>('1:1');
   const [headline, setHeadline] = useState(true);

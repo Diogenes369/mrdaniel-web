@@ -15,7 +15,7 @@ import { useNewsFeed, type NewsItem } from '../services/newsService';
  * mobile). Same strict gate as /news (Hebrew-only + real lead image via `filterCommandCenter`),
  * the shared `<NewsHeroCard>` / `<NewsGridCard>`, and the shared `<ArticleModal>` on click.
  */
-export default function CyberNewsGrid() {
+export default function AiNewsGrid() {
   const navigate = useNavigate();
   const { data: allItems, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useNewsFeed();
   const [active, setActive] = useState<NewsItem | null>(null);
@@ -35,7 +35,7 @@ export default function CyberNewsGrid() {
         <div className="mx-auto mb-8 max-w-4xl text-center md:mb-10">
           <div className="group mb-4 inline-flex max-w-full flex-col items-center">
             <h2 className="text-pop text-center font-display font-black text-white">
-              חדשות <span className="text-brand-500">סייבר, AI וטכנולוגיה</span>
+              חדשות <span className="text-brand-500">AI: מודלים, סוכנים וכלים</span>
             </h2>
             <TitleUnderline className="w-full" base="w-12" />
           </div>

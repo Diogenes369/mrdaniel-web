@@ -29,10 +29,10 @@ const DASHBOARD_QUEUE_URL = 'https://mrdaniel.co.il/#agent-queue'; // placeholde
 // pass their own topic/format instead of using this list.
 const AUTO_PILOT_TOPICS: { platform: Platform; topic: string; format: ContentFormat }[] = [
   { platform: 'linkedin', topic: 'איך סוכן AI אוטונומי (RAG) שונה מצ׳אטבוט גנרי', format: 'carousel' },
-  { platform: 'linkedin', topic: 'למה ארכיטקטורת Zero-Trust רלוונטית גם לסוכני AI, לא רק לרשת הארגונית', format: 'post' },
-  { platform: 'linkedin', topic: 'Wi-Fi 7 בסביבה ארגונית: מה זה באמת משנה מעבר לשיווקיות', format: 'post' },
-  { platform: 'instagram', topic: 'שילוב בין אבטחת סייבר, סוכני AI ופיתוח Web3 בפרויקט אחד', format: 'carousel' },
-  { platform: 'instagram', topic: '3 טעויות שעסקים עושים כשהם "מוסיפים AI" בלי לחשוב על אבטחה', format: 'carousel' },
+  { platform: 'linkedin', topic: 'איך בוחרים מודל שפה למשימה: Grok, Claude, Gemini או GPT', format: 'post' },
+  { platform: 'linkedin', topic: 'מודל מקומי מול מודל בענן: מתי מודל קטן מספיק', format: 'post' },
+  { platform: 'instagram', topic: 'סוכן AI ראשון: 5 החלטות שקובעות אם הוא יעבוד', format: 'carousel' },
+  { platform: 'instagram', topic: '3 טעויות שכולם עושים כשהם כותבים פרומפט לסוכן AI', format: 'carousel' },
 ];
 
 function setCors(res: any) {

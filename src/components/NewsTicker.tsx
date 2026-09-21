@@ -8,7 +8,7 @@ import { prefersReducedMotion } from '../lib/gsap';
 //                          (`hidden md:block`). It carries `id="news-ticker-bar"` so Header can
 //                          measure it and glue its own `top` to the bar's bottom edge.
 //   • placement="inline" — MOBILE ONLY (`md:hidden`) card rendered back inside the homepage news
-//                          section (CyberNewsGrid), where the ticker originally lived.
+//                          section (AiNewsGrid), where the ticker originally lived.
 //
 // The seamless marquee CSS lives in src/index.css (`.news-ticker*`): two identical `__group`s
 // inside `__track`, the track translates left by exactly one group width and loops → no blank
@@ -31,13 +31,12 @@ const FALLBACK_ITEM_COUNT = 8;
 
 // Shown while the feed is loading, empty, or errored — the ticker is never blank.
 const FALLBACK_TICKER: TickerRow[] = [
-  { id: 'fb-ai', title: 'סוכני AI בארגונים — מגמת האוטומציה שמשנה תהליכים עסקיים', stamp: 'עדכני', href: '/ai' },
-  { id: 'fb-cy', title: 'אבטחת סייבר לעסקים קטנים ובינוניים: Zero-Trust כברירת מחדל', stamp: 'עדכני', href: '/cyber' },
-  { id: 'fb-web', title: 'פיתוח Full-Stack מודרני — מהירות, נגישות וארכיטקטורה נקייה', stamp: 'עדכני', href: '/digital' },
-  { id: 'fb-jarvis', title: 'מערכת JARVIS — ארכיטקטורת AI ארגונית אוטונומית מקצה לקצה', stamp: 'עדכני', href: '/jarvis' },
-  { id: 'fb-data', title: 'ארכיטקטורת דאטה נכונה = החלטות מהירות ומוצר טוב יותר', stamp: 'עדכני', href: '/architecture' },
-  { id: 'fb-mkt', title: 'קמפיינים דיגיטליים מבוססי דאטה — יותר לידים, פחות בזבוז', stamp: 'עדכני', href: '/digital' },
-  { id: 'fb-cap', title: 'סקירת יכולות: מ-MVP ליזם ועד פלטפורמה ארגונית מלאה', stamp: 'עדכני', href: '/capabilities' },
+  { id: 'fb-ai', title: 'סוכני AI אוטונומיים: מה הם באמת יודעים לעשות היום', stamp: 'עדכני', href: '/ai' },
+  { id: 'fb-llm', title: 'מודלי שפה חדשים: איך בוחרים את המודל הנכון למשימה', stamp: 'עדכני', href: '/news' },
+  { id: 'fb-jarvis', title: 'מערכת JARVIS: עוזר AI אישי בעברית למייל, ליומן ולמשימות', stamp: 'עדכני', href: '/jarvis' },
+  { id: 'fb-rag', title: 'RAG בפועל: לחבר מודל שפה למסמכים שלכם בלי להמציא תשובות', stamp: 'עדכני', href: '/ai' },
+  { id: 'fb-guides', title: 'מדריכי AI מעשיים צעד אחר צעד, PDF להורדה מיידית', stamp: 'עדכני', href: '/magazines' },
+  { id: 'fb-news', title: 'חדשות AI בזמן אמת ממקורות מובילים', stamp: 'עדכני', href: '/news' },
 ];
 
 /** "27/08 · 14:32" — publication date + exact time, shown next to every headline. */

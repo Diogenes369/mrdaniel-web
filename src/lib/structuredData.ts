@@ -37,7 +37,7 @@ export function organizationLd() {
     email: 'daniel@mrdaniel.co.il',
     sameAs: SAME_AS,
     description:
-      'סוכני AI ואוטומציה לעסקים קטנים ולפרטיים, סייבר ואינטגרציות AI ל-SaaS ברמת Enterprise, והאב מדריכים וחדשות AI לשנת 2026.',
+      'ההאב לחדשות AI בעברית: פירוק מודלי השפה החדשים, בניית סוכני AI אוטונומיים ומדריכים מעשיים ליישום AI.',
     areaServed: { '@type': 'Country', name: 'Israel' },
     knowsLanguage: ['he', 'en'],
   };

@@ -9,11 +9,11 @@ import type { HomeOffer, OfferBullet } from '../../data/homeOffers';
 import { rtl } from '../../lib/rtl';
 import { smoothScrollTo } from '../../hooks/useLenis';
 
-/** Hero-scale supporting card on the unified `.cyber-glass` marketing surface. */
+/** Hero-scale supporting card on the unified `.glass-panel` marketing surface. */
 function BulletCard({ bullet }: { bullet: OfferBullet }) {
   const Icon = bullet.icon;
   return (
-    <div className="cyber-glass cyber-glass--marketing group/bc h-full flex flex-col rounded-3xl p-7 lg:p-9">
+    <div className="glass-panel glass-panel--marketing group/bc h-full flex flex-col rounded-3xl p-7 lg:p-9">
       <div className="w-12 h-12 lg:w-14 lg:h-14 shrink-0 rounded-2xl bg-black/40 border border-white/12 flex items-center justify-center text-brand-300 mb-5 transition-colors group-hover/bc:border-brand-500/45">
         <Icon className="w-6 h-6 lg:w-7 lg:h-7" />
       </div>
@@ -73,7 +73,13 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
               channels, which keeps a not-yet-ready visitor in the funnel instead of bouncing. */}
           <WebButton
             variant="ghost"
-            onClick={offer.secondary === 'community' ? () => smoothScrollTo('#community') : openLead}
+            onClick={
+              offer.secondary === 'community'
+                ? () => smoothScrollTo('#community')
+                : offer.secondary === 'x-feed'
+                  ? () => smoothScrollTo('#x-feed')
+                  : openLead
+            }
             className="!px-6"
           >
             {rtl(offer.secondaryLabel)}

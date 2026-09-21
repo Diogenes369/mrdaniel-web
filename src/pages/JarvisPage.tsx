@@ -79,7 +79,7 @@ const CAPABILITIES: CapabilityGroup[] = [
     points: [
       {
         lead: 'מערכת בקרה מרכזית',
-        text: 'חיבור לכל מכשירי ה-IoT (תאורה, מיזוג, אבטחה, ומולטימדיה).',
+        text: 'חיבור למכשירי ה-IoT (תאורה, מיזוג ומולטימדיה).',
       },
       {
         lead: 'תרחישים חכמים',
@@ -93,7 +93,7 @@ const CUSTOMER_BENEFITS = [
   'חיסכון של שעות עבודה (אוטומציה אדמיניסטרטיבית).',
   'זמינות של 24/7 (עוזר שלא מפספס משימה).',
   'התאמה אישית מלאה (נתפר בדיוק לפי הצרכים).',
-  'אבטחת מידע מתקדמת.',
+  'פרטיות ושליטה מלאה במידע.',
 ];
 
 const DEPLOYMENT_OPTIONS: {
@@ -118,7 +118,7 @@ const DEPLOYMENT_OPTIONS: {
   },
   {
     icon: Cpu,
-    title: 'התקנה מקומית (On-Premise) - לארגונים',
+    title: 'התקנה מקומית (On-Premise) - מודלים מקומיים',
     description:
       'המערכת מותקנת פיזית על השרתים או המחשבים בעסק שלך. מבטיח 100% פרטיות וניתוק מוחלט מהאינטרנט במידת הצורך.',
     points: [
@@ -127,7 +127,7 @@ const DEPLOYMENT_OPTIONS: {
       {
         label: 'כרטיס מסך (GPU)',
         value:
-          'חובה כרטיס מסך חזק של NVIDIA (סדרת RTX 3090/4090 או סדרות RTX ADA / A100 לארגונים) להרצת מודלי השפה המקומיים.',
+          'חובה כרטיס מסך חזק של NVIDIA (סדרת RTX 3090/4090 ומעלה) להרצת מודלי השפה המקומיים.',
       },
       { label: 'אחסון', value: 'כונן SSD NVMe מהיר (לפחות 1TB פנוי).' },
     ],
@@ -148,8 +148,8 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
     a: 'JARVIS נבנית ומותאמת אישית לכל עסק - החל מחברות הייטק, משרדי נדל"ן, סוכנויות דיגיטל ועד לעסקים קטנים ובינוניים. המערכת מייעלת תהליכי שירות לקוחות, ניהול לידים, אוטומציה של משימות אדמיניסטרטיביות, ניתוח דאטה וניהול פרויקטים.',
   },
   {
-    q: 'עד כמה המידע העסקי שלי שמור ומאובטח?',
-    a: 'אבטחת המידע והפרטיות של העסק שלך נמצאות בראש סדר העדיפויות. JARVIS עובדת בתוך סביבה מאובטחת, מוצפנת ומבודדת (Enterprise-grade Security). המידע העסקי שלך לא משמש לאימון מודלים ציבוריים ונשאר בשליטתך מלאה.',
+    q: 'עד כמה המידע שלי נשאר פרטי?',
+    a: 'הפרטיות שלך בראש סדר העדיפויות. JARVIS עובדת בתוך סביבה מוצפנת ומבודדת, ואפשר להריץ אותה על מודלים מקומיים. המידע העסקי שלך לא משמש לאימון מודלים ציבוריים ונשאר בשליטתך מלאה.',
   },
   {
     q: 'איך מתבצע תהליך ההטמעה בעסק שלי?',
@@ -160,7 +160,7 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
 function CapCard({ group }: { group: CapabilityGroup }) {
   const Icon = group.icon;
   return (
-    <div className="cyber-glass cyber-glass--marketing flex h-full flex-col rounded-2xl p-5 sm:p-6 lg:p-8">
+    <div className="glass-panel glass-panel--marketing flex h-full flex-col rounded-2xl p-5 sm:p-6 lg:p-8">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
         <Icon className="w-6 h-6" />
       </div>
@@ -213,7 +213,7 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <div className="mx-auto max-w-4xl divide-y divide-white/10 overflow-hidden rounded-2xl cyber-glass cyber-glass--info">
+    <div className="mx-auto max-w-4xl divide-y divide-white/10 overflow-hidden rounded-2xl glass-panel glass-panel--info">
       {items.map((item, i) => {
         const isOpen = openIndex === i;
         return (
@@ -292,7 +292,7 @@ export default function JarvisPage() {
       <div className="container-wide">
         <div className="pt-6 md:pt-12">
           {/* ---- Concept card — broad, full-width, centered text ---- */}
-          <Reveal className="cyber-glass cyber-glass--marketing rounded-2xl p-6 sm:p-8 lg:p-10 mb-16 md:mb-24 text-center">
+          <Reveal className="glass-panel glass-panel--marketing rounded-2xl p-6 sm:p-8 lg:p-10 mb-16 md:mb-24 text-center">
             <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">🤖 מהי מערכת JARVIS?</h2>
             <p className="text-base md:text-lg text-zinc-300 leading-[1.85] max-w-full">
               JARVIS אינה סתם עוד תוכנה או צ'אטבוט רגיל. זהו סוכן בינה מלאכותית פרואקטיבי (
@@ -334,12 +334,12 @@ export default function JarvisPage() {
           <SectionHeading
             icon={BrainCircuit}
             title="הארכיטקטורה הטכנולוגית של מערכת JARVIS"
-            description="חמש תשתיות טכנולוגיות שפועלות במקביל תחת 'מוח מרכזי' אחד — כל אחת אחראית על חלק אחר: הבנת שפה, זיכרון ארגוני, חיבור למערכות, קול ואבטחה."
+            description="חמש תשתיות טכנולוגיות שפועלות במקביל תחת 'מוח מרכזי' אחד — כל אחת אחראית על חלק אחר: הבנת שפה, זיכרון, חיבור לכלים, קול ופרטיות."
           />
           <InfoBox>
             <p>
-              מאחורי חוויית המשתמש החלקה והאינטראקטיבית של מערכת JARVIS עומד שילוב של טכנולוגיות הבינה
-              המלאכותית, האוטומציה ואבטחת המידע המתקדמות ביותר בעולם. המערכת אינה פועלת כתוכנה סגורה, אלא כ'מוח
+              מאחורי חוויית המשתמש החלקה והאינטראקטיבית של מערכת JARVIS עומד שילוב של מודלי השפה, הזיכרון
+              הווקטורי והאוטומציה המתקדמים ביותר בעולם. המערכת אינה פועלת כתוכנה סגורה, אלא כ'מוח
               מרכזי' המשלב מספר תשתיות טכנולוגיות במקביל כדי להשיג מהירות תגובה מקסימלית, יציבות מלאה ודיוק גבוה.
             </p>
           </InfoBox>
@@ -352,7 +352,6 @@ export default function JarvisPage() {
             <TermTooltip term="RAG" />
             <TermTooltip term="STT" />
             <TermTooltip term="TTS" />
-            <TermTooltip term="Zero-Trust" />
             <TermTooltip term="On-Premise" />
           </div>
           <ServiceGrid
@@ -360,7 +359,7 @@ export default function JarvisPage() {
               {
                 icon: BrainCircuit,
                 title: '🧠 מנועי LLM (Large Language Models) מובילים',
-                description: 'מבוסס על GPT-4, Claude ו-Gemini להבנת הקשר עמוקה וניהול שיחה דינמית.',
+                description: 'מבוסס על Grok, Claude, Gemini ו-GPT להבנת הקשר עמוקה וניהול שיחה דינמית.',
               },
               {
                 icon: Database,
@@ -380,7 +379,7 @@ export default function JarvisPage() {
               },
               {
                 icon: Lock,
-                title: '🔒 אבטחת מידע ופרטיות מקצה לקצה',
+                title: '🔒 פרטיות מקצה לקצה',
                 description:
                   'הצפנת AES-256 (תקן צבאי/פיננסי), ניהול הרשאות OAuth 2.0, ואפשרות לסביבה מבודדת בשרתים פרטיים או On-Premise.',
               },
@@ -391,13 +390,13 @@ export default function JarvisPage() {
           <SectionHeading
             icon={BarChart3}
             title="📊 היתרונות המרכזיים עבור הלקוח שלך"
-            description="מה זה אומר בפועל, בשורה התחתונה — פחות עבודה ידנית, זמינות מלאה, התאמה מדויקת ואבטחה ברמה ארגונית."
+            description="מה זה אומר בפועל, בשורה התחתונה — פחות עבודה ידנית, זמינות מלאה, התאמה מדויקת ופרטיות מלאה."
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-16 md:mb-24">
             {CUSTOMER_BENEFITS.map((benefit) => (
               <div
                 key={benefit}
-                className="flex items-start gap-3 cyber-glass cyber-glass--info rounded-2xl p-5"
+                className="flex items-start gap-3 glass-panel glass-panel--info rounded-2xl p-5"
               >
                 <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400">
                   <Check className="w-4 h-4" />
@@ -415,7 +414,7 @@ export default function JarvisPage() {
             </p>
             <p>
               לכן <strong className="text-white">אין באתר זה מחירים ציבוריים או עלויות חבילה קבועות</strong>.
-              ההיקף, לוחות הזמנים והתמחור נבנים לאחר פגישת אפיון ומוגשים כהצעה ארגונית מסודרת.
+              ההיקף, לוחות הזמנים והתמחור נבנים לאחר פגישת אפיון ומוגשים כהצעה מסודרת.
             </p>
           </InfoBox>
 
@@ -423,7 +422,7 @@ export default function JarvisPage() {
           <SectionHeading
             icon={Server}
             title="דרישות מערכת וחומרה"
-            description="מערכת JARVIS גמישה וניתנת להתקנה בשתי תצורות עיקריות, בהתאם לצרכי האבטחה והתקציב של העסק שלך:"
+            description="מערכת JARVIS גמישה וניתנת להתקנה בשתי תצורות עיקריות, בהתאם לצרכי הפרטיות והתקציב שלך:"
           />
           <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16 md:mb-24">
             {DEPLOYMENT_OPTIONS.map((opt) => (

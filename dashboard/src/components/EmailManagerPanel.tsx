@@ -164,9 +164,9 @@ function StatCard({ icon: Icon, label, value }: { icon: typeof Users; label: str
 }
 
 const AI_PRESETS: { id: string; label: string; goal: string }[] = [
-  { id: 'digest', label: 'עדכון חודשי לארגונים', goal: 'עדכון טכנולוגי חודשי לארגונים — מגמות, חדשות ושירותים' },
-  { id: 'announcement', label: 'הכרזה על מוצר/שירות', goal: 'הכרזה על שירות סייבר חדש עם יתרונות מרכזיים ו-CTA לתיאום שיחה' },
-  { id: 'insight', label: 'מכתב מומחה / Insight', goal: 'מכתב מומחה מעמיק בנושא סוכני AI אוטונומיים בארגון' },
+  { id: 'digest', label: 'עדכון AI חודשי', goal: 'עדכון AI חודשי — מודלים חדשים, סוכנים וכלים שכדאי להכיר' },
+  { id: 'announcement', label: 'הכרזה על מוצר/שירות', goal: 'הכרזה על סוכן AI חדש עם יתרונות מרכזיים ו-CTA לתיאום שיחה' },
+  { id: 'insight', label: 'מכתב מומחה / Insight', goal: 'מכתב מומחה מעמיק על בחירת מודל שפה לסוכן AI אוטונומי' },
 ];
 const AI_TONES = ['מקצועי-סמכותי', 'ידידותי-נגיש', 'ישיר וחד', 'שיווקי-אנרגטי'];
 
@@ -362,7 +362,7 @@ export default function EmailManagerPanel() {
                 <button onClick={() => setAiPreset('')} className="text-[11px] text-zinc-500 hover:text-white cursor-pointer">נקה תבנית</button>
               )}
             </div>
-            <input value={aiGoal} onChange={(e) => setAiGoal(e.target.value)} placeholder="מטרת / נושא המייל (למשל: השקת שירות סייבר חדש)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600" />
+            <input value={aiGoal} onChange={(e) => setAiGoal(e.target.value)} placeholder="מטרת / נושא המייל (למשל: השקת סוכן AI חדש)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600" />
             <div className="flex flex-wrap gap-2">
               {AI_TONES.map((t) => (
                 <button

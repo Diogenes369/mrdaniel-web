@@ -1,7 +1,7 @@
 // Types + option maps for the autonomous Auto-Publisher (AutoPublisherPanel.tsx).
 
 export type APPlatform = 'linkedin' | 'instagram' | 'all';
-export type APCategory = 'cyber' | 'ai' | 'tech' | 'auto';
+export type APCategory = 'ai' | 'ai_models' | 'ai_agents' | 'auto';
 export type APMode = 'full-auto' | 'drafts';
 export type APFrequency = 'daily' | 'twice' | 'custom';
 
@@ -44,9 +44,9 @@ export const PLATFORM_LABEL: Record<APPlatform, string> = {
 };
 
 export const CATEGORY_LABEL: Record<APCategory, string> = {
-  cyber: 'סייבר',
   ai: 'בינה מלאכותית',
-  tech: 'טכנולוגיה / דיגיטל',
+  ai_models: 'מודלי AI',
+  ai_agents: 'סוכני AI',
   auto: 'רוטציה אוטומטית',
 };
 

@@ -9,7 +9,6 @@ import {
   User,
   Building2,
   Rocket,
-  Landmark,
   Ban,
   Network,
   MessagesSquare,
@@ -29,12 +28,11 @@ import { AI_AGENTS, GOAL_LABEL, type AiAgent, type AgentGoal, type AgentAudience
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { loadTracker } from '../lib/loadTracker';
 
-type BusinessType = 'solo' | 'smb' | 'startup' | 'enterprise';
+type BusinessType = 'solo' | 'smb' | 'startup';
 const BUSINESS_TYPE_OPTIONS: { id: BusinessType; label: string; icon: LucideIcon; audience: AgentAudience }[] = [
   { id: 'solo', label: 'עצמאי / פרילנסר', icon: User, audience: 'individual' },
   { id: 'smb', label: 'עסק קטן-בינוני', icon: Building2, audience: 'business' },
   { id: 'startup', label: 'סטארטאפ / חברת טכנולוגיה', icon: Rocket, audience: 'business' },
-  { id: 'enterprise', label: 'ארגון / חברה גדולה', icon: Landmark, audience: 'business' },
 ];
 
 type TechStack = 'none' | 'manual' | 'crm' | 'custom';
@@ -45,11 +43,11 @@ const TECH_STACK_OPTIONS: { id: TechStack; label: string; icon: LucideIcon }[] =
   { id: 'custom', label: 'מערכת פנימית מותאמת אישית', icon: Server },
 ];
 
-type BudgetTier = 'starter' | 'growth' | 'enterprise' | 'unsure';
+type BudgetTier = 'starter' | 'growth' | 'pro' | 'unsure';
 const BUDGET_OPTIONS: { id: BudgetTier; label: string; hint: string; target: number }[] = [
   { id: 'starter', label: 'עד ₪7,000', hint: 'נקודת כניסה', target: 5500 },
   { id: 'growth', label: '₪7,000–12,000', hint: 'צמיחה', target: 9500 },
-  { id: 'enterprise', label: '₪12,000+', hint: 'ארגוני', target: 16000 },
+  { id: 'pro', label: '₪12,000+', hint: 'מערכת מלאה', target: 16000 },
   { id: 'unsure', label: 'עדיין לא ברור', hint: 'נשמח לעזור להעריך', target: 9000 },
 ];
 

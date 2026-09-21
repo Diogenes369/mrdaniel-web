@@ -12,15 +12,13 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 // toolbar and mobile drawer keep just these three.
 const HEADER_SOCIAL_CHANNELS = ['instagram', 'linkedin', 'mail'] as const;
 
-// Consolidated to the core offerings only. Dropped links (אודות / ארכיטקטורה / יכולות / חנות) stay
-// live as routes and remain in the footer. "צור קשר" is an action, not a route — it opens the lead
+// Consolidated to the core offerings only. אודות stays a live route and remains in the footer. "צור קשר" is an action, not a route — it opens the lead
 // modal (the site's contact funnel).
 type NavLink = { name: string; to?: string; action?: 'contact' };
 const navLinks: NavLink[] = [
   { name: 'סוכני AI', to: '/ai' },
   { name: 'מערכת JARVIS', to: '/jarvis' },
-  { name: 'סייבר ואבטחה', to: '/cyber' },
-  { name: 'פיתוח ושיווק', to: '/digital' },
+  { name: 'מדריכים', to: '/magazines' },
   { name: 'חדשות', to: '/news' },
   { name: 'דברו איתי', action: 'contact' },
 ];
@@ -28,13 +26,9 @@ const navLinks: NavLink[] = [
 // "Surprise me" destinations for the shuffle toolbar icon.
 const SHUFFLE_DESTINATIONS = [
   '/magazines',
-  '/architecture',
-  '/capabilities',
   '/ai',
   '/jarvis',
-  '/cyber',
   '/about',
-  '/digital',
   '/news',
 ];
 

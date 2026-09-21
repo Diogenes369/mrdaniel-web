@@ -36,9 +36,7 @@ function authHeaders(): HeadersInit {
  * query — used as the server's fallback if the per-slide Gemini creative-query step fails, and as
  * the query hint sent alongside `slideText` on every request. */
 export function pexelsQueryForTopic(topic: string): string {
-  if (/zero-?trust|אבטחת סייבר|סייבר|cyber/i.test(topic)) return 'cybersecurity dark technology abstract';
-  if (/wi-?fi ?7|רשת ארגונית|רשתות ארגוניות/i.test(topic)) return 'data center network technology dark blue';
-  if (/web3|webgl|בלוקצ/i.test(topic)) return 'blockchain abstract technology dark';
+  if (/\bllm\b|מודל(י)? שפה|grok|claude|gemini|gpt|llama/i.test(topic)) return 'gpu server data center blue light';
   if (/\bai\b|סוכן|בינה מלאכותית|agentic/i.test(topic)) return 'artificial intelligence technology dark abstract';
   return 'dark technology abstract finance night city';
 }

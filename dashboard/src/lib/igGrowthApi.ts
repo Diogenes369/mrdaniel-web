@@ -94,9 +94,9 @@ export function newsItemsToTrendSources(items: NewsItem[], limit = 24): TrendSou
 
 const TOPIC_HE: Record<string, string> = {
   ai: 'בינה מלאכותית',
-  cyber: 'אבטחת סייבר',
-  cloud: 'ענן ותשתיות',
-  general: 'טכנולוגיה',
+  ai_models: 'מודלי AI',
+  ai_agents: 'סוכני AI',
+  general: 'חדשות AI',
 };
 
 const STOP = new Set(
@@ -142,18 +142,16 @@ export function buildTrendRadarLocal(sources: TrendSource[], fallbackReason: str
       momentum: momentumFor(list.length, sources.length),
       why: `${list.length} כתבות מהפיד ב-${he} בימים האחרונים — ${list[0]?.source ?? ''} ואחרים מכסים את הנושא במקביל.`,
       audiencePainPoint:
-        topic === 'cyber'
-          ? 'מנהלי IT בארגונים קטנים-בינוניים לא בטוחים אם ההגנות הקיימות מכסות את וקטור התקיפה הזה.'
-          : topic === 'ai'
-            ? 'עסקים רוצים לאמץ AI אבל חוששים מהטמעה לא בטוחה ומחוסר שליטה על התוצאה.'
-            : topic === 'cloud'
-              ? 'צוותים מתקשים לאזן בין עלות, ביצועים ואבטחה בתשתית הענן.'
-              : 'קבלת ההחלטות הטכנולוגיות מרגישה כמו רדיפה אחרי טרנדים בלי מסגרת ברורה.',
+        topic === 'ai_models'
+          ? 'כל שבוע יוצא מודל חדש, וקשה לדעת איזה מהם באמת מתאים למשימה שלך.'
+          : topic === 'ai_agents'
+            ? 'רוצים סוכן AI שעושה עבודה אמיתית, אבל לא ברור מאיפה מתחילים ואיך שומרים עליו בשליטה.'
+            : 'קשה להפריד בין הייפ לבין כלי AI שבאמת חוסך זמן.',
     };
   });
 
   const viralHeadlines: ViralHeadline[] = sources.slice(0, 6).map((s) => ({
-    headline: s.title.length > 4 ? `${s.title.replace(/[.!?…]+$/, '')} — מה זה אומר בפועל לארגון שלך?` : 'הטרנד שכולם מדברים עליו — והזווית שמפספסים',
+    headline: s.title.length > 4 ? `${s.title.replace(/[.!?…]+$/, '')} — מה זה אומר בפועל בשבילך?` : 'הטרנד שכולם מדברים עליו — והזווית שמפספסים',
     angle: `לקחת את הכותרת של ${s.source} ולתרגם אותה להשלכה מעשית אחת שהקהל יכול ליישם.`,
   }));
 
@@ -162,14 +160,14 @@ export function buildTrendRadarLocal(sources: TrendSource[], fallbackReason: str
   const blueprints: ContentBlueprint[] = [
     {
       format: 'reel',
-      hook: `רוב האנשים חושבים ש-${topicHint} זה באזוורד. בפועל, זה כבר משנה איך ארגונים עובדים.`,
+      hook: `רוב האנשים חושבים ש-${topicHint} זה באזוורד. בפועל, זה כבר משנה איך אנשים עובדים.`,
       outline: [
         'פתיחה: סטטמנט שנוגד אינטואיציה על הטרנד',
         'הבעיה: מה הקהל מפספס היום',
         'הדגמה קצרה: דוגמה אחת מהשטח',
         'הפואנטה: הצעד הראשון שאפשר לעשות השבוע',
       ],
-      cta: 'שמרו את הסרטון ועקבו לניתוחים נוספים על סייבר ו-AI.',
+      cta: 'שמרו את הסרטון ועקבו לפירוקים נוספים של AI.',
     },
     {
       format: 'story',
@@ -286,26 +284,26 @@ const REPLY_ORDER: ReplyStyle[] = ['expert', 'question', 'concise'];
 /** Deterministic 3-reply set — used offline / when the LLM path is unavailable. */
 export function buildRepliesLocal(postText: string, fallbackReason: string, sourceUrl?: string): EngagementReplySet {
   const t = (postText || '').replace(/\s+/g, ' ').trim();
-  const topic = /סייבר|אבטח|cyber|ransomware|phishing|zero.?trust|vulnerab/i.test(t)
-    ? 'cyber'
-    : /\bai\b|בינה מלאכותית|llm|agent|סוכן|מודל/i.test(t)
-      ? 'ai'
-      : /ענן|cloud|kubernetes|devops|תשתית/i.test(t)
-        ? 'cloud'
+  const topic = /agent|סוכן|agentic|mcp/i.test(t)
+    ? 'ai_agents'
+    : /llm|מודל|gpt|claude|gemini|grok|llama/i.test(t)
+      ? 'ai_models'
+      : /\bai\b|בינה מלאכותית/i.test(t)
+        ? 'ai'
         : 'general';
 
   const angle: Record<string, string> = {
-    cyber: 'מזווית של מי שמנהל את זה בפועל — הפער הוא כמעט תמיד בין המדיניות הכתובה לבין מה שבאמת רץ ב-production.',
-    ai: 'ההטמעה הבטוחה היא החלק הקשה: בלי שכבת Guardrails וממשל, כלי ה-AI הכי טוב הופך לחשיפה.',
-    cloud: 'האיזון בין עלות, ביצועים ואבטחה בענן הוא החלטה ארכיטקטונית, לא הגדרה שמסמנים פעם אחת.',
-    general: 'הנקודה המעשית שנוטים לפספס היא איך זה משפיע על צוות ה-IT שצריך לתחזק את זה בשוטף.',
+    ai_agents: 'מזווית של מי שבונה סוכנים בפועל — הפער הוא כמעט תמיד בין הדמו לבין מה שרץ כל יום בלי השגחה.',
+    ai_models: 'השאלה המעניינת היא לא מי ניצח בבנצ׳מרק, אלא באיזו משימה המודל הזה באמת עדיף.',
+    ai: 'החלק הקשה הוא לא הכלי, אלא לחבר אותו לעבודה האמיתית כך שיחסוך זמן ולא ייצר עוד עבודה.',
+    general: 'הנקודה המעשית שנוטים לפספס היא מה זה משנה בעבודה היומיומית של מי שמשתמש בזה.',
   };
 
   const replies: EngagementReply[] = [
     {
       style: 'expert',
       label: REPLY_META.expert.label,
-      text: `נקודה חשובה. מהניסיון בשטח בניהול תשתיות ארגוניות — ${angle[topic]} שווה להוסיף שגם ההיבט של בקרה ותיעוד שינויים הוא קריטי כאן, לא רק הכלי עצמו.`,
+      text: `נקודה חשובה. מהניסיון בשטח בבניית סוכני AI — ${angle[topic]} שווה להוסיף שגם ההיבט של בקרה ותיעוד שינויים הוא קריטי כאן, לא רק הכלי עצמו.`,
     },
     {
       style: 'question',

@@ -6,11 +6,9 @@ import {
   RefreshCw,
   ChevronRight,
   ChevronLeft,
-  ShieldAlert,
   Sparkles,
   BrainCircuit,
-  Cloud,
-  Newspaper,
+  Bot,
   type LucideIcon,
 } from 'lucide-react';
 import { PageHero } from '../components/content/ContentPrimitives';
@@ -24,11 +22,9 @@ import { useNewsFeed, type NewsItem, type NewsTopic } from '../services/newsServ
 // ── categories (Command Center filter rail) ───────────────────────────────────────────────────
 const CATEGORIES: { id: NewsTopic | 'all'; he: string; en: string; icon?: LucideIcon }[] = [
   { id: 'all', he: 'הכל', en: 'ALL' },
-  { id: 'cyber', he: 'סייבר ואבטחת מידע', en: 'Cyber Security', icon: ShieldAlert },
-  { id: 'ai', he: 'בינה מלאכותית ואוטומציה', en: 'AI & Automation', icon: Sparkles },
+  { id: 'ai', he: 'בינה מלאכותית', en: 'AI', icon: Sparkles },
   { id: 'ai_models', he: 'מודלי AI וחידושים', en: 'AI Models & LLMs', icon: BrainCircuit },
-  { id: 'cloud', he: 'פיתוח ותשתיות', en: 'Full-Stack & Cloud', icon: Cloud },
-  { id: 'general', he: 'חדשות שוק', en: 'Tech Market Insights', icon: Newspaper },
+  { id: 'ai_agents', he: 'סוכני AI', en: 'AI Agents', icon: Bot },
 ];
 
 const PAGE_SIZE = 18;
@@ -197,8 +193,8 @@ export default function NewsPage() {
       <div className="container-wide">
         <PageHero
           badgeIcon={Rss}
-          badgeLabel="Cyber & AI News Command Center"
-          title={'חמ״ל חדשות סייבר, AI וטכנולוגיה'}
+          badgeLabel="AI News Command Center"
+          title={'חמ״ל חדשות AI: מודלים, סוכנים וכלים'}
           subtitle="ריכוז עדכונים בזמן אמת עם תקציר מנהלים מבוסס AI, ניתוח טכנולוגי ומשמעויות מעשיות לכל כתבה."
         />
 

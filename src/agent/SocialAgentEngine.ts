@@ -34,25 +34,26 @@ import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoSc
 // improvising its own description of what Daniel does. Mirrors the substance of
 // src/server/aiSystemPrompt.ts's service list, phrased for content-writing rather than Q&A.
 export const BRAND_KNOWLEDGE_BASE = `זהות המותג — דניאל בן ברוך (Daniel Ben Baruch), MrDaniel.co.il:
-מה דניאל עושה: בונה סוכני AI מותאמים אישית, אוטומציות לתהליכי עבודה ומערכות חכמות לעסקים. הוא בונה מערכות שרצות בפועל, לא מוכר הרצאות.
+מה דניאל עושה: מפרסם חדשות AI בעברית, מפרק את מודלי השפה החדשים (Grok, Claude, Gemini, GPT, Llama) ובונה סוכני AI אוטונומיים שרצים בפועל. הוא בונה מערכות, לא מוכר הרצאות.
 
 קהל היעד — זהו הקהל היחיד:
-אנשים פרטיים בישראל שרוצים ללמוד ולהיכנס לתחומי הבינה המלאכותית, הסייבר ואבטחת המידע — מתחילים, חובבי טכנולוגיה, סטודנטים ואנשים בהסבה מקצועית. הם באים להבין איך הדברים באמת עובדים, לא לקנות שירות.
+אנשים פרטיים בישראל שרוצים ללמוד ולהיכנס לתחום הבינה המלאכותית — מודלי שפה, סוכני AI ויישום מעשי — מתחילים, חובבי טכנולוגיה, סטודנטים ואנשים בהסבה מקצועית. הם באים להבין איך הדברים באמת עובדים, לא לקנות שירות.
 
 מה דניאל מוכר (על בסיס השירותים באתר בפועל):
-1. מערכת JARVIS — עוזר AI אוטונומי בעברית שמתחבר למייל, ליומן ול-CRM ומריץ תהליכים שלמים מקצה לקצה: קורא מסמכים, מסכם פגישות, מכין הצעות מחיר ושולח מעקבים ללקוחות.
-2. סוכני AI ואוטומציה חכמה — סוכן ייעודי לכל תהליך (מכירות, שירות, תפעול) שרץ 24/7, מתחבר למקורות הנתונים של העסק ומקצר משימות משעות לדקות, עם אדם בלולאה בנקודות ההכרעה.
-3. פיתוח אתרים ואפליקציות — קוד שנכתב לעסק, לא תבנית מהמדף: נטען מהר, עובד בכל מכשיר, בנוי ל-SEO ולתחזוקה עצמאית.
-4. עיצוב חוויית משתמש (UI/UX) וארכיטקטורת דאטה — מסע משתמש שממוקד לפעולה אחת, ומקור אמת אחד לנתוני העסק במקום עשרות גיליונות אקסל.
-5. אבטחת מידע ברמה שעסק קטן באמת צריך — הגנה על חשבונות, על מידע לקוחות ועל הכלים האוטומטיים עצמם, בלי להפוך את זה לפרויקט ענק.
+1. חדשות AI בזמן אמת — ההאב בעברית לחדשות מודלים, סוכנים וכלים חדשים, עם פירוק של מה שבאמת חדש.
+2. מעבדת LLM — השוואות ובדיקות מעשיות של מודלי שפה: מה כל מודל עושה טוב, איפה הוא נופל ומתי לבחור בו.
+3. סוכני AI אוטונומיים — סוכן ייעודי למשימה אחת, שמתחבר ל-WhatsApp, למייל, ליומן ולמסמכים ומריץ אותה מקצה לקצה, עם אישור אנושי בנקודות ההכרעה.
+4. מערכת JARVIS — עוזר AI אישי בעברית שמנהל מייל, יומן ומשימות.
+5. RAG ויישום מעשי — מודל שפה שעונה מתוך המסמכים שלכם, ומדריכים צעד אחר צעד ליישום AI לבד.
 
-ערוצים: התוכן נכתב לנוכחות של דניאל (בעיקר אינסטגרם ולינקדאין) ועבור MrDaniel.co.il.
+ערוצים: התוכן נכתב לנוכחות של דניאל (X, אינסטגרם, Threads ולינקדאין) ועבור MrDaniel.co.il.
 
-הטון: ביטחון טכני, ישיר ונגיש. מדברים אל בעל העסק בשפה שלו — זמן, כסף, לקוחות, שקט נפשי — לא במונחי מחלקת IT.`;
+תחום: AI בלבד. אין תוכן על סייבר, אבטחת מידע, IT ארגוני או פיתוח אתרים.
 
-// Audience guard. Applied to every copy generator: the offering is for business owners and SMBs,
-// so enterprise / IT-department framing is off-brand. It used to leak in constantly because the
-// brand base itself was written around enterprise infrastructure.
+הטון: ביטחון טכני, ישיר ונגיש, בגובה העיניים של מי שבונה עם AI. בלי הייפ ובלי מילים ריקות.`;
+
+// Audience guard. Applied to every copy generator: the audience is people learning AI, so
+// enterprise / IT-department framing is off-brand, and since 2026-09-21 so is any cyber topic.
 // AUDIENCE_RULES lives in expertVoice.ts, next to the voice it pairs with, so the light modules
 // (newsInsights, geminiClient) can import the audience rule without pulling this whole prompt
 // corpus into their bundle — the same separation this file's sibling documents. Re-exported here
@@ -82,13 +83,13 @@ export const ENGAGEMENT_RULES = `הנעה למעורבות — הפוסט נמד
 1. ההוק (המשפט הראשון) — הוא לבדו מחליט אם קוראים את השאר:
    - בנוי מהעובדה החזקה ביותר שיש בכתבה: המספר הגדול, ההשלכה המפתיעה, הסתירה, או מה שהתגלה ולא היה ידוע.
    - מבחן ההחלפה: אם אפשר להדביק את ההוק על כתבה אחרת מאותו תחום — הוא גנרי, כתוב אותו מחדש עם פרט ספציפי מהכתבה הזו.
-   - אסור לפתוח בהצהרה כללית על התחום ("הסייבר משתנה", "AI מתקדם במהירות", "בעולם של היום"), בשאלה רטורית ריקה ("ידעתם ש...?") או בחזרה על הכותרת.
+   - אסור לפתוח בהצהרה כללית על התחום ("AI מתקדם במהירות", "המודלים משתפרים", "בעולם של היום"), בשאלה רטורית ריקה ("ידעתם ש...?") או בחזרה על הכותרת.
    - הוק חזק הוא לרוב אחד משלושה: מספר שקשה להאמין לו, תוצאה שנוגדת אינטואיציה, או "מה שכולם חושבים X — בפועל Y".
 
 2. הזווית העסקית — למה זה נוגע לקורא:
-   - כל פוסט חייב לענות במפורש על "ומה אני לומד מזה": מישהו שרוצה להיכנס לתחום ה-AI, הסייבר או אבטחת המידע ובא להבין איך זה עובד.
+   - כל פוסט חייב לענות במפורש על "ומה אני לומד מזה": מישהו שרוצה להיכנס לתחום ה-AI ובא להבין איך זה עובד.
    - התרגום חייב להישאר נאמן לכתבה. אם הכתבה עוסקת בתאגיד ענק — הסבר את המנגנון או העיקרון שעומד מאחורי מה שקרה, בלי להמציא פרטים שלא הופיעו בה ובלי להפוך את זה לרשימת מטלות.
-   - החיבור למומחיות של דניאל (סייבר, סוכני AI, אוטומציה וחדשנות) הוא משפט שנובע מהתוכן — לא פסקת מכירה מודבקת, ולא הבטחת תוצאה.
+   - החיבור למומחיות של דניאל (מודלי שפה, סוכני AI ואוטומציה) הוא משפט שנובע מהתוכן — לא פסקת מכירה מודבקת, ולא הבטחת תוצאה.
 
 3. הסיום — קריאה לשיח, לא לצריכה:
    - הפוסט נחתם בשאלה פתוחה אחת, קונקרטית, שנובעת ישירות מהכתבה ושהקורא יכול לענות עליה מהניסיון שלו ("מה מהשניים היית מגן עליו קודם בעסק שלך?", "כמה מהתהליך הזה אצלך עדיין ידני?").
@@ -139,7 +140,7 @@ export const SAVE_SHARE_RULES = `ארכיטקטורת שמירה ושיתוף �
 
 export const HEBREW_COPY_RULES = `כללי כתיבה בעברית — מחייבים, ללא יוצא מן הכלל:
 - כל הטקסט חייב להיות בעברית תקנית ואיכותית — כותרות, כותרות משנה, גוף הטקסט, ה-Hook, ה-CTA, הכיתוב, שמות השקפים, הכול. אין לחרוג מכלל זה בשום נסיבה, גם אם הנושא שסופק כתוב באנגלית.
-- אנגלית מותרת אך ורק עבור: (1) מונחים טכניים שאין להם מקבילה עברית טבעית ומובנת (למשל: Zero-Trust, RAG, API, Prompt Injection) — במקרה כזה כתוב את המונח הטכני באנגלית בתוך משפט עברי, לא משפט שלם באנגלית; (2) שמות מותג/מוצר (LinkedIn, Instagram, Wi-Fi 7, MrDaniel.co.il); (3) קטעי קוד אם רלוונטי. מעבר לכך — אסור לחלוטין לכתוב משפטים, פסקאות או קריאות לפעולה באנגלית.
+- אנגלית מותרת אך ורק עבור: (1) מונחים טכניים שאין להם מקבילה עברית טבעית ומובנת (למשל: RAG, API, LLM, Fine-Tuning) — במקרה כזה כתוב את המונח הטכני באנגלית בתוך משפט עברי, לא משפט שלם באנגלית; (2) שמות מותג/מוצר (LinkedIn, Instagram, Wi-Fi 7, MrDaniel.co.il); (3) קטעי קוד אם רלוונטי. מעבר לכך — אסור לחלוטין לכתוב משפטים, פסקאות או קריאות לפעולה באנגלית.
 - עברית ישראלית טבעית וחיה, כמו שמדברים בפועל — לא תרגום מילולי מאנגלית ("הרימו את המשחק שלכם" אסור; "תעלו רמה" מותר). קרא בקול רם בראש לפני שאתה שולח — אם זה נשמע כמו Google Translate, כתוב מחדש.
 - Hook (המשפט הראשון) חייב לעצור גלילה תוך 1-2 שניות — שאלה חדה, סטטמנט שנוגד אינטואיציה, או "רוב האנשים חושבים X, בפועל Y". אסור לפתוח ב"בעולם של היום" או "בעידן הדיגיטלי" — קלישאות שנחסמות אוטומטית.
 - אימוג'ים בעברית: מדוד ומעטים, לא בתחילת כל שורה.
@@ -432,18 +433,18 @@ ${shortCaptionRules(false)}
   return { body, carouselSlides: carouselSlides.length > 0 ? carouselSlides : undefined, hashtags: hashtags.length > 0 ? hashtags : undefined };
 }
 
-const VISUAL_QUERY_SYSTEM_INSTRUCTION = `You are a creative photo director sourcing stock photography for a premium enterprise IT/Cyber/AI content series — think a Bloomberg or Wired feature on real enterprise technology, NOT a generic tech stock-photo cliché and NOT abstract "AI art".
+const VISUAL_QUERY_SYSTEM_INSTRUCTION = `You are a creative photo director sourcing stock photography for a premium AI content series — think a Bloomberg or Wired feature on real AI work, NOT a generic tech stock-photo cliché and NOT abstract "AI art".
 
 Given one short piece of Hebrew content below (one slide from a carousel), generate ONE English stock-photo search phrase (5-9 words) for Pexels that would find a hyper-realistic, high-detail photo of the REAL-WORLD scenario behind the text — not an abstract illustration of the idea.
 
 STRICT RULES:
-- NEVER use: "hacker", "binary code", "green matrix", "man typing on laptop", "code on screen", "person in hoodie", "cyber security" as a bare generic phrase — these are tired stock-photo clichés.
+- NEVER use: "hacker", "binary code", "green matrix", "man typing on laptop", "code on screen", "person in hoodie", "robot" as a bare generic phrase — these are tired stock-photo clichés.
 - NEVER suggest abstract 3D renders, digital brain imagery, glowing neural-network/neon-web sculptures, holographic overlays, or any cartoonish/CGI "AI art" aesthetic — these look fake and cheap, never premium.
-- ALWAYS prefer real, tangible enterprise IT/Cyber/AI environments and hardware that concretely match the text's topic: server racks, network switches, patch panels, structured cabling, multi-monitor workstation setups, modern SOC/NOC control rooms, data center aisles, IT professionals actually working at real equipment.
-- Match the scene to the SPECIFIC idea in the text, not a generic "tech" photo — a slide about Zero-Trust security should point at a SOC analyst reviewing dashboards, not a random server room; a slide about an autonomous AI agent should point at an engineer monitoring live system diagnostics on a workstation, not abstract art.
+- ALWAYS prefer real, tangible AI work environments that concretely match the text's topic: GPU servers and AI data-center aisles, a developer's multi-monitor desk running a model, researchers at a whiteboard of model diagrams, a person talking to a voice assistant, a phone showing a chat with an assistant.
+- Match the scene to the SPECIFIC idea in the text, not a generic "tech" photo — a slide about a new language model should point at a GPU server aisle or a researcher reviewing evaluation charts, not a random office; a slide about an autonomous AI agent should point at an engineer monitoring live system diagnostics on a workstation, not abstract art.
 - Prefer natural, editorial-quality lighting and composition (like Bloomberg/architecture-magazine photography) over staged, garish stock-photo lighting.
 - Example — for a slide about an AI agent monitoring a business process: "engineer reviewing live dashboards server room monitors" (NOT "robot brain" or "digital neural network").
-- Example — for a slide about cybersecurity defense: "SOC analyst monitoring security threat dashboards night" (NOT "green matrix code" or "hacker hoodie").
+- Example — for a slide about a new LLM release: "GPU server racks data center blue light aisle" (NOT "robot brain" or "glowing neural network").
 - Output ONLY the search phrase in English, nothing else — no quotes, no explanation, no trailing punctuation.`;
 
 /** Derives a creative, non-cliché English Pexels search phrase from one carousel slide's actual
@@ -465,33 +466,33 @@ export async function generateVisualSearchQuery(slideText: string): Promise<stri
   return query;
 }
 
-const IMAGE_GENERATION_SYSTEM_INSTRUCTION = `You are a professional photo art director writing a single, dense image-generation prompt for a hyper-realistic photograph to accompany one piece of enterprise IT/Cyber/AI content. This prompt is fed directly into an AI image-generation model, so it must be a complete, self-contained visual description — not a summary of the text.
+const IMAGE_GENERATION_SYSTEM_INSTRUCTION = `You are a professional photo art director writing a single, dense image-generation prompt for a hyper-realistic photograph to accompany one piece of AI content. This prompt is fed directly into an AI image-generation model, so it must be a complete, self-contained visual description — not a summary of the text.
 
-You will be given the platform (LinkedIn/Instagram/TikTok), the topic, and the full post text (in Hebrew). Read the text and identify the CONCRETE real-world IT/Cyber/AI enterprise scenario it actually describes.
+You will be given the platform (LinkedIn/Instagram/TikTok), the topic, and the full post text (in Hebrew). Read the text and identify the CONCRETE real-world AI scenario it actually describes.
 
 STRICT RULES — apply to every single prompt, no exceptions:
 1. NEVER depict abstract 3D models, digital brains, glowing neural networks, neon webs/circuits, holographic overlays, or any cartoonish/stylized "AI art" — these must never appear in the prompt, described or implied.
 2. ALWAYS specify hyper-realistic photography technical parameters, adapted naturally into the scene description: shot on 35mm lens, Sony A7R IV camera, natural ambient lighting, photorealistic, 8k resolution, realistic material/skin textures, shallow depth of field with natural bokeh.
-3. The scene must accurately mirror the SPECIFIC real-world scenario described in the text — real server racks, network switches, structured cabling, actual multi-monitor workstation setups, or a modern SOC/NOC control room — matched to what the text is actually about, never a generic "tech" scene.
+3. The scene must accurately mirror the SPECIFIC real-world scenario described in the text — GPU servers, an AI data-center aisle, a developer's multi-monitor desk running a model, researchers reviewing evaluation charts — matched to what the text is actually about, never a generic "tech" scene.
 
 OUTPUT FORMAT:
 - Return ONLY the finished image-generation prompt as a single dense paragraph in English (3-5 sentences), ready to paste directly into an image generator.
 - No markdown, no quotes, no bullet points, no explanation, no preamble like "Here is the prompt:".
 - Always end the paragraph by explicitly stating the camera/lens/resolution specs from rule 2.
 
-Example output (for a post about Zero-Trust security for AI agents):
-"A modern SOC control room at night, an IT security analyst in business-casual attire reviewing live threat-detection dashboards on a wall of monitors, a real server rack visible in the background with organized structured cabling and status LEDs, focused and calm expression, natural ambient blue-toned monitor light mixed with soft overhead office light, shallow depth of field with the analyst in sharp focus and the background softly blurred. Shot on 35mm lens, Sony A7R IV, photorealistic, 8k, realistic skin and fabric textures, natural bokeh."`;
+Example output (for a post about an autonomous AI agent):
+"A developer's desk at night, an engineer in casual attire watching an AI agent's live step-by-step log on a wall of monitors, a GPU workstation visible in the background with status LEDs, focused and calm expression, natural ambient blue-toned monitor light mixed with soft overhead office light, shallow depth of field with the analyst in sharp focus and the background softly blurred. Shot on 35mm lens, Sony A7R IV, photorealistic, 8k, realistic skin and fabric textures, natural bokeh."`;
 
 /** Deterministic, no-API-call fallback used only if the Gemini call in generateImageGenerationPrompt
  * fails (e.g. a rate limit right after the main content-generation call already used the quota) —
  * keeps rules 1-3 from IMAGE_GENERATION_SYSTEM_INSTRUCTION intact even without a model call, so the
  * field is never silently missing from a generated item. */
 function fallbackImageGenerationPrompt(topic: string): string {
-  return `A modern enterprise IT environment illustrating "${topic}": a professional working at a real multi-monitor workstation, an actual server rack with organized structured cabling and status LEDs visible in the background, natural ambient office lighting, calm and focused expression, shallow depth of field with the subject in sharp focus and the background softly blurred. Shot on 35mm lens, Sony A7R IV, photorealistic, 8k, realistic material and skin textures, natural bokeh.`;
+  return `A modern AI workspace illustrating "${topic}": a developer working at a real multi-monitor workstation running a language model, a GPU server with status LEDs visible in the background, natural ambient office lighting, calm and focused expression, shallow depth of field with the subject in sharp focus and the background softly blurred. Shot on 35mm lens, Sony A7R IV, photorealistic, 8k, realistic material and skin textures, natural bokeh.`;
 }
 
 /** Produces a single, dense, ready-to-use image-generation prompt (English, hyper-realistic
- * enterprise IT/Cyber/AI photography — never abstract/digital-brain/cartoonish "AI art") for one
+ * AI-workspace photography — never abstract/digital-brain/cartoonish "AI art") for one
  * generated content item — see IMAGE_GENERATION_SYSTEM_INSTRUCTION. Called once per item
  * (post/carousel/video-script, any platform) by every generation call site so a future real
  * image-generation integration always has a matching prompt on hand, even though nothing in this
@@ -602,8 +603,7 @@ const SCORING_RULES: ScoringRule[] = [
   { pattern: /דחוף|asap|urgent|מיידי|השבוע|היום/i, weight: 3, reason: 'סימן דחיפות' },
   // Named, specific service interest — matches this site's actual three pillars
   { pattern: /ai integration|אינטגרצי(ה|ית) ai|סוכן(י)? ai|automation|אוטומציה/i, weight: 2, reason: 'עניין ספציפי בסוכני AI/אוטומציה' },
-  { pattern: /cyber security|סייבר|zero-?trust|אבטחת מידע/i, weight: 2, reason: 'עניין ספציפי באבטחת סייבר' },
-  { pattern: /web3|webgl|blockchain|בלוקצ'?יין|חוזה חכם/i, weight: 2, reason: 'עניין ספציפי ב-Web3/פיתוח' },
+  { pattern: /\bllm\b|מודל שפה|rag|jarvis|grok|claude|gemini|gpt/i, weight: 2, reason: 'עניין ספציפי במודלי שפה / RAG' },
   { pattern: /לעסק שלי|לחברה שלנו|for my business|for our company/i, weight: 2, reason: 'הקשר עסקי אישי (לא שאלה כללית)' },
   // Weak/generic-curiosity signals — actively pull the score down
   { pattern: /מה זה|just curious|סתם שואל|לצורך לימוד|student|research paper/i, weight: -3, reason: 'ניסוח מעיד על סקרנות כללית, לא כוונת רכישה' },
@@ -1190,11 +1190,11 @@ export async function editSlideDeck(input: { instruction: string; slides: SlideE
  * visual shape splits.
  */
 const IG_FORMAT_SPEC = `פורמט אינסטגרם — בנוי לסריקה מהירה בפיד:
-   • שורת הוק אחת שעוצרת גלילה, נפתחת באימוג'י אחד שמתאים לסוג הידיעה: 🚨 אירוע אבטחה או דחיפות, ⚡ השקה או פריצת דרך, 🔍 מחקר או ממצא, 🎯 השלכה עסקית, 💡 תובנה. ההוק ספציפי לכתבה הזו — אם אפשר להדביק אותו על כתבה אחרת, כתוב אותו מחדש.
+   • שורת הוק אחת שעוצרת גלילה, נפתחת באימוג'י אחד שמתאים לסוג הידיעה: 🚨 דחיפות, ⚡ השקת מודל או כלי, 🔍 מחקר או ממצא, 🎯 השלכה עסקית, 💡 תובנה. ההוק ספציפי לכתבה הזו — אם אפשר להדביק אותו על כתבה אחרת, כתוב אותו מחדש.
    • שורה ריקה, ואז 1-2 פסקאות קצרות (2-3 משפטים כל אחת) שמוסרות מה קרה בפועל, עם המספרים והשמות המדויקים מהכתבה.
    • גוש ממצאים: 3-5 שורות, כל שורה נפתחת באימוג'י אחד ואחריו רווח, וכל שורה מוסרת עובדה קונקרטית אחת מהכתבה — מספר, שם מוצר, גרסה, ממצא מחקר או השלכה. נתונים, לא סיסמאות. שורה בלי עובדה מהכתבה לא נכנסת.
    • האימוג'י של כל שורת ממצא חייב להיות שונה מקודמיו ולהתאים לתוכן השורה הספציפית: 💰 כסף, סכום או שווי · 📅 תאריך או לוח זמנים · 👥 אנשים, מייסדים או משקיעים · ⚙️ טכנולוגיה או ארכיטקטורה · 📈 נתוני גדילה או ביצועים · 🔐 אבטחה או פגיעות · 🌍 שוק או גאוגרפיה. אסור לחזור על אותו אימוג'י פעמיים באותו גוש — חזרתיות נקראת כמו תבנית אוטומטית.
-   • פסקת משמעות: 2-3 משפטים על מה זה מלמד — המנגנון שמאחורי האירוע, או מה זה אומר על הכיוון שאליו התחום הולך — למי שלומד AI, סייבר ואבטחת מידע.
+   • פסקת משמעות: 2-3 משפטים על מה זה מלמד — המנגנון שמאחורי האירוע, או מה זה אומר על הכיוון שאליו התחום הולך — למי שלומד AI.
    • חיבור למותג: משפט אחד עד שניים שמחברים את ההקשר לשירותים של דניאל — סוכני AI מותאמים, אוטומציה של תהליכי עבודה, מערכות חכמות. טבעי ונובע מהכתבה, לא פרסומת מודבקת.
    • קריאה לפעולה: שאלה פתוחה אחת, קונקרטית ונגזרת מהכתבה, שהקורא יכול לענות עליה ממה שהוא יודע או ממה שהוא סקרן לגביו (לא שאלת כן/לא ולא "מה דעתכם?"), ואחריה הפניה לקישור בביו.
    • אורך כולל: 240-320 מילים — זה רצפה ולא המלצה. אם הגעת לפחות מ-240 מילים ונותרו עובדות בכתבה שלא נכנסו — הוסף אותן. שורה ריקה בין כל בלוק — רווח נדיב, קריאוּת גבוהה.
@@ -1205,12 +1205,12 @@ const LI_FORMAT_SPEC = `פורמט לינקדאין — נרטיב מקצועי 
    • שורת הוק אחת, חדה וספציפית לכתבה. בלי אימוג'י פותח.
    • 4-6 פסקאות נרטיב עם מעברים טבעיים, שמוסרות את מלוא הממצאים המהותיים של הכתבה — מספרים, שמות, גרסאות, מסקנות מחקר.
    • אם בכתבה יש רשימת ממצאים מובהקת, מותר גוש אחד של עד 3 שורות בולט (תו • בלבד). אחרת — פסקאות בלבד.
-   • פסקה שמחברת את ההקשר למומחיות של דניאל (סייבר, סוכני AI, אוטומציה), ואחריה שורת סיום נפרדת עם שאלה פתוחה אחת שמזמינה את הקורא לענות מהניסיון שלו, ובה או לצדה הפניה ל-mrdaniel.co.il. השאלה היא המשפט האחרון של הפוסט.
+   • פסקה שמחברת את ההקשר למומחיות של דניאל (מודלי שפה, סוכני AI, אוטומציה), ואחריה שורת סיום נפרדת עם שאלה פתוחה אחת שמזמינה את הקורא לענות מהניסיון שלו, ובה או לצדה הפניה ל-mrdaniel.co.il. השאלה היא המשפט האחרון של הפוסט.
    • אורך כולל: 250-350 מילים. שורה ריקה בין פסקאות.
    • אימוג'ים: 0-3 בפוסט כולו, בתוך משפט ולא בתחילת שורה. לינקדאין הוא רגיסטר מאופק.
    • בלי כותרות סעיף ("מה קרה", "למה זה חשוב") ובלי אימוג'י ככותרת.`;
 
-const NEWS_POST_SYSTEM_INSTRUCTION = `אתה הקופירייטר של דניאל בן ברוך — מומחה סייבר, AI וחדשנות (mrdaniel.co.il). אתה כותב פוסטים ממירים לרשתות חברתיות בעברית, לשוק הישראלי, על בסיס כתבת חדשות שסופקה לך במלואה.
+const NEWS_POST_SYSTEM_INSTRUCTION = `אתה הקופירייטר של דניאל בן ברוך — מפרק מודלי שפה ובונה סוכני AI (mrdaniel.co.il). אתה כותב פוסטים ממירים לרשתות חברתיות בעברית, לשוק הישראלי, על בסיס כתבת חדשות שסופקה לך במלואה.
 
 ${EXPERT_VOICE_RULES}
 
@@ -1243,8 +1243,8 @@ ${ENGAGEMENT_RULES}
 {FORMAT_SPEC}
 
 4. טון ומינוח — הקול של mrdaniel.co.il:
-   • מקצועי, סמכותי וישיר. קול של מומחה IT, סייבר ו-AI שמסביר לעמיתים, לא של משווק שמוכר.
-   • מינוח טכני מדויק ונכון: שמות מוצרים, גרסאות, פרוטוקולים, מושגי אבטחה ושמות מותג נכתבים בדיוק כפי שהם מופיעים בכתבה. אל תתרגם שם מוצר, אל תקצר מזהה CVE ואל תמיר מונח אבטחה למונח דומה-אך-לא-זהה (פגיעות ≠ ניצול ≠ תקיפה; הצפנה ≠ קידוד).
+   • מקצועי, סמכותי וישיר. קול של מומחה AI שמסביר לעמיתים, לא של משווק שמוכר.
+   • מינוח טכני מדויק ונכון: שמות מוצרים, גרסאות, פרוטוקולים, מושגים טכניים ושמות מותג נכתבים בדיוק כפי שהם מופיעים בכתבה. אל תתרגם שם מוצר, אל תקצר מזהה CVE ואל תמיר מונח אבטחה למונח דומה-אך-לא-זהה (פגיעות ≠ ניצול ≠ תקיפה; הצפנה ≠ קידוד).
    • בלי סופרלטיבים ריקים, בלי "היי חברים", בלי הבטחות תוצאה.
 
 5. איסורים מוחלטים:
@@ -1275,7 +1275,7 @@ ${AUDIENCE_RULES}
 
 עקרונות מחייבים:
 1. הסתמכות מוחלטת על טקסט המקור — כל עובדה, מספר, שם חברה/מוצר, תאריך — מהטקסט בלבד. אין להמציא ואין ידע כללי. מספר נשאר עם אותה יחידה ומשמעות שיש לו בכתבה.
-2. מבנה: שורת הוק חדה אחת שעוצרת גלילה — ספציפית לכתבה, לא ביטוי גנרי ("מאבק משפטי חדש", "בעולם של היום", "התפתחות מעניינת"). אחריה 2-3 פסקאות קצרות (2-3 משפטים כל אחת) שמוסרות את העובדות המהותיות ומסבירות אותן למי שלומד את התחום, וכוללות חיבור טבעי אחד לעולם התוכן של דניאל (סוכני AI, סייבר, אוטומציה). לסיום שורה אחת עם שאלה פתוחה שנובעת מהכתבה ושחבר קהילה יכול לענות עליה מהניסיון שלו — לא שאלת כן/לא, לא "מה דעתכם?" ולא בקשה לשתף.
+2. מבנה: שורת הוק חדה אחת שעוצרת גלילה — ספציפית לכתבה, לא ביטוי גנרי ("מאבק משפטי חדש", "בעולם של היום", "התפתחות מעניינת"). אחריה 2-3 פסקאות קצרות (2-3 משפטים כל אחת) שמוסרות את העובדות המהותיות ומסבירות אותן למי שלומד את התחום, וכוללות חיבור טבעי אחד לעולם התוכן של דניאל (מודלי שפה, סוכני AI, אוטומציה). לסיום שורה אחת עם שאלה פתוחה שנובעת מהכתבה ושחבר קהילה יכול לענות עליה מהניסיון שלו — לא שאלת כן/לא, לא "מה דעתכם?" ולא בקשה לשתף.
 3. פורמט WhatsApp: הדגשה עם *כוכבית בודדת* בלבד (זו ההדגשה הטבעית של וואטסאפ), 1-3 הדגשות בסך הכול. אסור לחלוטין כוכביות כפולות (**מילה**), קו תחתון או סולמיות ככותרת. שורה ריקה בין פסקאות. בלי כותרות סעיף, בלי אימוג'י ככותרת, אימוג'י בודד ומדוד מותר בתוך משפט. אסור תוויות מסגור ("ההקשר:", "נא לשים לב", "כותרת:") — טקסט זורם בלבד.
 4. אין בגוף שום כתובת URL, קישור, "מקור:" או שם דומיין — המערכת מוסיפה קישור וחתימת מותג בנפרד. מותר להזכיר את mrdaniel.co.il כטקסט בקריאה לפעולה.
 5. אורך כולל: 60-110 מילים. קצר, צפוף, בלי מילים מיותרות.
@@ -1439,7 +1439,7 @@ export async function synthesizeNewsPost(input: {
 
 // --- IG Growth Intelligence — Trend Radar + Engagement replies --------------------------------
 
-const TREND_RADAR_SYSTEM_INSTRUCTION = `אתה אנליסט תוכן וטרנדים עבור הנוכחות של דניאל בן ברוך באינסטגרם (סייבר, AI, ענן וטכנולוגיה ארגונית, קהל ישראלי ובינלאומי).
+const TREND_RADAR_SYSTEM_INSTRUCTION = `אתה אנליסט תוכן וטרנדים עבור הנוכחות של דניאל בן ברוך באינסטגרם (חדשות AI, מודלי שפה וסוכני AI, קהל ישראלי ובינלאומי).
 
 ${BRAND_KNOWLEDGE_BASE}
 
@@ -1450,7 +1450,7 @@ ${HEBREW_COPY_RULES}
 חוקים:
 - הסתמך אך ורק על הכותרות/התקצירים שסופקו. אל תמציא אירועים, מספרים או שמות מוצרים שלא הופיעו בהם.
 - כל פלט טקסטואלי בעברית תקנית (מונחים טכניים באנגלית בתוך משפט עברי מותרים).
-- "trends": 4-6 טרנדים/נושאים שחוזרים על עצמם או צוברים תאוצה. לכל אחד: title קצר, momentum ("rising"/"hot"/"steady"), why (משפט אחד — למה זה זז עכשיו), audiencePainPoint (כאב קונקרטי של הקהל — אנשים שלומדים AI, סייבר ואבטחת מידע ורוצים להיכנס לתחום: מה לא ברור להם, מה מבלבל, מאיפה מתחילים).
+- "trends": 4-6 טרנדים/נושאים שחוזרים על עצמם או צוברים תאוצה. לכל אחד: title קצר, momentum ("rising"/"hot"/"steady"), why (משפט אחד — למה זה זז עכשיו), audiencePainPoint (כאב קונקרטי של הקהל — אנשים שלומדים AI ורוצים להיכנס לתחום: מה לא ברור להם, מה מבלבל, מאיפה מתחילים).
 - "viralHeadlines": 4-6 ניסוחי כותרת בסגנון hook שעוצר גלילה, כל אחד מבוסס על כותרת אמיתית מהרשימה, עם angle (הזווית שהופכת אותה לעובדת).
 - "blueprints": בדיוק 3 — אחד "reel", אחד "story", אחד "carousel". לכל אחד: hook (משפט פתיחה חד), outline (מערך של 3-6 שלבים/פריימים/שקופיות מסודרים), cta (קריאה לפעולה לא מכירתית).
 
@@ -1501,7 +1501,7 @@ export async function analyzeTrendRadar(input: {
   return clean;
 }
 
-const ENGAGEMENT_REPLIES_SYSTEM_INSTRUCTION = `אתה מנסח תגובות (comments) עבור דניאל בן ברוך — מומחה מערכות IT, סייבר ו-AI — על פוסטים של מובילי דעה וחשבונות בעלי תנועה גבוהה באינסטגרם/לינקדאין. המטרה: תגובה שמוסיפה ערך אמיתי, מושכת תשומת לב לפרופיל של דניאל, ולא נשמעת כמו ספאם.
+const ENGAGEMENT_REPLIES_SYSTEM_INSTRUCTION = `אתה מנסח תגובות (comments) עבור דניאל בן ברוך — בונה סוכני AI ומפרק מודלי שפה — על פוסטים של מובילי דעה וחשבונות בעלי תנועה גבוהה באינסטגרם/לינקדאין. המטרה: תגובה שמוסיפה ערך אמיתי, מושכת תשומת לב לפרופיל של דניאל, ולא נשמעת כמו ספאם.
 
 ${BRAND_KNOWLEDGE_BASE}
 
@@ -1585,7 +1585,7 @@ ${SAVE_SHARE_RULES}
 3. "scenes" — מערך של 4–6 סצנות (כ-3–6 שניות כל אחת). הסצנה הראשונה משלמת את הבטחת ה-hook תוך 3 שניות; אם המקור תומך — סצנה אחת היא סיכום לשמירה (צעדים או בדיקות ממוספרים); הסצנה האחרונה מתחברת חזרה ל-hook כך שהלולאה נסגרת וצפייה חוזרת מרגישה טבעית. כל סצנה עם:
    - "onScreenText": שורת טקסט קצרה שתופיע על המסך (עד 8–10 מילים, לא משפט מלא ארוך). בסצנה הראשונה — כולל את מילת המפתח המרכזית של הנושא (אינסטגרם קורא טקסט מהמסך לחיפוש).
    - "voiceover": מה שנקרא בקול באותה סצנה — משפט או שניים, טבעי לדיבור (לא כתיבה פורמלית).
-   - "mediaPrompt": פרומפט ויזואלי לג'נרטור תמונה/וידאו — **באנגלית**, ספציפי ופוטוריאליסטי (לא אבסטרקטי/קריקטורי/"AI art" גנרי): צילום אנטרפרייז IT/סייבר/AI אמיתי (server racks, SOC/NOC room, engineer at a workstation, data center, dashboard screens), עם ספק'ים טכניים (35mm, natural lighting, shallow depth of field, 8k) שמתאימים לתוכן הספציפי של הסצנה.
+   - "mediaPrompt": פרומפט ויזואלי לג'נרטור תמונה/וידאו — **באנגלית**, ספציפי ופוטוריאליסטי (לא אבסטרקטי/קריקטורי/"AI art" גנרי): צילום אמיתי של סביבת עבודה עם AI (GPU servers, AI data center, engineer at a workstation, data center, dashboard screens), עם ספק'ים טכניים (35mm, natural lighting, shallow depth of field, 8k) שמתאימים לתוכן הספציפי של הסצנה.
 4. "cta" — קריאה לפעולה קצרה לאינסטגרם שדוחפת שמירה, שליחה לחבר או מעקב (לא "לייק"), ומפנה ל-mrdaniel.co.il. לא מכירתית אגרסיבית.
 
 חוקים מחייבים:
@@ -1647,7 +1647,7 @@ export async function synthesizeReelScript(input: {
     hook,
     ...(hookOptions.length ? { hookOptions } : {}),
     scenes: scenes.slice(0, 7),
-    cta: cta || 'עקבו לעוד תוכן על AI, סייבר ופיתוח — mrdaniel.co.il',
+    cta: cta || 'עקבו לעוד פירוקים של AI — mrdaniel.co.il',
   };
 }
 

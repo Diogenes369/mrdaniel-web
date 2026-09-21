@@ -38,7 +38,7 @@ function openAgentLead(kind: CtaKind, agent?: AiAgent) {
 
 function AgentWizardTrigger() {
   return (
-    <div className="cyber-glass cyber-glass--info max-w-2xl mx-auto rounded-[1.75rem] p-6 sm:p-8 mb-14 text-center">
+    <div className="glass-panel glass-panel--info max-w-2xl mx-auto rounded-[1.75rem] p-6 sm:p-8 mb-14 text-center">
       <div className="flex items-center gap-2.5 mb-2 justify-center">
         <Sparkles className="w-5 h-5 text-brand-400" />
         <h3 className="font-display font-black text-2xl text-white">שאלון התאמת סוכן AI</h3>
@@ -71,7 +71,7 @@ function AgentCard({ agent }: { agent: AiAgent }) {
     >
       <TiltCard strength={5} className="h-full">
         <div
-          className={`cyber-glass cyber-glass--marketing h-full flex flex-col rounded-2xl p-6 ${agent.glow}`}
+          className={`glass-panel glass-panel--marketing h-full flex flex-col rounded-2xl p-6 ${agent.glow}`}
         >
           <div className="flex items-start gap-4 mb-4">
             <div className={`w-14 h-14 shrink-0 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center ${agent.accent === 'text-black' ? 'text-brand-400' : agent.accent}`}>

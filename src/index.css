@@ -11,7 +11,7 @@
   --font-display: 'Rubik', 'Heebo', 'Segoe UI', sans-serif;
   /* Orbitron has no Hebrew glyphs — used deliberately for short English/mono tech chrome; Rubik
      then Heebo carry any Hebrew that lands in one of these elements. */
-  --font-cyber: 'Orbitron', 'Rubik', 'Heebo', sans-serif;
+  --font-tech: 'Orbitron', 'Rubik', 'Heebo', sans-serif;
   /* JetBrains Mono has no Hebrew glyphs: Latin/digits render monospaced, Hebrew falls to Heebo. */
   --font-mono: 'JetBrains Mono', 'Heebo', ui-monospace, 'Segoe UI', monospace;
 
@@ -99,7 +99,7 @@ p {
 
 /* One typographic baseline for the whole site. Every element inherits the brand sans (Heebo);
    headings default to the brand display face (Rubik). Kept in `@layer base` so a `font-*` utility
-   on the element (`.font-mono`, `.font-cyber`) still wins — intentional mono/tech chrome is
+   on the element (`.font-mono`, `.font-tech`) still wins — intentional mono/tech chrome is
    unaffected — but nothing falls through to a system serif/monospace/condensed face, and no
    component can quietly drop to a thin default. `font-synthesis: none` stops the browser
    faux-bolding a weight when (briefly) only the regular webfont has loaded. */
@@ -219,8 +219,8 @@ body::before {
   background-size: 8px 8px;
 }
 
-/* ── Unified frosted cyber-glass card system ─────────────────────────────────────────────────
-   ONE surface language for every homepage card. `.cyber-glass` is the frost: a LIGHT zinc-950/42
+/* ── Unified frosted glass-panel card system ─────────────────────────────────────────────────
+   ONE surface language for every homepage card. `.glass-panel` is the frost: a LIGHT zinc-950/42
    fill + blur(14px) (~backdrop-blur-md/lg) so the fixed Scene3D particle/mesh layer stays vividly
    visible flowing THROUGH the glass — sections are transparent, there is no backdrop behind the
    cards. Plus a hairline border, a radius-inherited mesh-glow + fine grain on `::before` and a
@@ -230,9 +230,9 @@ body::before {
      --flagship  : --marketing with a stronger bloom (the large Services tiles)
      --info      : restrained, gentle hover border, maximum text contrast (ROI, News)
    These rules are UNLAYERED so they beat Tailwind utilities — do not also put `border-*` /
-   `bg-*` / `backdrop-blur-*` / hover-`shadow-*` utilities on a `.cyber-glass` element; use the
+   `bg-*` / `backdrop-blur-*` / hover-`shadow-*` utilities on a `.glass-panel` element; use the
    modifiers. Radius and padding come from the element's own `rounded-*` / `p-*`. ── */
-.cyber-glass {
+.glass-panel {
   position: relative;
   isolation: isolate;
   /* MUST stay `auto`. A previous pass set this to `pan-y` to guarantee that dragging a card
@@ -250,7 +250,7 @@ body::before {
   border: 1px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
 }
-.cyber-glass::before {
+.glass-panel::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -265,7 +265,7 @@ body::before {
   opacity: 0.8;
   transition: opacity 0.35s ease;
 }
-.cyber-glass::after {
+.glass-panel::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -275,7 +275,7 @@ body::before {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 20%);
 }
 
-.cyber-glass--marketing {
+.glass-panel--marketing {
   border-color: rgba(118, 185, 0, 0.22);
   box-shadow: 0 0 40px -22px rgba(118, 185, 0, 0.4);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, background-color 0.3s ease;
@@ -283,35 +283,35 @@ body::before {
 /* Hover states only where a real hovering pointer exists. On touch, :hover sticks after a tap, so
    a card stayed lifted and glowing until the user tapped somewhere else. */
 @media (hover: hover) and (pointer: fine) {
-  .cyber-glass--marketing:hover {
+  .glass-panel--marketing:hover {
     border-color: rgba(118, 185, 0, 0.5);
     box-shadow: 0 0 60px -14px rgba(118, 185, 0, 0.55);
     transform: translateY(-3px);
     background-color: rgba(9, 9, 11, 0.34);
   }
-  .cyber-glass--marketing:hover::before {
+  .glass-panel--marketing:hover::before {
     opacity: 1;
   }
 }
 
-.cyber-glass--flagship {
+.glass-panel--flagship {
   border-color: rgba(118, 185, 0, 0.32);
   box-shadow: 0 0 52px -16px rgba(118, 185, 0, 0.5);
 }
 @media (hover: hover) and (pointer: fine) {
-  .cyber-glass--flagship:hover {
+  .glass-panel--flagship:hover {
     border-color: rgba(118, 185, 0, 0.6);
     box-shadow: 0 0 72px -12px rgba(118, 185, 0, 0.68);
   }
 }
 
-.cyber-glass--info {
+.glass-panel--info {
   border-color: rgba(255, 255, 255, 0.1);
 }
-.cyber-glass--info:hover {
+.glass-panel--info:hover {
   border-color: rgba(118, 185, 0, 0.3);
 }
-.cyber-glass--info::before {
+.glass-panel--info::before {
   background-image:
     radial-gradient(64% 72% at 50% 0%, rgba(118, 185, 0, 0.05), transparent 74%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='cg'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23cg)' opacity='0.24'/%3E%3C/svg%3E");
@@ -1101,18 +1101,18 @@ html.a11y-large-cursor * {
    scrolling past a stack of glass cards (every card re-samples and re-blurs what moves behind it).
    Halve the radius and compensate with a denser fill so text contrast is unchanged, and drop the
    feTurbulence grain — an SVG filter rasterized per tile, invisible at phone pixel density. */
-html.perf-lite .cyber-glass {
+html.perf-lite .glass-panel {
   background-color: rgba(9, 9, 11, 0.58);
   backdrop-filter: blur(7px);
   -webkit-backdrop-filter: blur(7px);
 }
-html.perf-lite .cyber-glass::before {
+html.perf-lite .glass-panel::before {
   background-image:
     radial-gradient(62% 80% at 14% 0%, rgba(118, 185, 0, 0.11), transparent 72%),
     radial-gradient(54% 66% at 100% 100%, rgba(56, 189, 248, 0.07), transparent 70%);
   background-size: 100% 100%, 100% 100%;
 }
-html.perf-lite .cyber-glass--info::before {
+html.perf-lite .glass-panel--info::before {
   background-image: radial-gradient(64% 72% at 50% 0%, rgba(118, 185, 0, 0.05), transparent 74%);
   background-size: 100% 100%;
 }
@@ -1143,7 +1143,7 @@ html.motion-reduced .hero-grid {
     display: none;
   }
   .channel-card,
-  .cyber-glass--marketing {
+  .glass-panel--marketing {
     transition: none;
   }
 }

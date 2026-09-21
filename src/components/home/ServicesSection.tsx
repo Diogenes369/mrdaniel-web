@@ -87,7 +87,7 @@ function ProofPoints({ points, wide, compact }: { points: string[]; wide?: boole
 }
 
 /**
- * One bento tile — the unified `.cyber-glass` surface (`--marketing`, `--flagship` for the large
+ * One bento tile — the unified `.glass-panel` surface (`--marketing`, `--flagship` for the large
  * tiles). Icon + giant title + blurb, then (when the data carries them) feature chips, a proof-point
  * list and a metric badge — sized so the copy fills the tile instead of leaving dead space. The
  * whole tile is a <Link> to the matching service page. `wide` splits the inner content into two
@@ -163,14 +163,14 @@ function ServiceTile({ s, compact }: { s: ServiceEntry; compact?: boolean }) {
   return (
     <Link
       to={s.to}
-      className={`cyber-glass cyber-glass--marketing group flex h-full flex-col ${
+      className={`glass-panel glass-panel--marketing group flex h-full flex-col ${
         compact
           ? // Safety ceiling only — the compact scale above is tuned so a card's natural height
-            // lands well under this, so it never actually engages (`.cyber-glass` is
+            // lands well under this, so it never actually engages (`.glass-panel` is
             // `overflow: hidden`, so a max-height that DID bite would clip rather than scroll).
             'max-h-[calc(100dvh-11rem)] rounded-2xl p-4'
           : 'rounded-3xl p-7 md:p-8 lg:p-12'
-      } ${s.flagship ? 'cyber-glass--flagship' : ''}`}
+      } ${s.flagship ? 'glass-panel--flagship' : ''}`}
     >
       <div className="flex h-full flex-col">
         {s.wide && !compact ? (

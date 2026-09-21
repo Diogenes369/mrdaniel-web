@@ -235,7 +235,7 @@ export default function AutoPublisherPanel() {
               <Layers className="w-3.5 h-3.5" /> קטגוריות יעד
             </div>
             <div className="flex flex-wrap gap-2">
-              {(['cyber', 'ai', 'tech', 'auto'] as APCategory[]).map((c) => (
+              {(['ai', 'ai_models', 'ai_agents', 'auto'] as APCategory[]).map((c) => (
                 <Pill key={c} active={config.category === c} onClick={() => saveConfig({ category: c })}>
                   {CATEGORY_LABEL[c]}
                 </Pill>

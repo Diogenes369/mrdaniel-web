@@ -4,7 +4,7 @@ import {
   Terminal,
   ShieldCheck,
   Bot,
-  Lock,
+  Cpu,
   Layout,
   Network,
   Rocket,
@@ -18,15 +18,13 @@ import SocialLinks from '../components/SocialLinks';
 import { ABOUT_COPY } from '../data/siteCopy';
 import { rtl } from '../lib/rtl';
 
-const PILLAR_ICONS = [Bot, Lock, Network, Rocket];
+const PILLAR_ICONS = [Bot, Cpu, Network, Rocket];
 
 const HUB_LINKS = [
-  { icon: Lock, to: '/cyber', title: 'אבטחת סייבר', description: 'הגנה ברמת Zero-Trust, EDR/XDR ואבטחת מערכות AI' },
-  { icon: Rocket, to: '/digital', title: 'פיתוח דיגיטלי ו-Web3', description: 'אתרים, אפליקציות ו-dApps שנבנים להמרה ולביצועים' },
-  { icon: Terminal, to: '/news', title: 'חדשות ומדריכי AI', description: 'עדכוני AI וסייבר בזמן אמת ומדריכים מעשיים' },
-  { icon: Bot, to: '/ai', title: 'בינה מלאכותית', description: 'סוכני AI אוטונומיים, RAG וחוברת הלימוד המלאה' },
-  { icon: Network, to: '/architecture', title: 'ארכיטקטורת הגנה', description: 'תרשים ארבע השכבות ופריסת AI בטוחה בארגון' },
-  { icon: LayoutGrid, to: '/capabilities', title: 'מטריצת יכולות', description: '18 יכולות מפורטות בשלושה תחומי הליבה' },
+  { icon: Terminal, to: '/news', title: 'חדשות ומדריכי AI', description: 'עדכוני AI בזמן אמת ופירוק של מודלי השפה החדשים' },
+  { icon: Bot, to: '/ai', title: 'סוכני AI', description: 'סוכני AI אוטונומיים, RAG וחוברת הלימוד המלאה' },
+  { icon: Rocket, to: '/jarvis', title: 'מערכת JARVIS', description: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות' },
+  { icon: LayoutGrid, to: '/magazines', title: 'מדריכים וחוברות', description: 'מדריכי AI מעשיים, PDF להורדה מיידית' },
 ];
 
 export default function AboutPage() {
@@ -35,16 +33,16 @@ export default function AboutPage() {
       <div className="container-wide">
         <PageHero
           badgeIcon={Terminal}
-          badgeLabel="IT Management • Cyber Architecture • Agentic AI • Web3"
+          badgeLabel="AI News • LLMs • Autonomous Agents"
           title={rtl(ABOUT_COPY.title)}
           subtitle={rtl(ABOUT_COPY.subtitle)}
         />
 
-        <div className="cyber-glass cyber-glass--info text-lg text-zinc-200 leading-[1.9] rounded-xl p-5 sm:p-6 lg:p-7 mb-14 max-w-4xl">
+        <div className="glass-panel glass-panel--info text-lg text-zinc-200 leading-[1.9] rounded-xl p-5 sm:p-6 lg:p-7 mb-14 max-w-4xl">
           {rtl(ABOUT_COPY.lede)}
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="cyber-glass cyber-glass--info rounded-2xl p-6 sm:p-8 mb-16 max-w-4xl">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="glass-panel glass-panel--info rounded-2xl p-6 sm:p-8 mb-16 max-w-4xl">
           <h2 className="flex items-center gap-3 font-display font-bold text-xl md:text-2xl text-white mb-5">
             <ShieldCheck className="w-6 h-6 text-brand-400" />
             מי אני ומה אני בונה
@@ -65,7 +63,7 @@ export default function AboutPage() {
           }))}
         />
 
-        <div className="cyber-glass cyber-glass--info rounded-2xl p-5 sm:p-6 lg:p-8 mb-16">
+        <div className="glass-panel glass-panel--info rounded-2xl p-5 sm:p-6 lg:p-8 mb-16">
           <div className="flex items-center gap-2.5 mb-5">
             <LayoutGrid className="w-5 h-5 text-brand-400" />
             <h3 className="font-display font-bold text-xl text-white">כל שירותי האתר במקום אחד</h3>
@@ -90,18 +88,18 @@ export default function AboutPage() {
           </div>
         </div>
 
-        <div className="cyber-glass cyber-glass--info rounded-2xl p-6 sm:p-8 mb-16 text-center max-w-3xl mx-auto">
+        <div className="glass-panel glass-panel--info rounded-2xl p-6 sm:p-8 mb-16 text-center max-w-3xl mx-auto">
           <div className="flex items-center justify-center gap-2.5 mb-3">
             <Share2 className="w-5 h-5 text-brand-400" />
             <h3 className="font-display font-bold text-xl text-white">עקבו אחרי הפעילות באופן שוטף</h3>
           </div>
           <p className="text-zinc-400 text-sm md:text-base leading-relaxed mb-6 max-w-lg mx-auto">
-            תובנות טכניות, עדכוני AI וסייבר, ותוכן מהשטח — ישירות ברשתות החברתיות או במייל.
+            תובנות טכניות, עדכוני AI ותוכן מהשטח — ישירות ברשתות החברתיות או במייל.
           </p>
           <SocialLinks className="justify-center" iconClassName="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 hover:shadow-[0_0_16px_rgba(0,255,102,0.35)] transition-all outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" glyphClassName="w-5 h-5" />
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="cyber-glass cyber-glass--flagship rounded-2xl p-8 md:p-12 text-center mb-16 max-w-4xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="glass-panel glass-panel--flagship rounded-2xl p-8 md:p-12 text-center mb-16 max-w-4xl mx-auto">
           <p className="font-display text-xl md:text-2xl font-bold text-white leading-relaxed mb-4">
             "{rtl(ABOUT_COPY.quote)}"
           </p>
@@ -111,7 +109,7 @@ export default function AboutPage() {
         <div className="bg-gradient-to-br from-brand-500/15 via-carbon-900 to-carbon-900 border border-brand-500/30 rounded-2xl p-7 md:p-10 mb-16 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right max-w-5xl mx-auto">
           <div>
             <h3 className="font-display font-bold text-xl md:text-2xl text-white mb-2">רוצים להעמיק בעצמכם? זה בחנות</h3>
-            <p className="text-zinc-400 max-w-md">חוברות עבודה מקצועיות ומגזינים דיגיטליים בנושאי AI, סייבר ורשתות ארגוניות — ידע מעשי, לא תיאוריה.</p>
+            <p className="text-zinc-400 max-w-md">חוברות עבודה מקצועיות ומגזינים דיגיטליים על סוכני AI ומודלי שפה — ידע מעשי, לא תיאוריה.</p>
           </div>
           <Link
             to="/magazines"
@@ -124,8 +122,8 @@ export default function AboutPage() {
 
         <SectionHeading icon={ShieldCheck} title={rtl(ABOUT_COPY.ctaTitle)} description={rtl(ABOUT_COPY.ctaDescription)} />
         <UnifiedCta
-          mailSubject="ייעוץ אסטרטגי — AI, סייבר ותשתיות"
-          whatsappMessage="שלום דניאל, אשמח לשיחת ייעוץ ראשונית על AI, סייבר או תשתיות עבור העסק שלי."
+          mailSubject="אפיון סוכן AI"
+          whatsappMessage="שלום דניאל, אשמח לשיחת אפיון ראשונית על סוכן AI."
         />
       </div>
     </div>

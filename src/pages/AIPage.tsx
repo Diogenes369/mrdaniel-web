@@ -27,7 +27,7 @@ import { useAINewsFeed } from '../services/aiNewsService';
 // or if it fails/returns nothing, so the video section is never empty or broken.
 const CURATED_VIDEOS = [
   { youtubeId: 'PLyCki2K0Lg', title: 'Why we built—and donated—the Model Context Protocol (MCP)', channel: 'Anthropic' },
-  { youtubeId: '5CcL6I3fdcA', title: 'What Is an Enterprise AI Agent? (Assistant vs Workflow vs Agent)', channel: 'Zenphi' },
+  { youtubeId: '5CcL6I3fdcA', title: 'What Is an AI Agent? (Assistant vs Workflow vs Agent)', channel: 'Zenphi' },
 ];
 
 interface ShowcaseAgent {
@@ -67,7 +67,7 @@ const SHOWCASE_AGENTS: ShowcaseAgent[] = [
   {
     icon: Database,
     title: 'סוכן מחקר וניתוח נתונים (RAG)',
-    tagline: 'ידע ארגוני שאפשר לשאול',
+    tagline: 'ידע שאפשר לשאול',
     roi: 'תשובות מבוססות-מקור בשניות במקום שעות חיפוש',
     features: [
       'RAG על מסמכים, מיילים ובסיסי נתונים פנימיים',
@@ -99,7 +99,7 @@ function openAgentLead(subject: string) {
 function ShowcaseCard({ agent }: { agent: ShowcaseAgent }) {
   const Icon = agent.icon;
   return (
-    <div className="flex h-full flex-col cyber-glass cyber-glass--marketing rounded-2xl p-5 sm:p-6 lg:p-8">
+    <div className="flex h-full flex-col glass-panel glass-panel--marketing rounded-2xl p-5 sm:p-6 lg:p-8">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
         <Icon className="w-6 h-6" />
       </div>
@@ -144,11 +144,11 @@ export default function AIPage() {
           badgeIcon={Sparkles}
           badgeLabel="Custom AI Agents · Architecture & Deployment"
           title="סוכני AI מותאמים אישית — לעסק ולניהול האישי"
-          subtitle="מ-Chatbot שעונה על שאלות לסוכן אוטונומי שמבצע משימות שלמות מקצה לקצה, מחובר למערכות שכבר יש לכם — תחת בקרה ואבטחת מידע."
+          subtitle="מ-Chatbot שעונה על שאלות לסוכן אוטונומי שמבצע משימות שלמות מקצה לקצה, מחובר לכלים שכבר יש לכם — עם בקרה אנושית."
           metaChips={[
             { icon: User, label: 'מאת: דניאל' },
             { icon: Layers, label: 'Agentic AI • RAG • MCP' },
-            { icon: ShieldAlert, label: 'Guardian Agents & אבטחת מידע' },
+            { icon: ShieldAlert, label: 'Guardian Agents & בקרה אנושית' },
           ]}
         />
 
@@ -185,7 +185,7 @@ export default function AIPage() {
                 icon: Database,
                 title: 'ארכיטקטורת RAG וניהול ידע',
                 description:
-                  'חיבור מודלי שפה (LLMs) למאגרי המידע, ה-PDFים וה-DB הארגוניים בשיטות שליפה מתקדמות, עם מיסוך מידע רגיש (PII) בזמן ריצה.',
+                  'חיבור מודלי שפה (LLMs) למסמכים, ל-PDFים ולמאגרי הנתונים שלכם בשיטות שליפה מתקדמות, עם מיסוך מידע רגיש (PII) בזמן ריצה.',
               },
               {
                 icon: Network,
@@ -197,11 +197,11 @@ export default function AIPage() {
                 icon: Bot,
                 title: 'אינטגרציה דרך MCP',
                 description:
-                  'חיבור הסוכן לכלים ולמערכות (CRM, ERP, יומן, מייל) דרך פרוטוקול MCP — סטנדרטי, מאובטח וקל לתחזוקה.',
+                  'חיבור הסוכן לכלים (יומן, מייל, מסמכים, APIs) דרך פרוטוקול MCP — סטנדרטי וקל לתחזוקה.',
               },
               {
                 icon: ShieldAlert,
-                title: 'Guardian Agents ואבטחה',
+                title: 'Guardian Agents ובקרה',
                 description:
                   'שכבת פיקוח שמאשרת, חוסמת ומתעדת כל פעולת סוכן — הגנה מפני Prompt Injection, הזיות ודליפת מידע.',
               },

@@ -75,7 +75,7 @@ export function sanitizeOutput(text: string): SecurityCheckResult {
     flags.push('marketing-overreach');
   }
 
-  const badge = flags.length === 0 ? 'Zero-Trust Security Verified 🛡️' : `⚠️ אומת עם הערות (${flags.length})`;
+  const badge = flags.length === 0 ? 'AI Guard Verified 🛡️' : `⚠️ אומת עם הערות (${flags.length})`;
   return { passed: true, flags, badge };
 }
 

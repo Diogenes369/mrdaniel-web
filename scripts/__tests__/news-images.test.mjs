@@ -56,12 +56,12 @@ t('the size check is applied AFTER upscaling', /const upscaled = upscaleImageUrl
 
 const item = (over = {}) => ({
   id: 'x1',
-  title: 'חברת סייבר ישראלית גייסה הון לפיתוח הגנה מבוססת בינה מלאכותית',
+  title: 'חברת AI ישראלית גייסה הון לפיתוח סוכנים אוטונומיים מבוססי בינה מלאכותית',
   excerpt: 'הסבב נועד להרחיב את פעילות המחקר והפיתוח בישראל ובאירופה.',
   source: 'אנשים ומחשבים',
   link: 'https://example.co.il/a',
   image: 'https://example.co.il/uploads/lead.jpg',
-  topic: 'cyber',
+  topic: 'ai_agents',
   publishedAt: new Date().toISOString(),
   ...over,
 });
@@ -75,13 +75,13 @@ t(
 t('a foreign source is dropped', !isHebrewWithImage(item({ source: 'BleepingComputer' })));
 t(
   'an English-dominant title is dropped',
-  !isHebrewWithImage(item({ title: 'Israeli cyber startup raises funding round for AI defense platform', excerpt: '' }))
+  !isHebrewWithImage(item({ title: 'Israeli AI startup raises funding round for autonomous agent platform', excerpt: '' }))
 );
 
 // ─── the fallback plate ────────────────────────────────────────────────────────────────────────
 // This is the guarantee: whatever the feed served, the image well is never empty.
 
-for (const topic of ['cyber', 'ai', 'ai_models', 'cloud', 'general']) {
+for (const topic of ['ai', 'ai_models', 'ai_agents', 'general']) {
   const uri = platePng(topic, 'item-1');
   t(`plate renders for topic "${topic}"`, uri.startsWith('data:image/svg+xml;charset=utf-8,'), uri.slice(0, 40));
   const svg = decodeURIComponent(uri.replace('data:image/svg+xml;charset=utf-8,', ''));

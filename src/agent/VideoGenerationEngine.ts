@@ -145,7 +145,7 @@ function buildPrompt(script: VideoScriptInput, topic: string): string {
     `Opening hook (first 1-2 seconds must grab attention): ${script.hook}`,
     bodyLines,
     `Closing call-to-action: ${script.cta}`,
-    'Style: clean, modern, tech/cybersecurity/AI brand aesthetic, confident and direct tone, dark background with cyan/blue accents, on-screen text overlays matching the script beats.',
+    'Style: clean, modern, AI-news brand aesthetic, confident and direct tone, dark background with cyan/blue accents, on-screen text overlays matching the script beats.',
   ].join('\n');
 }
 
@@ -155,7 +155,7 @@ function buildPrompt(script: VideoScriptInput, topic: string): string {
  * visual cues exist on this script (e.g. the agent queue's scene-based scripts). */
 function buildVisualCuePrompt(script: VideoScriptInput, topic: string): string {
   if (!script.visualCues || script.visualCues.length === 0) return buildPrompt(script, topic);
-  return [`Vertical (9:16) B-roll style background video, topic: ${topic}.`, ...script.visualCues, 'Style: clean, modern, tech/cybersecurity/AI brand aesthetic, dark background with cyan/blue accents, no on-screen text.'].join('\n');
+  return [`Vertical (9:16) B-roll style background video, topic: ${topic}.`, ...script.visualCues, 'Style: clean, modern, AI-news brand aesthetic, dark background with cyan/blue accents, no on-screen text.'].join('\n');
 }
 
 async function startVeo(script: VideoScriptInput, topic: string, aspectRatio: '9:16' | '16:9'): Promise<VideoStartResult> {

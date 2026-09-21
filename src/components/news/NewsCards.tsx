@@ -16,10 +16,9 @@ import { formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } fro
 
 /** Shared topic styling for every news card + the article modal. */
 export const TOPIC: Record<NewsTopic, { label: string; icon: LucideIcon; ring: string; grad: string }> = {
-  cyber: { label: 'סייבר', icon: ShieldAlert, ring: 'text-rose-300 border-rose-400/40 bg-rose-500/10', grad: 'from-rose-600/40' },
   ai: { label: 'בינה מלאכותית', icon: Sparkles, ring: 'text-violet-300 border-violet-400/40 bg-violet-500/10', grad: 'from-violet-600/40' },
   ai_models: { label: 'מודלי AI וחידושים', icon: BrainCircuit, ring: 'text-fuchsia-300 border-fuchsia-400/40 bg-fuchsia-500/10', grad: 'from-fuchsia-600/40' },
-  cloud: { label: 'תשתיות וענן', icon: Cloud, ring: 'text-sky-300 border-sky-400/40 bg-sky-500/10', grad: 'from-sky-600/40' },
+  ai_agents: { label: 'בינה מלאכותית', icon: Sparkles, ring: 'text-violet-300 border-violet-400/40 bg-violet-500/10', grad: 'from-violet-600/40' },
   general: { label: 'טכנולוגיה', icon: Newspaper, ring: 'text-zinc-300 border-white/20 bg-white/5', grad: 'from-zinc-500/30' },
 };
 

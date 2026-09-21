@@ -68,8 +68,8 @@ export function featuredNewsHtml(items: EmailNewsItem[], campaign?: string): str
 export function servicesHighlightsHtml(campaign?: string): string {
   const items = [
     { t: 'סוכני AI מותאמים אישית', d: 'אוטומציה מקצה לקצה, RAG, אינטגרציה למערכות קיימות.', href: `${SITE}/ai` },
-    { t: 'אבטחת סייבר וניהול IT', d: 'Zero-Trust, הקשחה, ניטור, רשת וזהויות ברמת Enterprise.', href: `${SITE}/cyber` },
-    { t: 'ארכיטקטורה ותשתיות', d: 'תכן מערכות, ענן, ופיתוח פלטפורמות מהיר ויציב.', href: `${SITE}/architecture` },
+    { t: 'חדשות AI ומודלי שפה', d: 'מה חדש במודלים, בסוכנים ובכלים, עם פירוק בעברית.', href: `${SITE}/news` },
+    { t: 'מערכת JARVIS', d: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות.', href: `${SITE}/jarvis` },
   ];
   const rows = items
     .map(
@@ -96,12 +96,12 @@ export function previewShell(inner: string, subject: string, extraSections = '')
   <tr><td style="height:4px;line-height:4px;font-size:0;background:${GREEN};background-image:linear-gradient(90deg,${GREEN},${GREEN_LIGHT},${GREEN});border-radius:4px 4px 0 0;">&nbsp;</td></tr>
   <tr><td style="background:#121218;background-image:linear-gradient(180deg,#17171f,#0e0e14);padding:26px 30px;border-radius:0 0 6px 6px;">
     <span style="color:#ffffff;font:800 22px/1 Arial,Helvetica,sans-serif;letter-spacing:3px;">MR. DANIEL</span>
-    <span style="display:block;color:#8a8f98;font:400 12px/1.6 Arial,Helvetica,sans-serif;margin-top:7px;">סוכני AI &nbsp;·&nbsp; אבטחת סייבר &nbsp;·&nbsp; פיתוח דיגיטלי</span>
+    <span style="display:block;color:#8a8f98;font:400 12px/1.6 Arial,Helvetica,sans-serif;margin-top:7px;">חדשות AI &nbsp;·&nbsp; מודלי שפה &nbsp;·&nbsp; סוכני AIדיגיטלי</span>
   </td></tr>
   <tr><td style="padding:16px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#181820;border:1px solid #24242e;border-radius:16px;padding:30px;color:#d8dade;font:400 15px/1.85 Arial,Helvetica,sans-serif;">${inner}</td></tr></table></td></tr>
   ${extraSections}
   <tr><td style="padding:22px 30px 6px;color:#6e727b;font:400 12px/1.9 Arial,Helvetica,sans-serif;text-align:center;">
-    ${link(SITE, 'האתר')} &nbsp;·&nbsp; ${link(`${SITE}/ai`, 'סוכני AI')} &nbsp;·&nbsp; ${link(`${SITE}/cyber`, 'סייבר')} &nbsp;·&nbsp; ${link(`${SITE}/news`, 'חדשות')}<br>
+    ${link(SITE, 'האתר')} &nbsp;·&nbsp; ${link(`${SITE}/ai`, 'סוכני AI')} &nbsp;·&nbsp; ${link(`${SITE}/news`, 'חדשות')}<br>
     <a href="mailto:daniel@mrdaniel.co.il" style="color:${GREEN_LIGHT};text-decoration:none;">daniel@mrdaniel.co.il</a> &nbsp;·&nbsp; ${link('https://www.linkedin.com/', 'LinkedIn')} &nbsp;·&nbsp; ${link('https://www.instagram.com/mrdaniel.ai/', 'Instagram')}
   </td></tr>
   <tr><td style="padding:6px 30px 0;color:#54575e;font:400 11px/1.8 Arial,Helvetica,sans-serif;text-align:center;">

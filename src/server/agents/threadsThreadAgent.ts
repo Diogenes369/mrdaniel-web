@@ -50,7 +50,7 @@ interface ThemeRule {
 const THEME_RULES: ThemeRule[] = [
   {
     theme: 'security',
-    badge: 'Cyber Security',
+    badge: 'AI Safety',
     guideSlug: 'ai-business-automations-2026',
     re: /\b(security|cyber(?:security)?|vulnerabilit(?:y|ies)|exploit|ransomware|phishing|malware|zero[- ]?trust|prompt injection|jailbreak|cve-?\d|pentest|breach|attack surface|encryption|threat)\b|סייבר|אבטח|פריצה|חדיר|כופר|הצפנ/i,
   },

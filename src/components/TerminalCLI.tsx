@@ -55,18 +55,18 @@ function asciiTable(rows: [string, string][], head: [string, string]): string[] 
 }
 
 const SKILLS: [string, string][] = [
-  ['Cyber', 'Zero-Trust · IAM/Entra · EDR/XDR'],
-  ['AI Agents', 'RAG · multi-model · guardian layer'],
-  ['Web3 / WebGL', '3D UI · wallets · smart contracts'],
-  ['Networking', 'Enterprise design · Wi-Fi 7'],
-  ['IT Ops', 'Production infra · hands-on'],
+  ['AI Agents', 'autonomous · tool-calling · memory'],
+  ['LLMs', 'Grok · Claude · Gemini · GPT · Llama'],
+  ['RAG', 'retrieval · embeddings · grounding'],
+  ['Automation', 'WhatsApp · mail · calendar · APIs'],
+  ['AI News', 'live feed · Hebrew breakdowns'],
 ];
 
 const STACK: [string, string][] = [
   ['Frontend', 'React · TypeScript · Tailwind'],
   ['3D / Motion', 'three.js / R3F · GSAP · Framer'],
   ['Backend', 'Node · Vercel Functions'],
-  ['AI', 'Gemini · Claude · GPT (routed)'],
+  ['AI', 'Grok · Gemini · Groq (routed)'],
   ['Data', 'Firebase RTDB · edge cache'],
 ];
 
@@ -83,10 +83,10 @@ const HELP: Line[] = [
 
 const WHOAMI: Line[] = [
   { text: 'Daniel Ben Baruch  ·  mrdaniel.co.il', tone: 'accent' },
-  { text: 'IT Manager turned AI-agent & cyber-security architect.', tone: 'out' },
+  { text: 'Builds autonomous AI agents and writes about LLMs in Hebrew.', tone: 'out' },
   { text: 'Builds & runs real production systems — not slideware.', tone: 'out' },
-  { text: 'Focus: autonomous AI agents, Zero-Trust security,', tone: 'out' },
-  { text: '       enterprise networking, Web3 / WebGL.', tone: 'out' },
+  { text: 'Focus: AI news, cutting-edge LLMs, autonomous agents,', tone: 'out' },
+  { text: '       practical AI you can ship this week.', tone: 'out' },
 ];
 
 const CONTACT: Line[] = [

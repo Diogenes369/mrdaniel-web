@@ -39,7 +39,7 @@ import type { HookOption } from '../agent/types.js';
 
 export type GrowthKind = 'carousel' | 'reel' | 'post';
 export type GrowthOp = 'hooks' | 'cheat-sheet' | 'pack';
-export type GrowthTopic = 'ai' | 'cyber' | 'cloud' | 'general';
+export type GrowthTopic = 'ai' | 'ai_models' | 'ai_agents' | 'general';
 
 export const GROWTH_OPS: readonly GrowthOp[] = ['hooks', 'cheat-sheet', 'pack'];
 
@@ -91,40 +91,40 @@ export type GrowthResult =
 // ─── Deterministic playbook (mirrored in dashboard/src/lib/growthPlaybook.ts) ────────────────
 
 /** The four tags the operator named as the brand's Israeli-niche anchors. */
-export const CORE_IL_TAGS = ['#בינהמלאכותית', '#סייבר', '#אוטומציה', '#פיתוחתוכנה'] as const;
+export const CORE_IL_TAGS = ['#בינהמלאכותית', '#סוכניAI', '#מודליAI', '#אוטומציה'] as const;
 
 /** Hebrew niche tags per topic. The first two are the anchors every caption on that topic carries. */
 const NICHE_TAGS: Record<GrowthTopic, string[]> = {
   ai: ['#בינהמלאכותית', '#אוטומציה', '#סוכניAI', '#אוטומציהלעסקים', '#פיתוחתוכנה'],
-  cyber: ['#סייבר', '#אבטחתמידע', '#בינהמלאכותית', '#אבטחתסייבר'],
-  cloud: ['#פיתוחתוכנה', '#אוטומציה', '#ענן', '#תשתיותIT'],
-  general: ['#בינהמלאכותית', '#אוטומציה', '#פיתוחתוכנה', '#הייטק'],
+  ai_models: ['#מודליAI', '#בינהמלאכותית', '#LLM', '#מודלישפה'],
+  ai_agents: ['#סוכניAI', '#בינהמלאכותית', '#אוטומציה', '#AIאוטונומי'],
+  general: ['#בינהמלאכותית', '#אוטומציה', '#כליAI', '#חדשותAI'],
 };
 
 /** High-volume English tags per topic — the reach half of the blend. */
 const BROAD_TAGS: Record<GrowthTopic, string[]> = {
   ai: ['#AI', '#ArtificialIntelligence', '#AIAutomation', '#AITools'],
-  cyber: ['#CyberSecurity', '#InfoSec', '#AI'],
-  cloud: ['#DevOps', '#CloudComputing', '#Automation'],
-  general: ['#Tech', '#AI', '#Automation'],
+  ai_models: ['#LLM', '#GenerativeAI', '#MachineLearning', '#AI'],
+  ai_agents: ['#AIAgents', '#AgenticAI', '#Automation', '#AI'],
+  general: ['#AI', '#AINews', '#Automation'],
 };
 
 /** Hebrew search phrases per topic, used to top up a thin keyword list. */
 const SEO_KEYWORDS: Record<GrowthTopic, string[]> = {
   ai: ['סוכני AI לעסקים', 'בינה מלאכותית לעסקים', 'אוטומציה לעסקים', 'כלי AI'],
-  cyber: ['אבטחת סייבר לעסקים', 'אבטחת מידע', 'הגנה מפני פישינג', 'סייבר לעסק קטן'],
-  cloud: ['פיתוח תוכנה', 'תשתיות ענן', 'אוטומציה לעסקים', 'DevOps'],
-  general: ['בינה מלאכותית', 'אוטומציה לעסקים', 'פיתוח תוכנה', 'טכנולוגיה לעסקים'],
+  ai_models: ['מודלי שפה', 'מודלי AI חדשים', 'השוואת מודלים', 'בינה מלאכותית גנרטיבית'],
+  ai_agents: ['סוכני AI', 'בניית סוכן AI', 'סוכנים אוטונומיים', 'אוטומציה עם AI'],
+  general: ['בינה מלאכותית', 'חדשות AI', 'כלי AI', 'מדריכי AI'],
 };
 
 /** Default trigger word per topic when neither the operator nor the model supplied a usable one. */
-const TOPIC_KEYWORD: Record<GrowthTopic, string> = { ai: 'סוכן', cyber: 'הגנה', cloud: 'ענן', general: 'מדריך' };
+const TOPIC_KEYWORD: Record<GrowthTopic, string> = { ai: 'סוכן', ai_models: 'מודל', ai_agents: 'סוכן', general: 'מדריך' };
 
 const TOPIC_LABEL: Record<GrowthTopic, string> = {
   ai: 'בינה מלאכותית ואוטומציה',
-  cyber: 'סייבר ואבטחת מידע',
-  cloud: 'ענן, תשתיות ופיתוח',
-  general: 'טכנולוגיה לעסקים',
+  ai_models: 'מודלי שפה ומודלי AI',
+  ai_agents: 'סוכני AI אוטונומיים',
+  general: 'חדשות ומדריכי AI',
 };
 
 const KIND_LABEL: Record<GrowthKind, string> = { carousel: 'קרוסלת אינסטגרם', reel: 'ריל', post: 'פוסט אינסטגרם' };
@@ -146,7 +146,7 @@ function stripBidi(text: string): string {
 }
 
 export function toGrowthTopic(topic: string): GrowthTopic {
-  return topic === 'ai' || topic === 'cyber' || topic === 'cloud' ? topic : 'general';
+  return topic === 'ai' || topic === 'ai_models' || topic === 'ai_agents' ? topic : 'general';
 }
 
 function toGrowthKind(kind: string): GrowthKind {
@@ -287,7 +287,7 @@ export function normalizeSeoKeywords(raw: unknown, topicRaw: string): string[] {
 
 // ─── Gemini operations ───────────────────────────────────────────────────────────────────────
 
-const GROWTH_SYSTEM_INSTRUCTION = `אתה אסטרטג צמיחה אורגנית באינסטגרם עבור דניאל בן ברוך (mrdaniel.co.il) — נישת AI, סייבר, אוטומציה ופיתוח תוכנה, קהל ישראלי. המטרה: עוקבים איכותיים שמתעניינים באמת בתחום, לא מספרים ריקים.
+const GROWTH_SYSTEM_INSTRUCTION = `אתה אסטרטג צמיחה אורגנית באינסטגרם עבור דניאל בן ברוך (mrdaniel.co.il) — נישת AI: חדשות AI, מודלי שפה וסוכני AI אוטונומיים, קהל ישראלי. המטרה: עוקבים איכותיים שמתעניינים באמת בתחום, לא מספרים ריקים.
 
 ${BRAND_KNOWLEDGE_BASE}
 
@@ -329,8 +329,8 @@ const PACK_TASK = `המשימה: הפק את שכבת ההפצה של הפוסט
    - publicReplies: 3 תשובות פומביות קצרות ושונות זו מזו (עד 8 מילים כל אחת) למי שהגיב — אוטומציה ששולחת את אותה תשובה בדיוק לכולם מזוהה כספאם.
    - dmMessage: 2–3 משפטים: תודה, מסירת ה-deliverable, הזמנה לשאול שאלה. בלי קישור — כפתור ה-DM נושא אותו.
    - dmButtonLabel: עד 4 מילים.
-2. hashtags: 3–4 האשטגים בעברית לנישה הישראלית (כמו #בינהמלאכותית #סייבר #אוטומציה #פיתוחתוכנה) ועוד 2–3 האשטגים באנגלית בנפח חיפוש גבוה (כמו #AI #CyberSecurity) — כולם רלוונטיים לתוכן, בלי רווח בתוך תג.
-3. seoKeywords: 4–6 ביטויי חיפוש בעברית (2–4 מילים כל אחד) שאנשים מקלידים בחיפוש של אינסטגרם ושהתוכן עונה עליהם (כמו "סוכני AI לעסקים", "אבטחת סייבר לעסק קטן").
+2. hashtags: 3–4 האשטגים בעברית לנישה הישראלית (כמו #בינהמלאכותית #סוכניAI #מודליAI #אוטומציה) ועוד 2–3 האשטגים באנגלית בנפח חיפוש גבוה (כמו #AI #AIAgents) — כולם רלוונטיים לתוכן, בלי רווח בתוך תג.
+3. seoKeywords: 4–6 ביטויי חיפוש בעברית (2–4 מילים כל אחד) שאנשים מקלידים בחיפוש של אינסטגרם ושהתוכן עונה עליהם (כמו "סוכני AI", "השוואת מודלי שפה").
 {"leadMagnet":{"keyword":"...","englishKeyword":"...","deliverable":"...","captionCta":"...","publicReplies":["..."],"dmMessage":"...","dmButtonLabel":"..."},"hashtags":["#..."],"seoKeywords":["..."]}`;
 
 /** Sanitised single-line Hebrew copy, capped. */

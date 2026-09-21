@@ -1,6 +1,6 @@
 // Shared types + constants for the news-driven Content Agent (NewsContentAgent.tsx).
 
-export type NewsTopic = 'ai' | 'ai_models' | 'cyber' | 'cloud' | 'devops' | 'general';
+export type NewsTopic = 'ai' | 'ai_models' | 'ai_agents' | 'general';
 
 /** Mirrors the site's `NewsItem` shape (src/services/newsService.ts) — the fields the generator uses. */
 export interface NewsItem {
@@ -19,24 +19,20 @@ export interface NewsItem {
 }
 
 /** The category buttons in the "Fetch Latest News" action bar. */
-export type NewsCategory = 'cyber' | 'cloud' | 'ai' | 'ai_models' | 'devops' | 'all';
+export type NewsCategory = 'ai' | 'ai_models' | 'ai_agents' | 'all';
 
 export const CATEGORY_LABEL: Record<NewsCategory, string> = {
-  cyber: 'סייבר ואבטחת מידע',
-  cloud: 'ענן ותשתיות',
   ai: 'בינה מלאכותית',
   ai_models: 'מודלי AI וחידושים',
-  devops: 'ניהול מערכות ו-DevOps',
+  ai_agents: 'סוכני AI',
   all: 'הכל',
 };
 
 /** Category → which `topic` values from the feed count as a match. `all` = no filter. */
 export const CATEGORY_TOPICS: Record<NewsCategory, NewsTopic[] | null> = {
-  cyber: ['cyber'],
-  cloud: ['cloud'],
   ai: ['ai'],
   ai_models: ['ai_models'],
-  devops: ['devops'],
+  ai_agents: ['ai_agents'],
   all: null,
 };
 

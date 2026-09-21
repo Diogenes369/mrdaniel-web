@@ -39,7 +39,7 @@ const RADAR_KEY = 'ig:radar_v1';
 const REPLIES_KEY = 'ig:replies_v1';
 const REPLY_INPUT_KEY = 'ig:reply_input_v1';
 
-const SOURCE_CATEGORIES: NewsCategory[] = ['all', 'cyber', 'cloud', 'ai', 'devops'];
+const SOURCE_CATEGORIES: NewsCategory[] = ['all', 'ai', 'ai_models', 'ai_agents'];
 
 function loadJson<T>(key: string): T | null {
   try {
@@ -208,7 +208,7 @@ export default function IgGrowthAgent() {
           <TrendingUp className="w-3.5 h-3.5" /> סוכן צמיחה ומעורבות לאינסטגרם
         </div>
         <p className="text-sm text-zinc-400 leading-relaxed">
-          שני כלים: <span className="text-zinc-200 font-bold">ראדאר טרנדים</span> שמנתח את הפיד המקצועי (סייבר · AI · ענן · טכנולוגיה)
+          שני כלים: <span className="text-zinc-200 font-bold">ראדאר טרנדים</span> שמנתח את הפיד המקצועי (חדשות AI · מודלים · סוכנים · טכנולוגיה)
           ומפיק כותרות ויראליות ותבניות תוכן, ו<span className="text-zinc-200 font-bold">מחולל תגובות חכם</span> שמנסח תגובה מקצועית
           לפוסטים של מובילי דעה — הכול בקול המותג של דניאל. יש גיבוי דטרמיניסטי מלא לכל כלי גם ללא חיבור ל-AI.
         </p>
@@ -451,7 +451,7 @@ export default function IgGrowthAgent() {
 
         {!replySet && (
           <p className="text-xs text-zinc-600 leading-relaxed mt-3">
-            הכלי מפיק 3 תגובות מובחנות: תוספת ערך מקצועית, שאלה מעוררת דיון, ומשפט חד וזכיר — כולן בטון של דניאל (מומחה IT, סייבר ו-AI),
+            הכלי מפיק 3 תגובות מובחנות: תוספת ערך מקצועית, שאלה מעוררת דיון, ומשפט חד וזכיר — כולן בטון של דניאל (בונה סוכני AI ומפרק מודלי שפה),
             בלי קישורים ובלי "עקבו אחריי". לחיצה על "העתק ופתח" מעתיקה את התגובה ופותחת את הפוסט (או את אינסטגרם) בלשונית חדשה.
           </p>
         )}

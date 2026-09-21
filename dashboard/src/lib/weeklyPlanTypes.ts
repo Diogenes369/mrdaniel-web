@@ -4,14 +4,14 @@
  * dashboard/src/lib/agentTypes.ts. Keep in sync by hand if the shape changes.
  */
 
-export type WeeklyTopic = 'ai-agents' | 'wifi7-networking' | 'cybersecurity' | 'automation';
+export type WeeklyTopic = 'ai-agents' | 'llm-models' | 'ai-news' | 'automation';
 export type WeeklyPlatform = 'instagram-reels' | 'tiktok' | 'linkedin' | 'youtube-shorts';
 export type ContentStatus = 'draft' | 'approved' | 'scheduled';
 
 export const WEEKLY_TOPIC_LABEL: Record<WeeklyTopic, string> = {
   'ai-agents': 'סוכני AI',
-  'wifi7-networking': 'רשתות ארגוניות / Wi-Fi 7',
-  cybersecurity: 'אבטחת סייבר',
+  'llm-models': 'מודלי שפה',
+  'ai-news': 'חדשות AI',
   automation: 'אוטומציה',
 };
 

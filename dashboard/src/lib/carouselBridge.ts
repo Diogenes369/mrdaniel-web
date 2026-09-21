@@ -173,7 +173,7 @@ export const STYLES = [
   { id: 'photoreal', label: 'צילום קונטקסטואלי', hint: 'תצלום אמיתי תואם נושא', source: 'photo' },
   { id: 'dark-minimal', label: 'טק מינימליסטי כהה', hint: 'רקע כהה, ניגודיות גבוהה', source: 'photo' },
   { id: 'concept-art', label: 'אמנות קונספט', hint: 'איור מושגי', source: 'hermes' },
-  { id: 'enterprise', label: 'ארגוני בהיר', hint: 'נקי, עסקי, ניגודיות חדה', source: 'photo' },
+  { id: 'enterprise', label: 'עסקי בהיר', hint: 'נקי, מקצועי, ניגודיות חדה', source: 'photo' },
 ] as const;
 
 /** Output presets — exact pixel dimensions per platform. */

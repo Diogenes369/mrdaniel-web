@@ -3,11 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   BookOpen,
-  ShieldAlert,
   ShieldCheck,
-  Terminal,
-  Network,
-  Package,
   Eye,
   X,
   ShoppingCart,
@@ -19,10 +15,6 @@ import {
   Check,
   Users,
   Clock,
-  Bot,
-  Server,
-  Gauge,
-  TrendingUp,
   Code2,
   Search,
   type LucideIcon,
@@ -33,11 +25,9 @@ import SocialLinks from '../components/SocialLinks';
 import AiAgentsSection from '../components/AiAgentsSection';
 import { prefersReducedMotion } from '../lib/gsap';
 
-type Category = 'ai' | 'cyber' | 'automation';
 
 interface Product {
   id: string;
-  category: Category;
   tierLabel: string;
   title: string;
   englishTag: string;
@@ -57,18 +47,17 @@ interface Product {
 const PRODUCTS: Product[] = [
   {
     id: 'ai-agentic-2026',
-    category: 'ai',
     tierLabel: 'Premium Flagship · VIP Guide',
     title: 'ארכיטקטורת סוכני AI אוטונומיים ומערכות Agentic 2026',
-    englishTag: 'Enterprise Agentic AI Systems',
-    subtitle: 'המדריך המלא לבניית סוכנים עצמאיים, פיתוח Multi-Agent Workflows, וחיבור ל-Enterprise APIs & Vector DBs.',
+    englishTag: 'Agentic AI Systems',
+    subtitle: 'המדריך המלא לבניית סוכנים עצמאיים, פיתוח Multi-Agent Workflows, וחיבור ל-APIs ול-Vector DBs.',
     icon: Sparkles,
     accent: 'text-brand-400',
     glow: 'group-hover:shadow-[0_20px_70px_rgba(0,255,102,0.2)]',
     highlights: [
       'תזמור Multi-Agent Workflows מקצה לקצה',
-      'חיבור סוכנים ל-Enterprise APIs ו-Vector DBs',
-      'Guardian Agents וממשל AI ארגוני',
+      'חיבור סוכנים ל-APIs חיצוניים ול-Vector DBs',
+      'Guardian Agents: בקרה על מה שהסוכן רשאי לעשות',
       'ניהול עלויות, Prompt Caching ו-Model Routing',
       'תבניות קוד מוכנות לפריסה בפרודקשן',
     ],
@@ -76,8 +65,8 @@ const PRODUCTS: Product[] = [
       'יסודות ה-Agentic AI וההבדל מ-Chat רגיל',
       'תכנון ארכיטקטורת Multi-Agent Workflows',
       'בניית שכבת Guardian Agents לממשל ובקרה',
-      'חיבור ל-Vector DBs ומאגרי ידע ארגוניים',
-      'אינטגרציה עם Enterprise APIs קיימים',
+      'חיבור ל-Vector DBs ולמאגרי ידע',
+      'אינטגרציה עם APIs קיימים',
       'ניהול עלויות, Model Routing ו-Prompt Caching',
       'הערכת ביצועים (Evals) ובדיקות רגרסיה',
       'פרויקט מקצה לקצה: מ-POC לפרודקשן',
@@ -85,7 +74,7 @@ const PRODUCTS: Product[] = [
     codeLang: 'python',
     codeSnippet: `agent = Agent(
     name="ops-orchestrator",
-    tools=[vector_db_search, enterprise_api_call],
+    tools=[vector_db_search, http_api_call],
     guardian=GuardianAgent(policy="least_privilege"),
 )
 result = agent.run(task="Reconcile weekly billing anomalies")`,
@@ -93,160 +82,13 @@ result = agent.run(task="Reconcile weekly billing anomalies")`,
     price: 290,
     badge: 'Premium Flagship',
   },
-  {
-    id: 'zero-trust-cloud-2026',
-    category: 'cyber',
-    tierLabel: 'Standard Guide',
-    title: 'Zero-Trust Architecture & Cloud Hardening 2026',
-    englishTag: 'Practical Enterprise Hardening',
-    subtitle: 'מדריך הקשחה מלא ליישום Zero-Trust אמיתי בענן ובארגון — פרוצדורות, רשימות תיוג וקוד תשתית, לא עוד תיאוריה.',
-    icon: ShieldAlert,
-    accent: 'text-brand-300',
-    glow: 'group-hover:shadow-[0_20px_60px_rgba(159,232,112,0.15)]',
-    highlights: [
-      'מיפוי משטח תקיפה ו-Micro-Segmentation מעשי',
-      'הקשחת IAM / Entra ID ומדיניות MFA אדפטיבית',
-      'הקשחת ענן Cloud-Native ו-IaC Scanning',
-      'תוכנית IR ו-BCP/DRP מוכנה להטמעה',
-      'רשימות תיוג (Checklists) מוכנות לביקורת אבטחה',
-    ],
-    chapters: [
-      'עקרונות Zero-Trust: Never Trust, Always Verify',
-      'מיפוי משטח התקיפה הארגוני שלכם',
-      'הקשחת זהויות: IAM, Entra ID ו-Conditional Access',
-      'Micro-Segmentation ברשת הארגונית והענן',
-      'CSPM ו-IaC Scanning לסביבות ענן דינמיות',
-      'בניית תוכנית תגובה לאירועים (IR Playbook)',
-      'BCP/DRP: המשכיות עסקית והתאוששות מאסון',
-      'רשימות תיוג להטמעה ולביקורת תקופתית',
-    ],
-    codeLang: 'hcl',
-    codeSnippet: `resource "aws_iam_policy" "least_privilege" {
-  name   = "zero-trust-baseline"
-  policy = jsonencode({
-    Statement = [{
-      Effect   = "Deny"
-      Action   = "*"
-      Resource = "*"
-      Condition = { Bool = { "aws:MultiFactorAuthPresent" = "false" } }
-    }]
-  })
-}`,
-    audience: 'CISO-ים, מהנדסי אבטחת רשת ואחראי תשתיות שרוצים ליישם Zero-Trust בפועל — לא רק להציג אותו במצגת.',
-    price: 129,
-    badge: 'הכי נמכר',
-  },
-  {
-    id: 'powershell-network-automation',
-    category: 'automation',
-    tierLabel: 'Standard Guide',
-    title: 'מדריך PowerShell, אוטומציות וסקריפטים לניהול רשת וסייבר',
-    englishTag: 'Network Admin Scripting Toolkit',
-    subtitle: 'ספריית סקריפטים מוכנה לשימוש + שיטות עבודה לאוטומציה של ניהול רשת, סייבר ותשתיות Windows.',
-    icon: Terminal,
-    accent: 'text-brand-600',
-    glow: 'group-hover:shadow-[0_20px_60px_rgba(92,146,0,0.15)]',
-    highlights: [
-      'עשרות סקריפטי PowerShell מוכנים לשימוש מיידי',
-      'אוטומציה של ניהול משתמשים, הרשאות וגיבויים',
-      'ניטור מערכת ודוחות אירועי אבטחה בסקריפט אחד',
-      'שילוב עם Task Scheduler ואוטומציה פנים-ארגונית',
-    ],
-    chapters: [
-      'יסודות PowerShell למנהלי רשת וסייבר',
-      'אוטומציה של ניהול משתמשים והרשאות ב-AD',
-      'סקריפטים לגיבוי ולשחזור אוטומטי',
-      'ניטור מערכת, לוגים ודוחות אירועי אבטחה',
-      'תזמון משימות עם Task Scheduler',
-      'ספריית סקריפטים מוכנה — Copy/Paste לפרודקשן',
-    ],
-    codeLang: 'powershell',
-    codeSnippet: `Get-ADUser -Filter {Enabled -eq $true} |
-  Where-Object { $_.LastLogonDate -lt (Get-Date).AddDays(-90) } |
-  Disable-ADAccount -WhatIf`,
-    audience: 'מנהלי רשת ותשתיות (Sysadmins) שרוצים לחסוך שעות עבודה שבועיות באמצעות אוטומציה אמיתית, לא תיאוריה כללית.',
-    price: 99,
-  },
-  {
-    id: 'infra-fortigate-perimeter',
-    category: 'cyber',
-    tierLabel: 'Standard Guide',
-    title: 'אבטחת תשתיות תקשורת, FortiGate וציוד היקפי בארגון',
-    englishTag: 'Perimeter & Network Infrastructure Security',
-    subtitle: 'הקשחה מעשית של ציוד היקפי, מדיניות FortiGate ותצורת רשת ארגונית — צעד אחר צעד, כולל קונפיגורציות אמיתיות.',
-    icon: Network,
-    accent: 'text-brand-400',
-    glow: 'group-hover:shadow-[0_20px_60px_rgba(0,255,102,0.15)]',
-    highlights: [
-      'תצורת מדיניות FortiGate מאובטחת מקצה לקצה',
-      'הקשחת ציוד היקפי: Firewalls, VPN ו-Load Balancers',
-      'פילוח רשת ומדיניות גישה בין VLANs',
-      'ניטור תעבורה וזיהוי חריגות ברמת הרשת',
-    ],
-    chapters: [
-      'ארכיטקטורת רשת היקפית מאובטחת',
-      'תצורת FortiGate: מדיניות בסיס ו-Best Practices',
-      'הקשחת VPN וגישה מרוחקת מאובטחת',
-      'פילוח VLAN ומדיניות גישה בין מקטעים',
-      'ניטור תעבורה וזיהוי אנומליות רשת',
-      'רשימת תיוג הקשחה לציוד היקפי',
-    ],
-    codeLang: 'bash',
-    codeSnippet: `config firewall policy
-  edit 12
-    set srcintf "lan"
-    set dstintf "wan1"
-    set action accept
-    set schedule "always"
-    set utm-status enable
-    set ssl-ssh-profile "deep-inspection"
-  next
-end`,
-    audience: 'מהנדסי רשת ואבטחה האחראים על ציוד היקפי ארגוני שרוצים תצורת אבטחה מאומתת, לא ניחושים.',
-    price: 149,
-  },
-];
-
-const INDIVIDUAL_TOTAL = PRODUCTS.reduce((sum, p) => sum + p.price, 0);
-const BUNDLE_PRICE = 399;
-const BUNDLE_SAVINGS = INDIVIDUAL_TOTAL - BUNDLE_PRICE;
-
-const BUNDLE: Product = {
-  id: 'complete-bundle-2026',
-  category: 'ai',
-  tierLabel: 'VIP · Complete Collection',
-  title: 'חבילת האוסף המלאה - כל המגזינים והמדריכים הדיגיטליים',
-  englishTag: 'The Complete 2026 Collection',
-  subtitle: `כל ${PRODUCTS.length} המדריכים המלאים במחיר מוזל משמעותית — חיסכון של ₪${BUNDLE_SAVINGS} לעומת רכישה נפרדת, כולל עדכונים עתידיים.`,
-  icon: Package,
-  accent: 'text-black',
-  glow: '',
-  highlights: [
-    `כל ${PRODUCTS.length} המדריכים המלאים (AI, סייבר, תשתיות ואוטומציה)`,
-    `חיסכון של ₪${BUNDLE_SAVINGS} לעומת רכישה נפרדת`,
-    'עדכוני גרסאות עתידיים ללא תוספת תשלום',
-    'עדיפות במענה לשאלות ובתמיכה טכנית',
-  ],
-  chapters: PRODUCTS.map((p) => `${p.title} — מלא`),
-  codeLang: '',
-  codeSnippet: '',
-  audience: 'ארגונים וצוותים שרוצים כיסוי מלא של AI, סייבר, תשתיות ואוטומציה תחת רכישה אחת — במקום ארבע רכישות נפרדות.',
-  price: BUNDLE_PRICE,
-  badge: 'VIP · המבצע המשתלם ביותר',
-};
-
-const CATEGORY_FILTERS: { id: Category | 'all'; label: string }[] = [
-  { id: 'all', label: 'הכל' },
-  { id: 'ai', label: 'סוכני AI' },
-  { id: 'cyber', label: 'סייבר ותשתיות' },
-  { id: 'automation', label: 'אוטומציות' },
 ];
 
 const VALUE_PROPS = [
   { icon: Check, title: 'אפס תיאוריות — 100% קוד וארכיטקטורה', description: 'כל פרק בנוי סביב דוגמאות אמיתיות, בלוקים של קוד ותבניות מוכנות — לא עוד הסברים כלליים שאי אפשר ליישם.' },
   { icon: Layers, title: 'מדריכים מעשיים צעד-אחר-צעד', description: 'מבנה מדורג מהיסודות ועד ליישום מלא, כך שאפשר להתחיל לעבוד כבר מהפרק הראשון — לא רק בסוף החוברת.' },
-  { icon: RefreshCw, title: 'גישה לעדכונים עתידיים', description: 'עולם ה-AI והסייבר משתנה מדי חודש — רוכשי החבילה המלאה מקבלים עדכוני תוכן ללא עלות נוספת.' },
-  { icon: Users, title: 'נכתב מניסיון בשטח, לא באקדמיה', description: 'כל תוכן מבוסס על פרויקטים אמיתיים בארגונים — כולל המכשולים וההחלטות שלא כתובים בשום מדריך רשמי.' },
+  { icon: RefreshCw, title: 'גישה לעדכונים עתידיים', description: 'עולם ה-AI משתנה מדי חודש — עדכוני תוכן נשלחים לרוכשים.' },
+  { icon: Users, title: 'נכתב מניסיון בשטח, לא באקדמיה', description: 'כל תוכן מבוסס על סוכנים שנבנו ורצים בפועל — כולל המכשולים וההחלטות שלא כתובים בשום מדריך רשמי.' },
 ];
 
 const FAQ_ITEMS = [
@@ -255,12 +97,12 @@ const FAQ_ITEMS = [
     a: 'פורמט דיגיטלי מיידי בלבד — קובץ PDF מלא בתוספת קובצי קוד וסקריפטים (כשרלוונטי), נשלחים ישירות למייל מיד לאחר אישור התשלום. אין מהדורה מודפסת.',
   },
   {
-    q: 'האם יש רישיון רכישה לצוותים או לארגונים?',
+    q: 'האם יש רישיון רכישה לצוות?',
     a: 'כן — ניתן לרכוש רישיון צוות למספר עובדים במחיר מותאם. יש למלא את פרטי הפנייה ולציין את גודל הצוות, ותקבלו הצעת מחיר מותאמת אישית תוך יום עסקים.',
   },
   {
     q: 'האם אקבל עדכונים עתידיים לתוכן?',
-    a: 'רוכשי חבילת האוסף המלאה מקבלים כל עדכון תוכן עתידי ללא עלות נוספת. רוכשי מדריך בודד מקבלים הנחה משמעותית על עדכוני גרסה עתידיים לאותו מדריך.',
+    a: 'כן. עדכוני תוכן למדריך נשלחים לרוכשים בלי עלות נוספת.',
   },
   {
     q: 'כמה זמן לוקח לקבל את המדריך אחרי הרכישה?',
@@ -269,42 +111,6 @@ const FAQ_ITEMS = [
   {
     q: 'האם ניתן לבטל רכישה ולקבל החזר כספי?',
     a: 'קובץ דיגיטלי שהורד אינו ניתן בדרך כלל להחזרה, אך בכל בעיה או טעות ברכישה ניתן לפנות ישירות ונטפל בכך באופן אישי.',
-  },
-];
-
-interface Role {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-  hoursSaved: number;
-  scriptsIncluded: number;
-  blurb: string;
-}
-
-const ROLES: Role[] = [
-  {
-    id: 'it',
-    label: 'מנהל IT / תשתיות',
-    icon: Server,
-    hoursSaved: 6,
-    scriptsIncluded: 22,
-    blurb: 'ספריית הסקריפטים המוכנה חוסכת כתיבת אוטומציה מאפס לכל משימת ניהול רשת חוזרת — גיבויים, הרשאות וניטור.',
-  },
-  {
-    id: 'cyber',
-    label: 'מומחה סייבר',
-    icon: ShieldAlert,
-    hoursSaved: 9,
-    scriptsIncluded: 18,
-    blurb: 'רשימות תיוג והקשחה מוכנות (Zero-Trust ו-FortiGate) מקצרות משמעותית את זמן ההיערכות למבדק אבטחה או ביקורת.',
-  },
-  {
-    id: 'ai',
-    label: 'מפתח / אדריכל AI',
-    icon: Bot,
-    hoursSaved: 12,
-    scriptsIncluded: 15,
-    blurb: 'תבניות קוד לסוכנים ו-Multi-Agent Workflows חוסכות שבועות של ניסוי וטעייה בבניית ארכיטקטורה מאפס.',
   },
 ];
 
@@ -324,7 +130,7 @@ function ProductCard({ product, onPreview }: { product: Product; onPreview: () =
       data-search-target={product.id}
       className="group"
     >
-      <div className={`cyber-glass cyber-glass--marketing rounded-2xl p-5 sm:p-6 ${product.glow}`}>
+      <div className={`glass-panel glass-panel--marketing rounded-2xl p-5 sm:p-6 ${product.glow}`}>
         {product.badge && (
           <span className="absolute top-4 left-4 z-10 text-[10px] font-mono font-bold tracking-widest uppercase bg-brand-500 text-black px-2.5 py-1 rounded-full shadow-[0_0_12px_rgba(0,255,102,0.5)]">
             {product.badge}
@@ -390,44 +196,6 @@ function ProductCard({ product, onPreview }: { product: Product; onPreview: () =
             </WebButton>
           </div>
         </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function VipBundleBanner() {
-  const reduced = prefersReducedMotion();
-
-  return (
-    <motion.div
-      className="relative overflow-hidden rounded-[1.75rem] border border-brand-500/50 bg-gradient-to-l from-brand-500/15 via-carbon-900 to-carbon-900 p-6 md:p-8 mb-14"
-    >
-      {reduced ? (
-        <div className="absolute -inset-1 rounded-[1.75rem] pointer-events-none" style={{ boxShadow: '0 0 40px 6px rgba(0,255,102,0.25)' }} aria-hidden="true" />
-      ) : (
-        <motion.div
-          className="absolute -inset-1 rounded-[1.75rem] pointer-events-none"
-          animate={{ opacity: [0.15, 0.4, 0.15] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ boxShadow: '0 0 60px 10px rgba(0,255,102,0.35)' }}
-          aria-hidden="true"
-        />
-      )}
-      <div className="relative flex flex-col md:flex-row items-center justify-between gap-5">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 shrink-0 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-black">
-            <Package className="w-7 h-7" />
-          </div>
-          <div>
-            <span className="font-mono text-xs font-bold text-brand-400 uppercase tracking-widest">מארז VIP משולב</span>
-            <h3 className="font-display text-xl md:text-2xl font-black text-white mt-1">{BUNDLE.title}</h3>
-            <p className="text-zinc-400 text-sm mt-1">חיסכון של ₪{BUNDLE_SAVINGS} לעומת רכישה נפרדת — כל {PRODUCTS.length} המדריכים המלאים.</p>
-          </div>
-        </div>
-        <WebButton variant="primary" onClick={() => openLead(purchaseTopic(BUNDLE))} className="shrink-0 !px-8 whitespace-nowrap">
-          <ShoppingCart size={16} />
-          לרכישת המארז ב-₪{BUNDLE_PRICE}
-        </WebButton>
       </div>
     </motion.div>
   );
@@ -527,75 +295,6 @@ function PreviewModal({ product, onClose }: { product: Product | null; onClose: 
   );
 }
 
-function RoiMeter() {
-  const [activeId, setActiveId] = useState(ROLES[0].id);
-  const active = ROLES.find((r) => r.id === activeId)!;
-
-  return (
-    <div className="cyber-glass cyber-glass--info max-w-3xl mx-auto rounded-[1.75rem] p-6 sm:p-8 mb-24">
-      <div className="flex items-center gap-2.5 mb-2 justify-center">
-        <Gauge className="w-5 h-5 text-brand-400" />
-        <h3 className="font-display font-black text-2xl text-white">מד ערך: כמה זמן החבילה חוסכת לכם?</h3>
-      </div>
-      <p className="text-zinc-400 text-sm text-center mb-7 max-w-xl mx-auto">בחרו את התפקיד שלכם וראו הערכה של שעות עבודה וסקריפטים/תבניות מוכנות שהחבילה המלאה חוסכת לכם.</p>
-
-      <div className="flex items-center justify-center gap-2 flex-wrap mb-7">
-        {ROLES.map((role) => {
-          const isActive = role.id === activeId;
-          return (
-            <button
-              key={role.id}
-              type="button"
-              onClick={() => setActiveId(role.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-full border text-sm font-bold transition-colors min-h-11 ${
-                isActive ? 'bg-brand-500 border-brand-500 text-black' : 'bg-black/30 border-white/10 text-zinc-300 hover:border-brand-500/40'
-              }`}
-            >
-              <role.icon className="w-4 h-4" />
-              {role.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeId}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.25 }}
-        >
-          <div className="grid grid-cols-2 gap-4 mb-5">
-            <div className="bg-black/40 border border-white/10 rounded-2xl p-5 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-brand-400 font-mono text-3xl font-black">
-                <TrendingUp className="w-6 h-6" />
-                {active.hoursSaved}
-              </div>
-              <div className="text-zinc-400 text-xs mt-1">שעות עבודה נחסכות בחודש בממוצע</div>
-            </div>
-            <div className="bg-black/40 border border-white/10 rounded-2xl p-5 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-brand-400 font-mono text-3xl font-black">
-                <Code2 className="w-6 h-6" />
-                {active.scriptsIncluded}
-              </div>
-              <div className="text-zinc-400 text-xs mt-1">סקריפטים ותבניות מוכנות לשימוש</div>
-            </div>
-          </div>
-          <p className="text-zinc-300 text-sm leading-relaxed text-center max-w-lg mx-auto mb-6">{active.blurb}</p>
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="text-center">
-        <WebButton variant="primary" onClick={() => openLead(purchaseTopic(BUNDLE))} className="!px-8">
-          <ShoppingCart size={16} />
-          לרכישת החבילה המלאה
-        </WebButton>
-      </div>
-    </div>
-  );
-}
-
 function FaqAccordion() {
   const [open, setOpen] = useState<number | null>(0);
 
@@ -604,7 +303,7 @@ function FaqAccordion() {
       {FAQ_ITEMS.map((item, idx) => {
         const isOpen = open === idx;
         return (
-          <div key={item.q} className="cyber-glass cyber-glass--info rounded-2xl overflow-hidden">
+          <div key={item.q} className="glass-panel glass-panel--info rounded-2xl overflow-hidden">
             <button
               type="button"
               onClick={() => setOpen(isOpen ? null : idx)}
@@ -636,9 +335,9 @@ function FaqAccordion() {
 
 function SocialFollowBanner() {
   return (
-    <div className="cyber-glass cyber-glass--marketing max-w-2xl mx-auto text-center rounded-2xl p-6 sm:p-8">
+    <div className="glass-panel glass-panel--marketing max-w-2xl mx-auto text-center rounded-2xl p-6 sm:p-8">
       <p className="text-zinc-200 text-base md:text-lg font-medium mb-5 leading-relaxed">
-        עקבו אחריי ב-LinkedIn ו-Instagram לקבלת עדכונים חמים, ניתוחי ארכיטקטורה וטיפים מעשיים ב-AI וסייבר
+        עקבו אחריי ב-LinkedIn ו-Instagram לקבלת עדכונים חמים, פירוקי מודלים וטיפים מעשיים לבניית סוכני AI
       </p>
       <SocialLinks className="justify-center" />
     </div>
@@ -653,15 +352,14 @@ const STATS = [
 
 export default function MagazinesPage() {
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
-  const [activeFilter, setActiveFilter] = useState<Category | 'all'>('all');
   const [query, setQuery] = useState('');
 
   const visibleProducts = useMemo(() => {
-    const base = activeFilter === 'all' ? PRODUCTS : PRODUCTS.filter((p) => p.category === activeFilter);
+    const base = PRODUCTS;
     const q = query.trim().toLowerCase();
     if (!q) return base;
     return base.filter((p) => p.title.toLowerCase().includes(q) || p.subtitle.toLowerCase().includes(q));
-  }, [activeFilter, query]);
+  }, [query]);
 
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
@@ -669,7 +367,7 @@ export default function MagazinesPage() {
         <PageHero
           badgeIcon={BookOpen}
           badgeLabel="החנות הדיגיטלית · Premium Guides 2026"
-          title="מגזינים וחוברות פרימיום: המדריכים המעשיים לעולם ה-AI והסייבר"
+          title="מגזינים וחוברות פרימיום: המדריכים המעשיים לעולם ה-AI"
           subtitle="ארכיטקטורה אמיתית, סקריפטים מוכנים לשימוש ואפס פילוסופיה מיותרת — כל מדריך נבנה כדי שתתחילו ליישם כבר מהפרק הראשון."
         />
 
@@ -706,29 +404,10 @@ export default function MagazinesPage() {
           />
         </div>
 
-        <div className="flex items-center justify-center gap-3 flex-wrap mb-12">
-          {CATEGORY_FILTERS.map((f) => {
-            const isActive = activeFilter === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setActiveFilter(f.id)}
-                className={`px-5 py-2.5 rounded-full border text-sm font-bold transition-colors min-h-11 ${
-                  isActive ? 'bg-brand-500 border-brand-500 text-black' : 'bg-carbon-900/60 border-white/10 text-zinc-300 hover:border-brand-500/40'
-                }`}
-              >
-                {f.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <VipBundleBanner />
 
         <AnimatePresence mode="wait">
           <motion.div
-            key={`${activeFilter}-${query}`}
+            key={query}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
@@ -745,7 +424,6 @@ export default function MagazinesPage() {
       </div>
 
       <div className="container-wide">
-        <RoiMeter />
 
         <div className="text-center mb-12">
           <h2 className="font-display text-3xl md:text-4xl font-black text-white mb-4">

@@ -12,11 +12,7 @@ const NAV_LINKS = [
   { name: 'אודות', to: '/about' },
   { name: 'AI', to: '/ai' },
   { name: 'מערכת JARVIS', to: '/jarvis' },
-  { name: 'סייבר', to: '/cyber' },
-  { name: 'דיגיטל', to: '/digital' },
-  { name: 'ארכיטקטורה', to: '/architecture' },
-  { name: 'יכולות', to: '/capabilities' },
-  { name: 'חנות', to: '/magazines' },
+  { name: 'מדריכים', to: '/magazines' },
   { name: 'חדשות', to: '/news' },
 ];
 

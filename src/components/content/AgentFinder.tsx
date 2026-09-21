@@ -112,7 +112,7 @@ export default function AgentFinder() {
     );
 
   return (
-    <div className="mb-16 rounded-2xl cyber-glass cyber-glass--info p-6 md:p-8">
+    <div className="mb-16 rounded-2xl glass-panel glass-panel--info p-6 md:p-8">
       <div className="mb-2 flex items-center gap-2.5">
         <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-brand-400">שלב 1</span>
         <h3 className="font-display text-lg md:text-xl font-bold text-white">מה הסוכן צריך לעשות עבורכם?</h3>

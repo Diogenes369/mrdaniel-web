@@ -29,9 +29,8 @@ import QuickPublishBar from './QuickPublishBar';
 const TOPICS: { id: NewsTopic; label: string }[] = [
   { id: 'ai', label: 'AI / בינה מלאכותית' },
   { id: 'ai_models', label: 'מודלי AI וחידושים' },
-  { id: 'cyber', label: 'סייבר ואבטחה' },
-  { id: 'cloud', label: 'ענן ותשתיות' },
-  { id: 'general', label: 'טכנולוגיה כללית' },
+  { id: 'ai_agents', label: 'סוכני AI' },
+  { id: 'general', label: 'AI כללי' },
 ];
 
 const AGENT_ICON: Record<AgentId, typeof Search> = {
@@ -222,7 +221,7 @@ export default function CarouselStudio() {
           <span className="text-[11px] text-zinc-500 font-mono">סגנון:</span>
           {([
             ['notes', '☀️ פנקס לימוד', 'רקע לבן · כותרות מודגשות · תת-כותרת נטויה'],
-            ['web3', '🌌 WEB3 סייבר', 'אובסידיאן · ניאון · זכוכית'],
+            ['web3', '🌌 WEB3 ניאון', 'אובסידיאן · ניאון · זכוכית'],
           ] as const).map(([id, label, hint]) => (
             <button
               key={id}
@@ -606,7 +605,7 @@ export default function CarouselStudio() {
       {!deck && !busy && (
         <div className="dash-card p-10 text-center text-zinc-500 text-sm leading-relaxed">
           בחרו תדריך מוכן, הדביקו קישור, או הזינו טקסט — וצוות ארבעת הסוכנים (סורק → קופירייטר → קריאייטיב → קומפוזיטור)
-          יפיק קרוסלת אינסטגרם של 10–14 שקופיות בעברית, בסגנון "פנקס לימוד" בהיר או "WEB3 סייבר" — ניתן להחליף סגנון גם אחרי היצירה — מוכנה לייצוא כ-ZIP.
+          יפיק קרוסלת אינסטגרם של 10–14 שקופיות בעברית, בסגנון "פנקס לימוד" בהיר או "WEB3 ניאון" — ניתן להחליף סגנון גם אחרי היצירה — מוכנה לייצוא כ-ZIP.
         </div>
       )}
     </div>

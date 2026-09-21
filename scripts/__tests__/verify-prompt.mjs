@@ -36,7 +36,7 @@ for (const phrase of ['פורץ דרך', 'פורצת דרך', 'בעולם הדי
 // Audience: learners, not organisations (retargeted 2026-09-20). The enterprise vocabulary is
 // banned explicitly as well as the audience being named, because a CVE-heavy news feed pulls a
 // model toward operator language on its own — see the AUDIENCE_RULES header.
-for (const phrase of ['בינה מלאכותית, סייבר ואבטחת מידע', 'מתחילים', 'ללמוד'])
+for (const phrase of ['מודלי שפה, סוכני AI ויישומים מעשיים', 'מתחילים', 'ללמוד', 'התחום הוא AI בלבד'])
   checks.push([`audience names learners: "${phrase}"`, AUDIENCE_RULES.includes(phrase)]);
 for (const phrase of ['בארגון שלכם', 'מפו את נקודות הקצה', 'בעלי עסקים', 'CISO'])
   checks.push([`audience bans enterprise framing: "${phrase}"`, AUDIENCE_RULES.includes(phrase)]);

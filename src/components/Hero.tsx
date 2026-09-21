@@ -16,7 +16,7 @@ export default function Hero() {
 
   const handleCtaClick = (e: React.MouseEvent<HTMLButtonElement | HTMLAnchorElement>) => {
     e.preventDefault();
-    window.dispatchEvent(new CustomEvent('open-lead-modal', { detail: { subject: 'שיחת אפיון — פרויקט חדש', sourceSection: 'Hero CTA' } }));
+    window.dispatchEvent(new CustomEvent('open-lead-modal', { detail: { subject: 'אפיון סוכן AI', sourceSection: 'Hero CTA' } }));
   };
 
   return (

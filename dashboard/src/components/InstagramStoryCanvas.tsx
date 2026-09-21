@@ -22,22 +22,18 @@ import GrowthScorePanel from './GrowthScorePanel';
 import { deckToCaption } from '../lib/socialPublish';
 import { deckToGrowthContent } from '../lib/growthPlaybook';
 
-const CATEGORIES: NewsCategory[] = ['cyber', 'cloud', 'ai', 'ai_models', 'devops', 'all'];
+const CATEGORIES: NewsCategory[] = ['ai', 'ai_models', 'ai_agents', 'all'];
 const TOPIC_LABEL: Record<string, string> = {
   ai: 'AI',
   ai_models: 'מודלי AI',
-  cyber: 'סייבר',
-  cloud: 'ענן / IT',
-  devops: 'DevOps',
-  general: 'גאדג׳טים / טק',
+  ai_agents: 'סוכני AI',
+  general: 'AI כללי',
 };
 const TOPICS: { id: NewsTopic; label: string }[] = [
   { id: 'ai', label: 'AI / בינה מלאכותית' },
   { id: 'ai_models', label: 'מודלי AI וחידושים' },
-  { id: 'cyber', label: 'סייבר ואבטחה' },
-  { id: 'cloud', label: 'ענן ותשתיות' },
-  { id: 'devops', label: 'ניהול מערכות ו-DevOps' },
-  { id: 'general', label: 'טכנולוגיה כללית' },
+  { id: 'ai_agents', label: 'סוכני AI' },
+  { id: 'general', label: 'AI כללי' },
 ];
 
 const SLIDE_FORMATS: { id: SlideFormat; label: string }[] = [
@@ -65,7 +61,7 @@ export default function InstagramStoryCanvas() {
   const [format, setFormat] = useState<SlideFormat>('9:16');
 
   // news mode
-  const [category, setCategory] = useState<NewsCategory>('cyber');
+  const [category, setCategory] = useState<NewsCategory>('ai');
   const [item, setItem] = useState<NewsItem | null>(null);
   const [list, setList] = useState<NewsItem[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);

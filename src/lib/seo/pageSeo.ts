@@ -7,17 +7,17 @@ import { organizationLd, serviceLd, breadcrumbLd } from '../structuredData';
  * — they fall through to DEFAULT_SEO and the page component renders its own richer <Seo> on top
  * once the data loads.
  *
- * Copy is tuned for Hebrew + English search intent around: custom AI agents
- * (סוכני בינה מלאכותית מותאמים אישית), cyber security for SMBs, and web development + marketing.
+ * Copy is tuned for Hebrew + English search intent around: AI news (חדשות AI), new LLMs
+ * (מודלי שפה), and building autonomous AI agents (סוכני AI אוטונומיים). AI-only since 2026-09-21.
  */
 
 export type PageSeoConfig = Omit<SeoProps, 'noindex'> & { noindex?: boolean };
 
 export const PAGE_SEO: Record<string, PageSeoConfig> = {
   '/': {
-    title: 'דניאל בן ברוך — סוכני AI, סייבר ומדריכי AI 2026',
+    title: 'דניאל בן ברוך — חדשות AI, מודלי שפה וסוכני AI אוטונומיים',
     description:
-      'סוכני AI ואוטומציה לעסקים קטנים ולפרטיים, סייבר Zero-Trust ואינטגרציות AI ל-SaaS ברמת Enterprise, וחדשות ומדריכי AI מעשיים לשנת 2026.',
+      'ההאב לחדשות AI בעברית: פירוק מודלי השפה החדשים, בניית סוכני AI אוטונומיים ומדריכים מעשיים ליישום AI, מתעדכן כל יום.',
     path: '/',
     // Organization + WebSite JSON-LD is already emitted statically in index.html (survives client
     // navigation) — no managed block needed here.
@@ -41,80 +41,36 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
   '/jarvis': {
     title: 'מערכת JARVIS לעסקים ולבית חכם — העוזר האישי של העתיד | דניאל בן ברוך',
     description:
-      'מערכת JARVIS (Just A Rather Very Intelligent System) — סוכן בינה מלאכותית פרואקטיבי המנהל סביבה, פרויקטים ואוטומציות: ממשק קולי טבעי, אוטומציה עסקית, שליטה בבית ובמשרד החכם, מבוסס LLM ו-RAG עם אבטחת AES-256. פתרון בהתאמה אישית, ללא מחירון מדף.',
+      'מערכת JARVIS (Just A Rather Very Intelligent System) — סוכן בינה מלאכותית פרואקטיבי המנהל סביבה, פרויקטים ואוטומציות: ממשק קולי טבעי, אוטומציה עסקית, שליטה בבית ובמשרד החכם, מבוסס LLM, RAG וזיכרון וקטורי. פתרון בהתאמה אישית, ללא מחירון מדף.',
     path: '/jarvis',
     jsonLd: [
       serviceLd({
         name: 'מערכת JARVIS — עוזר AI לעסקים ולבית חכם',
         serviceType: 'AI Assistant & Automation System',
         description:
-          'תכנון והטמעה של מערכת JARVIS: ממשק קולי טבעי (NLP), אוטומציה וניהול עסקי, שליטה במכשירי IoT בבית ובמשרד, מבוססת LLM, RAG וזיכרון וקטורי עם אבטחת מידע מקצה לקצה.',
+          'תכנון והטמעה של מערכת JARVIS: ממשק קולי טבעי (NLP), אוטומציה וניהול עסקי, שליטה במכשירי IoT בבית ובמשרד, מבוססת LLM, RAG וזיכרון וקטורי.',
         path: '/jarvis',
       }),
       breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'מערכת JARVIS', path: '/jarvis' }]),
     ],
   },
-  '/cyber': {
-    title: 'אבטחת סייבר וניהול IT ארגוני — רשת, זהויות והגנת קצה | דניאל בן ברוך',
-    description:
-      'אבטחת מידע וסייבר לעסקים ולארגונים יחד עם ניהול IT ברמת Enterprise: הנדסת רשת Fortinet (FortiGate/FortiSwitch, VLAN, VPN), ניהול זהויות Active Directory ו-Entra ID, ארכיטקטורת Zero-Trust, הגנת קצה ESET PROTECT ו-Cyber 2.0. כולל תרחישי הנדסה מהשטח.',
-    path: '/cyber',
-    jsonLd: [
-      serviceLd({
-        name: 'אבטחת סייבר לעסקים וארגונים',
-        serviceType: 'Cyber Security Services',
-        description:
-          'אבטחת מידע וסייבר לעסקים קטנים ובינוניים ולארגונים: Zero-Trust, ניטור איומים, הקשחת מערכות והגנה על נתונים ומודלי AI.',
-        path: '/cyber',
-      }),
-      breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'סייבר ואבטחה', path: '/cyber' }]),
-    ],
-  },
-  '/digital': {
-    title: 'פיתוח אתרים ואפליקציות וקמפיינים דיגיטליים | דניאל בן ברוך',
-    description:
-      'עיצוב ופיתוח אתרים ואפליקציות ברמה גבוהה — פיתוח פול-סטאק מקצה לקצה, חוויית משתמש מתקדמת וקמפיינים שיווקיים ממוקדי המרה עם החזר השקעה גבוה.',
-    path: '/digital',
-    jsonLd: [
-      serviceLd({
-        name: 'פיתוח דיגיטלי ושיווק',
-        serviceType: 'Web Development & Digital Marketing',
-        description:
-          'עיצוב ופיתוח אתרים ואפליקציות פול-סטאק מקצה לקצה, וקמפיינים דיגיטליים ממוקדי ROI.',
-        path: '/digital',
-      }),
-      breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'פיתוח ושיווק', path: '/digital' }]),
-    ],
-  },
   '/news': {
-    title: 'חדשות ומדריכי AI וסייבר 2026 — עדכון יומי בעברית | דניאל בן ברוך',
+    title: 'חדשות AI בעברית — מודלי שפה, סוכנים וכלים חדשים | דניאל בן ברוך',
     description:
-      'לוח חדשות אינטראקטיבי בזמן אמת: ריכוז הכתבות הטריות ביותר בסייבר, בינה מלאכותית וענן מגיקטיים, אנשים ומחשבים, Techtime ו-Israel Defense.',
+      'לוח חדשות AI בזמן אמת: מודלי שפה חדשים, סוכנים אוטונומיים, כלים ומחקר, ממקורות מובילים בעולם ובישראל, עם פירוק בעברית.',
     path: '/news',
     jsonLd: breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'חדשות', path: '/news' }]),
   },
   '/about': {
-    title: 'אודות — דניאל בן ברוך | ארכיטקטורת AI, סייבר ופיתוח',
+    title: 'אודות — דניאל בן ברוך | סוכני AI ומודלי שפה',
     description:
-      'דניאל בן ברוך — ארכיטקט סוכני AI, מומחה אבטחת סייבר ומפתח דיגיטלי. גישה אישית, ישירה ומקצועית, ללא בוטים וללא מוקדי שירות.',
+      'דניאל בן ברוך — בונה סוכני AI ומפרק מודלי שפה בעברית. גישה אישית, ישירה ומקצועית, ללא בוטים וללא מוקדי שירות.',
     path: '/about',
     jsonLd: organizationLd(),
   },
-  '/architecture': {
-    title: 'ארכיטקטורת מערכות AI וסייבר | דניאל בן ברוך',
-    description:
-      'עקרונות הארכיטקטורה שמאחורי סוכני ה-AI ומערכות האבטחה — רב-מודליות, Zero-Trust, אינטגרציות מאובטחות וזמן הטמעה קצר.',
-    path: '/architecture',
-  },
-  '/capabilities': {
-    title: 'יכולות — מה אפשר לבנות | דניאל בן ברוך',
-    description:
-      'סקירת יכולות: סוכני AI לתהליכים עסקיים, אבטחת סייבר לעסקים וארגונים, פיתוח אתרים ואפליקציות וקמפיינים דיגיטליים.',
-    path: '/capabilities',
-  },
   '/magazines': {
-    title: 'חנות ומגזינים מקצועיים | דניאל בן ברוך',
-    description: 'מגזינים ותכנים מקצועיים בנושאי בינה מלאכותית, אבטחת סייבר וטכנולוגיה.',
+    title: 'מדריכי AI ומגזינים מקצועיים | דניאל בן ברוך',
+    description: 'מדריכים ומגזינים מעשיים על סוכני AI ומודלי שפה, PDF להורדה מיידית.',
     path: '/magazines',
   },
   '/privacy': {
@@ -138,9 +94,9 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
 
 export function DEFAULT_SEO(pathname: string): PageSeoConfig {
   return {
-    title: 'דניאל בן ברוך — סוכני AI, סייבר ופיתוח דיגיטלי',
+    title: 'דניאל בן ברוך — חדשות AI, מודלי שפה וסוכני AI',
     description:
-      'סוכני בינה מלאכותית מותאמים אישית, אבטחת סייבר לעסקים ולארגונים, ופיתוח דיגיטלי ושיווק מתקדם.',
+      'חדשות AI בעברית, פירוק מודלי השפה החדשים ובניית סוכני AI אוטונומיים.',
     path: pathname || '/',
   };
 }

@@ -23,11 +23,11 @@ const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
 // ─── recency gate ──────────────────────────────────────────────────────────────────────────────
 
 const item = (over = {}) => ({
-  id: 'x', slug: 'x', source: 'Kodkod Cyber', category: 'cyber', topic: 'cyber',
-  title: 'מבוא לחולשות אבטחה בסביבות Docker ובקונטיינרים',
+  id: 'x', slug: 'x', source: 'Machine Learning Israel', category: 'מודלי AI וחידושים', topic: 'ai_models',
+  title: 'מודל שפה פתוח חדש מציג שיפור בהבנת עברית',
   link: 'https://a.co.il/x',
-  excerpt: 'חולשות אבטחה בקונטיינרים ודרכי הגנה מפניהן',
-  summary: 'מאמר על חולשות אבטחה בסביבות Docker',
+  excerpt: 'מודל השפה החדש נבדק על משימות בעברית',
+  summary: 'סקירה של מודל שפה פתוח חדש ותוצאותיו בעברית',
   publishedAt: new Date().toISOString(),
   ...over,
 });
@@ -53,7 +53,12 @@ t('recency · age is positive for the past', (itemAgeDays(daysAgo(10)) ?? 0) > 9
 t('recency · age is negative for the future', (itemAgeDays(daysAgo(-5)) ?? 0) < 0);
 
 // The recency check must not have weakened the gates that were already there.
-t('gate · a fresh but English-dominant title is still dropped', !sanitizeAndKeep(item({ title: 'Docker container security vulnerabilities explained for beginners' })));
+t('gate · a fresh but English-dominant title is still dropped', !sanitizeAndKeep(item({ title: 'New open-weight language model improves Hebrew understanding' })));
+// AI-only since 2026-09-21: a security-beat story is dropped even when it mentions AI, and an item
+// the classifier found no AI signal in never reaches a card.
+t('gate · a security-beat story is dropped even with an AI angle', !sanitizeAndKeep(item({ title: 'מתקפת כופרה חדשה מנצלת סוכן AI כדי להתפשט', summary: 'חוקרי סייבר זיהו ransomware חדש' })));
+t('gate · a non-AI topic is dropped', !sanitizeAndKeep(item({ topic: 'general', title: 'שעון חכם חדש הושק היום בישראל עם סוללה ארוכה' })));
+t('gate · an agent story passes', sanitizeAndKeep(item({ topic: 'ai_agents', title: 'סוכן AI חדש יודע להזמין טיסות בעצמו' })));
 t('gate · a fresh markup-leftover title is still dropped', !sanitizeAndKeep(item({ title: '&#8217; &lt;p&gt; מבוא לחולשות' })));
 t('gate · a fresh on-topic Hebrew item still passes', sanitizeAndKeep(item()));
 

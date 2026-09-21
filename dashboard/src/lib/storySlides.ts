@@ -93,11 +93,9 @@ export interface SlideSource {
 }
 
 const KICKER: Record<NewsTopic, string> = {
-  cyber: 'סייבר ואבטחה',
   ai: 'בינה מלאכותית',
   ai_models: 'מודלי AI וחידושים',
-  cloud: 'ענן ותשתיות',
-  devops: 'ניהול מערכות ו-DevOps',
+  ai_agents: 'בינה מלאכותית',
   general: 'טכנולוגיה',
 };
 
@@ -105,7 +103,7 @@ const KICKER: Record<NewsTopic, string> = {
 // derived from the article and NOT overridable by the LLM.
 const CTA_HEADING = 'רוצים להישאר מעודכנים?';
 const CTA_BODY =
-  'עקבו אחר העמוד לניתוחי סייבר וטכנולוגיה בזמן אמת, וקראו את הכתבות המלאות באתר:';
+  'עקבו אחר העמוד לפירוקי AI בזמן אמת, וקראו את הכתבות המלאות באתר:';
 const CTA_LINK = 'mrdaniel.co.il';
 const TITLE_MAX = 90;
 

@@ -79,7 +79,7 @@ export interface GeneratedContentItem {
   videoScript?: VideoScript;
   mediaPreview: MediaFrameSpec[];
   /** Hyper-realistic photography prompt for a future real image-generation model — always present.
-   * Never abstract 3D/digital-brain/cartoonish "AI art"; always enterprise IT/Cyber/AI photography
+   * Never abstract 3D/digital-brain/cartoonish "AI art"; always real AI-workspace photography
    * (real server racks, workstations, SOC/NOC rooms) matched to the item's actual content, with
    * hyper-realistic photography specs baked in (35mm, Sony A7R IV, 8k, natural lighting, shallow
    * depth of field). Mirrors src/agent/types.ts — see that file for the generating function. */

@@ -54,10 +54,10 @@ function splitSentences(text: string): string[] {
     .filter((s) => s.length > 8);
 }
 
-const CTA_DEFAULT = 'עקבו לעוד תוכן על AI, סייבר ופיתוח — mrdaniel.co.il';
+const CTA_DEFAULT = 'עקבו לעוד פירוקים של AI — mrdaniel.co.il';
 
 function mediaPromptFor(sceneText: string): string {
-  return `Photorealistic enterprise IT / cybersecurity / AI scene illustrating: "${sceneText.slice(0, 140)}". Modern office or data center / SOC room, engineer at a workstation, real server racks or dashboard screens. 35mm lens, natural lighting, shallow depth of field, 8k. No text overlays, no cartoon or abstract 3D "AI art".`;
+  return `Photorealistic AI-workspace scene illustrating: "${sceneText.slice(0, 140)}". Modern developer desk or GPU data center, engineer at a workstation, real server racks or dashboard screens. 35mm lens, natural lighting, shallow depth of field, 8k. No text overlays, no cartoon or abstract 3D "AI art".`;
 }
 
 /** Deterministic reel built straight from the article's own sentences — real content, never a

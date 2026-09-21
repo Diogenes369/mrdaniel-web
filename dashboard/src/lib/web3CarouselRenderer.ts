@@ -797,7 +797,7 @@ function renderCta(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   ctx.direction = 'rtl';
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(226,232,240,0.6)';
-  ctx.fillText('עקבו לעוד תוכן על AI · סייבר · Web3', W / 2, y);
+  ctx.fillText('עקבו לעוד תוכן על AI · מודלים · סוכנים', W / 2, y);
 }
 
 const LAYOUT_RENDERERS: Record<LayoutKind, (ctx: CanvasRenderingContext2D, s: StudioSlide) => void> = {

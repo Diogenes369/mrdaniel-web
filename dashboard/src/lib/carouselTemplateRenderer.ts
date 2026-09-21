@@ -162,9 +162,7 @@ function drawRunsLine(ctx: CanvasRenderingContext2D, words: WordRun[], rightX: n
  * SocialAgentEngine.ts's BRAND_KNOWLEDGE_BASE for these same four pillars), falling back to the
  * brand name when the topic doesn't match a known pillar. */
 function shortTopicLabel(topic: string): string {
-  if (/zero-?trust|אבטחת סייבר|סייבר|cyber/i.test(topic)) return 'אבטחת סייבר';
-  if (/wi-?fi ?7|רשת ארגונית|רשתות ארגוניות/i.test(topic)) return 'רשתות ארגוניות';
-  if (/web3|webgl|בלוקצ/i.test(topic)) return 'Web3';
+  if (/\bllm\b|מודל(י)? שפה|grok|claude|gemini|gpt|llama/i.test(topic)) return 'מודלי שפה';
   if (/\bai\b|סוכן|בינה מלאכותית|agentic/i.test(topic)) return 'סוכני AI';
   return 'MR. DANIEL';
 }

@@ -17,36 +17,30 @@ import type { EngagementTrigger, GrowthContent, GrowthKind, GrowthPack, LeadMagn
 // ─── Banks (mirrored in src/server/igGrowthStrategy.ts) ───────────────────────────────────────
 
 /** The four tags the operator named as the brand's Israeli-niche anchors. */
-export const CORE_IL_TAGS = ['#בינהמלאכותית', '#סייבר', '#אוטומציה', '#פיתוחתוכנה'];
+export const CORE_IL_TAGS = ['#בינהמלאכותית', '#סוכניAI', '#מודליAI', '#אוטומציה'];
 
 const NICHE_TAGS: Record<NewsTopic, string[]> = {
   ai: ['#בינהמלאכותית', '#אוטומציה', '#סוכניAI', '#אוטומציהלעסקים', '#פיתוחתוכנה'],
   ai_models: ['#מודליAI', '#בינהמלאכותית', '#LLM', '#פיתוחתוכנה', '#אוטומציה'],
-  cyber: ['#סייבר', '#אבטחתמידע', '#בינהמלאכותית', '#אבטחתסייבר'],
-  cloud: ['#פיתוחתוכנה', '#אוטומציה', '#ענן', '#תשתיותIT'],
-  devops: ['#DevOps', '#אוטומציה', '#פיתוחתוכנה', '#תשתיותIT'],
-  general: ['#בינהמלאכותית', '#אוטומציה', '#פיתוחתוכנה', '#הייטק'],
+  ai_agents: ['#סוכניAI', '#בינהמלאכותית', '#אוטומציה', '#AIאוטונומי'],
+  general: ['#בינהמלאכותית', '#אוטומציה', '#כליAI', '#חדשותAI'],
 };
 
 const BROAD_TAGS: Record<NewsTopic, string[]> = {
   ai: ['#AI', '#ArtificialIntelligence', '#AIAutomation', '#AITools'],
   ai_models: ['#LLM', '#GenerativeAI', '#MachineLearning', '#AI'],
-  cyber: ['#CyberSecurity', '#InfoSec', '#AI'],
-  cloud: ['#DevOps', '#CloudComputing', '#Automation'],
-  devops: ['#DevOps', '#CICD', '#Automation'],
-  general: ['#Tech', '#AI', '#Automation'],
+  ai_agents: ['#AIAgents', '#AgenticAI', '#Automation', '#AI'],
+  general: ['#AI', '#AINews', '#Automation'],
 };
 
 export const SEO_KEYWORD_BANK: Record<NewsTopic, string[]> = {
   ai: ['סוכני AI לעסקים', 'בינה מלאכותית לעסקים', 'אוטומציה לעסקים', 'כלי AI'],
   ai_models: ['מודלי שפה', 'בינה מלאכותית גנרטיבית', 'LLM לעסקים', 'מודלי AI חדשים'],
-  cyber: ['אבטחת סייבר לעסקים', 'אבטחת מידע', 'הגנה מפני פישינג', 'סייבר לעסק קטן'],
-  cloud: ['פיתוח תוכנה', 'תשתיות ענן', 'אוטומציה לעסקים', 'DevOps'],
-  devops: ['DevOps לעסקים', 'ניהול מערכות', 'אוטומציית CI/CD', 'תשתיות IT'],
-  general: ['בינה מלאכותית', 'אוטומציה לעסקים', 'פיתוח תוכנה', 'טכנולוגיה לעסקים'],
+  ai_agents: ['סוכני AI', 'בניית סוכן AI', 'סוכנים אוטונומיים', 'אוטומציה עם AI'],
+  general: ['בינה מלאכותית', 'חדשות AI', 'כלי AI', 'מדריכי AI'],
 };
 
-const TOPIC_KEYWORD: Record<NewsTopic, string> = { ai: 'סוכן', ai_models: 'מודל', cyber: 'הגנה', cloud: 'ענן', devops: 'תפעול', general: 'מדריך' };
+const TOPIC_KEYWORD: Record<NewsTopic, string> = { ai: 'סוכן', ai_models: 'מודל', ai_agents: 'סוכן', general: 'מדריך' };
 
 /** Same 3–5 ceiling the server caption rules use. */
 export const MAX_HASHTAGS = 5;

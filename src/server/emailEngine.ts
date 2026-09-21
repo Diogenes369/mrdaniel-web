@@ -91,12 +91,12 @@ export function featuredNewsHtml(items: EmailNewsItem[], campaign?: string): str
   );
 }
 
-/** AI / Cyber / Infrastructure highlights — a stacked list of 3 mini-cards linking to the site. */
+/** AI highlights — a stacked list of 3 mini-cards linking to the site. */
 export function servicesHighlightsHtml(campaign?: string): string {
   const items = [
     { t: 'סוכני AI מותאמים אישית', d: 'אוטומציה מקצה לקצה, RAG, אינטגרציה למערכות קיימות.', href: `${SITE}/ai` },
-    { t: 'אבטחת סייבר וניהול IT', d: 'Zero-Trust, הקשחה, ניטור, רשת וזהויות ברמת Enterprise.', href: `${SITE}/cyber` },
-    { t: 'ארכיטקטורה ותשתיות', d: 'תכן מערכות, ענן, ופיתוח פלטפורמות מהיר ויציב.', href: `${SITE}/architecture` },
+    { t: 'חדשות AI ומודלי שפה', d: 'מה חדש במודלים, בסוכנים ובכלים, עם פירוק בעברית.', href: `${SITE}/news` },
+    { t: 'מערכת JARVIS', d: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות.', href: `${SITE}/jarvis` },
   ];
   const rows = items
     .map(
@@ -161,7 +161,7 @@ export function wrapBrandedEmail(inner: string, opts: WrapOptions = {}): string 
 
   <tr><td style="background:#121218;background-image:linear-gradient(180deg,#17171f,#0e0e14);padding:26px 30px;border-radius:0 0 6px 6px;">
     <span style="color:#ffffff;font:800 22px/1 Arial,Helvetica,sans-serif;letter-spacing:3px;">MR. DANIEL</span>
-    <span style="display:block;color:#8a8f98;font:400 12px/1.6 Arial,Helvetica,sans-serif;margin-top:7px;">סוכני AI &nbsp;·&nbsp; אבטחת סייבר &nbsp;·&nbsp; פיתוח דיגיטלי</span>
+    <span style="display:block;color:#8a8f98;font:400 12px/1.6 Arial,Helvetica,sans-serif;margin-top:7px;">חדשות AI &nbsp;·&nbsp; מודלי שפה &nbsp;·&nbsp; סוכני AI</span>
   </td></tr>
 
   <tr><td style="padding:16px 0;">
@@ -173,7 +173,7 @@ export function wrapBrandedEmail(inner: string, opts: WrapOptions = {}): string 
   ${extraSections}
 
   <tr><td style="padding:22px 30px 6px;color:#6e727b;font:400 12px/1.9 Arial,Helvetica,sans-serif;text-align:center;">
-    ${link(SITE, 'האתר')} &nbsp;·&nbsp; ${link(`${SITE}/ai`, 'סוכני AI')} &nbsp;·&nbsp; ${link(`${SITE}/cyber`, 'סייבר')} &nbsp;·&nbsp; ${link(`${SITE}/news`, 'חדשות')} &nbsp;·&nbsp; ${link(`${SITE}/jarvis`, 'JARVIS')}<br>
+    ${link(SITE, 'האתר')} &nbsp;·&nbsp; ${link(`${SITE}/ai`, 'סוכני AI')} &nbsp;·&nbsp; ${link(`${SITE}/news`, 'חדשות')} &nbsp;·&nbsp; ${link(`${SITE}/jarvis`, 'JARVIS')}<br>
     <a href="mailto:daniel@mrdaniel.co.il" style="color:${GREEN_LIGHT};text-decoration:none;">daniel@mrdaniel.co.il</a>
     &nbsp;·&nbsp; ${link('https://www.linkedin.com/', 'LinkedIn')}
     &nbsp;·&nbsp; ${link('https://www.instagram.com/mrdaniel.ai/', 'Instagram')}
@@ -194,7 +194,7 @@ export function welcomeEmailHtml(name?: string): { subject: string; html: string
   const hi = name ? `שלום ${escapeHtml(name)},` : 'שלום,';
   const inner = `
     <p style="margin:0 0 14px;color:#ffffff;font:700 19px/1.5 Arial,Helvetica,sans-serif;">${hi}</p>
-    <p style="margin:0 0 14px;">תודה שנרשמת. מכאן תקבלו עדכונים ממוקדים על סוכני AI, אבטחת סייבר ופתרונות טכנולוגיים שמייצרים ערך עסקי אמיתי — בלי רעש מיותר.</p>
+    <p style="margin:0 0 14px;">תודה שנרשמת. מכאן תקבלו עדכונים ממוקדים על חדשות AI, מודלי שפה וסוכני AI — בלי רעש מיותר.</p>
     <p style="margin:0 0 18px;">בינתיים אפשר לעיין בפתרונות ובכתבות העדכניות באתר:</p>
     <p style="margin:0;">${emailButton(SITE, 'כניסה לאתר', 'welcome')}</p>`;
   return {

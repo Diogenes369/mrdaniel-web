@@ -20,10 +20,12 @@ import { buildStorySlides } from './storySlides.js';
 
 const SITE_ORIGIN = 'https://mrdaniel.co.il';
 
-const CATEGORY_TOPICS: Record<'cyber' | 'ai' | 'tech', NewsTopic[]> = {
-  cyber: ['cyber'],
+/** AI-only since 2026-09-21. A legacy stored value ('cyber' / 'tech') resolves as 'auto'. */
+export type AutoPublishCategory = 'ai' | 'ai_models' | 'ai_agents';
+const CATEGORY_TOPICS: Record<AutoPublishCategory, NewsTopic[]> = {
   ai: ['ai'],
-  tech: ['cloud', 'general'],
+  ai_models: ['ai_models'],
+  ai_agents: ['ai_agents'],
 };
 
 const BLOCKED_HOST =
@@ -88,10 +90,10 @@ function normalizeTitle(t: string): string {
   return t.replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 120);
 }
 
-function resolveCategory(cfg: 'cyber' | 'ai' | 'tech' | 'auto'): 'cyber' | 'ai' | 'tech' {
-  if (cfg !== 'auto') return cfg;
+function resolveCategory(cfg: string): AutoPublishCategory {
+  if (cfg === 'ai' || cfg === 'ai_models' || cfg === 'ai_agents') return cfg;
   const dayOfYear = Math.floor((Date.now() - Date.UTC(new Date().getUTCFullYear(), 0, 0)) / 86_400_000);
-  return (['cyber', 'ai', 'tech'] as const)[dayOfYear % 3];
+  return (['ai', 'ai_models', 'ai_agents'] as const)[dayOfYear % 3];
 }
 
 function platformsFor(p: 'linkedin' | 'instagram' | 'all'): SocialPlatform[] {
@@ -137,7 +139,7 @@ export async function runAutoPublishCycle(opts: RunOpts): Promise<Record<string,
   const publishedIds = new Set(runs.map((r) => r.newsId));
   const publishedTitles = new Set(runs.map((r) => normalizeTitle(r.newsTitle)));
 
-  const category = resolveCategory((cfg.category ?? 'auto') as 'cyber' | 'ai' | 'tech' | 'auto');
+  const category = resolveCategory(cfg.category ?? 'auto');
   const wantedTopics = CATEGORY_TOPICS[category];
 
   const { items } = await getNewsItems();

@@ -29,7 +29,7 @@ const RED = '#E23B4E';
 
 const DOMAIN = 'mrdaniel.co.il';
 const AUTHOR = 'דניאל בן ברוך';
-const HANDLE = '@mrdaniel · AI · סייבר · Web3';
+const HANDLE = '@mrdaniel · AI · LLM · Agents';
 
 interface TopicStyle {
   glyph: string;
@@ -39,9 +39,7 @@ interface TopicStyle {
 const TOPIC: Record<NewsTopic, TopicStyle> = {
   ai: { glyph: '🤖', accent: '#F0356E', soft: '#FCE7EF' },
   ai_models: { glyph: '🧠', accent: '#D946EF', soft: '#FBE7FE' },
-  cyber: { glyph: '🛡️', accent: '#2F6BFF', soft: '#E4ECFF' },
-  cloud: { glyph: '☁️', accent: '#0EA5E9', soft: '#E0F3FC' },
-  devops: { glyph: '⚙️', accent: '#F59E0B', soft: '#FEF3D6' },
+  ai_agents: { glyph: '🤖', accent: '#F0356E', soft: '#FCE7EF' },
   general: { glyph: '⚡', accent: '#7C3AED', soft: '#EFE7FD' },
 };
 
@@ -595,7 +593,7 @@ function renderCta({ ctx, s, style }: Ctx) {
   setBody(ctx, 25, 600);
   ctx.direction = 'rtl';
   ctx.fillStyle = INK_MUTED;
-  ctx.fillText('עקבו · שמרו · שתפו — ולעוד תוכן על AI · סייבר · Web3', W / 2, y);
+  ctx.fillText('עקבו · שמרו · שתפו — ולעוד תוכן על AI · מודלים · סוכנים', W / 2, y);
 }
 
 const RENDERERS: Record<LayoutKind, (c: Ctx) => void> = {

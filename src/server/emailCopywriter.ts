@@ -17,14 +17,14 @@ export type EmailPreset = 'digest' | 'announcement' | 'insight' | '';
 
 const PRESET_GUIDANCE: Record<Exclude<EmailPreset, ''>, string> = {
   digest:
-    'סוג המייל: "עדכון חודשי לארגונים" (Enterprise Monthly Digest). מבנה עריכתי: פתיח קצר, 2-3 בלוקי נושא עם כותרת משנה וניתוח, רשימת מגמות טכנולוגיות (bullets), ותיבת callout אחת עם תובנה מרכזית. הגדר includeNews=true ו-includeServices=true.',
+    'סוג המייל: "עדכון AI חודשי" (Monthly AI Digest). מבנה עריכתי: פתיח קצר, 2-3 בלוקי נושא עם כותרת משנה וניתוח, רשימת מגמות AI (bullets), ותיבת callout אחת עם תובנה מרכזית. הגדר includeNews=true ו-includeServices=true.',
   announcement:
     'סוג המייל: "הכרזה על מוצר/שירות". מבנה: Hero עם משפט ערך חד, 3-4 יתרונות מרכזיים (bullets), תיבת callout עם snippet של מקרה לקוח/תוצאה מדידה, ו-CTA ראשי חזק ל"תיאום שיחת אפיון". הגדר includeServices=true, includeNews=false.',
   insight:
     'סוג המייל: "מכתב מומחה / Thought Leadership". מבנה: פתיח דעתני, deep-dive מובנה של 3-4 פסקאות עם דוגמאות, תיבת callout עם ציטוט/עיקרון, ו"Key Takeaways" כרשימה ממוספרת. טון סמכותי ומעמיק. הגדר includeServices=true, includeNews=false.',
 };
 
-const SYSTEM = `אתה קופירייטר בכיר למיילים שיווקיים B2B בעברית, עבור המותג "MR. DANIEL" (דניאל בן ברוך) — סוכני AI מותאמים אישית, אבטחת סייבר וניהול IT ברמת Enterprise, ופיתוח דיגיטלי.
+const SYSTEM = `אתה קופירייטר בכיר למיילים בעברית, עבור המותג "MR. DANIEL" (דניאל בן ברוך) — חדשות AI, פירוק מודלי שפה ובניית סוכני AI אוטונומיים. תוכן AI בלבד.
 
 ${EXPERT_VOICE_RULES}
 
@@ -47,7 +47,7 @@ ${EXPERT_VOICE_RULES}
 - תיבת callout/ציטוט: <div style="margin:0 0 16px;background:#0e0e14;border-right:3px solid #76B900;border-radius:10px;padding:14px 18px;color:#c7cad0;font:400 14px/1.7 Arial,Helvetica,sans-serif;">...</div>
 - כפתור CTA ראשי: <p style="margin:18px 0;"><a href="https://mrdaniel.co.il/ai" style="display:inline-block;background:#76B900;background-image:linear-gradient(180deg,#9FE870,#5C9200);color:#0b0f0e;font:800 15px/1 Arial,Helvetica,sans-serif;text-decoration:none;padding:14px 28px;border-radius:12px;box-shadow:0 6px 22px rgba(118,185,0,.35);">טקסט הכפתור&nbsp;&larr;</a></p>
 - כפתור CTA משני: <a style="...color:#9FE870;border:1px solid #2f3a33;border-radius:10px;padding:10px 18px;display:inline-block;text-decoration:none;font:700 14px/1 Arial,Helvetica,sans-serif;">...</a>
-- קישורים: תמיד ל-https://mrdaniel.co.il/... (למשל /ai, /cyber, /architecture, /jarvis, /news). אין להוסיף פרמטרי utm — המערכת מוסיפה אותם.
+- קישורים: תמיד ל-https://mrdaniel.co.il/... (למשל /ai, /jarvis, /news, /magazines). אין להוסיף פרמטרי utm — המערכת מוסיפה אותם.
 - אורך: 400-700 מילים. תוכן עשיר: storytelling, ניתוח מומחה, נקודות ערך, לפחות תיבת callout אחת ולפחות CTA ראשי + משני.
 - עברית תקנית, טון סמכותי-מקצועי, בלי הבטחות מוגזמות.
 - includeNews=true אם המייל עריכתי/חדשותי; includeServices=true כמעט תמיד (אלא אם המייל צר-מיקוד מאוד).`;

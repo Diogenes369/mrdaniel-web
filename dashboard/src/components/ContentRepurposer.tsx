@@ -30,9 +30,8 @@ import { deckToGrowthContent } from '../lib/growthPlaybook';
 const TOPICS: { id: NewsTopic; label: string }[] = [
   { id: 'ai', label: 'AI / בינה מלאכותית' },
   { id: 'ai_models', label: 'מודלי AI וחידושים' },
-  { id: 'cyber', label: 'סייבר ואבטחה' },
-  { id: 'cloud', label: 'ענן ותשתיות' },
-  { id: 'general', label: 'טכנולוגיה כללית' },
+  { id: 'ai_agents', label: 'סוכני AI' },
+  { id: 'general', label: 'AI כללי' },
 ];
 
 type TargetKind = 'visual' | 'whatsapp';

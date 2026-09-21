@@ -2,7 +2,15 @@ import Parser from 'rss-parser';
 import { createHash } from 'node:crypto';
 import { translateForeignItems } from './newsTranslate.js';
 
-export type NewsTopic = 'ai' | 'ai_models' | 'cyber' | 'cloud' | 'devops' | 'general';
+/**
+ * AI-only since 2026-09-21: the feed carries artificial-intelligence news exclusively. `general` is
+ * the classifier's "no AI signal" verdict — such items are dropped at fetch time (`onlyTopics`) and
+ * again by `sanitizeAndKeep`, so a served item is always one of the three AI topics.
+ */
+export type NewsTopic = 'ai' | 'ai_models' | 'ai_agents' | 'general';
+
+/** The topics a served item may carry. */
+export const AI_TOPICS: readonly NewsTopic[] = ['ai', 'ai_models', 'ai_agents'];
 
 export interface NewsItem {
   id: string;
@@ -20,7 +28,7 @@ export interface NewsItem {
    * that draw it onto a <canvas> must route it through `/api/img-proxy` for CORS. */
   image?: string;
   /** Set to 'en' only transiently, between a curated English specialist outlet's fetch
-   * (AWS/Azure/GCP/OpenAI/…, see `FeedSource.lang`) and `translateForeignItems` in
+   * (OpenAI/TechCrunch AI/…, see `FeedSource.lang`) and `translateForeignItems` in
    * newsTranslate.ts, which runs every refresh cycle before anything is cached. A cached/served
    * item is always already-Hebrew and has this cleared (undefined) — see `sanitizeAndKeep`. */
   lang?: 'he' | 'en';
@@ -37,11 +45,11 @@ interface FeedSource {
    * split off so the article's real outlet shows in the source badge (and `category` fallback)
    * instead of the generic aggregator name, and doesn't linger inside the displayed headline. */
   stripTitleSuffix?: boolean;
-  /** Single-topic feeds (e.g. Israel Defense) can pin their display category directly. */
+  /** Single-topic feeds can pin their display category directly. */
   defaultCategory?: string;
   /** Keep only items whose classified `topic` is in this list. Used for broad-mandate outlets
-   * (Israel Defense carries naval / air / ground stories too) so the feed contributes only the
-   * slice that's on-topic for this site — its cyber coverage — instead of military noise. */
+   * (Geektime, Globes, ynet carry every tech/business story) so the feed contributes only the
+   * slice that's on-topic for this site — its AI coverage. */
   onlyTopics?: NewsTopic[];
   /** Per-source item cap (default `PER_FEED_ITEM_CAP`). International outlets publish constantly —
    * a lower cap keeps them present in the mix without drowning the Israeli feeds. */
@@ -51,97 +59,82 @@ interface FeedSource {
    * Omit (default 'he') for native Hebrew outlets and the Google-News queries. */
   lang?: 'he' | 'en';
   /** Pins the item's topic without running it through `classifyTopic` — for a single-purpose
-   * outlet (AWS/Azure/GCP/OpenAI/…) whose headlines rarely repeat the vendor/category keyword the
-   * classifier looks for (e.g. an AWS "What's New" title is just a feature name). Also skips the
+   * outlet (OpenAI/DeepMind/…) whose headlines rarely repeat the vendor/category keyword the
+   * classifier looks for (e.g. a lab's release title is often just a product name). Also skips the
    * `onlyTopics` check, since the source itself is the topic filter. */
   forceTopic?: NewsTopic;
 }
 
-// Aggregated Israeli tech / AI / cyber / economy coverage. Native RSS from each outlet first, with
-// a Google-News search as a safety net so one 404'd feed never leaves a gap. Ordered by dedup
-// priority: the outlets we most want to attribute a shared story to come first.
-const GNEWS_QUERY = '(טכנולוגיה OR סייבר OR "בינה מלאכותית" OR הייטק OR סטארטאפ) when:14d';
+// Aggregated AI coverage. Broad Israeli tech outlets contribute only their AI stories (`onlyTopics`),
+// curated English AI outlets are auto-translated to Hebrew, and scoped Google-News queries cover the
+// labs that publish no RSS (xAI, Anthropic, Meta). Ordered by dedup priority: the outlets we most
+// want to attribute a shared story to come first.
+const GNEWS_QUERY = '("בינה מלאכותית" OR "מודל שפה" OR ChatGPT OR Claude OR Gemini OR Grok OR "סוכן AI" OR "סוכני AI") when:7d';
 const GNEWS_URL = `https://news.google.com/rss/search?q=${encodeURIComponent(GNEWS_QUERY)}&hl=iw&gl=IL&ceid=IL:iw`;
 
-const GNEWS_CYBER_QUERY = '(סייבר OR "אבטחת מידע" OR ransomware OR "מתקפת סייבר" OR פריצה OR דלף) when:10d';
-const GNEWS_CYBER_URL = `https://news.google.com/rss/search?q=${encodeURIComponent(GNEWS_CYBER_QUERY)}&hl=iw&gl=IL&ceid=IL:iw`;
+const gnewsEn = (query: string) =>
+  `https://news.google.com/rss/search?q=${encodeURIComponent(`${query} when:7d`)}&hl=en-US&gl=US&ceid=US:en`;
+
+/** Every broad outlet is filtered down to its AI stories. */
+const AI_ONLY: NewsTopic[] = ['ai', 'ai_models', 'ai_agents'];
 
 const SOURCES: FeedSource[] = [
-  // ── Israeli tech / business (native RSS, highest dedup priority) ──
-  { name: 'Geektime', url: 'https://www.geektime.co.il/feed/', priority: 0 },
-  { name: 'TechTime', url: 'https://techtime.co.il/feed/', priority: 1 },
-  { name: 'אנשים ומחשבים', url: 'https://www.pc.co.il/feed/', priority: 2 },
-  { name: 'גלובס', url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=1725', priority: 2, timeoutMs: 9000 },
+  // ── Israeli tech / business (native RSS, highest dedup priority) — AI stories only ──
+  { name: 'Geektime', url: 'https://www.geektime.co.il/feed/', priority: 0, onlyTopics: AI_ONLY },
+  { name: 'TechTime', url: 'https://techtime.co.il/feed/', priority: 1, onlyTopics: AI_ONLY },
+  { name: 'אנשים ומחשבים', url: 'https://www.pc.co.il/feed/', priority: 2, onlyTopics: AI_ONLY },
+  { name: 'גלובס', url: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=1725', priority: 2, timeoutMs: 9000, onlyTopics: AI_ONLY },
   // Ynet DIGITAL/TECH feed only (StoryRss544). Do NOT use the general-news feed (StoryRss2) —
   // it floods the aggregate with politics/crime that isn't on-topic for this site.
-  { name: 'ynet דיגיטל', url: 'https://www.ynet.co.il/Integration/StoryRss544.xml', priority: 2, timeoutMs: 9000 },
+  { name: 'ynet דיגיטל', url: 'https://www.ynet.co.il/Integration/StoryRss544.xml', priority: 2, timeoutMs: 9000, onlyTopics: AI_ONLY },
   // Calcalist + TheMarker native feeds often 403 datacenter IPs (Yediot / Haaretz WAF) — kept in
   // the list anyway: Promise.allSettled logs the failure and moves on, and when they DO answer
-  // (CDN edge, warm cache) it's real Hebrew business/tech coverage. Google News is the safety net.
-  { name: 'כלכליסט', url: 'https://www.calcalist.co.il/GeneralRSS/0,16335,L-3927,00.xml', priority: 3, timeoutMs: 7000 },
-  { name: 'TheMarker', url: 'https://www.themarker.com/cmlink/1.145', priority: 3, timeoutMs: 7000 },
-  { name: 'Israel Defense', url: 'https://www.israeldefense.co.il/rss.xml', priority: 3, onlyTopics: ['cyber'] },
-  // ── Israeli AI / cyber specialist blogs (small WordPress feeds — lower per-feed cap + tighter
-  //    timeout; the two security blogs are pinned cyber-only via onlyTopics so an off-topic post
-  //    never leaks into the general mix). ──
-  { name: 'Machine Learning Israel', url: 'https://machinelearning.co.il/feed/', priority: 2, maxItems: 10, timeoutMs: 8000 },
-  { name: 'SPD Blog', url: 'https://blog.spd.co.il/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
-  { name: 'Kodkod Cyber', url: 'https://kodkodcyber.com/feed/', priority: 3, maxItems: 10, onlyTopics: ['cyber'], timeoutMs: 8000 },
-  // NOTE: the general-purpose English international outlets (TechCrunch, The Verge, Ars Technica,
-  // CyberNews, Krebs on Security) stay removed — broad-mandate sources would mostly add off-brand
-  // noise even once translated. The curated single-topic outlets below are different: `lang: 'en'`
-  // tags their items so `translateForeignItems` (newsTranslate.ts) auto-translates them to Hebrew
-  // every refresh cycle, BEFORE the cache is written — this is what feeds the site's and
-  // dashboard's Cloud/AI/DevOps tabs real content instead of coming back empty for lack of native
-  // Hebrew coverage in those categories.
-  // ── Cyber specialists (high-frequency, multi-times-daily outlets — keeps the cyber tab from
-  //    lagging behind the Hebrew outlets, which publish far less often) ──
-  { name: 'Dark Reading', url: 'https://www.darkreading.com/rss.xml', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
-  { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
-  { name: 'The Hacker News', url: 'https://feeds.feedburner.com/TheHackersNews', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
-  { name: 'SecurityWeek', url: 'https://www.securityweek.com/feed/', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
-  { name: 'CISA Advisories', url: 'https://www.cisa.gov/cybersecurity-advisories/all.xml', priority: 5, lang: 'en', forceTopic: 'cyber', maxItems: 10, timeoutMs: 9000 },
-  // ── Cloud & infrastructure ──
-  { name: 'AWS News', url: 'https://aws.amazon.com/about-aws/whats-new/recent/feed/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 10, timeoutMs: 9000 },
-  // Azure + GCP's blogs are real 200s (verified) but heavier to parse than the others — a slightly
-  // longer timeout avoids them flaking out under `Promise.allSettled` on a slow tick.
-  { name: 'Azure Blog', url: 'https://azure.microsoft.com/en-us/blog/feed/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 10, timeoutMs: 13000 },
-  // cloud.google.com/blog/rss serves an HTML page, not RSS — this is GCP's actual feed endpoint.
-  { name: 'Google Cloud Blog', url: 'https://cloudblog.withgoogle.com/rss/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 10, timeoutMs: 13000 },
-  { name: 'Kubernetes Blog', url: 'https://kubernetes.io/feed.xml', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 8, timeoutMs: 9000 },
-  { name: 'CNCF', url: 'https://www.cncf.io/feed/', priority: 5, lang: 'en', forceTopic: 'cloud', maxItems: 8, timeoutMs: 9000 },
-  // ── Artificial intelligence (broad AI/automation business & product coverage) ──
+  // (CDN edge, warm cache) it's real Hebrew coverage. Google News is the safety net.
+  { name: 'כלכליסט', url: 'https://www.calcalist.co.il/GeneralRSS/0,16335,L-3927,00.xml', priority: 3, timeoutMs: 7000, onlyTopics: AI_ONLY },
+  { name: 'TheMarker', url: 'https://www.themarker.com/cmlink/1.145', priority: 3, timeoutMs: 7000, onlyTopics: AI_ONLY },
+  // ── Israeli AI specialist blog ──
+  { name: 'Machine Learning Israel', url: 'https://machinelearning.co.il/feed/', priority: 2, maxItems: 10, timeoutMs: 8000, onlyTopics: AI_ONLY },
+  // `lang: 'en'` tags these items so `translateForeignItems` (newsTranslate.ts) auto-translates them
+  // to Hebrew every refresh cycle, BEFORE the cache is written. Every one is an AI-dedicated feed or
+  // the AI section of a broad outlet (verified live 2026-09-21), never a general tech firehose.
+  // ── AI industry & products ──
   { name: 'AI News', url: 'https://www.artificialintelligence-news.com/feed/', priority: 5, lang: 'en', forceTopic: 'ai', maxItems: 8, timeoutMs: 9000 },
-  // ── AI Models & LLMs — dedicated feed for model releases, research and dev tools from the
-  //    frontier labs. Kept separate from the broad `ai` topic above so a reader who wants just
-  //    "what's new in the models themselves" doesn't have to wade through general AI-business news.
+  { name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', priority: 5, lang: 'en', maxItems: 10, timeoutMs: 9000, onlyTopics: AI_ONLY },
+  { name: 'The Verge AI', url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml', priority: 5, lang: 'en', maxItems: 8, timeoutMs: 9000, onlyTopics: AI_ONLY },
+  { name: 'MIT Technology Review AI', url: 'https://www.technologyreview.com/topic/artificial-intelligence/feed', priority: 5, lang: 'en', forceTopic: 'ai', maxItems: 6, timeoutMs: 9000 },
+  // ── AI Models & LLMs — model releases, research and dev tools from the frontier labs. Kept
+  //    separate from the broad `ai` topic so "what's new in the models themselves" has its own tab.
   { name: 'OpenAI News', url: 'https://openai.com/news/rss.xml', priority: 5, lang: 'en', forceTopic: 'ai_models', maxItems: 10, timeoutMs: 9000 },
   { name: 'Hugging Face Blog', url: 'https://huggingface.co/blog/feed.xml', priority: 5, lang: 'en', forceTopic: 'ai_models', maxItems: 8, timeoutMs: 9000 },
   { name: 'Google AI Blog', url: 'https://blog.google/innovation-and-ai/technology/ai/rss/', priority: 5, lang: 'en', forceTopic: 'ai_models', maxItems: 8, timeoutMs: 9000 },
   { name: 'DeepMind Blog', url: 'https://deepmind.google/blog/rss.xml', priority: 5, lang: 'en', forceTopic: 'ai_models', maxItems: 8, timeoutMs: 9000 },
-  // Anthropic and Meta AI don't publish an official RSS feed — a scoped Google News query is the
-  // safety net (same pattern as GNEWS_URL/GNEWS_CYBER_URL below), so the tab still gets their
-  // model/product news instead of coming back empty for lack of a native feed.
-  // A bare "Anthropic" query pulled in unrelated stories that merely mention the company (an
-  // office-lease signing, a nearby real-estate listing) — scoped to phrases that only occur in an
-  // actual model/product story.
+  { name: 'MarkTechPost', url: 'https://www.marktechpost.com/feed/', priority: 5, lang: 'en', maxItems: 8, timeoutMs: 9000, onlyTopics: AI_ONLY },
+  // xAI, Anthropic and Meta AI publish no official RSS feed — a scoped Google News query is the
+  // safety net. Scoped to phrases that only occur in an actual model/product story: a bare
+  // "Anthropic" query pulled in office-lease and real-estate stories.
+  {
+    name: 'Google News · xAI Grok',
+    url: gnewsEn('("Grok 4" OR "Grok 5" OR "xAI Grok" OR "Grok model" OR "xAI model" OR "Grok AI")'),
+    priority: 6, lang: 'en', forceTopic: 'ai_models', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
+  },
   {
     name: 'Google News · Anthropic',
-    url: `https://news.google.com/rss/search?q=${encodeURIComponent('("Claude AI" OR "Claude Opus" OR "Claude Sonnet" OR "Claude model" OR "Anthropic model" OR "Anthropic AI") when:7d')}&hl=en-US&gl=US&ceid=US:en`,
+    url: gnewsEn('("Claude AI" OR "Claude Opus" OR "Claude Sonnet" OR "Claude model" OR "Anthropic model" OR "Anthropic AI")'),
     priority: 6, lang: 'en', forceTopic: 'ai_models', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
   },
   {
     name: 'Google News · Meta AI',
-    url: `https://news.google.com/rss/search?q=${encodeURIComponent('("Meta AI" OR "Llama 4" OR "Llama model" OR "Meta\'s AI model") when:7d')}&hl=en-US&gl=US&ceid=US:en`,
+    url: gnewsEn(`("Meta AI" OR "Llama 4" OR "Llama model" OR "Meta's AI model")`),
     priority: 6, lang: 'en', forceTopic: 'ai_models', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
   },
-  // ── DevOps & SysAdmin ──
-  { name: 'The New Stack', url: 'https://thenewstack.io/feed/', priority: 5, lang: 'en', forceTopic: 'devops', maxItems: 10, timeoutMs: 9000 },
-  { name: 'Red Hat Blog', url: 'https://www.redhat.com/en/rss/blog', priority: 5, lang: 'en', forceTopic: 'devops', maxItems: 10, timeoutMs: 9000 },
-  { name: 'Microsoft Tech Community · IT Ops', url: 'https://techcommunity.microsoft.com/t5/s/gxcuf89792/rss/board?board.id=ITOpsTalkBlog', priority: 5, lang: 'en', forceTopic: 'devops', maxItems: 8, timeoutMs: 9000 },
-  // ── Google News safety nets — Hebrew tech query + a dedicated Hebrew cyber query ──
-  { name: 'Google News', url: GNEWS_URL, priority: 7, stripTitleSuffix: true, timeoutMs: 9000 },
-  { name: 'Google News · סייבר', url: GNEWS_CYBER_URL, priority: 7, stripTitleSuffix: true, maxItems: 12, timeoutMs: 9000 },
+  // ── AI agents — the agentic tooling beat (frameworks, MCP, computer-use, coding agents) ──
+  {
+    name: 'Google News · AI Agents',
+    url: gnewsEn('("AI agent" OR "AI agents" OR "agentic AI" OR "Model Context Protocol" OR "coding agent")'),
+    priority: 6, lang: 'en', forceTopic: 'ai_agents', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
+  },
+  // ── Google News safety net — Hebrew AI query ──
+  { name: 'Google News', url: GNEWS_URL, priority: 7, stripTitleSuffix: true, timeoutMs: 9000, onlyTopics: AI_ONLY },
 ];
 
 // Publishers still dropped from the aggregate (name-only Google-News hits). pc.co.il was
@@ -440,61 +433,45 @@ function extractImage(item: Record<string, any>): string | undefined {
   return undefined;
 }
 
-// Keyword heuristics over title + summary + feed categories. Checked cyber first so a
-// security-flavored AI story (e.g. "AI-powered phishing") lands under cyber, not ai.
-const CYBER_PATTERNS = [
-  /סייבר/, /אבטחת מידע/, /האק(ר|רים|ינג)/, /תקיפ(ת|ה) סייבר/, /כופרה/, /פישינג/,
-  /פרצ(ת|ה) אבטחה/, /דלף מידע/, /malware/i, /ransomware/i, /phishing/i, /\bcve-?\d/i,
-  /\bbreach(ed)?\b/i, /\bhack(ed|er|ing)?\b/i, /zero.?trust/i,
-];
+// Keyword heuristics over title + summary + feed categories. Most specific first: an agent story
+// lands in `ai_agents`, a model release in `ai_models`, anything else AI in `ai`.
 const AI_PATTERNS = [
   /בינה מלאכותית/, /למידת מכונה/, /רשת(ות)? נוירונים/, /אג'נט/, /\bAI\b/, /chatgpt/i,
   /openai/i, /\bllm\b/i, /gemini/i, /copilot/i, /anthropic/i, /\bclaude\b/i, /generativ/i,
-  /gpt-?\d/i, /agentic/i,
+  /gpt-?\d/i, /agentic/i, /\bgrok\b/i, /\bxai\b/i, /machine learning/i, /artificial intelligence/i,
 ];
-// Specific model/LLM/dev-tool releases — a narrower slice of AI_PATTERNS, checked first so a
-// story about an actual model drop (GPT-5, Claude Opus, Llama, a Hugging Face release, a new
-// agent framework) lands in the dedicated `ai_models` tab rather than the broad `ai` one.
+// Specific model/LLM releases — a narrower slice of AI_PATTERNS, so a story about an actual model
+// drop (GPT-5, Claude Opus, Grok, Llama, a Hugging Face release) lands in the `ai_models` tab.
 const AI_MODEL_PATTERNS = [
-  /מודל(ים)? (שפה|בינה מלאכותית|AI)/, /סוכן(י)? AI/, /גרסת מודל/, /דגם שפה/,
+  /מודל(ים)? (שפה|בינה מלאכותית|AI)/, /גרסת מודל/, /דגם שפה/,
   /\bgpt-?\d/i, /\bo\d(-mini|-pro)?\b.*openai/i, /\bclaude\b/i, /\banthropic\b/i, /\bgemini\b/i,
-  /\bllama-?\d?\b/i, /\bmistral\b/i, /\bdeepseek\b/i, /\bllm\b/i, /\bslm\b/i, /hugging.?face/i,
-  /\bdeepmind\b/i, /foundation model/i, /open.?weight model/i, /model weights/i, /fine-?tun(e|ing)/i,
-  /\bagentic\b/i, /ai agent/i, /model release/i, /\bmulti-?modal model\b/i,
+  /\bgrok\b/i, /\bxai\b/i, /\bllama-?\d?\b/i, /\bmistral\b/i, /\bdeepseek\b/i, /\bqwen\b/i,
+  /\bllm\b/i, /\bslm\b/i, /hugging.?face/i, /\bdeepmind\b/i, /foundation model/i,
+  /open.?weight model/i, /model weights/i, /fine-?tun(e|ing)/i, /model release/i, /\bmulti-?modal model\b/i,
 ];
-// NOTE: `/ענן/` is a deliberate bare substring match, not `/\bענן\b/` — JavaScript's `\b` is
-// defined only in terms of ASCII `[A-Za-z0-9_]`, so it never recognizes a boundary next to a
-// Hebrew letter. `/\bענן\b/` silently matched nothing, ever (confirmed: `/\bענן\b/.test("מחשוב
-// ענן חדש")` is `false`) — which was the actual root cause of the Cloud category being empty.
-// Hebrew's final-letter forms (a plain "ן" only ever appears at the end of a word) keep this safe
-// from matching inside a longer word — e.g. "עננים" (plural) ends in a regular "נ", not "ן".
-const CLOUD_PATTERNS = [
-  /ענן/, /מחשוב ענן/, /אחסון (ב)?ענן/, /שירותי ענן/, /ספק(ית)? ענן/, /תשתית(ות)? ענן/,
-  /דאטה סנטר/, /גוגל קלאוד/, /\bcloud\b/i, /\baws\b/i, /\bazure\b/i, /\bgcp\b/i,
-  /google cloud/i, /\bvercel\b/i, /קוברנטיס/, /kubernetes/i, /\bcncf\b/i,
-  /מרכז(י)? נתונים/, /data.?center/i, /serverless/i, /\bsaas\b/i,
+// Agents — autonomous, tool-using systems and the frameworks/protocols they run on.
+const AI_AGENT_PATTERNS = [
+  /סוכן(י)? (AI|בינה)/, /סוכנים אוטונומיים/, /אג'נט/, /\bagentic\b/i, /ai agents?/i,
+  /autonomous agents?/i, /coding agents?/i, /\bmcp\b/i, /model context protocol/i, /computer.?use/i,
+  /multi-?agent/i, /agent framework/i,
 ];
-// DevOps / SysAdmin operational tooling & culture — distinct from CLOUD_PATTERNS' vendor/infra
-// terms so a story about running/operating systems (CI/CD, IaC, on-call) lands in its own tab
-// rather than the cloud-provider one.
-const DEVOPS_PATTERNS = [
-  /דבופס/, /ניהול מערכות/, /תפעול מערכות/, /אוטומציה( של)? תשתיות/,
-  /\bdevops\b/i, /\bsysadmin\b/i, /\bci\/cd\b/i, /\bcontinuous (integration|deployment|delivery)\b/i,
-  /\bansible\b/i, /\bterraform\b/i, /\bdocker\b/i, /\bgitops\b/i, /\bred ?hat\b/i, /\bopenshift\b/i,
-  /\binfrastructure as code\b/i, /\bit ops\b/i, /\bobservability\b/i, /\bincident response\b/i,
+// Security-beat stories are off-brand for an AI-only feed even when they mention AI ("AI-powered
+// phishing", "a CVE in an AI SDK") — dropped outright by `sanitizeAndKeep`.
+const SECURITY_BEAT_PATTERNS = [
+  /סייבר/, /אבטחת מידע/, /האק(ר|רים|ינג)/, /כופרה/, /פישינג/, /פרצ(ת|ה) אבטחה/, /דלף מידע/,
+  /malware/i, /ransomware/i, /phishing/i, /\bcve-?\d/i, /\bbreach(ed)?\b/i, /\bhack(ed|er|ing)?\b/i,
+  /zero.?trust/i, /vulnerabilit/i, /exploit/i,
 ];
 
 function classifyTopic(text: string): NewsTopic {
-  if (CYBER_PATTERNS.some((re) => re.test(text))) return 'cyber';
+  if (AI_AGENT_PATTERNS.some((re) => re.test(text))) return 'ai_agents';
   if (AI_MODEL_PATTERNS.some((re) => re.test(text))) return 'ai_models';
   if (AI_PATTERNS.some((re) => re.test(text))) return 'ai';
-  if (CLOUD_PATTERNS.some((re) => re.test(text))) return 'cloud';
-  if (DEVOPS_PATTERNS.some((re) => re.test(text))) return 'devops';
   return 'general';
 }
 
 // Generic consumer-tech / gadget / gaming markers. The opt-in strict filter drops an item that
-// matches one of these UNLESS it also carries an AI / cyber / cloud signal (so "AI comes to your
+// matches one of these UNLESS it also carries an AI signal (so "AI comes to your
 // smart TV" stays, "best gaming monitors of 2026" goes).
 const GENERIC_CONSUMER_PATTERNS = [
   /גיימינג/, /קונסול/, /טלוויזי/, /סמארטפון/, /מכשיר סלולרי/, /מחשב נייד/, /לפטופ/, /אוזניות/,
@@ -539,9 +516,8 @@ const MARKUP_LEFTOVER = /<\/?[a-z][^>]*>|&#\d{2,};|\]\]>|\{\{|https?:\/\/\S+\s*$
  *      translation silently misbehaved for one item.
  *   2. Clean — the title isn't a scrape/parse artefact (`...`, bare URL, leftover `<tag>` /
  *      `&#8217;`, CDATA tail) and is a real headline length.
- *   3. On-topic — AI / cyber / cloud / devops signal in the title+summary (reuses the SAME
- *      classifier patterns the feed already runs on), and NOT generic consumer-tech/gadget/gaming
- *      without one of those signals.
+ *   3. On-topic — an AI signal in the title+summary (reuses the SAME classifier patterns the feed
+ *      already runs on), and NOT a security-beat story. The feed is AI-only since 2026-09-21.
  * `opts.allowEnglish` is accepted for API back-compat (the dashboard still passes
  * `?allowEnglish=1`) but no longer bypasses the Hebrew check — see point 1.
  * Applied as a per-request VIEW over the shared cache in `getNewsItems` — never mutates the cache,
@@ -552,11 +528,10 @@ const MARKUP_LEFTOVER = /<\/?[a-z][^>]*>|&#\d{2,};|\]\]>|\{\{|https?:\/\/\S+\s*$
  * sit before it is treated as wrong.
  *
  * Both limits exist because of what production actually served on 2026-09-21:
- *   - `Kodkod Cyber` is an evergreen security BLOG whose RSS carries its whole archive. Ten items
- *     between 293 and **1950** days old (a 2021 WiFi-cracking tutorial) sat permanently in the
- *     `cyber` topic, crowding genuinely fresh cyber stories out of the card slots.
- *   - Dark Reading publishes webinar listings dated in the FUTURE — one was `2026-12-03`, 74 days
- *     ahead. Sorted newest-first, a future date pins an advert to the top of the feed forever.
+ *   - an evergreen BLOG whose RSS carries its whole archive put ten items between 293 and **1950**
+ *     days old permanently into one topic tab, crowding genuinely fresh stories out of the slots.
+ *   - a trade outlet published webinar listings dated in the FUTURE — one was 74 days ahead.
+ *     Sorted newest-first, a future date pins an advert to the top of the feed forever.
  *
  * A week of slack on the future side absorbs timezone and clock-skew sloppiness in feeds that
  * publish a date with no offset, without letting an event listing through.
@@ -587,7 +562,7 @@ export function sanitizeAndKeep(item: NewsItem, _opts: { allowEnglish?: boolean 
 
   // 0 · recency. Checked first because it is the cheapest test and the one that was missing: this
   // gate had no notion of time at all, which is why a 2021 blog post and a 2026-12 webinar advert
-  // both rode into the cyber tab and made it look frozen.
+  // both rode into one tab and made it look frozen.
   if (isStaleOrFutureDated(item.publishedAt)) return false;
 
   // 1 · Hebrew
@@ -597,20 +572,19 @@ export function sanitizeAndKeep(item: NewsItem, _opts: { allowEnglish?: boolean 
 
   const text = `${title} ${item.excerpt} ${item.summary} ${item.category}`;
 
-  // 2 · strict relevance — no stock/finance market noise, regardless of any AI/cyber overlap
+  // 2 · strict relevance — no stock/finance market noise and no security-beat story, regardless
+  //     of any AI overlap; and only the three AI topics are ever served.
   if (isStockNoise(text)) return false;
+  if (SECURITY_BEAT_PATTERNS.some((re) => re.test(text))) return false;
+  if (!AI_TOPICS.includes(item.topic)) return false;
 
-  const onTopic =
-    CYBER_PATTERNS.some((re) => re.test(text)) ||
+  // 3 · on-topic — a forced-topic source (OpenAI News, DeepMind…) is AI by construction, so its
+  //     topic alone qualifies; a gadget story needs an AI signal in its own text.
+  const aiSignal =
+    AI_AGENT_PATTERNS.some((re) => re.test(text)) ||
     AI_MODEL_PATTERNS.some((re) => re.test(text)) ||
-    AI_PATTERNS.some((re) => re.test(text)) ||
-    CLOUD_PATTERNS.some((re) => re.test(text)) ||
-    DEVOPS_PATTERNS.some((re) => re.test(text));
-
-  // 3 · on-topic
-  if (GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text)) && !onTopic) return false;
-  if (onTopic) return true;
-  return classifyTopic(text) !== 'general';
+    AI_PATTERNS.some((re) => re.test(text));
+  return !(GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text)) && !aiSignal);
 }
 
 /** @deprecated alias kept for any external caller expecting this exact name (task-requested). */
@@ -627,15 +601,12 @@ const ECONOMY_PATTERNS = [
   /\bIPO\b/i, /\bVC\b/, /\bM&A\b/i, /valuation/i, /funding round/i, /\bseed\b/i, /series [a-e]\b/i, /raised \$/i,
 ];
 
-/** Clean Hebrew display tag: סייבר / בינה מלאכותית / מודלי AI וחידושים / ענן ותשתיות / כלכלה / טכנולוגיה. */
+/** Clean Hebrew display tag: סוכני AI / מודלי AI וחידושים / עסקי AI / בינה מלאכותית. */
 function deriveCategory(topic: NewsTopic, text: string): string {
-  if (topic === 'cyber') return 'סייבר';
+  if (topic === 'ai_agents') return 'סוכני AI';
   if (topic === 'ai_models') return 'מודלי AI וחידושים';
-  if (topic === 'ai') return 'בינה מלאכותית';
-  if (topic === 'cloud') return 'ענן ותשתיות';
-  if (topic === 'devops') return 'ניהול מערכות ו-DevOps';
-  if (ECONOMY_PATTERNS.some((re) => re.test(text))) return 'כלכלה';
-  return 'טכנולוגיה';
+  if (ECONOMY_PATTERNS.some((re) => re.test(text))) return 'עסקי AI';
+  return 'בינה מלאכותית';
 }
 
 /** Normalised headline key for cross-source de-duplication. */
@@ -922,7 +893,7 @@ async function refreshAll(): Promise<NewsItem[]> {
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
 
-  // Auto-translate the curated English specialist outlets (AWS/Azure/GCP/OpenAI/Dark Reading/…)
+  // Auto-translate the curated English specialist outlets (OpenAI/TechCrunch AI/DeepMind/…)
   // into Hebrew BEFORE anything is cached — see newsTranslate.ts. An item that can't be translated
   // this cycle (Gemini unconfigured/rate-limited/bad response) is dropped here, never cached in
   // English, so `sanitizeAndKeep`'s Hebrew gate downstream never has to filter it out later.
@@ -937,14 +908,14 @@ async function refreshAll(): Promise<NewsItem[]> {
       console.error('[news] translateForeignItems failed, falling back to Hebrew-native items only:', err);
       return deduped.filter((it) => (it.title.match(/[֐-׿]/g) || []).length >= 6);
     }),
-    // Scrape og:image for the newest items whose feed carried no inline media (TechTime, Israel
-    // Defense, most Google-News entries) so the Content Agent has a real article photo to render.
+    // Scrape og:image for the newest items whose feed carried no inline media (TechTime, most
+    // Google-News entries) so the Content Agent has a real article photo to render.
     enrichImages(deduped).catch((err) => console.error('[news] enrichImages failed:', err)),
   ]);
 
   // `translateForeignItems` returns Hebrew-native items first and translated-foreign items
   // appended after — it does NOT preserve `deduped`'s recency order. Re-sorting here is what
-  // actually keeps the cyber tab fresh: without it, a BleepingComputer/Hacker News item published
+  // actually keeps every tab fresh: without it, a TechCrunch/OpenAI item published
   // minutes ago (foreign, needs translation) always lands after every older native-Hebrew item,
   // no matter how stale, because it was appended rather than merged back into place.
   const items = translated.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());

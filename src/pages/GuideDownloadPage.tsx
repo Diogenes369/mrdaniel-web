@@ -78,7 +78,6 @@ function readingMinutes(sections: GuideSection[]): number {
  */
 function guideBadge(title: string): string {
   const t = title.toLowerCase();
-  if (/סייבר|אבטח|פריצ|תקיפ|פגיעו|injection|cyber|security/.test(t)) return 'מדריך סייבר';
   if (/אוטומצ|תהליך|workflow|automation/.test(t)) return 'מדריך אוטומציה';
   if (/ai|בינה מלאכותית|סוכן|agent|llm|gpt/.test(t)) return 'מדריך AI';
   return 'מדריך מעשי';
@@ -182,7 +181,7 @@ export default function GuideDownloadPage() {
     <div className="relative min-h-screen overflow-hidden bg-carbon-950" dir="rtl">
       <Seo
         title="הורדת מדריך | דניאל בן ברוך"
-        description="מדריך מקצועי להורדה בנושאי AI, סייבר ואוטומציה לעסקים."
+        description="מדריך AI מעשי להורדה: סוכנים, מודלי שפה ואוטומציה."
         path="/download"
         noindex
       />
@@ -210,7 +209,7 @@ export default function GuideDownloadPage() {
         <footer className="mt-14 border-t border-white/[0.07] pt-6 text-center">
           <Link to="/" className="inline-flex items-center gap-2 text-[13px] font-medium text-zinc-400 transition-colors hover:text-brand-400">
             <ArrowLeft className="h-3.5 w-3.5 rtl:rotate-180" />
-            mrdaniel.co.il — סוכני AI, סייבר ואוטומציה לעסקים
+            mrdaniel.co.il — חדשות AI, מודלי שפה וסוכנים
           </Link>
         </footer>
       </main>
@@ -246,7 +245,7 @@ function GuideArticle({
       )}
 
       {/* HERO */}
-      <p className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 font-cyber text-[10px] tracking-[0.2em] text-brand-300 uppercase">
+      <p className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 font-tech text-[10px] tracking-[0.2em] text-brand-300 uppercase">
         <ShieldCheck className="h-3 w-3" />
         {guideBadge(meta.title)}
       </p>
@@ -474,7 +473,7 @@ function StaticCover({ meta }: { meta: GuideMeta }) {
       />
       <FileText className="relative mb-5 h-8 w-8 text-brand-400" />
       <p className="relative font-display text-2xl leading-tight font-extrabold text-white sm:text-3xl">{meta.title}</p>
-      <p className="relative mt-5 font-cyber text-[10px] tracking-[0.25em] text-zinc-500 uppercase">
+      <p className="relative mt-5 font-tech text-[10px] tracking-[0.25em] text-zinc-500 uppercase">
         PDF{meta.pages ? ` · ${meta.pages} עמודים` : ''} · mrdaniel.co.il
       </p>
     </div>
@@ -510,7 +509,7 @@ function SlidePreview({
           compact ? 'rounded-xl' : 'rounded-2xl'
         }`}
       >
-        <span className="font-cyber text-[10px] tracking-widest text-zinc-600 uppercase">
+        <span className="font-tech text-[10px] tracking-widest text-zinc-600 uppercase">
           slide {n} / {total}
         </span>
       </div>
@@ -533,7 +532,7 @@ function SlidePreview({
         className={`block h-auto w-full transition-opacity duration-500 ${loaded ? 'opacity-100' : 'absolute inset-0 opacity-0'}`}
       />
       {loaded && !compact && (
-        <span className="absolute bottom-3 left-3 rounded-md bg-black/70 px-2 py-1 font-cyber text-[10px] tracking-wider text-zinc-300 backdrop-blur-sm">
+        <span className="absolute bottom-3 left-3 rounded-md bg-black/70 px-2 py-1 font-tech text-[10px] tracking-wider text-zinc-300 backdrop-blur-sm">
           {n} / {total}
         </span>
       )}
@@ -602,7 +601,7 @@ function BrandMark() {
   return (
     <div className="mb-8 flex items-center gap-2.5">
       <span className="h-2 w-2 rounded-full bg-brand-500 shadow-[0_0_12px_#76B900]" />
-      <span className="font-cyber text-[11px] tracking-[0.3em] text-zinc-400 uppercase">mrdaniel.co.il</span>
+      <span className="font-tech text-[11px] tracking-[0.3em] text-zinc-400 uppercase">mrdaniel.co.il</span>
     </div>
   );
 }

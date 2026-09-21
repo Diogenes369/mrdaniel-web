@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-export type NewsTopic = 'ai' | 'ai_models' | 'cyber' | 'cloud' | 'general';
+export type NewsTopic = 'ai' | 'ai_models' | 'ai_agents' | 'general';
 
 export interface NewsItem {
   id: string;
@@ -22,11 +22,11 @@ interface NewsResponse {
   updatedAt: string;
 }
 
-// v4: `/api/news` is now the sanitized Hebrew AI/cyber stream by default (see server/newsFeed.ts
+// v4: `/api/news` is now the sanitized Hebrew AI stream by default (see server/newsFeed.ts
 // `sanitizeAndKeep`). Bumped so every browser drops its pre-filter cache — which still holds
 // English / off-topic items for up to 24h — and re-fetches the clean feed on the next load.
 // (v3 added the `topic` field.)
-const CACHE_KEY = 'dbb-cyber-news-cache-v4';
+const CACHE_KEY = 'dbb-news-feed-cache-v5';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // refresh at most once a day per browser
 
 interface NewsCacheShape {
@@ -76,7 +76,7 @@ export async function fetchNews(): Promise<NewsItem[]> {
 
 export function useNewsFeed() {
   return useQuery({
-    queryKey: ['cyber-news'],
+    queryKey: ['news-feed'],
     queryFn: fetchNews,
     staleTime: CACHE_TTL_MS,
     gcTime: CACHE_TTL_MS * 2,
@@ -103,10 +103,10 @@ export function useNewsArticle(slug: string | undefined) {
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: ['cyber-news-item', slug],
+    queryKey: ['news-feed-item', slug],
     queryFn: async () => {
       if (!slug) throw new Error('missing slug');
-      const listed = queryClient.getQueryData<NewsItem[]>(['cyber-news']);
+      const listed = queryClient.getQueryData<NewsItem[]>(['news-feed']);
       const fromList = listed?.find((item) => item.slug === slug);
       if (fromList) return fromList;
       return fetchNewsItemBySlug(slug);

@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Bot,
-  ShieldAlert,
   Code2,
   BookOpen,
   MessageCircle,
@@ -36,9 +35,8 @@ const trackField = (field: string, action: 'focus' | 'blur' | 'submit') =>
 const WHATSAPP_NUMBER = '972506473039';
 
 const SERVICES = [
-  { id: 'ai', label: 'בינה מלאכותית ואוטומציה', icon: Bot },
-  { id: 'cyber', label: 'סייבר ואבטחת מידע', icon: ShieldAlert },
-  { id: 'dev', label: 'פיתוח דיגיטלי ו-Web3', icon: Code2 },
+  { id: 'ai', label: 'סוכן AI מותאם אישית', icon: Bot },
+  { id: 'dev', label: 'אוטומציה ואינטגרציית LLM', icon: Code2 },
   { id: 'content', label: 'רכישת תוכן / מגזינים', icon: BookOpen },
   { id: 'other', label: 'משהו אחר', icon: MessageCircle },
 ];
@@ -51,7 +49,7 @@ const GOALS = [
   { id: 'crm', label: 'חיבור למערכת CRM קיימת', icon: Network },
   { id: 'whatsapp', label: 'אוטומציה ב-WhatsApp', icon: MessagesSquare },
   { id: 'web', label: 'אתר / צ׳אט אתר', icon: Globe },
-  { id: 'internal', label: 'ידע ותהליכים פנים-ארגוניים', icon: BrainCog },
+  { id: 'internal', label: 'חיפוש חכם במסמכים ובידע שלי', icon: BrainCog },
   { id: 'other', label: 'משהו אחר', icon: MessageCircleQuestion },
 ];
 
@@ -64,9 +62,8 @@ const COMPANY_SIZES = [
 
 function mapSubjectToService(subject?: string): string {
   if (!subject) return '';
-  if (/AI|בינה|אוטומצי/i.test(subject)) return 'ai';
-  if (/סייבר|zero|אבטחה/i.test(subject)) return 'cyber';
-  if (/web3|פיתוח|אתר/i.test(subject)) return 'dev';
+  if (/אוטומצי|LLM|API|אינטגרצי/i.test(subject)) return 'dev';
+  if (/AI|בינה|סוכן/i.test(subject)) return 'ai';
   if (/רכישת|מגזין|חוברת/i.test(subject)) return 'content';
   return '';
 }
@@ -152,7 +149,7 @@ export default function LeadForm() {
   // Product flow: step 0 = goal + company size, step 1 = contact details, step 2 = confirmation.
   // Generic flow: step 0 = contact details, step 1 = topic, step 2 = message. Kept as two distinct
   // orderings (rather than one shared shape) so every existing generic-flow call site — Header,
-  // Hero, CapabilityMatrix, ROICalculator, etc. — keeps its already-tested UX unchanged.
+  // Hero, ROICalculator, etc. — keeps its already-tested UX unchanged.
   const canProceed = isProductFlow
     ? step === 0
       ? form.goal !== '' && form.companySize !== ''

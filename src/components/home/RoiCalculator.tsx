@@ -114,7 +114,7 @@ export default function RoiCalculator() {
       <DepthSection className="container-wide relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 max-w-[1400px] mx-auto items-stretch">
           {/* ---- Inputs ---- */}
-          <div className="cyber-glass cyber-glass--info w-full min-w-0 rounded-3xl p-5 sm:p-7 lg:p-10 flex flex-col">
+          <div className="glass-panel glass-panel--info w-full min-w-0 rounded-3xl p-5 sm:p-7 lg:p-10 flex flex-col">
             <div className="flex items-center gap-3 mb-8">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-black/40 text-brand-300">
                 <Calculator className="w-5 h-5" />
@@ -163,7 +163,7 @@ export default function RoiCalculator() {
           </div>
 
           {/* ---- Output (updates in place — no remount, no per-tick animation) ---- */}
-          <div className="cyber-glass cyber-glass--info w-full min-w-0 break-words rounded-3xl p-5 sm:p-7 lg:p-10 flex flex-col shadow-[0_0_48px_-20px_rgba(118,185,0,0.4)]">
+          <div className="glass-panel glass-panel--info w-full min-w-0 break-words rounded-3xl p-5 sm:p-7 lg:p-10 flex flex-col shadow-[0_0_48px_-20px_rgba(118,185,0,0.4)]">
             <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-7 flex-1 content-center">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-sm lg:text-base font-display font-bold text-zinc-200 tracking-tight mb-3">

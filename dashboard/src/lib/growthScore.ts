@@ -215,7 +215,7 @@ function scoreSeo(content: GrowthContent, caption: string, pack: GrowthPack | nu
   const anchors = CORE_IL_TAGS.filter((t) => tagKeys.has(tagKey(t))).length;
   if (anchors >= 2) {
     score += 15;
-    positives.push('עוגני נישה ישראליים (#בינהמלאכותית, #סייבר…)');
+    positives.push('עוגני נישה ישראליים (#בינהמלאכותית, #סוכניAI…)');
   } else if (anchors === 1) {
     score += 7;
   } else if (tags.length) {

@@ -246,7 +246,7 @@ export async function fetchTipFeed(limit = 8): Promise<TipTopic[]> {
       clearTimeout(timer);
     }
     return items
-      .filter((i) => i.topic === 'ai' || i.topic === 'cloud')
+      .filter((i) => i.topic === 'ai' || i.topic === 'ai_models' || i.topic === 'ai_agents')
       .slice(0, limit)
       .map((i) => ({
         id: `feed-${i.id}`,
@@ -306,7 +306,7 @@ function buildFallbackDeck(topic: string, reason: string): TechTipDeck {
     { kind: 'step', kicker: 'שלב 2', title: 'מימוש', body: 'כתבו את הליבה — פונקציה אחת שעושה את העבודה, בלי הפשטות מיותרות.', bullets: [], code: '', codeLang: '', stepNumber: 2, visualPrompt: VISUAL_BASE },
     { kind: 'step', kicker: 'שלב 3', title: 'בדיקה', body: 'הריצו על מקרה אמיתי אחד, ומדדו את התוצאה מול קריטריון ברור.', bullets: [], code: '', codeLang: '', stepNumber: 3, visualPrompt: VISUAL_BASE },
     { kind: 'takeaway', kicker: 'השורה התחתונה', title: 'מה עושים מחר בבוקר', body: '', bullets: ['התחילו מתהליך אחד קטן', 'מדדו לפני שמרחיבים', 'אבטחה כברירת מחדל, לא כתוספת'], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
-    { kind: 'cta', kicker: 'צעד הבא', title: 'רוצים את המדריך המלא?', body: 'עוד מדריכים, כלים ודוגמאות קוד — ב-mrdaniel.co.il. עקבו לעוד תוכן על AI, סייבר ופיתוח.', bullets: [], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
+    { kind: 'cta', kicker: 'צעד הבא', title: 'רוצים את המדריך המלא?', body: 'עוד מדריכים, כלים ודוגמאות קוד — ב-mrdaniel.co.il. עקבו לעוד פירוקים של AI.', bullets: [], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
   ];
   return {
     title: short,

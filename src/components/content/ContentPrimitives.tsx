@@ -77,7 +77,7 @@ export function SectionHeading({
  * site-wide) — kept optional so existing call sites that still pass one don't need to be touched. */
 export function InfoBox({ title, children }: { badgeIcon?: LucideIcon; badgeLabel?: string; title?: string; children: ReactNode }) {
   return (
-    <div className="cyber-glass cyber-glass--info rounded-2xl p-5 sm:p-6 lg:p-10 mb-16">
+    <div className="glass-panel glass-panel--info rounded-2xl p-5 sm:p-6 lg:p-10 mb-16">
       {title && <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">{title}</h2>}
       {/* Prose measure so a wide page doesn't stretch these paragraphs past a readable line length. */}
       <div className="space-y-4 text-base md:text-lg text-zinc-300 leading-[1.85] max-w-4xl">{children}</div>
@@ -97,7 +97,7 @@ export function ServiceGrid({ items }: { items: ServiceItem[] }) {
       {items.map((item) => (
         <motion.div
           key={item.title}
-          className="cyber-glass cyber-glass--marketing rounded-2xl p-5 sm:p-6 lg:p-8"
+          className="glass-panel glass-panel--marketing rounded-2xl p-5 sm:p-6 lg:p-8"
         >
           <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-brand-400 mb-4">
             <item.icon className="w-6 h-6" />
@@ -121,7 +121,7 @@ function InteractiveServiceCard({ item, index, featured = false }: { item: Servi
     <motion.div
       whileHover={{ y: -4 }}
       transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-      className={`cyber-glass cyber-glass--marketing group rounded-2xl p-5 sm:p-6 lg:p-8 ${
+      className={`glass-panel glass-panel--marketing group rounded-2xl p-5 sm:p-6 lg:p-8 ${
         featured ? 'md:flex md:items-center md:gap-8' : ''
       }`}
     >
@@ -167,7 +167,7 @@ export function InteractiveServiceGrid({ items }: { items: ServiceItem[] }) {
 
 export function SpecTable({ rows }: { rows: { label: string; value: ReactNode }[] }) {
   return (
-    <div className="cyber-glass cyber-glass--info overflow-x-auto rounded-2xl mb-16">
+    <div className="glass-panel glass-panel--info overflow-x-auto rounded-2xl mb-16">
       <table className="w-full text-right text-base">
         <tbody>
           {rows.map((row, idx) => (
@@ -192,7 +192,7 @@ export function AudienceGrid({ items }: { items: AudienceItem[] }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6 mb-16">
       {items.map((item) => (
-        <div key={item.title} className="cyber-glass cyber-glass--marketing rounded-2xl p-5 sm:p-6 lg:p-8">
+        <div key={item.title} className="glass-panel glass-panel--marketing rounded-2xl p-5 sm:p-6 lg:p-8">
           <div className="font-mono text-xs font-bold text-brand-400 mb-2 uppercase tracking-wide">{item.tag}</div>
           <h3 className="font-display font-bold text-lg text-white mb-2">{item.title}</h3>
           <p className="text-zinc-400 text-base leading-relaxed">{item.description}</p>
@@ -211,7 +211,7 @@ export interface TocEntry {
 
 export function TocGrid({ items }: { items: TocEntry[] }) {
   return (
-    <div className="cyber-glass cyber-glass--info rounded-2xl p-5 sm:p-6 lg:p-8 mb-16">
+    <div className="glass-panel glass-panel--info rounded-2xl p-5 sm:p-6 lg:p-8 mb-16">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {items.map((item) => (
           <div
@@ -240,7 +240,7 @@ export function TocGrid({ items }: { items: TocEntry[] }) {
  */
 export function UnifiedCta({ mailSubject, whatsappMessage }: { mailSubject: string; whatsappMessage: string }) {
   return (
-    <div className="cyber-glass cyber-glass--marketing rounded-2xl p-6 sm:p-8 lg:p-10 mb-8 text-center">
+    <div className="glass-panel glass-panel--marketing rounded-2xl p-6 sm:p-8 lg:p-10 mb-8 text-center">
       <p className="text-zinc-400 text-base md:text-lg mb-7 max-w-xl mx-auto">הדרך המהירה ביותר להתחיל — פנייה ישירה במייל או ב-WhatsApp, בלי טפסים מיותרים.</p>
       <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
         <WebButton variant="primary" href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(mailSubject)}`}>

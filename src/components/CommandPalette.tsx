@@ -5,7 +5,7 @@ import { Search } from 'lucide-react';
 import { searchEntries, type SearchEntry } from '../lib/searchIndex';
 import { scrollToAndHighlight } from '../lib/searchHighlight';
 
-/** Geektime-style "Cyber Terminal" command palette — open via the header's search icon or
+/** Geektime-style "AI Terminal" command palette — open via the header's search icon or
  * Ctrl/Cmd+K, navigate with arrow keys + Enter or a click. Backed by the curated content index in
  * `lib/searchIndex.ts` (fuzzy substring-token matching), and on selection: closes immediately,
  * navigates cross-route if needed, then smooth-scrolls to and highlights the exact match via
@@ -104,7 +104,7 @@ export default function CommandPalette() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onInputKeyDown}
-                placeholder="חיפוש חכם... ארכיטקטורה, RAG, סייבר, CISO..."
+                placeholder="חיפוש חכם... סוכנים, RAG, LLM, JARVIS..."
                 className="flex-1 bg-transparent text-white placeholder-zinc-500 text-sm focus:outline-none"
               />
               <kbd className="hidden sm:inline text-[10px] font-mono text-zinc-500 border border-white/10 rounded px-1.5 py-0.5" dir="ltr">

@@ -75,12 +75,16 @@ const BANNED = [
   'חדשני',
 ];
 
-// The three pillars, in order.
-t('offer order: AI agents, enterprise cyber/SaaS, 2026 hub', HOME_OFFERS.map((o) => o.id).join() === 'offer-ai-agents,offer-cyber-saas,offer-ai-hub', HOME_OFFERS.map((o) => o.id).join());
+// The three pillars, in order. AI-only since 2026-09-21.
+t('offer order: AI agents, LLM lab, AI news hub', HOME_OFFERS.map((o) => o.id).join() === 'offer-ai-agents,offer-llm-lab,offer-ai-hub', HOME_OFFERS.map((o) => o.id).join());
 t('hub offer links to the news hub', HOME_OFFERS[2]?.route === '/news', HOME_OFFERS[2]?.route);
 t('hub offer second CTA goes to the community grid', HOME_OFFERS[2]?.secondary === 'community', HOME_OFFERS[2]?.secondary);
 
+// The retired cyber / enterprise offer must not creep back into the marketing copy.
+const RETIRED = /סייבר|אבטחת מידע|cyber|infosec|enterprise|אנטרפרייז|ארגונ|saas|zero[- ]?trust/i;
+
 for (const [label, text, max] of fields) {
+  if (typeof text === 'string') t(`${label}: AI-only (no cyber / enterprise)`, !RETIRED.test(text), text);
   t(`${label}: filled`, typeof text === 'string' && text.trim().length > 0 && !text.includes('__'), JSON.stringify(text));
   if (typeof text !== 'string') continue;
   t(`${label}: no question mark`, !/[?؟]/.test(text), text);

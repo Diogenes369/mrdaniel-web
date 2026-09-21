@@ -290,7 +290,7 @@ export function buildDeckFallback(brief: ResearchBrief, topic: NewsTopic, reason
     layout: 'cta',
     kicker: 'צעד הבא',
     headline: 'רוצים ליישם את זה נכון?',
-    body: 'המדריך המלא, כלים ודוגמאות — ב-mrdaniel.co.il. עקבו לעוד תוכן על AI, סייבר ו-Web3.',
+    body: 'המדריך המלא, כלים ודוגמאות — ב-mrdaniel.co.il. עקבו לעוד פירוקים של AI.',
   });
 
   return {
@@ -337,7 +337,7 @@ export async function synthesizeStudioDeck(
     const cta = slides[slides.length - 1];
     if (cta && cta.role === 'cta') {
       if (!cta.headline) cta.headline = 'רוצים ליישם את זה נכון?';
-      if (!cta.body) cta.body = 'המדריך המלא, כלים ודוגמאות — ב-mrdaniel.co.il. עקבו לעוד תוכן על AI, סייבר ו-Web3.';
+      if (!cta.body) cta.body = 'המדריך המלא, כלים ודוגמאות — ב-mrdaniel.co.il. עקבו לעוד פירוקים של AI.';
     }
     slides = slides.filter((s) => s.headline || s.body || s.bullets.length || s.quote || s.code || s.stat || s.role === 'cta');
     return {
@@ -363,9 +363,7 @@ function topicHashtags(topic: NewsTopic): string[] {
   const base: Record<NewsTopic, string[]> = {
     ai: ['#בינה_מלאכותית', '#סוכני_AI', '#AI', '#אוטומציה', '#פרודוקטיביות'],
     ai_models: ['#מודלי_AI', '#LLM', '#GenerativeAI', '#AI', '#MachineLearning'],
-    cyber: ['#סייבר', '#אבטחת_מידע', '#ZeroTrust', '#CyberSecurity', '#הגנת_סייבר'],
-    cloud: ['#ענן', '#תשתיות', '#DevOps', '#CloudComputing', '#ארכיטקטורה'],
-    devops: ['#DevOps', '#אוטומציה', '#CI_CD', '#ITOps', '#תשתיות'],
+    ai_agents: ['#בינה_מלאכותית', '#סוכני_AI', '#AI', '#אוטומציה', '#פרודוקטיביות'],
     general: ['#טכנולוגיה', '#חדשנות', '#הייטק', '#Tech', '#דיגיטל'],
   };
   return [...(base[topic] || base.general), '#mrdaniel'];

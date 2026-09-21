@@ -63,7 +63,7 @@ const KIND_LABEL: Record<string, string> = {
 const THEME_LABEL: Record<string, string> = {
   ai: 'בינה מלאכותית',
   automation: 'אוטומציה',
-  security: 'סייבר ואבטחה',
+  security: 'בטיחות AI',
   code: 'פיתוח וקוד',
   data: 'נתונים',
   web3: 'Web3',

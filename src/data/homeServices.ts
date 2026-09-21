@@ -1,4 +1,4 @@
-import { Bot, BrainCircuit, Globe, Palette, Database, Workflow, ServerCog, type LucideIcon } from 'lucide-react';
+import { Bot, BrainCircuit, Cpu, Database, MessageSquare, Sparkles, Workflow, type LucideIcon } from 'lucide-react';
 
 /**
  * Data model for the homepage <ServicesSection> bento grid. Editing an entry here is the only
@@ -6,7 +6,7 @@ import { Bot, BrainCircuit, Globe, Palette, Database, Workflow, ServerCog, type 
  *
  * `span` carries the desktop (lg+) bento placement as Tailwind classes; below `lg` every tile
  * falls back to a plain 1-col / 2-col cell, and on phones the whole grid becomes a snap carousel.
- * `flagship` tiles get the stronger cyber-glass bloom; `wide` is the full-row tile whose inner
+ * `flagship` tiles get the stronger glass-panel bloom; `wide` is the full-row tile whose inner
  * content lays out in two columns on desktop.
  *
  * Content rule: `metric.value` is always an ESTIMATE / range (prefixed "~" or "כ-") or a
@@ -68,65 +68,64 @@ export const SERVICES: ServiceEntry[] = [
     span: 'lg:col-span-3',
   },
   {
-    id: 'fullstack-it',
-    icon: ServerCog,
-    title: 'פיתוח ותשתית Full-Stack',
+    id: 'rag-knowledge',
+    icon: Database,
+    title: 'RAG: AI שעונה מהמסמכים שלכם',
     blurb:
-      'פיתוח, ענן, סייבר ואינטגרציות אצל גורם אחד. בלי לתאם בין חמישה ספקים.',
+      'מודל שפה שמחובר למסמכים, להערות ולידע שלכם, ועונה עם הפניה למקור במקום להמציא.',
     points: [
-      'תשתית ענן כקוד, מתועדת ומשוחזרת',
-      'אבטחה מובנית מהיום הראשון',
-      'חיבור למערכות ה-SaaS הקיימות',
+      'שליפה מדויקת מתוך PDF, מסמכים והערות',
+      'כל תשובה עם הפניה למקור',
+      'עובד עם המודל שמתאים למשימה',
     ],
-    chips: ['ספק אחד', 'אבטחה מובנית', 'תשתית-כקוד'],
-    metric: { value: 'ספק אחד', label: 'במקום 4–5 גורמים שמתאמים ביניהם' },
-    to: '/cyber',
+    chips: ['תשובות עם מקור', 'חיפוש סמנטי', 'בלי הזיות'],
+    to: '/ai',
     flagship: true,
     span: 'lg:col-span-3',
   },
   {
-    id: 'web-apps',
-    icon: Globe,
-    title: 'אתרים ואפליקציות',
+    id: 'llm-selection',
+    icon: Cpu,
+    title: 'בחירת מודל LLM',
     blurb:
-      'קוד ייעודי, לא תבנית. נטען מהר, עובד בכל מכשיר ובנוי ל-SEO ולהמרה.',
+      'Grok, Claude, Gemini, GPT או מודל מקומי. בודקים על המשימה שלכם ובוחרים לפי איכות, מהירות ועלות.',
     points: [
-      'בלי תוספים כבדים שמאטים את האתר',
-      'ציון Core Web Vitals ירוק',
-      'קל לתחזוקה ולהרחבה',
+      'השוואה על דוגמאות אמיתיות שלכם',
+      'ניתוב בין מודלים לפי סוג המשימה',
+      'מודל מקומי כשהמידע לא יוצא מהמחשב',
     ],
-    chips: ['מהיר לטעינה', 'רספונסיבי', 'ללא קוד תבניתי'],
-    to: '/digital',
+    chips: ['השוואה מעשית', 'ניתוב מודלים', 'מודלים מקומיים'],
+    to: '/news',
     span: 'lg:col-span-2',
   },
   {
-    id: 'ux-ui',
-    icon: Palette,
-    title: 'עיצוב UI/UX',
+    id: 'content-agents',
+    icon: Sparkles,
+    title: 'סוכני תוכן',
     blurb:
-      'כל מסך בנוי סביב פעולה אחת ברורה. נגישות ו-RTL תקינים כברירת מחדל.',
+      'סוכן שקורא חדשות, מסכם ומנסח פוסטים, קרוסלות ושרשורים. אתם מאשרים לפני כל פרסום.',
     points: [
-      'מסע משתמש שממוקד לפעולה אחת',
-      'פחות חיכוך בטפסים ובתשלום',
-      'עברית ו-RTL בלי שבירות',
+      'סריקת מקורות ומיון לפי רלוונטיות',
+      'טיוטות מותאמות לכל פלטפורמה',
+      'אישור אנושי לפני פרסום',
     ],
-    chips: ['ממוקד המרה', 'נגיש ו-RTL', 'מבוסס נתונים'],
-    to: '/digital',
+    chips: ['חדשות לתוכן', 'רב-פלטפורמי', 'אישור אנושי'],
+    to: '/ai',
     span: 'lg:col-span-2',
   },
   {
-    id: 'data-arch',
-    icon: Database,
-    title: 'ארכיטקטורת דאטה',
+    id: 'voice-agents',
+    icon: MessageSquare,
+    title: 'סוכני שיחה',
     blurb:
-      'מקור אמת אחד במקום עשרות גיליונות. דשבורדים בזמן אמת וחיפוש חכם במסמכים.',
+      'סוכן שעונה ב-WhatsApp או באתר, בעברית טבעית, ומעביר אליכם רק את מה שדורש החלטה.',
     points: [
-      'כל הנתונים העסקיים במקום אחד',
-      'דשבורדים שמתעדכנים בזמן אמת',
-      'חיפוש חכם במסמכים ובידע הפנימי',
+      'מענה בעברית טבעית',
+      'העברה אליכם כשצריך החלטה',
+      'היסטוריית שיחה מלאה',
     ],
-    chips: ['מקור אמת אחד', 'בזמן אמת', 'חיפוש חכם'],
-    to: '/architecture',
+    chips: ['WhatsApp', 'צ׳אט אתר', 'עברית מלאה'],
+    to: '/ai',
     span: 'lg:col-span-2',
   },
   {
@@ -134,7 +133,7 @@ export const SERVICES: ServiceEntry[] = [
     icon: Workflow,
     title: 'אוטומציות שחוסכות זמן',
     blurb:
-      'סנכרון בין CRM, יומן, מייל ומסמכים, בין הכלים שכבר יש לכם. פחות העתק-הדבק, פחות טעויות.',
+      'סנכרון בין יומן, מייל ומסמכים, בין הכלים שכבר יש לכם, עם מודל שפה באמצע. פחות העתק-הדבק, פחות טעויות.',
     points: [
       'חשבוניות והצעות מחיר שנשלחות לבד',
       'סנכרון יומן, CRM ומייל בלי עבודה ידנית',

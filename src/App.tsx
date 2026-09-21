@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import NewsTicker from './components/NewsTicker';
 import ScrollProgress from './components/ScrollProgress';
@@ -8,7 +8,7 @@ import AIAssistantWidget from './components/AIAssistantWidget';
 import AccessibilityWidget from './components/AccessibilityWidget';
 import LeadForm from './components/LeadForm';
 import AgentQualificationModal from './components/AgentQualificationModal';
-import CyberCookieBanner from './components/CyberCookieBanner';
+import CookieBanner from './components/CookieBanner';
 import CommandPalette from './components/CommandPalette';
 import TerminalCLI from './components/TerminalCLI';
 import { useLenis, triggerRouteTransitionPulse } from './hooks/useLenis';
@@ -33,10 +33,6 @@ import HomePage from './pages/HomePage';
 import AboutPage from './pages/AboutPage';
 import AIPage from './pages/AIPage';
 import JarvisPage from './pages/JarvisPage';
-import CyberPage from './pages/CyberPage';
-import DigitalPage from './pages/DigitalPage';
-import ArchitecturePage from './pages/ArchitecturePage';
-import CapabilitiesPage from './pages/CapabilitiesPage';
 import MagazinesPage from './pages/MagazinesPage';
 import NewsPage from './pages/NewsPage';
 import NewsArticlePage from './pages/NewsArticlePage';
@@ -122,7 +118,7 @@ export default function App() {
       {/* Live headline ticker: very top of the layout, above the header, in normal document
           flow, DESKTOP ONLY (the component is `hidden md:block`). It scrolls away with the page;
           the header measures it and is NOT sticky-bundled with it (see Header.tsx). On mobile the
-          ticker instead renders inline inside the homepage news section (CyberNewsGrid). */}
+          ticker instead renders inline inside the homepage news section (AiNewsGrid). */}
       <NewsTicker placement="top" />
       <Header />
       <main key={location.pathname} className="relative z-[1] w-full max-w-full overflow-x-clip">
@@ -131,10 +127,11 @@ export default function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/ai" element={<AIPage />} />
           <Route path="/jarvis" element={<JarvisPage />} />
-          <Route path="/cyber" element={<CyberPage />} />
-          <Route path="/digital" element={<DigitalPage />} />
-          <Route path="/architecture" element={<ArchitecturePage />} />
-          <Route path="/capabilities" element={<CapabilitiesPage />} />
+          {/* The site is AI-only since 2026-09-21: the old cyber / web-dev / architecture pages
+              were removed, and their URLs (still in backlinks and search results) land on /ai. */}
+          {['/cyber', '/digital', '/architecture', '/capabilities'].map((path) => (
+            <Route key={path} path={path} element={<Navigate to="/ai" replace />} />
+          ))}
           <Route path="/magazines" element={<MagazinesPage />} />
           <Route path="/news" element={<NewsPage />} />
           <Route path="/news/:slug" element={<NewsArticlePage />} />
@@ -151,7 +148,7 @@ export default function App() {
       <AccessibilityWidget />
       <LeadForm />
       <AgentQualificationModal />
-      <CyberCookieBanner />
+      <CookieBanner />
       <CommandPalette />
       <TerminalCLI />
     </div>

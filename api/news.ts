@@ -15,7 +15,7 @@ import { readCommentDmCampaigns } from '../src/agent/firebaseServer.js';
 // CORS is open (`*`) so the analytics dashboard — served from its own origin — can read the feed
 // directly for the news-driven content generator. The payload is public, read-only news metadata.
 //
-// The response is the SANITIZED Hebrew AI/cyber/cloud stream BY DEFAULT (see `sanitizeAndKeep` in
+// The response is the SANITIZED Hebrew AI-only stream BY DEFAULT (see `sanitizeAndKeep` in
 // newsFeed.ts) — Hebrew-only titles, no scrape/parse artefacts, on-topic only. `?strict=0` (or
 // `?strict=false`) returns the raw unfiltered aggregate for debugging. Vercel's edge caches the
 // two URL variants under separate keys, so they never mix.

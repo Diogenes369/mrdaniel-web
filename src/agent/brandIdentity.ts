@@ -54,11 +54,11 @@ export const BRAND_META = {
   handle: '@mrdaniel',
   site: 'mrdaniel.co.il',
   /**
-   * Pure Hebrew on purpose. A mixed-script tag ("#סייבר_ו_AI") put Latin, Hebrew and neutral
+   * Pure Hebrew on purpose. A mixed-script tag ("#חדשות_AI") put Latin, Hebrew and neutral
    * underscores in one token, and the bidi ordering inside it rendered as "AI_ו_רבייס#". A tag is
    * brand furniture, not content — there is no reason to fight bidi for it.
    */
-  hashtag: '#סייבר_ובינה_מלאכותית',
+  hashtag: '#בינה_מלאכותית',
   year: '20\n26',
   /** public/logo.png. Not yet placed on slides — see the note in figmaTemplates' logo handling. */
   logoPath: 'public/logo.png',

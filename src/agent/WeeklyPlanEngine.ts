@@ -7,14 +7,14 @@ import type { SecurityCheckResult } from './types.js';
 
 export { isEngineConfigured };
 
-export type WeeklyTopic = 'ai-agents' | 'wifi7-networking' | 'cybersecurity' | 'automation';
+export type WeeklyTopic = 'ai-agents' | 'llm-models' | 'ai-news' | 'automation';
 export type WeeklyPlatform = 'instagram-reels' | 'tiktok' | 'linkedin' | 'youtube-shorts';
 export type ContentStatus = 'draft' | 'approved' | 'scheduled';
 
 export const WEEKLY_TOPIC_LABEL: Record<WeeklyTopic, string> = {
   'ai-agents': 'סוכני AI',
-  'wifi7-networking': 'רשתות ארגוניות / Wi-Fi 7',
-  cybersecurity: 'אבטחת סייבר',
+  'llm-models': 'מודלי שפה',
+  'ai-news': 'חדשות AI',
   automation: 'אוטומציה',
 };
 
@@ -64,7 +64,7 @@ ${BRAND_KNOWLEDGE_BASE}
 
 ${HEBREW_COPY_RULES}
 
-המשימה: תכנן 7 ימי תוכן (ראשון עד שבת), כל יום עם נושא אחד מתוך ארבעת התחומים הבאים — סוכני AI, רשתות ארגוניות/Wi-Fi 7, אבטחת סייבר, אוטומציה — כך שכל ארבעת התחומים מכוסים לפחות פעם אחת במהלך השבוע (אפשר חזרה על תחום פעמיים אם צריך, יש 7 ימים ו-4 תחומים). בחר פלטפורמה אחת לכל יום מתוך: Instagram Reels, TikTok, LinkedIn, YouTube Shorts — גוון בין הפלטפורמות לאורך השבוע, ואל תשתמש באותה פלטפורמה יומיים ברצף.
+המשימה: תכנן 7 ימי תוכן (ראשון עד שבת), כל יום עם נושא אחד מתוך ארבעת התחומים הבאים — סוכני AI, מודלי שפה, חדשות AI, אוטומציה עם AI — כך שכל ארבעת התחומים מכוסים לפחות פעם אחת במהלך השבוע (אפשר חזרה על תחום פעמיים אם צריך, יש 7 ימים ו-4 תחומים). בחר פלטפורמה אחת לכל יום מתוך: Instagram Reels, TikTok, LinkedIn, YouTube Shorts — גוון בין הפלטפורמות לאורך השבוע, ואל תשתמש באותה פלטפורמה יומיים ברצף.
 
 לכל יום ספק:
 - postText: כיתוב/פוסט מלא, מותאם לטון הפלטפורמה שנבחרה לאותו יום (LinkedIn מקצועי יותר, TikTok/Reels/Shorts קליל וקצר יותר).
@@ -74,10 +74,10 @@ ${HEBREW_COPY_RULES}
 החזר אך ורק JSON תקני בפורמט הבא, ללא טקסט נוסף לפני/אחרי, ללא markdown code fence:
 {"days":[{"day":"ראשון","topic":"ai-agents","platform":"linkedin","postText":"...","hashtags":["...","..."],"videoScript":{"hook":"...","body":"...","cta":"...","visualCues":["...","..."]}}, ... (7 total, one per day)]}
 
-ערכי topic מותרים בדיוק: "ai-agents", "wifi7-networking", "cybersecurity", "automation".
+ערכי topic מותרים בדיוק: "ai-agents", "llm-models", "ai-news", "automation".
 ערכי platform מותרים בדיוק: "instagram-reels", "tiktok", "linkedin", "youtube-shorts".`;
 
-const VALID_TOPICS: WeeklyTopic[] = ['ai-agents', 'wifi7-networking', 'cybersecurity', 'automation'];
+const VALID_TOPICS: WeeklyTopic[] = ['ai-agents', 'llm-models', 'ai-news', 'automation'];
 const VALID_PLATFORMS: WeeklyPlatform[] = ['instagram-reels', 'tiktok', 'linkedin', 'youtube-shorts'];
 
 function normalizeTopic(value: unknown, fallbackIndex: number): WeeklyTopic {

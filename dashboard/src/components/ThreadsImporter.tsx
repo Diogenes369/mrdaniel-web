@@ -76,7 +76,7 @@ const PREVIEW_H = 425;
 const THEME_LABEL: Record<string, string> = {
   ai: 'בינה מלאכותית',
   automation: 'אוטומציה',
-  security: 'סייבר ואבטחה',
+  security: 'בטיחות AI',
   code: 'פיתוח וקוד',
   data: 'נתונים',
   web3: 'Web3',
@@ -855,7 +855,7 @@ export default function ThreadsImporter() {
       {!deck && !busy && (
         <div className="dash-card p-10 text-center text-sm leading-relaxed text-zinc-500">
           הדביקו קישור לפוסט ב-Threads — המערכת תמשוך את השרשור, תתרגם ותתאים אותו לעברית ישראלית טבעית,
-          ותבנה קרוסלת לימוד של 10–12 שקופיות בעיצוב סייבר כהה. אם הפוסט חסום, הדביקו את הטקסט ידנית —
+          ותבנה קרוסלת לימוד של 10–12 שקופיות בעיצוב ניאון כהה. אם הפוסט חסום, הדביקו את הטקסט ידנית —
           התוצאה זהה. פלט כפול: קרוסלה (PNG · ZIP) וריל 9:16.
         </div>
       )}

@@ -1,4 +1,10 @@
 {
+  "redirects": [
+    { "source": "/cyber", "destination": "/ai", "permanent": true },
+    { "source": "/digital", "destination": "/ai", "permanent": true },
+    { "source": "/architecture", "destination": "/ai", "permanent": true },
+    { "source": "/capabilities", "destination": "/ai", "permanent": true }
+  ],
   "rewrites": [
     {
       "source": "/api/health",

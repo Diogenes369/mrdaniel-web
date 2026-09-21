@@ -28,7 +28,7 @@ export default function Logo({ className = '', iconClassName = 'h-9', textClassN
           onError={() => setImgError(true)}
         />
       ) : (
-        <span className={`font-cyber font-bold tracking-wide whitespace-nowrap ${textClassName}`}>
+        <span className={`font-tech font-bold tracking-wide whitespace-nowrap ${textClassName}`}>
           <span className="text-white">דניאל</span> <span className="text-brand-400">בן ברוך</span>
         </span>
       )}

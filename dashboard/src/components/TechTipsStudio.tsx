@@ -316,7 +316,7 @@ export default function TechTipsStudio() {
               value={customTopic}
               onChange={(e) => setCustomTopic(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !busy && customTopic.trim().length > 5 && void generate()}
-              placeholder="הקלד נושא למדריך (לדוגמה: 5 טיפים לאבטחת מידע בארגון)"
+              placeholder="הקלד נושא למדריך (לדוגמה: 5 טיפים לכתיבת פרומפט לסוכן AI)"
               dir="rtl"
               className="min-w-[16rem] flex-1 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600"
             />
@@ -589,7 +589,7 @@ export default function TechTipsStudio() {
       {!deck && !busy && (
         <div className="dash-card p-10 text-center text-zinc-500 text-sm leading-relaxed">
           בחרו נושא מהמדף או מהפיד החי — והסטודיו יפיק מדריך של 10–12 שקופיות בעברית עם קטעי קוד אמיתיים, שלבים וכלים,
-          בעיצוב סייבר כהה. פלט כפול: קרוסלה (PNG · ZIP) לאינסטגרם, וריל 9:16 מונפש עם פס קול.
+          בעיצוב ניאון כהה. פלט כפול: קרוסלה (PNG · ZIP) לאינסטגרם, וריל 9:16 מונפש עם פס קול.
         </div>
       )}
     </div>

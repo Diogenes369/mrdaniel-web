@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import type { NewsItem } from './newsService';
 
 /**
- * "AI Pulse" — the live AI/cyber news strip on the AI page. It reads the SAME sanitized Hebrew
+ * "AI Pulse" — the live AI news strip on the AI page. It reads the SAME sanitized Hebrew
  * stream as the rest of the site (`/api/news`, strict-by-default: Hebrew-only titles, no scrape
- * artefacts, AI/cyber/cloud only), keeps just the `ai` + `cyber` items, and maps them to the
+ * artefacts, AI only), keeps just the `ai` + `ai_agents` items, and maps them to the
  * widget's shape. If the fetch fails or comes back empty it returns a curated, evergreen Hebrew
  * fallback so the section is NEVER empty or broken. Cached ~30 min via react-query.
  *
@@ -74,7 +74,7 @@ export const AI_PULSE_FALLBACK: PulseItem[] = [
 
 /** The site's sanitized Hebrew feed. The server already: aggregates, de-duplicates cross-source,
  * sorts newest-first, and applies the Hebrew + on-topic gate — so all this needs to do is keep the
- * ai/cyber slice and reshape. */
+ * AI slice and reshape. */
 export async function fetchAIPulse(): Promise<PulseItem[]> {
   try {
     const ac = new AbortController();
@@ -90,7 +90,7 @@ export async function fetchAIPulse(): Promise<PulseItem[]> {
 
     const items = Array.isArray(json.items) ? json.items : [];
     const pulse: PulseItem[] = items
-      .filter((i) => i.topic === 'ai' || i.topic === 'cyber')
+      .filter((i) => i.topic === 'ai' || i.topic === 'ai_agents')
       .slice(0, 14)
       .map((i) => ({
         id: `news-${i.id}`,
