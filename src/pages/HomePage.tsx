@@ -7,6 +7,7 @@ import TechMarquee from '../components/TechMarquee';
 import AiNewsGrid from '../components/AiNewsGrid';
 import ContactPortal from '../components/ContactPortal';
 import CommunitySection from '../components/home/CommunitySection';
+import XFeedSection from '../components/home/XFeedSection';
 import { HOME_OFFERS } from '../data/homeOffers';
 
 /**
@@ -32,6 +33,7 @@ export default function HomePage() {
       <ServicesSection />
       <TechMarquee />
       <AiNewsGrid />
+      <XFeedSection />
       <CommunitySection />
       <ContactPortal />
     </>

@@ -28,12 +28,34 @@ import { readCommentDmCampaigns } from '../src/agent/firebaseServer.js';
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret');
 
   // `GET /api/download/:guideId` is rewritten here as `?action=download&guideId=...` (vercel.json).
   // Checked before the analyze branch because that branch claims every POST.
   if (req.query?.action === 'download') {
     await handleDownload(req, res);
+    return;
+  }
+
+  // `GET /api/news?action=x-feed` — the homepage's live @mrdaniel_ai feed (src/server/xFeed.ts).
+  // Folded into this function because the Hobby plan caps a deployment at 12. Cached at the edge
+  // for the feed TTL: the Grok fallback is billed per post, so the CDN is what keeps it cheap.
+  // `?refresh=1` with the admin secret forces a fresh fetch (the dashboard's "refresh now").
+  if (req.query?.action === 'x-feed') {
+    const { getXFeed, xFeedCdnSeconds } = await import('../src/server/xFeed.js');
+    const secret = process.env.ADMIN_API_SECRET;
+    const force = String(req.query?.refresh ?? '') === '1' && (!secret || req.headers?.['x-admin-secret'] === secret);
+    try {
+      const feed = await getXFeed(force);
+      const ttl = xFeedCdnSeconds();
+      res.setHeader('Cache-Control', force ? 'no-store' : 'public, max-age=300');
+      if (!force) res.setHeader('Vercel-CDN-Cache-Control', `max-age=${feed.source === 'none' ? 300 : ttl}, stale-while-revalidate=86400`);
+      res.status(200).json({ ok: true, ...feed });
+    } catch (err) {
+      console.error('[x-feed] failed:', (err as Error)?.message ?? err);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ ok: false, handle: 'mrdaniel_ai', profileUrl: 'https://x.com/mrdaniel_ai', posts: [], source: 'none' });
+    }
     return;
   }
 

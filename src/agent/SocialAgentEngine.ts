@@ -924,7 +924,7 @@ ${SAVE_SHARE_RULES}
 {"role":"hook|value|cta","layout":"hero|value|checklist|stat|comparison|prompt|quote|cta","kicker":"...","headline":"...","subhead":"...","body":"...","bullets":["..."],"bulletsLeft":["..."],"columnLabels":["...","..."],"stat":"...","code":"...","quote":"...","readingTime":"..."}
 שדות שאינם רלוונטיים ל-layout: החזר "" (מחרוזת ריקה) או [] (מערך ריק).`;
 
-function mapCarouselLayout(v: unknown, role: string): CarouselLayout {
+export function mapCarouselLayout(v: unknown, role: string): CarouselLayout {
   const s = String(v || '').toLowerCase();
   if (role === 'hook') return 'hero';
   if (role === 'cta') return 'cta';
@@ -937,12 +937,12 @@ function mapCarouselLayout(v: unknown, role: string): CarouselLayout {
   return 'value';
 }
 
-function cleanCarouselText(v: unknown, max: number): string {
+export function cleanCarouselText(v: unknown, max: number): string {
   const t = stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(v ?? '').trim())));
   return t.length > max ? trimToCleanSentenceEnd(t, max) : t;
 }
 
-function cleanCarouselList(v: unknown, maxItems: number, maxLen: number): string[] {
+export function cleanCarouselList(v: unknown, maxItems: number, maxLen: number): string[] {
   if (!Array.isArray(v)) return [];
   return v
     .map((x) => stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(x ?? '').trim()))).slice(0, maxLen))

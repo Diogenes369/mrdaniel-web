@@ -25,6 +25,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PAIRS = [
   { server: 'src/agent/types.ts', dashboard: ['dashboard/src/lib/techTipsApi.ts', 'dashboard/src/lib/agentTypes.ts'] },
   { server: 'src/server/igGrowthStrategy.ts', dashboard: ['dashboard/src/lib/igGrowthTypes.ts'] },
+  { server: 'src/server/xAlgorithm.ts', dashboard: ['dashboard/src/lib/xAlgorithm.ts'] },
 ];
 
 /** Differences that are deliberate. Key: `TypeName.member` (or `TypeName|literal`), value: why. */

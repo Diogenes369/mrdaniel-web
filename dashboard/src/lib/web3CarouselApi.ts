@@ -181,7 +181,7 @@ export async function researchSource(input: ResearchInput): Promise<{ brief: Res
 
 // ─── Agent 2 · Copywriter & Hook Architect ─────────────────────────────────────────────────
 
-interface ApiSlide {
+export interface ApiSlide {
   role?: string;
   layout?: string;
   kicker?: string;
@@ -197,7 +197,7 @@ interface ApiSlide {
   readingTime?: string;
 }
 
-function toStudioSlide(s: ApiSlide, index: number): StudioSlide {
+export function toStudioSlide(s: ApiSlide, index: number): StudioSlide {
   const role: SlideRole = s.role === 'hook' ? 'hook' : s.role === 'cta' ? 'cta' : 'value';
   const layout = (s.layout || (role === 'hook' ? 'hero' : role === 'cta' ? 'cta' : 'value')) as LayoutKind;
   return {

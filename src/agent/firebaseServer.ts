@@ -541,3 +541,32 @@ export async function recordEmailCampaign(record: Record<string, unknown>): Prom
     console.error('[email] failed to record campaign:', err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// X feed snapshot (src/server/xFeed.ts)
+// The last good @mrdaniel_ai timeline, so a cold function instance — or a day X rate-limits the
+// free endpoint and no xAI key is set — still has something real to serve. Public data only.
+// Needs an `x_feed_snapshot` read/write rule; without it both calls degrade to no-ops.
+// ---------------------------------------------------------------------------
+
+export async function readXFeedSnapshot(): Promise<Record<string, unknown> | null> {
+  const db = getServerDb();
+  if (!db) return null;
+  try {
+    const snap = await get(ref(db, 'x_feed_snapshot'));
+    return snap.exists() ? (snap.val() as Record<string, unknown>) : null;
+  } catch (err) {
+    console.error('[x-feed] failed to read snapshot:', (err as Error)?.message ?? err);
+    return null;
+  }
+}
+
+export async function writeXFeedSnapshot(payload: Record<string, unknown>): Promise<void> {
+  const db = getServerDb();
+  if (!db) return;
+  try {
+    await set(ref(db, 'x_feed_snapshot'), payload);
+  } catch (err) {
+    console.error('[x-feed] failed to write snapshot:', (err as Error)?.message ?? err);
+  }
+}

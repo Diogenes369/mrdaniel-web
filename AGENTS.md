@@ -7,7 +7,7 @@ The deep reference is **`DOCUMENTATION.md`** (Hebrew, ~360 lines) — consult it
 
 ## What this is
 
-`mrdaniel.co.il` — the marketing site + admin dashboard for Daniel Ben Baruch (IT / AI-agents / cyber / Web3 consultant).
+`mrdaniel.co.il` — the AI-only hub (AI news, LLMs, autonomous agents) + admin dashboard for Daniel Ben Baruch. **AI-only since 2026-09-21** — no cyber / enterprise content anywhere (guarded by `npm run test:copy`).
 **One repo, two independent Vite apps, two separate Vercel projects:**
 
 | Part | Dir | Vercel project | URL |
@@ -71,7 +71,15 @@ Single POST endpoint, **action-dispatched** (`{ action, ...params }`). Auth: `x-
 
 Client libs in `dashboard/src/lib/*Api.ts` follow one rule: **never throw** — on 429/503/network/thin output they fall back to a deterministic local builder so content generation never fully stops.
 
-Actions incl.: `generate-content`, `draft-engagement`, `story-synthesize`, `post-synthesize`, `import-url`, `slides-edit`, `trend-radar`, `engagement-replies`, `growth-optimize`, `carousel-studio`, `reel-script-synthesize`, `reel-tts`, `tech-tip-deck`, `email-generate`, `auto-publish-run`, `parse-x-post`, `x-subtitles`, `x-post-deck`.
+Actions incl.: `generate-content`, `draft-engagement`, `story-synthesize`, `post-synthesize`, `import-url`, `slides-edit`, `trend-radar`, `engagement-replies`, `growth-optimize`, `carousel-studio`, `reel-script-synthesize`, `reel-tts`, `tech-tip-deck`, `email-generate`, `auto-publish-run`, `parse-x-post`, `x-subtitles`, `x-post-deck`, `grok-status`, `grok-carousel`, `x-score`.
+
+### Grok (xAI) + the X marketing engine
+
+- `src/server/xaiClient.ts` — `api.x.ai` (chat completions + Responses API `x_search`). Key: `XAI_API_KEY` (X Premium is NOT API access). Model: `XAI_MODEL` (default `grok-4.7`).
+- `src/server/xAlgorithm.ts` — weights from xai-org/x-algorithm `param.rs` (read 2026-09-21), the thread scorer and deck→thread builder. Mirrored in `dashboard/src/lib/xAlgorithm.ts` (`check:mirrors`).
+- `src/server/agents/grokCarouselAgent.ts` — Grok drafts slides + thread, Hermes verifies (unverified numbers, security guard, X limits).
+- `src/server/xFeed.ts` — homepage live @mrdaniel_ai feed at `/api/news?action=x-feed` (syndication → Grok `x_search` → Firebase `x_feed_snapshot`), CDN-cached for `X_FEED_TTL_MIN`.
+- Dashboard: `Grok · סטודיו X` tab and the R3F `Mission Control` arena, driven by `lib/agentActivity.ts` (a fetch tap that classifies every API call as Scout / Grok / Hermes). The dashboard pins React ~19.2 because @react-three/fiber 9.7 requires <19.3.
 
 ### Two AI providers: Groq for text, Gemini for multimodal
 

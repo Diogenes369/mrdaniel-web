@@ -128,13 +128,19 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Cyber/tech news aggregation
+// AI news aggregation
 // ---------------------------------------------------------------------------
 
 app.get('/api/news', async (_req: Request, res: Response) => {
   // CORS open (mirrors api/news.ts) so the dashboard, on its own origin, can read the feed for the
   // news-driven content generator. Public read-only news metadata.
   res.setHeader('Access-Control-Allow-Origin', '*');
+  // Local mirror of api/news.ts's `?action=x-feed` (the homepage's live @mrdaniel_ai feed).
+  if (_req.query?.action === 'x-feed') {
+    const { getXFeed } = await import('./src/server/xFeed.js');
+    res.json({ ok: true, ...(await getXFeed(_req.query?.refresh === '1')) });
+    return;
+  }
   const data = await getNewsItems();
   res.json(data);
 });

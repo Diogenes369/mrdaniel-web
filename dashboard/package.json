@@ -10,19 +10,23 @@
     "preview": "vite preview --port 5174"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
     "firebase": "^11.0.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.546.0",
     "mp4-muxer": "^5.2.2",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1",
+    "react": "~19.2.8",
+    "react-dom": "~19.2.8",
     "recharts": "^3.0.0",
+    "three": "^0.185.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.14",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.0.4",
     "simple-icons": "^16.31.0",
     "tailwindcss": "^4.1.14",

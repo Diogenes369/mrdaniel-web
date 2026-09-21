@@ -888,6 +888,56 @@ ${typeof notes === 'string' ? notes : ''}`);
       return;
     }
 
+    // ── Grok (xAI) — X-optimized carousels + threads. See src/server/agents/grokCarouselAgent.ts.
+    //    Dynamically imported so the 20-odd Gemini/Groq actions never load the xAI path.
+    if (action === 'grok-status') {
+      const { isXaiConfigured, xaiModel } = await import('../src/server/xaiClient.js');
+      const { X_RANKING_WEIGHTS, X_RANKING_ADJUSTMENTS, X_ALGORITHM_SOURCE } = await import('../src/server/xAlgorithm.js');
+      res.status(200).json({ ok: true, configured: isXaiConfigured(), model: xaiModel(), weights: X_RANKING_WEIGHTS, adjustments: X_RANKING_ADJUSTMENTS, source: X_ALGORITHM_SOURCE });
+      return;
+    }
+
+    if (action === 'x-score') {
+      const { scoreXThread } = await import('../src/server/xAlgorithm.js');
+      const posts = Array.isArray(req.body?.posts) ? req.body.posts : [];
+      res.status(200).json({
+        ok: true,
+        report: scoreXThread({
+          posts: posts.map((p: any) => ({ text: String(p?.text ?? ''), mediaSlides: Array.isArray(p?.mediaSlides) ? p.mediaSlides.map(Number) : [] })),
+          hasVideo: Boolean(req.body?.hasVideo),
+        }),
+      });
+      return;
+    }
+
+    if (action === 'grok-carousel') {
+      const { runGrokCarouselAgent } = await import('../src/server/agents/grokCarouselAgent.js');
+      const { describeXaiError } = await import('../src/server/xaiClient.js');
+      const { title, source, topic, brief, takeaways } = req.body ?? {};
+      if (typeof brief !== 'string' || brief.trim().length < 40) {
+        rejectThinInput(res, 'brief (>= 40 chars) required', 'הבריף קצר מדי לבניית קרוסלה (נדרשים לפחות 40 תווים)');
+        return;
+      }
+      try {
+        const result = await runGrokCarouselAgent({
+          title: String(title ?? ''),
+          source: String(source ?? ''),
+          topic: String(topic ?? 'ai'),
+          brief,
+          takeaways: Array.isArray(takeaways) ? takeaways.map((t: unknown) => String(t)) : [],
+        });
+        if (!result.verification.securityPassed) {
+          res.status(200).json({ ok: true, blocked: true, verification: result.verification });
+          return;
+        }
+        res.status(200).json({ ok: true, ...result });
+      } catch (err) {
+        const e = describeXaiError(err);
+        res.status(e.status).json({ ok: false, code: e.code, error: e.message, message: e.message });
+      }
+      return;
+    }
+
     if (action === 'slides-edit') {
       if (!isEngineConfigured()) {
         res.status(503).json({ ok: false, code: 'not_configured', error: 'GEMINI_API_KEY not configured', message: 'GEMINI_API_KEY לא מוגדר כראוי בסביבת הריצה של האתר.', detail: engineConfigReason() ?? undefined });
