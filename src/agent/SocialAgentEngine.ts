@@ -22,7 +22,7 @@ export { stripCodeFence, requireText, parseJsonOrThrow, ModelOutputError };
 export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
-import { AUDIENCE_RULES, EXPERT_VOICE_RULES, shortCaptionRules } from './expertVoice.js';
+import { AUDIENCE_RULES, CONCISE_FACTUAL_RULES, EXPERT_VOICE_RULES, shortCaptionRules } from './expertVoice.js';
 import { enforceDeck, storyCarouselInstruction, type CarouselContentKind, type StoryCarouselDeck } from './storyCarousel.js';
 import { planDeck, type SlidePlan } from './figmaTemplates.js';
 import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode, PromptCard, ImageOverlayBox } from './types.js';
@@ -415,7 +415,7 @@ ${shortCaptionRules(false)}
     model: GEMINI_TEXT_MODEL,
     contents: [{ role: 'user', parts: [{ text: `נושא הפוסט: ${cleanTopic}\n\n${formatInstruction}` }] }],
     config: { systemInstruction: withStrategicContext(CONTENT_SYSTEM_INSTRUCTION, strategicContext), temperature: 0.85, topP: 0.95 },
-  });
+  }, { textOnly: true });
 
   const raw = response.text?.trim() || '';
   const { body: text, hashtags } = extractHashtags(raw);
@@ -822,7 +822,7 @@ export async function synthesizeStorySlides(input: {
       },
     ],
     config: { systemInstruction: STORY_SYNTH_SYSTEM_INSTRUCTION, temperature: 0.4, topP: 0.9, responseMimeType: 'application/json' },
-  });
+  }, { textOnly: true });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow(raw, 'synthesizeStorySlides') as unknown;
@@ -1016,7 +1016,7 @@ ${clean}
       },
     ],
     config: { systemInstruction: storyCarouselInstruction(kind), temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
-  });
+  }, { textOnly: true });
 
   const deck = enforceDeck(parseJsonOrThrow(stripCodeFence(requireText(response)), 'synthesizeStoryCarousel'));
   // Planned here rather than at the call site so every caller — endpoint, Hermes, a test — gets the
@@ -1052,7 +1052,7 @@ export async function synthesizeCarouselDeck(input: {
       },
     ],
     config: { systemInstruction: CAROUSEL_STUDIO_SYSTEM_INSTRUCTION, temperature: 0.55, topP: 0.9, responseMimeType: 'application/json' },
-  });
+  }, { textOnly: true });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow(raw, 'synthesizeCarouselDeck') as unknown;
@@ -1157,7 +1157,7 @@ export async function editSlideDeck(input: { instruction: string; slides: SlideE
       },
     ],
     config: { systemInstruction: SLIDE_EDIT_SYSTEM_INSTRUCTION, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
-  });
+  }, { textOnly: true });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow(raw, 'editSlideDeck') as unknown;
@@ -1358,9 +1358,14 @@ export async function synthesizeNewsPost(input: {
   // (220-350 words vs the previous 90-250) are what let a post carry the article's actual findings
   // instead of a two-sentence gloss; Flash still returns well inside the 60s serverless ceiling.
   const formatSpec = input.platform === 'linkedin' ? LI_FORMAT_SPEC : IG_FORMAT_SPEC;
-  const systemInstruction = isWhatsapp
+  // CONCISE_FACTUAL_RULES is appended LAST on purpose: it revokes the closing-question rule that
+  // ENGAGEMENT_RULES (folded into NEWS_POST_SYSTEM_INSTRUCTION) asks for, and on a direct conflict
+  // a model follows the later instruction. Its own text also says it overrides, so the resolution
+  // is explicit rather than positional luck.
+  const baseInstruction = isWhatsapp
     ? WHATSAPP_POST_SYSTEM_INSTRUCTION
     : NEWS_POST_SYSTEM_INSTRUCTION.replace('{FORMAT_SPEC}', formatSpec);
+  const systemInstruction = `${baseInstruction}\n\n${CONCISE_FACTUAL_RULES}`;
 
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,
@@ -1375,7 +1380,7 @@ export async function synthesizeNewsPost(input: {
       },
     ],
     config: { systemInstruction, temperature: 0.7, topP: 0.95 },
-  });
+  }, { textOnly: true });
 
   // The source citation is appended downstream from clean feed metadata (bare domain, no URL) —
   // strip any raw link or "מקור:" line the model may have echoed from the article text so it
@@ -1601,7 +1606,7 @@ export async function synthesizeReelScript(input: {
       },
     ],
     config: { systemInstruction: REEL_SCRIPT_SYSTEM_INSTRUCTION, temperature: 0.8, topP: 0.95, responseMimeType: 'application/json' },
-  });
+  }, { textOnly: true });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow(raw, 'synthesizeReelScript') as Record<string, unknown>;
@@ -1794,7 +1799,7 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
     model: GEMINI_TEXT_MODEL,
     contents: [{ role: 'user', parts: [{ text: `נושא המדריך:\n"""\n${clean}\n"""${countDirective}` }] }],
     config: { systemInstruction: TECH_TIP_SYSTEM_INSTRUCTION, temperature: 0.6, topP: 0.9, responseMimeType: 'application/json' },
-  });
+  }, { textOnly: true });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow(raw, 'synthesizeTechTipDeck') as Record<string, unknown>;
@@ -2022,7 +2027,7 @@ export async function synthesizeThreadDeck(input: {
       topP: 0.9,
       responseMimeType: 'application/json',
     },
-  });
+  }, { textOnly: true });
 
   return parseAdaptedDeck(stripCodeFence(requireText(response)), {
     label: 'synthesizeThreadDeck',

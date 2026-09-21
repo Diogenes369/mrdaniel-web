@@ -547,10 +547,48 @@ const MARKUP_LEFTOVER = /<\/?[a-z][^>]*>|&#\d{2,};|\]\]>|\{\{|https?:\/\/\S+\s*$
  * Applied as a per-request VIEW over the shared cache in `getNewsItems` — never mutates the cache,
  * so an unfiltered (`?strict=0`) call and a filtered one can't poison each other.
  */
+/**
+ * How old a story may be and still count as news, and how far into the future a publish date may
+ * sit before it is treated as wrong.
+ *
+ * Both limits exist because of what production actually served on 2026-09-21:
+ *   - `Kodkod Cyber` is an evergreen security BLOG whose RSS carries its whole archive. Ten items
+ *     between 293 and **1950** days old (a 2021 WiFi-cracking tutorial) sat permanently in the
+ *     `cyber` topic, crowding genuinely fresh cyber stories out of the card slots.
+ *   - Dark Reading publishes webinar listings dated in the FUTURE — one was `2026-12-03`, 74 days
+ *     ahead. Sorted newest-first, a future date pins an advert to the top of the feed forever.
+ *
+ * A week of slack on the future side absorbs timezone and clock-skew sloppiness in feeds that
+ * publish a date with no offset, without letting an event listing through.
+ */
+export const MAX_ITEM_AGE_DAYS = 21;
+const MAX_FUTURE_SKEW_DAYS = 7;
+const DAY_MS = 86_400_000;
+
+/** How old the item is, in days — negative when the feed claims it is published in the future.
+ *  An unparseable date returns null, which is treated as "no opinion" rather than as stale. */
+export function itemAgeDays(publishedAt: string, now = Date.now()): number | null {
+  const ts = new Date(publishedAt).getTime();
+  if (!Number.isFinite(ts)) return null;
+  return (now - ts) / DAY_MS;
+}
+
+/** True when a publish date puts the item outside the window a NEWS surface should show. */
+export function isStaleOrFutureDated(publishedAt: string, now = Date.now()): boolean {
+  const age = itemAgeDays(publishedAt, now);
+  if (age === null) return false;
+  return age > MAX_ITEM_AGE_DAYS || age < -MAX_FUTURE_SKEW_DAYS;
+}
+
 export function sanitizeAndKeep(item: NewsItem, _opts: { allowEnglish?: boolean } = {}): boolean {
   const title = (item.title || '').trim();
   // clean, real headline — applies regardless of language
   if (title.length < 12 || GARBAGE_TITLE.test(title) || MARKUP_LEFTOVER.test(title)) return false;
+
+  // 0 · recency. Checked first because it is the cheapest test and the one that was missing: this
+  // gate had no notion of time at all, which is why a 2021 blog post and a 2026-12 webinar advert
+  // both rode into the cyber tab and made it look frozen.
+  if (isStaleOrFutureDated(item.publishedAt)) return false;
 
   // 1 · Hebrew
   if (!HEBREW_CHAR.test(title)) return false;
@@ -698,8 +736,116 @@ function buildSlug(title: string, link: string): string {
 
 const TITLE_SUFFIX_RE = /\s-\s([^-]+)$/;
 
+/**
+ * The headers a real Chrome tab sends when it opens a feed URL directly.
+ *
+ * `parser.parseURL` sends only the three headers configured on the Parser, and several Israeli
+ * outlets' WAFs (Cloudflare and Imperva both appear in this list) answer that with a 403 from a
+ * datacenter IP while serving the identical request from a residential one. Confirmed in production
+ * on 2026-09-21: Geektime, Calcalist, Israel Defense and Machine Learning Israel all logged
+ * `failed to fetch … Status code 403` on Vercel while returning 200 and fresh items from a laptop.
+ *
+ * Adding the `Sec-Fetch-*` / `Referer` set is the same technique `api/img-proxy.ts` already uses
+ * successfully against the same outlets' CDNs. This fetches publicly-published RSS; it bypasses no
+ * paywall and no authentication.
+ */
+function feedHeaders(url: string): Record<string, string> {
+  let origin = '';
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    /* a malformed source URL fails at fetch anyway */
+  }
+  return {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    Accept: 'application/rss+xml, application/xml, text/xml, application/atom+xml, text/html;q=0.9, */*;q=0.8',
+    'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
+    ...(origin ? { Referer: `${origin}/` } : {}),
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+  };
+}
+
+/**
+ * Google News' RSS mirror for one outlet's domain.
+ *
+ * The last resort for a source whose own CDN refuses this datacenter. Google News republishes the
+ * same headlines with the same publish times, so an outlet recovered this way keeps its recency —
+ * only its links become `news.google.com` redirects, which the rest of the pipeline already
+ * understands (see the `news.google.com` carve-out in `enrichImages`).
+ */
+function googleNewsMirror(siteUrl: string): string | null {
+  let host = '';
+  try {
+    host = new URL(siteUrl).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+  if (!host) return null;
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(`site:${host} when:7d`)}&hl=he&gl=IL&ceid=IL:he`;
+}
+
+/** A refusal that a different route might still satisfy — as opposed to a parse error or a 404,
+ *  where retrying elsewhere is pointless. */
+const BLOCKED_STATUS = /\b(40[13]|429|451|503)\b/;
+
+/**
+ * Fetch and parse one feed, working around a CDN that refuses this runtime.
+ *
+ * Three attempts, cheapest first: the parser's own fetch, then a hand-rolled fetch carrying the
+ * full browser header set, then the outlet's Google News mirror. Each step only runs when the
+ * previous one failed in a way the next could plausibly fix.
+ */
+async function parseFeed(source: FeedSource): Promise<{ feed: Awaited<ReturnType<typeof parser.parseURL>>; viaMirror: boolean }> {
+  const timeoutMs = source.timeoutMs ?? 8000;
+  try {
+    return { feed: await withTimeout(parser.parseURL(source.url), timeoutMs, source.name), viaMirror: false };
+  } catch (err) {
+    const message = (err as Error)?.message ?? String(err);
+    if (!BLOCKED_STATUS.test(message)) throw err;
+
+    // Attempt 2 — the same URL, with the headers a browser actually sends.
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(source.url, {
+          signal: controller.signal,
+          redirect: 'follow',
+          headers: feedHeaders(source.url),
+        });
+        if (res.ok) {
+          const xml = await res.text();
+          if (xml.trim()) {
+            console.info(`[news] ${source.name}: recovered via browser headers after ${message}`);
+            return { feed: await parser.parseString(xml), viaMirror: false };
+          }
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (retryErr) {
+      console.warn(`[news] ${source.name}: browser-header retry failed:`, (retryErr as Error)?.message);
+    }
+
+    // Attempt 3 — Google News' mirror of the same outlet.
+    const mirror = googleNewsMirror(source.url);
+    if (!mirror) throw err;
+    const feed = await withTimeout(parser.parseURL(mirror), timeoutMs, `${source.name} (google-news mirror)`);
+    console.info(`[news] ${source.name}: recovered ${feed.items?.length ?? 0} items via Google News mirror`);
+    return { feed, viaMirror: true };
+  }
+}
+
 async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
-  const feed = await withTimeout(parser.parseURL(source.url), source.timeoutMs ?? 8000, source.name);
+  const { feed, viaMirror } = await parseFeed(source);
   const items: NewsItem[] = [];
 
   for (const item of feed.items ?? []) {
@@ -708,7 +854,9 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
     if (!title || !link || !/^https?:\/\//i.test(link)) continue;
 
     let sourceName = source.name;
-    if (source.stripTitleSuffix) {
+    // Google News appends the outlet name to every headline ("… - גיקטיים"), so a mirrored feed
+    // always needs the suffix stripped even when the outlet's own feed never did.
+    if (source.stripTitleSuffix || viaMirror) {
       const match = title.match(TITLE_SUFFIX_RE);
       if (match) {
         sourceName = match[1].trim();

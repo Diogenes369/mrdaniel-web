@@ -76,6 +76,47 @@ ${hasCarousel ? '- התוכן הכבד יושב בשקפים. הכיתוב לא 
 - אימוג'י אחד לכל היותר, ורק אם הוא מוסיף. לא אימוג'י לכל שורה.`;
 }
 
+/**
+ * The concision + factuality contract for news summaries and post drafting.
+ *
+ * Written 2026-09-21 against a specific complaint: the copy read like AI. It opened on a scene-
+ * setting clause, asked a question nobody wanted answered, padded the middle with adjectives and
+ * closed on another question.
+ *
+ * ## It deliberately contradicts ENGAGEMENT_RULES, and wins where both apply
+ *
+ * `ENGAGEMENT_RULES` (SocialAgentEngine.ts) tells the model to close every post on an open
+ * question, because that block was written to raise comment counts. For NEWS summaries and news
+ * post drafting that instruction is now revoked: an IT peer reading a security advisory does not
+ * want to be asked how it makes them feel. Any prompt that includes both blocks must include this
+ * one LAST — the later instruction is the one the model follows on a direct conflict, and this
+ * block says so in its own text so the model resolves it rather than averaging the two.
+ */
+export const CONCISE_FACTUAL_RULES = `סגנון כתיבה — כלל אדום, גובר על כל הנחיה סותרת קודמת בפרומפט הזה:
+
+1. טון — עמית למקצוע, לא משווק:
+   - כותבים לאיש IT / סייבר שמבין את התחום. ישר, מקצועי, ענייני. בלי התלהבות מלאכותית ובלי סימני קריאה.
+   - מתחילים מהעובדה הכי חזקה שיש במקור. המשפט הראשון הוא כבר תוכן, לא הקדמה לתוכן.
+
+2. אסור בהחלט — מילוי מילים (כל אלה פוסלים את הפלט):
+   - "בעולם המודרני", "בעידן הבינה המלאכותית", "בעולם של היום", "בתקופה הנוכחית", "כידוע", "אין זה סוד ש", "חשוב לציין", "יש לציין כי", "לסיכום", "בואו נצלול", "ללא ספק".
+   - תארים ריקים: "מהפכני", "פורץ דרך", "משנה את כללי המשחק", "עוצמתי במיוחד".
+   - משפט פתיחה שמתאר את התחום במקום את הידיעה.
+
+3. אסור בהחלט — שאלות רטוריות:
+   - אין שאלה בפתיחה ואין שאלה בסיום. לא "האם תהיתם", לא "ידעתם ש", לא "מה דעתכם", לא "מעניין, לא?".
+   - שאלה מותרת רק אם היא מצוטטת מהמקור עצמו.
+
+4. עובדתיות מוחלטת:
+   - אך ורק מה שכתוב במקור: מספרים, שמות, תאריכים, גרסאות, שמות חולשות (CVE) — בדיוק כפי שהופיעו.
+   - אסור להוסיף דעה, הערכה, תחזית או הקשר שלא הופיע במקור. אם פרט לא מופיע — הוא לא נכתב.
+   - אם המקור דל מכדי לכתוב ממנו, כתוב פחות. טקסט קצר ונכון עדיף על פסקה מנופחת.
+
+5. מבנה — קצר וחד:
+   - פסקאות של 2-3 משפטים לכל היותר, או תבליטים של שורה אחת כל אחד.
+   - כל משפט נושא עובדה אחת. משפט שאפשר למחוק בלי לאבד מידע — נמחק.
+   - בלי חזרה על הכותרת בגוף הטקסט.`;
+
 /** A banned phrase and what replaces it. Replacements are chosen so the sentence around them stays
  *  grammatical Hebrew — removal where the phrase is pure filler, a plain synonym where it carries
  *  meaning (an adjective can't just vanish from "גישה מהפכנית"). */
@@ -107,6 +148,28 @@ const RULES: Array<[RegExp, string | ((match: string) => string)]> = [
   [/פורץ דרך/g, 'חדשני'],
   [/משנה את כללי המשחק/g, 'משנה את התמונה'],
   [/(?:ל)?שלב הבא/g, (m) => (m.startsWith('ל') ? 'לרמה הבאה' : 'הרמה הבאה')],
+
+  // ── 2026-09-21 concision pass ───────────────────────────────────────────────────────────────
+  // Openers the model fell back on once the blocks above closed the obvious ones. Same failure
+  // every time: a sentence of throat-clearing before the first real fact.
+  [/(?:ו?ב)עולם ה?מודרני\s*[,،]?\s*/g, ''],
+  [/(?:ו?ב)תקופה ה(?:נוכחית|אחרונה)\s*[,،]?\s*/g, ''],
+  [/(?:ו?)כידוע\s*[,،]?\s*/g, ''],
+  [/(?:ו?)כפי שאנו יודעים\s*[,،]?\s*/g, ''],
+  [/(?:ו?)אין זה סוד ש/g, ''],
+  [/(?:ו?)יש לציין (?:כי|ש)\s*/g, ''],
+  [/(?:ו?)במאמר (?:זה|הזה)\s*[,،]?\s*/g, ''],
+  [/(?:ו?)בפוסט (?:זה|הזה)\s*[,،]?\s*/g, ''],
+
+  // Rhetorical openers. These are ALWAYS a full clause ending in a question mark, so the whole
+  // clause goes — trimming just the stem would leave a dangling "?" mid-paragraph.
+  [/(?:^|(?<=[\n.!?]\s*))(?:האם\s+)?(?:תהיתם|חשבתם|ידעתם|שמתם לב|דמיינו)[^.!?\n]*\?\s*/gm, ''],
+  [/(?:^|(?<=[\n.!?]\s*))מה אם[^.!?\n]*\?\s*/gm, ''],
+  [/(?:^|(?<=[\n.!?]\s*))רוצים לדעת[^.!?\n]*\?\s*/gm, ''],
+
+  // Closing engagement bait. The repo already forbids "תגיבו"/"שתפו" in the prompts; this removes
+  // the softer variants the model substitutes for them.
+  [/\s*(?:מה דעתכם|מעניין,? לא|נשמח לשמוע)[^.!?\n]*\?\s*$/gm, ''],
 ];
 
 /** Hebrew letter present at all — the scrubber is a no-op on English image prompts and code. */

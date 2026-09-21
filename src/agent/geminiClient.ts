@@ -320,6 +320,39 @@ export function geminiPacingStatus(): { minSpacingMs: number; dailyBudget: numbe
 export interface GenerateOptions {
   /** Default true. Set false when the response is code, not prose — see above. */
   scrub?: boolean;
+  /**
+   * Declares "this call only ever needs TEXT out", which does two things:
+   *   1. Any `inlineData` part is STRIPPED from the payload before the request is built, and
+   *   2. the call is therefore always eligible for Groq.
+   *
+   * Set on the interactive copywriting paths — news summaries, post drafting, captions, the
+   * "העתק טקסט" flows. Those never need to see a picture to write a paragraph, but an image
+   * riding along in the payload would pin them to Gemini (`isTextOnlyRequest` rejects any
+   * binary part) and therefore to Gemini's 20-requests/day free-tier cap. Stripping is cheap
+   * insurance: it cannot change a text answer, and it guarantees the operator's click is never
+   * blocked by a quota that background work already spent.
+   */
+  textOnly?: boolean;
+}
+
+/**
+ * Drop every binary part, keeping the text. Returns the SAME object when there was nothing to
+ * strip, so the common path allocates nothing.
+ */
+function stripInlineData(params: GenContentReq): GenContentReq {
+  const contents = (params as GeminiLikeRequest).contents;
+  if (!Array.isArray(contents)) return params;
+  let stripped = 0;
+  const cleaned = contents.map((c) => {
+    const parts = c?.parts ?? [];
+    const kept = parts.filter((p) => !p?.inlineData);
+    stripped += parts.length - kept.length;
+    return kept.length === parts.length ? c : { ...c, parts: kept };
+  });
+  if (!stripped) return params;
+  console.info(`[ai-router] textOnly: stripped ${stripped} media part(s) before the model call`);
+  // A turn whose only content was an image would otherwise be sent empty.
+  return { ...params, contents: cleaned.filter((c) => (c?.parts ?? []).length > 0) } as GenContentReq;
 }
 
 /**
@@ -342,7 +375,10 @@ export async function generateContentWithRetry(params: GenContentReq, options: G
   // Why Groq first: Gemini's free tier throttles at a few requests per minute and
   // `gemini-3.6-flash` returns `503 high demand` often enough to be user-facing (seen repeatedly in
   // production on 2026-09-21). Groq answers the same Hebrew deck in under two seconds.
-  const textOnly = isTextOnlyRequest(params as GeminiLikeRequest);
+  // `textOnly: true` is the caller stating the answer is prose, so any media in the payload is
+  // dead weight that would otherwise pin the call to Gemini. Strip first, then route.
+  if (options.textOnly) params = stripInlineData(params);
+  const textOnly = options.textOnly === true || isTextOnlyRequest(params as GeminiLikeRequest);
   if (textOnly && isGroqConfigured()) {
     try {
       return await groqGenerate(params as GeminiLikeRequest, options);

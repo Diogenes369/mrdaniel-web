@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   genAI,
+  isGroqConfigured,
   generateContentWithRetry,
   requireText,
   stripCodeFence,
@@ -93,7 +94,8 @@ interface TranslateTarget {
 
 async function translateChunk(targets: TranslateTarget[]): Promise<Map<string, TranslatedText>> {
   const out = new Map<string, TranslatedText>();
-  if (!genAI) return out;
+  // Either engine can do this — translation is text-only, so Groq serves it (and is preferred).
+  if (!genAI && !isGroqConfigured()) return out;
 
   const payload = targets.map((t) => ({
     id: t.id,
@@ -156,8 +158,22 @@ async function translateChunk(targets: TranslateTarget[]): Promise<Map<string, T
 // concurrency: workers pull the next chunk off a shared cursor as soon as they free up (no
 // wave-sync stalling), so raising CHUNK_CONCURRENCY well above what a naive "chunks / deadline"
 // calculation suggests lets pipelining cover most of MAX_ITEMS_PER_REFRESH inside one deadline.
-const CHUNK_SIZE = 5;
-const CHUNK_CONCURRENCY = 12;
+// ── 2026-09-21 rebalance: background translation was starving interactive generation ──────────
+//
+// These numbers were tuned for Gemini alone, where the only cost was latency. With Groq primary for
+// text they became the thing that broke the dashboard: 12 concurrent calls × 5-item chunks is a
+// burst big enough to blow Groq's free-tier TOKENS-PER-MINUTE ceiling on a single cache refresh.
+// Production logs showed the whole cascade — ten consecutive
+// `[ai-router] groq failed: groq rate limit exceeded`, each falling back to Gemini, which then hit
+// its own 20-requests/day free-tier cap. By the time the operator pressed "generate copy" there was
+// no quota left at either provider, which is exactly the symptom reported ("Gemini 429 blocks text
+// copy generation").
+//
+// A larger chunk with far less concurrency moves the same number of items for a fraction of the
+// requests: 8 items per call at 3 workers is 24 items in flight instead of 60, and roughly half the
+// total calls. Background work must never be able to price an operator's click out of the budget.
+const CHUNK_SIZE = 8;
+const CHUNK_CONCURRENCY = 3;
 // Runs CONCURRENTLY with `enrichImages` in refreshAll (newsFeed.ts), not after it — kept well under
 // `api/news.ts`'s 45s function budget alongside the RSS fetch phase (~13s worst case) that precedes
 // both.
@@ -165,7 +181,10 @@ const OVERALL_DEADLINE_MS = 28_000;
 // Hard cap on how many foreign items get a translation attempt per refresh cycle — the source list
 // can carry 100+ English items before cache warms up; this keeps one refresh bounded. Skipped items
 // are simply dropped this cycle and retried (cache miss) on the next `refreshAll()`.
-const MAX_ITEMS_PER_REFRESH = 90;
+// Lowered from 90 for the same reason as the concurrency above. 40 foreign items is already more
+// than any news surface shows at once, and the remainder is not lost — it is retried on the next
+// refresh, by which time the per-item cache has absorbed most of it.
+const MAX_ITEMS_PER_REFRESH = 40;
 
 /**
  * Returns a NEW array: Hebrew-native items pass through untouched; foreign-language items are
@@ -182,8 +201,8 @@ export async function translateForeignItems(items: NewsItem[], excerptMax = 160)
   }
   if (foreign.length === 0) return passthrough;
 
-  if (!genAI) {
-    console.warn(`[news-translate] Gemini not configured — dropping ${foreign.length} foreign-language items`);
+  if (!genAI && !isGroqConfigured()) {
+    console.warn(`[news-translate] no text engine configured — dropping ${foreign.length} foreign-language items`);
     return passthrough;
   }
 

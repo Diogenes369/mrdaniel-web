@@ -1,5 +1,5 @@
 import { genAI, generateContentWithRetry, requireText, stripCodeFence, parseJsonOrThrow } from '../agent/geminiClient.js';
-import { AUDIENCE_RULES, EXPERT_VOICE_RULES } from '../agent/expertVoice.js';
+import { AUDIENCE_RULES, CONCISE_FACTUAL_RULES, EXPERT_VOICE_RULES } from '../agent/expertVoice.js';
 
 /**
  * Article-grounded technical analysis ("ניתוח טכנולוגי ומשמעויות" / MR. DANIEL Analysis) for the
@@ -157,7 +157,9 @@ ${body || '(המקור סיפק כותרת בלבד — הסתמך עליה וע
     model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: `${SYSTEM_INSTRUCTION}
+
+${CONCISE_FACTUAL_RULES}`,
       temperature: 0.55,
       topP: 0.9,
       responseMimeType: 'application/json',
