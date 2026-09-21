@@ -519,7 +519,7 @@ export function layOutDeck(deck: TechTipDeck, thread: DeckSource, topic: ThreadT
 // ─── deterministic fallback ─────────────────────────────────────────────────────────────────
 
 const NEUTRAL_VISUAL =
-  'abstract dark cyber technology background, deep obsidian, circuit and node grid geometry, neon green and cyan accents, no text, no letters, no words, no logos, no watermark';
+  'abstract dark futuristic AI technology background, deep obsidian, circuit and node grid geometry, neon green and cyan accents, no text, no letters, no words, no logos, no watermark';
 
 function blankSlide(partial: Partial<TechTipSlide> & Pick<TechTipSlide, 'kind'>): TechTipSlide {
   return {

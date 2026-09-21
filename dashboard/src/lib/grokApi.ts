@@ -19,6 +19,9 @@ const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
 export interface GrokStatus {
   configured: boolean;
+  /** False when the key exists but xAI refuses it for billing — drafts then come from free Groq. */
+  usable?: boolean;
+  reason?: string;
   model: string;
   reachable: boolean;
 }
@@ -61,8 +64,8 @@ export async function fetchGrokStatus(): Promise<GrokStatus> {
     const res = await post({ action: 'grok-status' }, 15_000);
     if (res.status === 401) reportAuthFailure('grok-status');
     if (!res.ok) return { configured: false, model: '', reachable: false };
-    const data = (await res.json()) as { configured?: boolean; model?: string };
-    return { configured: Boolean(data.configured), model: data.model ?? '', reachable: true };
+    const data = (await res.json()) as { configured?: boolean; usable?: boolean; reason?: string; model?: string };
+    return { configured: Boolean(data.configured), usable: data.usable ?? Boolean(data.configured), reason: data.reason, model: data.model ?? '', reachable: true };
   } catch {
     return { configured: false, model: '', reachable: false };
   }

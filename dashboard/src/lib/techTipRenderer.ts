@@ -203,7 +203,7 @@ export async function resolveTipBackgrounds(
         const subject = [slide.title, slide.body, slide.code].filter(Boolean).join(' ');
         const brands = brandVisualsFor(subject);
         const prompt = [
-          slide.visualPrompt || 'dark cyber technology scene, neon green accents',
+          slide.visualPrompt || 'dark futuristic AI technology scene, neon green accents',
           ...brands,
           // Pushes the model off generic wallpaper and towards a deliberate, readable illustration.
           'bold high-contrast digital illustration, dramatic rim lighting, deep dark background,',

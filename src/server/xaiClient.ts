@@ -52,6 +52,23 @@ export function xaiModel(): string {
   return (process.env.XAI_MODEL || '').trim() || XAI_DEFAULT_MODEL;
 }
 
+/**
+ * Free probe: `GET /v1/models` is not billed, and a team without credits answers it 403
+ * ("doesn't have any credits or licenses yet", verified 2026-09-22). `usable: false` means callers
+ * should expect the Groq fallback, not that the key is wrong.
+ */
+export async function probeXai(timeoutMs = 4000): Promise<{ usable: boolean; status: number; reason: string }> {
+  const key = xaiApiKey();
+  if (!key) return { usable: false, status: 0, reason: 'not_configured' };
+  try {
+    const res = await fetch(`${XAI_BASE_URL}/models`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(timeoutMs) });
+    if (res.ok) return { usable: true, status: res.status, reason: 'ok' };
+    return { usable: false, status: res.status, reason: res.status === 402 || res.status === 403 ? 'no_credits' : res.status === 401 ? 'bad_key' : 'upstream' };
+  } catch {
+    return { usable: false, status: 0, reason: 'unreachable' };
+  }
+}
+
 async function xaiPost(path: string, body: unknown, timeoutMs: number): Promise<unknown> {
   const key = xaiApiKey();
   if (!key) throw new XaiNotConfiguredError();

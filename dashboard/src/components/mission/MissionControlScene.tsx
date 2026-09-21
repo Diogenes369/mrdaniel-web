@@ -1,6 +1,6 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Html, OrbitControls } from '@react-three/drei';
+import { Html, OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
 import { AGENT_META, type ActivitySnapshot, type AgentId } from '../../lib/agentActivity';
 
@@ -235,7 +235,22 @@ function Core({ busy }: { busy: boolean }) {
   );
 }
 
-function Scene({ snap }: { snap: Snapshot }) {
+/**
+ * Hardware tier, decided once at mount. 'low' = ≤4 cores, ≤4 GB (Chrome's deviceMemory), or the
+ * OS asks for reduced motion: DPR 1, no MSAA, the racks and particle streams dropped, no
+ * auto-rotate. On 'high' the drei PerformanceMonitor still steps DPR down to 1 if the frame rate
+ * sags under load (the dashboard shares the tab), and back up once it recovers.
+ */
+export type ArenaTier = 'high' | 'low';
+export function detectArenaTier(): ArenaTier {
+  if (typeof window === 'undefined') return 'high';
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (reduced || (nav.hardwareConcurrency ?? 8) <= 4 || (nav.deviceMemory ?? 8) <= 4) return 'low';
+  return 'high';
+}
+
+function Scene({ snap, tier }: { snap: Snapshot; tier: ArenaTier }) {
   const working = (id: AgentId) => snap.agents[id].status === 'working';
   const load = (['scout', 'grok', 'hermes'] as AgentId[]).filter(working).length / 3;
   return (
@@ -245,27 +260,30 @@ function Scene({ snap }: { snap: Snapshot }) {
       <ambientLight intensity={0.25} />
       <directionalLight position={[4, 8, 5]} intensity={0.6} />
       <Floor />
-      <Racks load={load} />
+      {tier === 'high' && <Racks load={load} />}
       {(Object.keys(POS) as AgentId[]).map((id) => (
         <AgentNode key={id} id={id} snap={snap} />
       ))}
       <Core busy={working('hermes')} />
-      {EDGES.map((e) => (
+      {tier === 'high' && EDGES.map((e) => (
         <Stream key={`${e.from}-${e.to}`} from={POS[e.from]} to={e.to === 'core' ? CORE : POS[e.to]} active={working(e.from)} color={AGENT_META[e.from].color} />
       ))}
-      <OrbitControls enablePan={false} minDistance={6} maxDistance={16} maxPolarAngle={Math.PI / 2.2} autoRotate autoRotateSpeed={load > 0 ? 0.9 : 0.35} />
+      <OrbitControls enablePan={false} minDistance={6} maxDistance={16} maxPolarAngle={Math.PI / 2.2} autoRotate={tier === 'high'} autoRotateSpeed={load > 0 ? 0.9 : 0.35} />
     </>
   );
 }
 
 export default function MissionControlScene({ snap }: { snap: Snapshot }) {
+  const [tier] = useState(detectArenaTier);
+  const [dpr, setDpr] = useState(tier === 'low' ? 1 : 1.75);
   return (
     <Canvas
-      dpr={[1, 1.75]}
+      dpr={dpr}
       camera={{ position: [0, 5.2, 9.5], fov: 45 }}
-      gl={{ antialias: true, powerPreference: 'low-power', alpha: false }}
+      gl={{ antialias: tier === 'high', powerPreference: 'low-power', alpha: false }}
     >
-      <Scene snap={snap} />
+      {tier === 'high' && <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(1.75)} flipflops={3} onFallback={() => setDpr(1)} />}
+      <Scene snap={snap} tier={tier} />
     </Canvas>
   );
 }

@@ -273,7 +273,7 @@ export function parseThreadRawText(raw: string, url = ''): ImportedThread {
 // ─── step 2 · translate, adapt & lay out ────────────────────────────────────────────────────
 
 const VISUAL_BASE =
-  'abstract dark cyber technology background, deep obsidian, subtle circuit and node grid geometry, neon green and cyan accents, no text, no letters, no words, no logos, no watermark';
+  'abstract dark futuristic AI technology background, deep obsidian, subtle circuit and node grid geometry, neon green and cyan accents, no text, no letters, no words, no logos, no watermark';
 
 const MAX_TITLE_WORDS = 8;
 const MAX_BODY_WORDS = 30;

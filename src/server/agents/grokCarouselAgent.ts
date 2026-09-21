@@ -13,7 +13,8 @@
  * Without XAI_API_KEY this throws XaiNotConfiguredError; the dashboard falls back to its local deck
  * builder + `threadFromDeck`, so the operator still gets a thread.
  */
-import { grokChat, parseGrokJson, xaiModel } from '../xaiClient.js';
+import { grokChat, parseGrokJson, xaiModel, XaiHttpError, XaiNotConfiguredError, type GrokChatOptions } from '../xaiClient.js';
+import { groqGenerate, isGroqConfigured, GROQ_TEXT_MODEL } from '../../agent/groqClient.js';
 import {
   X_ALGORITHM_PROMPT_RULES,
   X_POST_LIMIT,
@@ -131,13 +132,42 @@ function fitPost(text: string): { text: string; trimmed: boolean } {
   return { text: cut.trim(), trimmed: true };
 }
 
+/**
+ * Zero-cost policy: xAI is evaluated on credits the operator will not top up. When the key is
+ * missing, or xAI answers 402 (no credits) / 403 (a key whose team has no credits or no model
+ * access), the SAME prompt goes to the free Groq text model and Hermes verifies it as usual. Any
+ * other failure (429, timeout, bad JSON) still surfaces — a fallback there would hide real bugs.
+ */
+export function isXaiBillingFailure(err: unknown): boolean {
+  if (err instanceof XaiNotConfiguredError) return true;
+  return err instanceof XaiHttpError && (err.status === 402 || err.status === 403);
+}
+
+async function draftWithFallback(opts: GrokChatOptions): Promise<{ raw: string; model: string }> {
+  try {
+    return { raw: await grokChat(opts), model: xaiModel() };
+  } catch (err) {
+    if (!isXaiBillingFailure(err) || !isGroqConfigured()) throw err;
+    console.warn(`[grok] ${(err as Error).message.slice(0, 160)} — falling back to Groq (${GROQ_TEXT_MODEL})`);
+    const res = await groqGenerate({
+      contents: opts.user,
+      config: {
+        systemInstruction: opts.system,
+        temperature: opts.temperature,
+        ...(opts.json ? { responseMimeType: 'application/json' } : {}),
+      },
+    });
+    return { raw: res.text, model: `groq:${GROQ_TEXT_MODEL}` };
+  }
+}
+
 export async function runGrokCarouselAgent(input: GrokCarouselInput): Promise<GrokCarouselResult> {
   const { clean } = sanitizeInput(input.brief.slice(0, 9000));
   if (clean.trim().length < 40) throw new Error('brief too thin to build a carousel');
   const takeaways = (input.takeaways ?? []).map((t) => String(t).slice(0, 200)).filter(Boolean).slice(0, 8);
 
   const t0 = Date.now();
-  const raw = await grokChat({
+  const { raw, model } = await draftWithFallback({
     system: GROK_SYSTEM,
     user: `כותרת המקור: ${input.title}\nמקור: ${input.source}\nנושא: ${input.topic}\n\n${
       takeaways.length ? `תובנות שחולצו:\n- ${takeaways.join('\n- ')}\n\n` : ''
@@ -193,7 +223,7 @@ export async function runGrokCarouselAgent(input: GrokCarouselInput): Promise<Gr
       securityFlags: security.flags,
       trimmedPosts,
     },
-    model: xaiModel(),
+    model,
     timings: { grokMs, hermesMs },
   };
 }

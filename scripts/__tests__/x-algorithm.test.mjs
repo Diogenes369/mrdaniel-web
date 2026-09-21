@@ -11,7 +11,7 @@ import {
   scoreXThread,
   threadFromDeck,
 } from '../../src/server/xAlgorithm.ts';
-import { findUnverifiedNumbers } from '../../src/server/agents/grokCarouselAgent.ts';
+import { findUnverifiedNumbers, isXaiBillingFailure } from '../../src/server/agents/grokCarouselAgent.ts';
 import { parseGrokJson, describeXaiError, XaiNotConfiguredError, XaiHttpError } from '../../src/server/xaiClient.ts';
 
 const results = [];
@@ -85,6 +85,13 @@ t('parses fenced JSON', parseGrokJson('```json\n{"a":1}\n```').a === 1);
 t('parses JSON after a preamble', parseGrokJson('here you go: {"slides":[]}').slides.length === 0);
 t('missing key → 503 not_configured', describeXaiError(new XaiNotConfiguredError()).status === 503);
 t('402 → no_credits (Premium is not API access)', describeXaiError(new XaiHttpError(402, '')).code === 'no_credits');
+
+// ─── zero-cost policy: billing refusals fall back to free Groq, real faults still surface ────────
+t('fallback on missing key', isXaiBillingFailure(new XaiNotConfiguredError()));
+t('fallback on 402 (no credits)', isXaiBillingFailure(new XaiHttpError(402, '')));
+t('fallback on 403 (team without credits — what xAI actually returns)', isXaiBillingFailure(new XaiHttpError(403, '')));
+t('no fallback on 429', !isXaiBillingFailure(new XaiHttpError(429, '')));
+t('no fallback on a parse error', !isXaiBillingFailure(new Error('xAI answer was not JSON')));
 
 for (const [state, label, detail] of results) if (state === 'FAIL') console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);
 const failed = results.filter((r) => r[0] === 'FAIL').length;

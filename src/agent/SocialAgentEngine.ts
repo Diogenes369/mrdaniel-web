@@ -1726,7 +1726,7 @@ ${HEBREW_COPY_RULES}
 4. כל טקסט ההסבר בעברית תקנית. הקוד עצמו באנגלית (זה קוד). מונחים טכניים באנגלית בתוך משפט עברי — תקין ורצוי.
 5. אסור תוויות מסגור ("הקשר:", "כותרת:", "הערה:") בתוך body/title.
 
-לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית** לרקע השקופית: אבסטרקטי-טכני, כהה, מתאים למותג (dark cyber, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent, no text, no people, no logos). ספציפי לתוכן השקופית.
+לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית** לרקע השקופית: אבסטרקטי-טכני, כהה, מתאים למותג (dark futuristic, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent, no text, no people, no logos). ספציפי לתוכן השקופית.
 
 פלט: JSON תקין בלבד, בלי markdown code fence:
 {"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"visualPrompt":"..."}]}
@@ -1980,7 +1980,7 @@ ${AUDIENCE_RULES}
 6. אסור תוויות מסגור ("הקשר:", "כותרת:", "תרגום:") בתוך title או body.
 7. אסור לקרדט את מחבר השרשור המקורי או לאזכר את Threads בתוך הדק. שם המחבר ניתן לך כהקשר לטון בלבד — המותג היחיד שמופיע בפלט הוא mrdaniel.co.il.
 
-לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית בלבד**, נטול טקסט: רקע אבסטרקטי-טכני כהה שמתאים לתוכן השקופית (dark cyber, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent). חובה לכלול בסוף: "no text, no letters, no words, no logos, no watermark". אין אנשים, אין לוגואים.
+לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית בלבד**, נטול טקסט: רקע אבסטרקטי-טכני כהה שמתאים לתוכן השקופית (dark futuristic, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent). חובה לכלול בסוף: "no text, no letters, no words, no logos, no watermark". אין אנשים, אין לוגואים.
 
 פלט: JSON תקין בלבד, בלי markdown code fence:
 {"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"visualPrompt":"..."}]}
@@ -1990,7 +1990,7 @@ ${AUDIENCE_RULES}
 const TEXT_FREE_GUARD = 'no text, no letters, no words, no logos, no watermark';
 
 const NEUTRAL_VISUAL =
-  'abstract dark cyber technology background, deep obsidian, circuit and node grid geometry, neon green and cyan accents';
+  'abstract dark futuristic AI technology background, deep obsidian, circuit and node grid geometry, neon green and cyan accents';
 
 function normalizeVisualPrompt(raw: string): string {
   const base = String(raw || '').trim() || NEUTRAL_VISUAL;
@@ -2252,7 +2252,7 @@ ${AUDIENCE_RULES}
 8. אסור לקרדט את מפרסם הקרוסלה המקורי, אסור לאזכר רשת חברתית ואסור להעתיק קריאות אינגייג'מנט ("Follow for more", "Save this post", "Comment X", "Link in bio"). המותג היחיד שמופיע בפלט הוא mrdaniel.co.il.
 9. אם הטקסט על השקופית משובש או לא קריא — אל תמציאו תוכן. השאירו את השדה ריק במקום לנחש.
 
-לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי באנגלית בלבד, נטול טקסט: רקע אבסטרקטי-טכני כהה (dark cyber, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent, no text, no people, no logos, no watermark).
+לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי באנגלית בלבד, נטול טקסט: רקע אבסטרקטי-טכני כהה (dark futuristic, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent, no text, no people, no logos, no watermark).
 
 פלט: JSON תקין בלבד, בלי markdown code fence:
 {"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","badge":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"rawText":"...","visualPrompt":"...","overlayBoxes":[]}]}

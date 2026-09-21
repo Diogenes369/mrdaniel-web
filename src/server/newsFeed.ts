@@ -342,16 +342,56 @@ async function fetchOgImage(articleUrl: string): Promise<string | undefined> {
   return undefined;
 }
 
+const GOOGLE_NEWS_HOST = /(^|\.)news\.google\.com$/i;
+
+/**
+ * Resolve a `news.google.com/rss/articles/<id>` redirect to the publisher's real article URL.
+ *
+ * The id is no longer a base64 URL (since mid-2024 it's an opaque `AU_yqL…` token), so the only
+ * way back is what Google's own article page does: read the signature + timestamp it embeds
+ * (`data-n-a-sg` / `data-n-a-ts`) and ask the `batchexecute` RPC `Fbv4je` ("garturlreq") for the
+ * target. Two requests, ~0.6–1s total (measured 2026-09-22 on Calcalist + Geektime entries).
+ * Returns undefined on any failure — the caller just leaves the item imageless.
+ */
+async function resolveGoogleNewsUrl(link: string, timeoutMs = 3500): Promise<string | undefined> {
+  const id = link.match(/\/(?:rss\/)?articles\/([^/?#]+)/)?.[1];
+  if (!id) return undefined;
+  const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+  const signal = AbortSignal.timeout(timeoutMs);
+  try {
+    const page = await (await fetch(`https://news.google.com/rss/articles/${id}`, { headers: { 'User-Agent': ua }, signal })).text();
+    const sg = page.match(/data-n-a-sg="([^"]+)"/)?.[1];
+    const ts = page.match(/data-n-a-ts="([^"]+)"/)?.[1];
+    if (!sg || !ts) return undefined;
+    const inner = JSON.stringify([
+      'garturlreq',
+      [['X', 'X', ['X', 'X'], null, null, 1, 1, 'US:en', null, 1, null, null, null, null, null, 0, 1], 'X', 'X', 1, [1, 1, 1], 1, 1, null, 0, 0, null, 0],
+      id,
+      Number(ts),
+      sg,
+    ]);
+    const res = await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'User-Agent': ua },
+      body: `f.req=${encodeURIComponent(JSON.stringify([[['Fbv4je', inner, null, 'generic']]]))}`,
+      signal,
+    });
+    const url = (await res.text()).match(/\\"garturlres\\",\\"(https?:[^"\\]+)\\"/)?.[1];
+    return url && !GOOGLE_NEWS_HOST.test(safeHost(url)) ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Fills in `image` for the newest items whose feed carried none, by scraping the article
  * `og:image` (see `fetchOgImage`). Concurrency-limited AND under a single overall deadline so a
  * batch of slow/blocked outlets can never balloon the `/api/news` refresh — whatever's filled
  * when the clock runs out is kept. Best-effort: any individual failure is silently skipped. */
-async function enrichImages(items: NewsItem[], limit = 28, overallMs = 12_000): Promise<void> {
-  // Skip Google-News entries: their `link` is a news.google.com redirect, not a scrapeable
-  // article — fetching it just yields Google's consent-wall og:image.
-  const targets = items
-    .filter((it) => !it.image && !/(^|\.)news\.google\.com/i.test(safeHost(it.link)))
-    .slice(0, limit);
+async function enrichImages(items: NewsItem[], limit = 36, overallMs = 9_000): Promise<void> {
+  // Google-News entries link to a news.google.com redirect (fetching it directly just yields
+  // Google's consent-wall og:image), so those are resolved to the publisher URL first. They were
+  // skipped outright until 2026-09-22 — which left every Calcalist / Geektime / Haaretz item bare.
+  const targets = items.filter((it) => !it.image).slice(0, limit);
   if (targets.length === 0) return;
 
   const deadline = Date.now() + overallMs;
@@ -361,7 +401,9 @@ async function enrichImages(items: NewsItem[], limit = 28, overallMs = 12_000): 
   const worker = async () => {
     while (cursor < targets.length && Date.now() < deadline) {
       const it = targets[cursor++];
-      const og = await fetchOgImage(it.link);
+      const articleUrl = GOOGLE_NEWS_HOST.test(safeHost(it.link)) ? await resolveGoogleNewsUrl(it.link) : it.link;
+      if (!articleUrl || Date.now() >= deadline) continue;
+      const og = await fetchOgImage(articleUrl);
       // Reject a URL we've already used this refresh — a repeat almost always means a generic
       // placeholder / error-page image rather than the real article photo.
       if (og && !assigned.has(og)) {
@@ -371,7 +413,7 @@ async function enrichImages(items: NewsItem[], limit = 28, overallMs = 12_000): 
       }
     }
   };
-  const run = Promise.all(Array.from({ length: Math.min(6, targets.length) }, worker));
+  const run = Promise.all(Array.from({ length: Math.min(8, targets.length) }, worker));
   await Promise.race([run, new Promise((r) => setTimeout(r, overallMs + 500))]);
   console.info(
     `[news] og:image enrichment — filled ${filled}/${targets.length} imageless items in ${Date.now() - (deadline - overallMs)}ms`,

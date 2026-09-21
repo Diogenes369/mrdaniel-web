@@ -123,8 +123,12 @@ export default function GrokStudio() {
           <span className="ms-auto flex items-center gap-2 text-xs">
             {status === null ? (
               <span className="text-zinc-500">בודק חיבור ל-xAI…</span>
-            ) : status.configured ? (
+            ) : status.configured && status.usable ? (
               <span className="rounded-full border border-lime-500/40 bg-lime-500/10 px-2.5 py-1 font-mono text-lime-300">xAI מחובר · {status.model}</span>
+            ) : status.configured ? (
+              <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2.5 py-1 text-sky-300" title="המפתח תקף אבל לחשבון ה-xAI אין קרדיט. הטיוטות נכתבות ב-Groq החינמי, ו-Hermes מאמת כרגיל.">
+                xAI ללא קרדיט · Groq חינמי
+              </span>
             ) : (
               <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-amber-300" title="הוסיפו XAI_API_KEY ב-Vercel (Production + Preview) ופרסו מחדש">
                 XAI_API_KEY חסר — מצב מקומי

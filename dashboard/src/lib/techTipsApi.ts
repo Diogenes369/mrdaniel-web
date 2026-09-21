@@ -293,7 +293,7 @@ async function post(body: Record<string, unknown>, timeoutMs = 90000): Promise<R
 }
 
 const VISUAL_BASE =
-  'abstract dark cyber technology background, deep obsidian, subtle circuit and node grid geometry, neon green and cyan accents, no text, no people, cinematic depth';
+  'abstract dark futuristic AI technology background, deep obsidian, subtle circuit and node grid geometry, neon green and cyan accents, no text, no people, cinematic depth';
 
 /** Deterministic local deck — real structure with the operator's own topic, used whenever AI
  * synthesis is unavailable. Deliberately honest: it does NOT invent code, it prompts for it. */

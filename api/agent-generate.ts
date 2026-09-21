@@ -891,9 +891,10 @@ ${typeof notes === 'string' ? notes : ''}`);
     // ── Grok (xAI) — X-optimized carousels + threads. See src/server/agents/grokCarouselAgent.ts.
     //    Dynamically imported so the 20-odd Gemini/Groq actions never load the xAI path.
     if (action === 'grok-status') {
-      const { isXaiConfigured, xaiModel } = await import('../src/server/xaiClient.js');
+      const { isXaiConfigured, xaiModel, probeXai } = await import('../src/server/xaiClient.js');
       const { X_RANKING_WEIGHTS, X_RANKING_ADJUSTMENTS, X_ALGORITHM_SOURCE } = await import('../src/server/xAlgorithm.js');
-      res.status(200).json({ ok: true, configured: isXaiConfigured(), model: xaiModel(), weights: X_RANKING_WEIGHTS, adjustments: X_RANKING_ADJUSTMENTS, source: X_ALGORITHM_SOURCE });
+      const probe = await probeXai();
+      res.status(200).json({ ok: true, configured: isXaiConfigured(), usable: probe.usable, reason: probe.reason, model: xaiModel(), weights: X_RANKING_WEIGHTS, adjustments: X_RANKING_ADJUSTMENTS, source: X_ALGORITHM_SOURCE });
       return;
     }
 

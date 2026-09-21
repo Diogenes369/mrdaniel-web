@@ -94,7 +94,7 @@ export async function readCarouselFrames(files: File[]): Promise<CarouselFrame[]
 // ─── local fallback ─────────────────────────────────────────────────────────────────────────
 
 const VISUAL_BASE =
-  'abstract dark cyber technology background, deep obsidian, subtle circuit and node grid geometry, neon green and cyan accents, no text, no letters, no words, no logos, no watermark';
+  'abstract dark futuristic AI technology background, deep obsidian, subtle circuit and node grid geometry, neon green and cyan accents, no text, no letters, no words, no logos, no watermark';
 
 function slide(partial: Partial<TechTipSlide> & Pick<TechTipSlide, 'kind'>): TechTipSlide {
   return {
