@@ -27,7 +27,6 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { id: 'offer-ai-hub', title: 'חדשות ומדריכי AI', snippet: 'חדשות AI בזמן אמת ומדריכים מעשיים צעד אחר צעד', keywords: 'news חדשות מדריכים tutorials', icon: BookOpen, route: '/', targetSelector: '#offer-ai-hub' },
   { id: 'roi-calculator', title: 'מחשבון חיסכון לסוכן AI', snippet: 'הערכת זמן שנחסך לפי היקף העבודה החוזרת', keywords: 'roi calculator חיסכון עלות מחשבון סוכן', icon: Calculator, route: '/', targetSelector: '#roi-calculator' },
   { id: 'services', title: 'מה אני בונה', snippet: 'JARVIS, סוכנים, RAG, אוטומציות ואינטגרציות LLM', keywords: 'services שירותים rag jarvis אוטומציה', icon: Layers, route: '/', targetSelector: '#services' },
-  { id: 'news', title: 'חדשות AI חיות', snippet: 'עדכוני AI ממקורות מובילים, מתעדכנים לאורך היום', keywords: 'news חדשות ai llm openai anthropic google', icon: Newspaper, route: '/', targetSelector: '#news' },
   { id: 'contact', title: 'יצירת קשר', snippet: 'שיחה ישירה איתי, בלי בוטים', keywords: 'קשר contact פנייה', icon: Mail, route: '/', targetSelector: '#contact-portal' },
 
   // Dedicated pages

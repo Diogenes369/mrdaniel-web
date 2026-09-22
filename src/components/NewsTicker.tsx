@@ -1,14 +1,18 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNewsFeed } from '../services/newsService';
+import { useNewsFeed, type NewsItem } from '../services/newsService';
+import ArticleModal from './news/ArticleModal';
 import { prefersReducedMotion } from '../lib/gsap';
 
 // Live headline marquee. Two placements share the same internals:
 //   • placement="top"    — site-wide bar mounted in App.tsx, ABOVE the header, DESKTOP ONLY
 //                          (`hidden md:block`). It carries `id="news-ticker-bar"` so Header can
 //                          measure it and glue its own `top` to the bar's bottom edge.
-//   • placement="inline" — MOBILE ONLY (`md:hidden`) card rendered back inside the homepage news
-//                          section (AiNewsGrid), where the ticker originally lived.
+//   • placement="inline" — MOBILE ONLY (`md:hidden`) card, for a page that wants the ticker in its
+//                          own body (the homepage news section that used it was removed 2026-09-22).
+//
+// A live headline opens the shared <ArticleModal> (summary, extended article, MR. DANIEL
+// analysis). Only the static fallback rows, which point at site routes, navigate.
 //
 // The seamless marquee CSS lives in src/index.css (`.news-ticker*`): two identical `__group`s
 // inside `__track`, the track translates left by exactly one group width and loops → no blank
@@ -19,6 +23,8 @@ interface TickerRow {
   title: string;
   stamp: string;
   href: string;
+  /** The feed item behind a live row — present means "open in the article modal". */
+  item?: NewsItem;
 }
 
 // The ticker is a "what's new TODAY" strip: it shows only items published within the last 24h.
@@ -73,6 +79,7 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
       title: i.title,
       stamp: stampFor(i.publishedAt),
       href: i.link,
+      item: i,
     }));
     return mapped.length >= 4 ? mapped : FALLBACK_TICKER;
   }, [allItems]);
@@ -87,9 +94,12 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
     return out;
   }, [rows]);
 
-  const openRow = (href: string) => {
-    if (href.startsWith('/')) navigate(href);
-    else window.open(href, '_blank', 'noopener,noreferrer');
+  const [active, setActive] = useState<NewsItem | null>(null);
+
+  const openRow = (row: TickerRow) => {
+    if (row.item) setActive(row.item);
+    else if (row.href.startsWith('/')) navigate(row.href);
+    else window.open(row.href, '_blank', 'noopener,noreferrer');
   };
 
   // BiDi-safe row. The marquee viewport is dir="ltr" (so the CSS translateX loop stays
@@ -104,7 +114,7 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
   const Item = ({ row }: { row: TickerRow }) => (
     <button
       type="button"
-      onClick={() => openRow(row.href)}
+      onClick={() => openRow(row)}
       dir="rtl"
       className="group inline-flex items-center gap-2.5 leading-none text-[13px] md:text-sm text-zinc-300 hover:text-brand-300 transition-colors [unicode-bidi:isolate]"
     >
@@ -135,6 +145,7 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
     : 'news-ticker relative md:hidden mb-8 rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden';
 
   return (
+    <>
     <div id={isTop ? 'news-ticker-bar' : undefined} className={wrapperClass}>
       {/* LIVE tag (RTL start = right) + gradient mask so items dissolve out from behind it */}
       <div className="absolute right-0 inset-y-0 z-20 flex items-center gap-2 pr-3 sm:pr-4 pl-10 bg-gradient-to-l from-carbon-950 via-carbon-950 to-transparent">
@@ -184,5 +195,8 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
         </div>
       )}
     </div>
+    {/* Portals to <body>, so the ticker's overflow/backdrop never clips it. */}
+    <ArticleModal item={active} onClose={() => setActive(null)} />
+    </>
   );
 }

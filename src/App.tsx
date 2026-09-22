@@ -117,8 +117,8 @@ export default function App() {
       <ScrollProgress />
       {/* Live headline ticker: very top of the layout, above the header, in normal document
           flow, DESKTOP ONLY (the component is `hidden md:block`). It scrolls away with the page;
-          the header measures it and is NOT sticky-bundled with it (see Header.tsx). On mobile the
-          ticker instead renders inline inside the homepage news section (AiNewsGrid). */}
+          the header measures it and is NOT sticky-bundled with it (see Header.tsx). Clicking a
+          headline opens the article modal. */}
       <NewsTicker placement="top" />
       <Header />
       <main key={location.pathname} className="relative z-[1] w-full max-w-full overflow-x-clip">

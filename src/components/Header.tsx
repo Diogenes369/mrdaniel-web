@@ -19,7 +19,6 @@ const navLinks: NavLink[] = [
   { name: 'סוכני AI', to: '/ai' },
   { name: 'מערכת JARVIS', to: '/jarvis' },
   { name: 'מדריכים', to: '/magazines' },
-  { name: 'חדשות', to: '/news' },
   { name: 'דברו איתי', action: 'contact' },
 ];
 

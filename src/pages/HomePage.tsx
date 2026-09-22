@@ -4,15 +4,16 @@ import OfferSection from '../components/home/OfferSection';
 import RoiCalculator from '../components/home/RoiCalculator';
 import ServicesSection from '../components/home/ServicesSection';
 import TechMarquee from '../components/TechMarquee';
-import AiNewsGrid from '../components/AiNewsGrid';
 import ContactPortal from '../components/ContactPortal';
 import { HOME_OFFERS } from '../data/homeOffers';
 
 /**
  * Homepage (AI-only since 2026-09-21): hero → rotating headline → the three pillars (autonomous
  * AI agents, the LLM lab, the AI news hub) → interactive ROI calculator (lead magnet) → services
- * bento → tech-stack marquee → live AI news dashboard → contact.
- * (The X feed and channels grid were removed 2026-09-22; the hero keeps the social icons.)
+ * bento → tech-stack marquee → contact.
+ * (The X feed and channels grid were removed 2026-09-22; the hero keeps the social icons. The news
+ * section was removed the same day — headlines reach the homepage through the site-wide ticker,
+ * whose items open the article modal, and the full feed lives on /news.)
  *
  * Every section wrapper is fully transparent — no divider elements, no per-section backdrop — so
  * the fixed Scene3D particle/mesh layer (`.scene3d-layer`, z-0 in App.tsx) runs unobstructed from
@@ -30,7 +31,6 @@ export default function HomePage() {
       <RoiCalculator />
       <ServicesSection />
       <TechMarquee />
-      <AiNewsGrid />
       <ContactPortal />
     </>
   );
