@@ -128,9 +128,10 @@ async function handleAnalyze(req: any, res: any) {
       topic: String(body.topic || 'general'),
       link: String(body.link || ''),
     });
-    // Deterministic per article for the memo window, so the edge may hold it too.
-    res.setHeader('Cache-Control', 'public, max-age=300');
-    res.setHeader('Vercel-CDN-Cache-Control', 'max-age=3600, stale-while-revalidate=21600');
+    // A published article does not change, so the edge holds one generation for a day and every
+    // visitor after the first is served without touching a model's free quota.
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Vercel-CDN-Cache-Control', 'max-age=86400, stale-while-revalidate=604800');
     res.status(200).json({ available: true, insights });
   } catch (err) {
     console.error('[api/news?action=analyze] failed to generate article insights:', err);

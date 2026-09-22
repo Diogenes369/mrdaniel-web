@@ -141,6 +141,12 @@ t('rules · the news-analysis path keeps the audience block', /\$\{AUDIENCE_RULE
 t('analysis · reads the FULL article, not the teaser', /importUrlContent\(link\)/.test(insights) && /resolveGoogleNewsUrl/.test(insights));
 t('analysis · the prompt is sized to the Groq window', /fitToTokens\(/.test(insights) && /maxOutputTokens: OUTPUT_TOKENS/.test(insights));
 t('analysis · returns the three modal sections', ['executiveSummary', 'extendedArticle', 'mrDanielAnalysis'].every((k) => insights.includes(k)));
+t('analysis · first engine is a free flash-lite, not the 20/day 3.6-flash', /ENGINES: Engine\[\] = \[\s*\{[^}]*'gemini-3\.1-flash-lite'/.test(insights) && !/'gemini-3\.6-flash'/.test(insights));
+t('analysis · stays off the shared router (Groq main model / 3.6-flash pacing)', !/generateContentWithRetry\(/.test(insights));
+t('analysis · a daily 429 benches the model until UTC midnight', /nextUtcMidnight\(\)/.test(insights));
+t('analysis · concurrent opens share one generation', /inFlight\.get\(key\)/.test(insights));
+t('analysis · the voice scrub still runs', /scrubAiPhrases\(/.test(insights));
+t('analysis · edge caches a generation for a day', /max-age=86400/.test(readFileSync(new URL('../../api/news.ts', import.meta.url), 'utf8')));
 
 // ─── text generation never carries media ───────────────────────────────────────────────────────
 

@@ -315,7 +315,7 @@ function toGeminiFinishReason(raw: string): string {
  */
 export async function groqGenerate(
   params: GeminiLikeRequest,
-  options: { scrub?: boolean } = {}
+  options: { scrub?: boolean; model?: string; reasoningEffort?: 'low' | 'medium' | 'high' } = {}
 ): Promise<GroqGeminiLikeResponse> {
   if (!KEY_LOOKS_REAL) throw new Error(groqConfigReason() ?? 'GROQ_API_KEY not configured');
 
@@ -325,11 +325,19 @@ export async function groqGenerate(
   }
 
   const body: Record<string, unknown> = {
-    model: GROQ_TEXT_MODEL,
+    // Free-tier daily budgets are per model, so a caller may pin a smaller one to stay off the
+    // bucket the rest of the app spends.
+    model: options.model || GROQ_TEXT_MODEL,
     messages,
     temperature: typeof params.config?.temperature === 'number' ? params.config.temperature : 0.6,
   };
   if (typeof params.config?.topP === 'number') body.top_p = params.config.topP;
+  // gpt-oss spends completion tokens on hidden reasoning first; at the default effort a Hebrew JSON
+  // answer can run out of room before the JSON starts. `low` keeps it to a few dozen tokens.
+  if (options.reasoningEffort) {
+    body.reasoning_effort = options.reasoningEffort;
+    body.include_reasoning = false;
+  }
   // `max_tokens` is a RESERVATION against the per-minute token bucket, not just a ceiling.
   //
   // This was set to 8000, which is exactly the free tier's whole TPM allowance
