@@ -166,7 +166,7 @@ const ENGINES: Engine[] = [
   { id: 'flash-lite-3.1', provider: 'gemini', model: 'gemini-3.1-flash-lite', bodyTokens: 9_000 },
   { id: 'flash-lite-3.5', provider: 'gemini', model: 'gemini-3.5-flash-lite', bodyTokens: 9_000 },
   { id: 'groq-oss-20b', provider: 'groq', model: 'openai/gpt-oss-20b', bodyTokens: 0 /* sized per call */ },
-  { id: 'gemma-4-31b', provider: 'gemini', model: 'gemma-4-31b-it', bodyTokens: 6_000, slowMs: 60_000 },
+  { id: 'gemma-4-31b', provider: 'gemini', model: 'gemma-4-31b-it', bodyTokens: 6_000, slowMs: 40_000 },
 ];
 
 /** Wall-clock budget for one analysis (api/news.ts allows the function 90s). */
@@ -334,8 +334,16 @@ async function fetchFullText(link: string): Promise<{ body: string; image: strin
   }
 }
 
+/** Smaller models sometimes return a list field as one string (paragraphs separated by blank
+ *  lines, bullets by newlines) — accept that shape instead of failing the whole answer. */
+function asList(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') return value.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+  return [];
+}
+
 function cleanList(value: unknown, min: number, max: number): string[] {
-  return (Array.isArray(value) ? value : [])
+  return asList(value)
     .map(cleanLine)
     .filter((line) => line.length >= min)
     .slice(0, max);
@@ -345,11 +353,15 @@ function cleanList(value: unknown, min: number, max: number): string[] {
 function toInsights(raw: string, fullText: boolean): ArticleInsights {
   const parsed = parseJsonOrThrow<Record<string, unknown>>(stripCodeFence(raw), 'news insights');
   const tidy = (v: unknown) => scrubAiPhrases(normalizeModelUnicode(String(v ?? '')));
-  const executiveSummary = cleanList((Array.isArray(parsed.executiveSummary) ? parsed.executiveSummary : []).map(tidy), 15, 4);
-  const extendedArticle = cleanList((Array.isArray(parsed.extendedArticle) ? parsed.extendedArticle : []).map(tidy), 60, 3);
-  const mrDanielAnalysis = cleanLine(tidy(parsed.mrDanielAnalysis));
+  const executiveSummary = cleanList(asList(parsed.executiveSummary).map(tidy), 15, 4);
+  const extendedArticle = cleanList(asList(parsed.extendedArticle).map(tidy), 60, 3);
+  const analysisRaw = parsed.mrDanielAnalysis;
+  const mrDanielAnalysis = cleanLine(tidy(Array.isArray(analysisRaw) ? analysisRaw.join(' ') : analysisRaw));
   if (executiveSummary.length < 2 || extendedArticle.length < 1 || mrDanielAnalysis.length < 80) {
-    throw new Error('model did not return a usable summary / article / analysis');
+    // Counts, not content — enough to tell which field a model keeps getting wrong.
+    throw new Error(
+      `model did not return a usable summary / article / analysis (bullets ${executiveSummary.length}, paragraphs ${extendedArticle.length}, analysis ${mrDanielAnalysis.length} chars; keys ${Object.keys(parsed).join(',')})`
+    );
   }
   // No filler headline: if the model omitted it the modal renders the analysis without one.
   return { headline: cleanLine(tidy(parsed.headline)), executiveSummary, extendedArticle, mrDanielAnalysis, fullText };
