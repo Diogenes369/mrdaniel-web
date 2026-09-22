@@ -2,18 +2,22 @@ import { useQuery } from '@tanstack/react-query';
 import type { NewsItem } from './newsService';
 
 /**
- * Client side of the "ניתוח טכנולוגי ומשמעויות" (MR. DANIEL Analysis) block: posts the article's
- * own title + body to `POST /api/news/analyze`, which asks Gemini for 3 insights derived from THAT
- * story (see src/server/newsInsights.ts).
+ * Client side of the article modal's generated sections: posts the article's title + link to
+ * `POST /api/news/analyze`, which fetches the FULL article from the publisher and returns an
+ * executive summary, an extended article and the MR. DANIEL analysis paragraph
+ * (see src/server/newsInsights.ts).
  *
- * There is no client-side fallback copy on purpose. If the endpoint is unconfigured, rate-limited
- * or errors, the hook reports the failure and the modal drops the section — the old behaviour of
- * printing a static topic-keyed paragraph is gone.
+ * No client-side fallback copy for the analysis on purpose. If the endpoint fails, the modal keeps
+ * its teaser-based summary/article and drops the analysis block.
  */
 
 export interface ArticleInsights {
   headline: string;
-  points: string[];
+  executiveSummary: string[];
+  extendedArticle: string[];
+  mrDanielAnalysis: string;
+  /** False when the server could not reach the article and wrote from the feed teaser. */
+  fullText: boolean;
 }
 
 interface AnalyzeResponse {
@@ -23,33 +27,32 @@ interface AnalyzeResponse {
   rateLimited?: boolean;
 }
 
+const clean = (v: unknown) => String(v ?? '').replace(/^[\s\-–—•*·>]+/, '').trim();
+const cleanList = (v: unknown, max: number) =>
+  (Array.isArray(v) ? v : []).map(clean).filter((line) => line.length > 0).slice(0, max);
+
 /** Defensive normalisation of a server payload — also the last guard against a leading "- ". */
 function normalize(raw: unknown): ArticleInsights | null {
   const value = raw as Partial<ArticleInsights> | undefined;
-  const points = (Array.isArray(value?.points) ? value.points : [])
-    .map((p) => String(p ?? '').replace(/^[\s\-–—•*·>]+/, '').trim())
-    .filter((p) => p.length > 0)
-    .slice(0, 3);
-  if (points.length === 0) return null;
-  return {
-    headline: String(value?.headline ?? '').replace(/^[\s\-–—•*·>]+/, '').trim(),
-    points,
-  };
+  const executiveSummary = cleanList(value?.executiveSummary, 4);
+  const extendedArticle = cleanList(value?.extendedArticle, 3);
+  const mrDanielAnalysis = clean(value?.mrDanielAnalysis);
+  if (!executiveSummary.length && !extendedArticle.length && !mrDanielAnalysis) return null;
+  return { headline: clean(value?.headline), executiveSummary, extendedArticle, mrDanielAnalysis, fullText: value?.fullText === true };
 }
 
 export async function fetchArticleInsights(item: NewsItem): Promise<ArticleInsights> {
-  const res = await fetch('/api/news/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      title: item.title,
-      summary: item.summary,
-      excerpt: item.excerpt,
-      source: item.source,
-      topic: item.topic,
-      link: item.link,
-    }),
+  // GET, not POST: the query is deterministic per article, so Vercel's edge caches the generation
+  // and every later visitor gets it for free. The teaser is clipped to keep the URL short — the
+  // server reads the full article itself and only falls back to this when the fetch fails.
+  const params = new URLSearchParams({
+    title: item.title,
+    link: item.link,
+    source: item.source || '',
+    topic: item.topic || 'general',
+    summary: (item.summary || item.excerpt || '').slice(0, 280),
   });
+  const res = await fetch(`/api/news/analyze?${params}`);
 
   const data: AnalyzeResponse = await res.json().catch(() => ({}) as AnalyzeResponse);
   if (!res.ok || data.available === false) {
@@ -67,7 +70,7 @@ export async function fetchArticleInsights(item: NewsItem): Promise<ArticleInsig
  */
 export function useArticleInsights(item: NewsItem | null) {
   return useQuery({
-    queryKey: ['news-article-insights', item?.id ?? item?.link ?? ''],
+    queryKey: ['news-article-insights-v2', item?.id ?? item?.link ?? ''],
     queryFn: () => fetchArticleInsights(item as NewsItem),
     enabled: Boolean(item),
     staleTime: 6 * 60 * 60 * 1000,

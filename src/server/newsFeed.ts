@@ -353,7 +353,7 @@ const GOOGLE_NEWS_HOST = /(^|\.)news\.google\.com$/i;
  * target. Two requests, ~0.6–1s total (measured 2026-09-22 on Calcalist + Geektime entries).
  * Returns undefined on any failure — the caller just leaves the item imageless.
  */
-async function resolveGoogleNewsUrl(link: string, timeoutMs = 3500): Promise<string | undefined> {
+export async function resolveGoogleNewsUrl(link: string, timeoutMs = 3500): Promise<string | undefined> {
   const id = link.match(/\/(?:rss\/)?articles\/([^/?#]+)/)?.[1];
   if (!id) return undefined;
   const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';

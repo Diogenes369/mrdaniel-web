@@ -217,12 +217,12 @@ app.get('/api/news/item/:slug', async (req: Request, res: Response) => {
 // Local-dev mirror of api/news-analyze.ts — the Gemini-generated "ניתוח טכנולוגי ומשמעויות"
 // block of the article modal. No boilerplate fallback: an unconfigured key or a model failure
 // answers `available: false` and the modal hides the section.
-app.post('/api/news/analyze', async (req: Request, res: Response) => {
+app.all('/api/news/analyze', async (req: Request, res: Response) => {
   if (!isInsightsConfigured()) {
     res.status(503).json({ error: 'analysis unavailable', available: false });
     return;
   }
-  const b = req.body ?? {};
+  const b: Record<string, unknown> = (req.method === 'GET' ? req.query : req.body) ?? {};
   try {
     const insights = await generateArticleInsights({
       title: String(b.title || ''),

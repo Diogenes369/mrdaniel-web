@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Radar, Activity, Play } from 'lucide-react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Radar, Activity, Play, Maximize2, Minimize2, Copy, Check } from 'lucide-react';
 import { AGENT_META, useAgentActivity, type AgentId } from '../lib/agentActivity';
 import { fetchNewsList } from '../lib/newsFeedClient';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
@@ -33,6 +33,30 @@ export default function MissionControl() {
   const [gl] = useState(webglAvailable);
   const [scanning, setScanning] = useState(false);
   const totals = useMemo(() => ORDER.reduce((n, id) => n + snap.agents[id].done, 0), [snap]);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [full, setFull] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => setFull(document.fullscreenElement === stageRef.current);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void stageRef.current?.requestFullscreen?.().catch(() => undefined);
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#office`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* clipboard blocked — nothing to do */
+    }
+  }
 
   // While this tab is open Scout re-reads the live feed every 3 minutes — a real request through the
   // same fetch tap, so the office shows the pipeline breathing instead of sitting idle.
@@ -59,16 +83,27 @@ export default function MissionControl() {
     <div className="space-y-4" dir="rtl">
       <div className="dash-card flex flex-wrap items-center gap-3 p-4">
         <Radar className="h-5 w-5 text-lime-300" />
-        <h2 className="font-display text-lg font-black text-white">Mission Control · המשרד</h2>
+        <h2 className="font-display text-lg font-black text-white">משרד סוכנים 3D · <span dir="ltr">Live 3D Agent Office</span></h2>
         <span className="text-sm text-zinc-400">הסוכנים בזמן אמת — כל בקשה שהדשבורד שולח מאירה את הסוכן שמטפל בה</span>
         <span className="ms-auto font-mono text-xs text-zinc-500">{totals} משימות הושלמו בסשן</span>
         <button type="button" onClick={scan} disabled={scanning} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-bold text-sky-300 disabled:opacity-50">
           <Play className="h-3.5 w-3.5" /> {scanning ? 'Scout סורק…' : 'שלח את Scout לסרוק'}
         </button>
+        <button type="button" onClick={toggleFullscreen} className="inline-flex items-center gap-1.5 rounded-lg border border-lime-400/40 bg-lime-400/10 px-3 py-1.5 text-xs font-bold text-lime-300">
+          <Maximize2 className="h-3.5 w-3.5" /> מסך מלא
+        </button>
+        <button type="button" onClick={copyLink} title="קישור ישיר למשרד (#office)" className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-zinc-300">
+          {copied ? <Check className="h-3.5 w-3.5 text-lime-300" /> : <Copy className="h-3.5 w-3.5" />} {copied ? 'הועתק' : 'קישור ישיר'}
+        </button>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-        <div className="dash-card relative h-[62vh] min-h-[420px] overflow-hidden p-0">
+        <div ref={stageRef} className={`dash-card relative overflow-hidden p-0 ${full ? 'h-screen rounded-none bg-black' : 'h-[70vh] min-h-[460px]'}`}>
+          {full && (
+            <button type="button" onClick={toggleFullscreen} className="absolute left-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/60 px-3 py-1.5 text-xs font-bold text-white">
+              <Minimize2 className="h-3.5 w-3.5" /> יציאה ממסך מלא
+            </button>
+          )}
           {gl ? (
             <PreviewErrorBoundary label="זירת Mission Control">
               <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-zinc-500">טוען את הזירה…</div>}>

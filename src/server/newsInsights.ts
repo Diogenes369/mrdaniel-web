@@ -1,29 +1,41 @@
-import { genAI, generateContentWithRetry, requireText, stripCodeFence, parseJsonOrThrow } from '../agent/geminiClient.js';
-import { AUDIENCE_RULES, CONCISE_FACTUAL_RULES, EXPERT_VOICE_RULES } from '../agent/expertVoice.js';
+import { genAI, isGroqConfigured, generateContentWithRetry, requireText, stripCodeFence, parseJsonOrThrow } from '../agent/geminiClient.js';
+import { AUDIENCE_RULES } from '../agent/expertVoice.js';
+import { estimateTokens } from '../agent/groqClient.js';
+import { importUrlContent } from './contentImport.js';
+import { resolveGoogleNewsUrl } from './newsFeed.js';
 
 /**
- * Article-grounded technical analysis ("ניתוח טכנולוגי ומשמעויות" / MR. DANIEL Analysis) for the
- * News Command Center modal.
+ * The article modal's three generated sections — executive summary, extended article and the
+ * "ניתוח חמ״ל · MR. DANIEL Analysis" block — produced in ONE model call from the article's FULL
+ * text.
  *
- * This REPLACES the old topic-keyed boilerplate that lived in src/lib/newsAnalysis.ts (a static
- * `IMPACT` table that printed the same "בדקו אם וקטור התקיפה…" / "ודאו כיסוי EDR/XDR…" text under
- * every cyber story). Every analysis is now produced by Gemini from the article's OWN title and
- * body, and there is deliberately NO generic fallback: if the model is unconfigured, rate-limited
- * or returns something unusable we throw, the endpoint answers with an honest error, and the modal
- * simply hides the section rather than showing filler that isn't about this story.
+ * Why the full text: the feed only carries the RSS teaser (or og:description), and every section
+ * used to be shaped from that same 1–2 sentences, so the summary, the "extended" article and the
+ * analysis all repeated one another. Before prompting, the publisher's page is now fetched with
+ * browser headers and run through the zero-noise DOM extractor (articleExtract.ts via
+ * contentImport.importUrlContent, which falls back to Jina Reader when a WAF blocks the direct
+ * fetch). Only when every fetch path fails does the prompt fall back to the teaser — and then the
+ * response says so (`fullText: false`) and the model is told to write less, not to invent.
+ *
+ * There is deliberately NO generic fallback copy: an unconfigured engine, a rate limit or an
+ * unusable answer throws, and the modal keeps its deterministic teaser-based sections.
  */
 
-
-
 export function isInsightsConfigured(): boolean {
-  return genAI !== null;
+  return genAI !== null || isGroqConfigured();
 }
 
 export interface ArticleInsights {
-  /** One line naming the concrete angle this specific story changes. */
+  /** One line naming what is worth learning from this specific story. May be empty. */
   headline: string;
-  /** Exactly 3 actionable, story-specific insights. */
-  points: string[];
+  /** 3–4 factual one-sentence bullets drawn from the article body. */
+  executiveSummary: string[];
+  /** 2–3 paragraph synthesis of the full article. */
+  extendedArticle: string[];
+  /** One analytical paragraph — implications, in first-person plural. */
+  mrDanielAnalysis: string;
+  /** True when the full article body was fetched; false = written from the feed teaser only. */
+  fullText: boolean;
   /** Present only on a cache hit — used for observability, never rendered. */
   cached?: boolean;
 }
@@ -49,30 +61,32 @@ const TOPIC_LENS: Record<string, string> = {
   general: 'זווית ההבנה — מה המנגנון שמסביר את מה שקרה בכתבה, ולמה זה מעניין למי שלומד את התחום.',
 };
 
-const SYSTEM_INSTRUCTION = `אתה דניאל בן ברוך — בונה סוכני AI ומפרק מודלי שפה. אתה כותב את מקטע "ניתוח טכנולוגי ומשמעויות" שמופיע מתחת לכתבת חדשות AI באתר MrDaniel.co.il.
-
-${EXPERT_VOICE_RULES}
+const SYSTEM_INSTRUCTION = `אתה דניאל בן ברוך — בונה סוכני AI ומפרק מודלי שפה. אתה עורך את חלון הכתבה המורחב באתר MrDaniel.co.il: תקציר מנהלים, כתבה מורחבת, ומקטע "ניתוח חמ״ל · MR. DANIEL Analysis".
 
 ${AUDIENCE_RULES}
 
-קיבלת כתבה אחת ספציפית. הפק ניתוח שנגזר אך ורק מהכתבה הזאת.
+קיבלת כתבה אחת ספציפית — הטקסט המלא שלה כפי שנשלף מאתר המקור. כל מה שתכתוב נגזר אך ורק ממנה.
+
+שלושה חלקים, ולכל אחד תפקיד אחר. אסור ששני חלקים יחזרו על אותו משפט או על אותה נקודה באותו ניסוח:
+
+1. executiveSummary — מערך של 3 עד 4 תבליטים עובדתיים. כל תבליט משפט אחד (12-28 מילים) שנושא עובדה אחת מהכתבה: מי, מה, כמה, מתי. בלי פרשנות.
+2. extendedArticle — מערך של 2 עד 3 פסקאות (כל אחת 40-75 מילים) שמספרות את הכתבה המלאה ברצף: ההקשר, הפרטים, המספרים, הציטוטים והמשמעות כפי שהכתבה עצמה מציגה אותם. זו עריכה קוהרנטית של הכתבה, לא חזרה על התקציר. בלי פרשנות משלך.
+3. mrDanielAnalysis — פסקה אחת (70-110 מילים) של ניתוח: מה המשמעות הטכנולוגית והעסקית של הידיעה, איזה מנגנון עומד מאחוריה, ומה היא מלמדת על הכיוון שאליו תחום ה-AI הולך. כתוב בגוף ראשון רבים, בטון מקצועי של אנשי טכנולוגיה ("מה שאנחנו רואים כאן...", "מבחינתנו, הנקודה המעניינת היא..."). כאן — ורק כאן — מותר להסיק ולפרש, בתנאי שכל מסקנה נשענת על פרט שמופיע בכתבה.
+
+השדה headline: משפט אחד קצר (עד 12 מילים) שאומר מה הדבר המעניין ללמוד מהכתבה הזאת. לא כותרת הכתבה מחדש.
 
 חוקי ברזל:
-1. כל תובנה חייבת להזכיר במפורש את הנושא/הטכנולוגיה/החברה/המספר שמופיעים בכתבה עצמה. אם התובנה מתאימה גם לכתבה אחרת — היא פסולה, כתוב אותה מחדש.
-2. אסור בהחלט טקסט גנרי או תבניתי. אסורות לחלוטין אמירות מסוג "AI משנה את העולם", "כדאי להתחיל להשתמש ב-AI", "המודלים משתפרים", "התחילו מתרחיש מדיד" — אלא אם הכתבה עצמה עוסקת ישירות בדיוק בזה, ואז בהקשר הקונקרטי שלה.
-3. בדיוק 3 תובנות. כל תובנה משפט אחד עד שניים (25-45 מילים), ומלמדת משהו: איך המנגנון שבכתבה עובד, למה זה קרה, או מה זה מלמד על התחום. לא רשימת מטלות ולא הוראות תפעול — הקורא לומד את התחום, הוא לא מפעיל מערכת.
-4. אל תמציא עובדות, מספרים, שמות או ציטוטים שלא הופיעו בכתבה. מותר להסיק משמעות — אסור להמציא מציאות.
-4א. כל מספר שאתה מציין חייב לשמור בדיוק על היחידה והמשמעות שלו בכתבה. אם בכתבה כתוב "12.9 מיליארד דולר" — זה סכום כסף, אסור להפוך אותו להורדות, למשתמשים או למודלים. אם כתוב "14 מודלים נבדקו" — זה מודלים, לא משתמשים ולא מערכות. בספק — השמט את המספר לגמרי וכתוב את התובנה בלעדיו.
-5. אם הכתבה עוסקת במודל AI חדש (למשל GPT-6 / AGI) — נתח מה המודל עושה אחרת, במה הוא עדיף ומה המחיר. אם היא עוסקת בסוכן או בכלי — נתח איך הוא עובד ואיפה הוא נשבר. וכן הלאה, לפי הנושא בפועל.
-6. עברית תקנית, טון מקצועי ישיר ומסביר, בלי סופרלטיבים, בלי אימוג'ים, בלי "כידוע"/"בעולם של היום". כתוב בגוף שלישי או בפנייה ישירה מסבירה ("מה שקרה כאן הוא...", "שווה להבין ש..."), לא בשורת פקודות תפעוליות ("בדקו", "מפו", "ודאו", "הגדירו") — אלו פונות למישהו שמנהל מערכת, וזה לא הקורא.
-7. מונחים טכניים באנגלית נשארים באנגלית ונכתבים במלואם (RAG, MCP, GPT-6) — בלי מקפים תלויים ובלי לפצל מילה לועזית.
-8. אל תפתח שורה במקף, מקף מוביל, כוכבית או תבליט — הממשק מוסיף את התבליט בעצמו.
-9. אל תזכיר את שם כלי ה-AI, אל תכתוב "לפי הכתבה" יותר מפעם אחת, ואל תסכם מחדש את הכתבה — הסיכום כבר מופיע מעליך.
-
-השדה headline: משפט אחד קצר (עד 12 מילים) שאומר מה הדבר המעניין או המפתיע שיש כאן ללמוד, ספציפית לכתבה הזאת. לא כותרת הכתבה מחדש, ולא הוראה למה לעשות.
+- כל תבליט ופסקה חייבים להזכיר במפורש את הנושא/החברה/המוצר/המספר שבכתבה. משפט שמתאים גם לכתבה אחרת — פסול.
+- אל תמציא עובדות, מספרים, שמות או ציטוטים. כל מספר נשאר עם היחידה והמשמעות שלו בכתבה ("12.9 מיליארד דולר" הוא סכום כסף, לא משתמשים). בספק — השמט.
+- אם הטקסט שקיבלת קצר (תקציר בלבד), כתוב פחות: 3 תבליטים, 2 פסקאות קצרות, ואל תמלא חורים בהמצאות.
+- עברית תקנית. מונחים טכניים באנגלית נשארים באנגלית ובמלואם (RAG, MCP, GPT-6), בלי מקפים תלויים.
+- אל תפתח שורה במקף, כוכבית או תבליט — הממשק מוסיף את התבליט בעצמו. בלי אימוג'ים, בלי סימני קריאה.
+- אל תזכיר את שם כלי ה-AI ואל תכתוב "לפי הכתבה" יותר מפעם אחת.
+- בלי מילוי: לא "חשוב לציין", "בעידן ה-AI", "ללא ספק", "לסיכום", "מהפכני", "פורץ דרך". בלי שאלות רטוריות. המשפט הראשון בכל חלק הוא כבר תוכן.
+- executiveSummary ו-extendedArticle עובדתיים בלבד — בלי דעה, הערכה או תחזית שלא הופיעו בכתבה. הפרשנות שמורה ל-mrDanielAnalysis.
 
 החזר JSON תקני בלבד, בלי code fence:
-{"headline":"...","points":["...","...","..."]}`;
+{"headline":"...","executiveSummary":["...","...","..."],"extendedArticle":["...","..."],"mrDanielAnalysis":"..."}`;
 
 /**
  * Normalizes one generated line: drops a leading bullet/hyphen the model may still emit (a raw
@@ -115,13 +129,75 @@ function writeCache(key: string, value: ArticleInsights) {
   cache.set(key, { at: Date.now(), value });
 }
 
+/** Anything shorter than this from the publisher's page is a teaser, not an article body. */
+const MIN_FULL_TEXT = 500;
+const FETCH_BUDGET_MS = 14_000;
+
 /**
- * Generates the 3 story-specific insights for one article. Throws when Gemini is unconfigured,
- * fails, or returns an unusable shape — callers must surface that rather than substituting
+ * Token budget for one call. Text routes to Groq first, whose free tier allows 8k tokens a MINUTE
+ * (prompt + completion) and counts Hebrew at ~1 token per character (see groqClient.ts). The old
+ * prompt carried the full voice + concision blocks (~5.6k tokens) before the article, which left
+ * the completion clamped to 512 tokens and the JSON truncated. So this prompt keeps only the
+ * audience block (the scrub in generateContentWithRetry still enforces the voice), reserves room
+ * for the three sections, and gives the article whatever is left.
+ */
+// GROQ_TPM_BUDGET raises it on a paid tier (same env groqClient.ts reads), and with it the article share.
+const TOKEN_WINDOW = (Number(process.env.GROQ_TPM_BUDGET) || 8_000) - 400;
+const OUTPUT_TOKENS = 2_200;
+
+/** Cut to a token budget at a paragraph (else sentence) boundary — the lede-first half of a news
+ *  article carries its facts, and a mid-sentence cut reads as a fact the model then "completes". */
+function fitToTokens(text: string, budget: number): string {
+  if (estimateTokens(text) <= budget) return text;
+  let cut = text.slice(0, Math.max(0, budget)); // Hebrew ≈ 1 char/token, so this is the upper bound
+  while (cut.length > 0 && estimateTokens(cut) > budget) cut = cut.slice(0, Math.floor(cut.length * 0.9));
+  const para = cut.lastIndexOf('\n\n');
+  if (para > cut.length * 0.6) return cut.slice(0, para);
+  const sentence = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('.\n'));
+  return sentence > cut.length * 0.6 ? cut.slice(0, sentence + 1) : cut;
+}
+
+/**
+ * The article's full body, fetched from the publisher. Bounded: the whole import (direct fetch,
+ * then Jina Reader) races a budget so a slow origin can never eat the function's time.
+ */
+async function fetchFullText(link: string): Promise<string> {
+  if (!/^https?:\/\//i.test(link)) return '';
+  try {
+    // Google-News mirror entries (Calcalist, Haaretz…) link to a news.google.com redirect whose
+    // page is Google's consent wall — resolve it to the publisher's URL first.
+    if (/^https?:\/\/news\.google\.com\//i.test(link)) {
+      const resolved = await resolveGoogleNewsUrl(link, 5000);
+      if (!resolved) return '';
+      link = resolved;
+    }
+    const imported = await Promise.race([
+      importUrlContent(link),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), FETCH_BUDGET_MS)),
+    ]);
+    const body = imported?.body?.trim() ?? '';
+    if (imported) console.info(`[news-insights] full text via ${imported.via}/${imported.strategy}: ${body.length} chars`);
+    return body;
+  } catch (err) {
+    console.warn('[news-insights] full-text fetch failed:', (err as Error)?.message?.slice(0, 200));
+    return '';
+  }
+}
+
+function cleanList(value: unknown, min: number, max: number): string[] {
+  return (Array.isArray(value) ? value : [])
+    .map(cleanLine)
+    .filter((line) => line.length >= min)
+    .slice(0, max);
+}
+
+/**
+ * Generates the modal's three sections for one article. Throws when no engine is configured, the
+ * call fails, or the answer is unusable — callers must surface that rather than substituting
  * boilerplate.
  */
 export async function generateArticleInsights(input: InsightsInput): Promise<ArticleInsights> {
-  if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+  if (!isInsightsConfigured()) throw new Error('no text engine configured');
 
   const title = String(input.title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
   if (title.length < 8) throw new Error('article title is missing or too short to analyze');
@@ -130,56 +206,66 @@ export async function generateArticleInsights(input: InsightsInput): Promise<Art
   const hit = readCache(key);
   if (hit) return { ...hit, cached: true };
 
-  // Full available text — the feed's `summary` is the real lede (see server/newsFeed.ts), with the
-  // shorter excerpt as a backstop. Capped so a long scrape can't blow the request up.
-  const body = String(input.summary || input.excerpt || '').replace(/\s+/g, ' ').trim().slice(0, 6000);
+  const teaser = String(input.summary || input.excerpt || '').replace(/\s+/g, ' ').trim();
+  const fetched = await fetchFullText(String(input.link || ''));
+  const fullText = fetched.length >= MIN_FULL_TEXT && fetched.length > teaser.length;
   const topic = String(input.topic || 'general');
   const lens = TOPIC_LENS[topic] ?? TOPIC_LENS.general;
+  // Paragraph breaks are kept — they tell the model where the publisher's own sections are.
+  const overhead = estimateTokens(SYSTEM_INSTRUCTION) + estimateTokens(title) + 350;
+  const body = fitToTokens(fullText ? fetched : teaser, TOKEN_WINDOW - OUTPUT_TOKENS - overhead);
 
   const prompt = `כותרת הכתבה:
 """
 ${title}
 """
 
-גוף הכתבה (כפי שסופק על ידי המקור):
+${fullText ? 'הטקסט המלא של הכתבה (נשלף מאתר המקור):' : 'תקציר הכתבה בלבד (הטקסט המלא לא היה זמין — כתוב פחות, אל תשלים מהדמיון):'}
 """
-${body || '(המקור סיפק כותרת בלבד — הסתמך עליה ועל הקטגוריה, ואל תמציא פרטים)'}
+${body || '(המקור סיפק כותרת בלבד — הסתמך עליה ואל תמציא פרטים)'}
 """
 
 מקור: ${String(input.source || 'לא צוין').slice(0, 80)}
 קטגוריה: ${topic}
-זווית הניתוח המבוקשת: ${lens}
+זווית הניתוח: ${lens}
 
-הפק את הניתוח לכתבה הספציפית הזאת בלבד.`;
+הפק את שלושת החלקים לכתבה הזאת בלבד.`;
 
-  const response = await generateContentWithRetry({
-    model: 'gemini-3.6-flash',
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    config: {
-      systemInstruction: `${SYSTEM_INSTRUCTION}
-
-${CONCISE_FACTUAL_RULES}`,
-      temperature: 0.55,
-      topP: 0.9,
-      responseMimeType: 'application/json',
+  const response = await generateContentWithRetry(
+    {
+      model: 'gemini-3.6-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        maxOutputTokens: OUTPUT_TOKENS,
+        temperature: 0.5,
+        topP: 0.9,
+        responseMimeType: 'application/json',
+      },
     },
-  });
+    { textOnly: true }
+  );
 
-  // requireText() distinguishes a safety block from a truncated answer; the bare JSON.parse below
-  // it used to throw a raw SyntaxError ("Unexpected end of JSON input") straight to the endpoint.
+  // requireText() distinguishes a safety block from a truncated answer, so the endpoint reports
+  // the real cause instead of a bare SyntaxError.
   const raw = stripCodeFence(requireText(response));
-  const parsed = parseJsonOrThrow<{ headline?: unknown; points?: unknown }>(raw, 'news insights');
-  const headline = cleanLine(parsed.headline);
-  const points = (Array.isArray(parsed.points) ? parsed.points : [])
-    .map(cleanLine)
-    .filter((p) => p.length >= 25)
-    .slice(0, 3);
+  const parsed = parseJsonOrThrow<Record<string, unknown>>(raw, 'news insights');
+  const executiveSummary = cleanList(parsed.executiveSummary, 15, 4);
+  const extendedArticle = cleanList(parsed.extendedArticle, 60, 3);
+  const mrDanielAnalysis = cleanLine(parsed.mrDanielAnalysis);
 
-  if (points.length < 3) throw new Error('model did not return 3 usable insights');
+  if (executiveSummary.length < 2 || extendedArticle.length < 1 || mrDanielAnalysis.length < 80) {
+    throw new Error('model did not return a usable summary / article / analysis');
+  }
 
-  // No filler headline: if the model omitted it the modal simply renders the points without a
-  // sub-heading, rather than printing a stock line that isn't about this story.
-  const value: ArticleInsights = { headline, points };
+  // No filler headline: if the model omitted it the modal renders the analysis without one.
+  const value: ArticleInsights = {
+    headline: cleanLine(parsed.headline),
+    executiveSummary,
+    extendedArticle,
+    mrDanielAnalysis,
+    fullText,
+  };
   writeCache(key, value);
   return value;
 }

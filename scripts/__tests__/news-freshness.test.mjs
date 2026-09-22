@@ -134,7 +134,13 @@ t('rules · the block declares it overrides earlier conflicts', /גובר על �
 const engine = readFileSync(new URL('../../src/agent/SocialAgentEngine.ts', import.meta.url), 'utf8');
 t('rules · news post drafting appends the block LAST', /\$\{baseInstruction\}\\n\\n\$\{CONCISE_FACTUAL_RULES\}/.test(engine));
 const insights = readFileSync(new URL('../../src/server/newsInsights.ts', import.meta.url), 'utf8');
-t('rules · the news-analysis path uses it too', /CONCISE_FACTUAL_RULES/.test(insights));
+// The analysis prompt inlines the concision contract instead of the full block: the shared blocks
+// cost ~4k tokens, which on Groq's 8k/min free tier truncated the three-section JSON.
+t('rules · the news-analysis path carries the concision contract inline', /בלי מילוי/.test(insights) && /בלי שאלות רטוריות/.test(insights) && /עובדתיים בלבד/.test(insights));
+t('rules · the news-analysis path keeps the audience block', /\$\{AUDIENCE_RULES\}/.test(insights));
+t('analysis · reads the FULL article, not the teaser', /importUrlContent\(link\)/.test(insights) && /resolveGoogleNewsUrl/.test(insights));
+t('analysis · the prompt is sized to the Groq window', /fitToTokens\(/.test(insights) && /maxOutputTokens: OUTPUT_TOKENS/.test(insights));
+t('analysis · returns the three modal sections', ['executiveSummary', 'extendedArticle', 'mrDanielAnalysis'].every((k) => insights.includes(k)));
 
 // ─── text generation never carries media ───────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp, LayoutTemplate, GraduationCap, AtSign, ImagePlus, Code2, Twitter, Sparkles, Radar } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp, LayoutTemplate, GraduationCap, AtSign, ImagePlus, Code2, Twitter, Sparkles, Radar, Box } from 'lucide-react';
 import { useAuthUser, logout } from './lib/auth';
 import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
 import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
@@ -51,7 +51,7 @@ const GROUPS = [
 type GroupId = (typeof GROUPS)[number]['id'];
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutGrid; group: GroupId }[] = [
-  { id: 'mission', label: 'Mission Control', icon: Radar, group: 'agents' },
+  { id: 'mission', label: 'משרד סוכנים 3D', icon: Radar, group: 'agents' },
   { id: 'grok', label: 'Grok · סטודיו X', icon: Sparkles, group: 'agents' },
   { id: 'overview', label: 'סקירה כללית', icon: LayoutGrid, group: 'analytics' },
   { id: 'visitors', label: 'מבקרים', icon: Users2, group: 'analytics' },
@@ -73,6 +73,19 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutGrid; group: GroupId }[
   { id: 'email', label: 'מערכת דיוור ומיילים', icon: Mail, group: 'growth' },
   { id: 'weekly-plan', label: 'לוח תוכן שבועי', icon: Calendar, group: 'growth' },
 ];
+
+/**
+ * Tab <-> URL hash, so a tab is linkable. `#office` (and `#mission`) opens the 3D agent office
+ * directly — the hash survives the login gate, so the link lands there right after sign-in.
+ */
+const HASH_ALIASES: Record<string, Tab> = { office: 'mission', '3d': 'mission' };
+
+function tabFromHash(): Tab | null {
+  const key = decodeURIComponent(window.location.hash.replace(/^#/, '')).trim();
+  if (!key) return null;
+  if (HASH_ALIASES[key]) return HASH_ALIASES[key];
+  return TABS.some((t) => t.id === key) ? (key as Tab) : null;
+}
 
 /** Live connection strip — Firebase realtime link + an independent 5s round-trip probe to the
  * production domain (mrdaniel.co.il/api/health). Makes the "no manual refresh needed" claim visible
@@ -116,7 +129,22 @@ export default function App() {
   const leads = useLeads();
   const signups = useNewsletterSignups();
   const connected = useFirebaseConnection();
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTabState] = useState<Tab>(() => tabFromHash() ?? 'overview');
+
+  function setTab(next: Tab) {
+    setTabState(next);
+    const hash = next === 'mission' ? '#office' : `#${next}`;
+    if (window.location.hash !== hash) window.history.replaceState(null, '', hash);
+  }
+
+  useEffect(() => {
+    const onHash = () => {
+      const next = tabFromHash();
+      if (next) setTabState(next);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   if (loading) {
     return (
@@ -139,6 +167,25 @@ export default function App() {
             <p className="text-zinc-500 text-sm mt-1">Live Analytics · דניאל בן ברוך</p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
+            {/* The 3D office used to be one pill among twenty. This is the direct way in. */}
+            <button
+              type="button"
+              onClick={() => setTab('mission')}
+              aria-current={tab === 'mission' ? 'page' : undefined}
+              className={`group inline-flex items-center gap-2.5 rounded-full border px-4 py-2 text-sm font-black transition-all cursor-pointer ${
+                tab === 'mission'
+                  ? 'border-lime-300/70 bg-lime-400 text-black shadow-[0_0_24px_-4px_rgba(163,230,53,0.7)]'
+                  : 'border-lime-400/50 bg-gradient-to-l from-lime-500/20 via-sky-500/10 to-fuchsia-500/20 text-lime-200 shadow-[0_0_20px_-6px_rgba(163,230,53,0.6)] hover:border-lime-300 hover:text-white'
+              }`}
+            >
+              <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime-300 opacity-70" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-lime-300" />
+              </span>
+              <Box className="h-4 w-4" />
+              משרד סוכנים 3D
+              <span className="font-mono text-[10px] font-bold opacity-70" dir="ltr">LIVE 3D AGENT OFFICE</span>
+            </button>
             <LiveStatus connected={connected} />
             <ExportControls leads={leads} events={events} health={health} />
             <button
