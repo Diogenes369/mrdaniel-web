@@ -150,18 +150,6 @@ function scrubResponse(res: GenContentRes): GenContentRes {
   return res;
 }
 
-/** Transient 5xx: two retries with a short widening gap. */
-const TRANSIENT_WAITS_MS = [700, 1800];
-/** Per-minute 429: three retries at 2s, 4s, 8s (plus jitter), stretched to Google's own retryDelay
- *  when it names a longer one — but only up to this cap, so a long wait is surfaced, not slept on.
- *
- *  The cap is 30s because the free tier's real ceiling is 5 RPM, and a genuine collision there comes
- *  back asking for ~22s (measured in production). At the old 15s cap that request was abandoned one
- *  second before the wait Google actually wanted, turning a recoverable collision into a user-facing
- *  error. Anything past 30s is a quota problem, not a throttle, and still surfaces. */
-const RATE_WAITS_MS = [2000, 4000, 8000];
-const MAX_RATE_WAIT_MS = 30000;
-
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const withJitter = (ms: number) => Math.round(ms * (0.8 + Math.random() * 0.4));
 
@@ -333,6 +321,12 @@ export interface GenerateOptions {
    * blocked by a quota that background work already spent.
    */
   textOnly?: boolean;
+  /**
+   * Which end of the free-tier waterfall to start from (see planLegs). `background` is for work no
+   * one is waiting on — feed translation — and starts on Groq's small model so it never drains the
+   * flash-lite daily quota that interactive agent calls depend on. Default `interactive`.
+   */
+  priority?: 'interactive' | 'background';
 }
 
 /**
@@ -355,94 +349,181 @@ function stripInlineData(params: GenContentReq): GenContentReq {
   return { ...params, contents: cleaned.filter((c) => (c?.parts ?? []).length > 0) } as GenContentReq;
 }
 
+// ─── free-tier waterfall ───────────────────────────────────────────────────────────────────────
+//
+// Every agent (dashboard studios, social agent, email, weekly plan, chat, X intel, translation)
+// asks for the general flash model. On the free tier that model allows ~20 requests a DAY for the
+// whole project, and Groq's main model 200k tokens a day — both gone by midday, after which every
+// agent 429'd. Free quotas are counted PER MODEL, and the same two keys expose models nothing else
+// spends. So a request for the general flash model is served by a waterfall of free models instead,
+// and the 20/day model is never called.
+//
+//   interactive (default) : gemini-3.1-flash-lite → gemini-3.5-flash-lite → Groq gpt-oss-120b
+//                           → Groq gpt-oss-20b
+//   background            : Groq gpt-oss-20b → Groq gpt-oss-120b → gemini-3.5-flash-lite
+//                           (feed translation runs every refresh; it must not drain the ~500/day
+//                           flash-lite quota the operator's clicks depend on)
+//   media in the payload  : the Gemini legs only (Groq cannot read images/video/audio)
+//
+// A request naming a SPECIFIC non-general model (TTS, image generation, Gemma) is sent to that model
+// as-is. GEMINI_FREE_CHAIN (comma-separated) overrides the Gemini legs.
+
+/** The Gemini legs, in order. Measured 2026-09-22: 3.1 ~6s with clean Hebrew, ~500 RPD; 3.5 has its
+ *  own ~500 RPD but 503s under load more often. */
+const GEMINI_FREE_CHAIN = (process.env.GEMINI_FREE_CHAIN?.split(',').map((s) => s.trim()).filter(Boolean)) ?? [
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
+];
+const GROQ_SMALL_MODEL = 'openai/gpt-oss-20b';
+
+/** "The general flash model" — what every agent asks for. Specialised variants (tts, image,
+ *  transcribe, computer-use) do not match and keep their own model. */
+function isGeneralFlashModel(model: string): boolean {
+  if (model === GEMINI_TEXT_MODEL) return true;
+  return /^gemini-(?:[\d.]+-)?flash(?:-lite)?(?:-latest|-preview)?$/.test(model);
+}
+
+type Leg = { provider: 'gemini' | 'groq'; model: string };
+
+function planLegs(requested: string, textOnly: boolean, priority: 'interactive' | 'background'): Leg[] {
+  if (!isGeneralFlashModel(requested)) return [{ provider: 'gemini', model: requested }];
+  const gemini: Leg[] = genAI ? GEMINI_FREE_CHAIN.map((model) => ({ provider: 'gemini' as const, model })) : [];
+  if (!textOnly || !isGroqConfigured()) return gemini;
+  const bigGroq: Leg = { provider: 'groq', model: GROQ_TEXT_MODEL };
+  const smallGroq: Leg = { provider: 'groq', model: GROQ_SMALL_MODEL };
+  if (priority === 'background') return [smallGroq, bigGroq, ...gemini.slice(-1)];
+  return [...gemini, bigGroq, smallGroq];
+}
+
 /**
- * One model call with the shared retry policy:
- *   - transient upstream 5xx (INTERNAL / UNAVAILABLE / overloaded / reset) → up to 2 retries;
- *   - per-minute 429 throttle → up to 3 retries with exponential backoff + jitter;
- *   - billing / daily-quota 429 → thrown immediately: nothing clears either within a request, and
- *     retrying only adds load and latency before the same answer;
- *   - any other 4xx / parse error → thrown immediately.
- * Every failed attempt is logged with its status and Google's error payload (logGeminiFailure).
+ * Per-instance cooldowns, keyed by provider:model. A spent DAILY quota benches the model until the
+ * next UTC midnight (when Google's and Groq's free quotas reset); a per-minute 429 for a minute; a
+ * 503 for 20s after one quick retry; a 404 (model withdrawn) for the rest of the day. The next
+ * request goes straight to a leg that can answer instead of re-hitting a known wall.
+ */
+const benchedUntil = new Map<string, number>();
+
+function nextUtcMidnight(): number {
+  const d = new Date();
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+}
+
+const legKey = (leg: Leg) => `${leg.provider}:${leg.model}`;
+
+function isLegBenched(leg: Leg): boolean {
+  const until = benchedUntil.get(legKey(leg));
+  if (!until) return false;
+  if (Date.now() < until) return true;
+  benchedUntil.delete(legKey(leg));
+  return false;
+}
+
+function benchLeg(leg: Leg, err: unknown): void {
+  const msg = err instanceof Error ? err.message : String(err);
+  const status = (err as { status?: unknown })?.status;
+  let until = 0;
+  if (leg.provider === 'gemini') {
+    const rate = detectGeminiRateLimit(err);
+    if (rate) until = rate.kind === 'rate' ? Date.now() + 60_000 : nextUtcMidnight();
+    else if (status === 404 || /\b404\b|NOT_FOUND|no longer available/i.test(msg)) until = nextUtcMidnight();
+    else if (TRANSIENT_UPSTREAM.test(msg)) until = Date.now() + 20_000;
+  } else if (/DAILY|per day|TPD/i.test(msg)) {
+    until = nextUtcMidnight();
+  } else if (/429|rate.?limit/i.test(msg)) {
+    until = Date.now() + 60_000;
+  }
+  if (until) benchedUntil.set(legKey(leg), until);
+}
+
+/** Which legs are cooling down in this runtime — for the health check. */
+export function modelBenchStatus(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, until] of benchedUntil) if (until > Date.now()) out[key] = new Date(until).toISOString();
+  return out;
+}
+
+async function runGeminiLeg(params: GenContentReq, model: string, options: GenerateOptions) {
+  if (!genAI) throw new Error(engineConfigReason() ?? 'GEMINI_API_KEY not configured');
+  for (let attempt = 1; ; attempt++) {
+    consumeDailyBudget(model);
+    await reserveCallSlot();
+    try {
+      const res = await genAI.models.generateContent({ ...params, model });
+      return options.scrub === false ? res : scrubResponse(res);
+    } catch (err) {
+      logGeminiFailure(`generateContent(${model})`, err, attempt);
+      // One quick retry on a transient 5xx — Google's free models 503 in short bursts. Anything
+      // else (a 429 of any kind, a 4xx) moves straight to the next leg instead of sleeping here.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (attempt === 1 && !detectGeminiRateLimit(err) && TRANSIENT_UPSTREAM.test(msg)) {
+        await sleep(withJitter(1500));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+/**
+ * One model call, served by the free-tier waterfall above. Each leg is tried once (a Gemini 503
+ * gets one quick retry); a failed leg is benched for as long as its failure means, and the next leg
+ * answers. Only when every leg fails is the LAST error thrown, unchanged, so callers' existing
+ * 429 / billing / safety classification keeps working.
  */
 export async function generateContentWithRetry(params: GenContentReq, options: GenerateOptions = {}) {
-  // ── provider routing ──────────────────────────────────────────────────────────────────────
-  //
-  // Groq is the primary engine for TEXT, Gemini for MULTIMODAL. The decision is made from the
-  // payload, never from an action name: a request carrying an `inlineData` part is an image, a PDF
-  // or an mp4, which Groq's chat endpoint cannot read. Deciding structurally means a multimodal
-  // action added later routes correctly with no list to remember to update.
-  //
-  // Why Groq first: Gemini's free tier throttles at a few requests per minute and
-  // `gemini-3.6-flash` returns `503 high demand` often enough to be user-facing (seen repeatedly in
-  // production on 2026-09-21). Groq answers the same Hebrew deck in under two seconds.
   // `textOnly: true` is the caller stating the answer is prose, so any media in the payload is
   // dead weight that would otherwise pin the call to Gemini. Strip first, then route.
   if (options.textOnly) params = stripInlineData(params);
   const textOnly = options.textOnly === true || isTextOnlyRequest(params as GeminiLikeRequest);
-  if (textOnly && isGroqConfigured()) {
-    try {
-      return await groqGenerate(params as GeminiLikeRequest, options);
-    } catch (err) {
-      // Groq failing must never take the action down while Gemini is available — fall through and
-      // let the Gemini path below serve it. Logged, so a provider outage is visible rather than
-      // showing up only as a latency change.
-      if (!genAI) throw err;
-      console.warn('[ai-router] groq failed, falling back to gemini:', (err as Error)?.message?.slice(0, 200));
-    }
-  }
+  const legs = planLegs(String(params.model), textOnly, options.priority ?? 'interactive');
 
-  if (!genAI) {
-    // No Gemini key. For text that is only reachable when Groq is also unconfigured or already
-    // failed; for multimodal it is the real answer, and the reason should say which.
+  if (!legs.length) {
     throw new Error(
       textOnly
         ? (groqConfigReason() ?? engineConfigReason() ?? 'no text engine configured')
         : (engineConfigReason() ?? 'GEMINI_API_KEY not configured (required for image/video input)')
     );
   }
-  let transientRetries = 0;
-  let rateRetries = 0;
-  for (let attempt = 1; ; attempt++) {
-    // Pacing sits inside the retry loop on purpose: a retry is another request against the same
-    // per-minute limit, so it waits its turn exactly like a first attempt. Both are outside the
-    // try, because a locally refused call is not a Gemini failure and must not be logged as one.
-    consumeDailyBudget(String(params.model));
-    await reserveCallSlot();
+
+  // When every leg is cooling down only briefly (a 503 burst or a per-minute 429 — common for
+  // media calls, which have no Groq legs), try them anyway rather than fail without calling anyone.
+  // Legs benched for the day stay skipped.
+  const allBenched = legs.every(isLegBenched);
+  const shortBench = (leg: Leg) => (benchedUntil.get(legKey(leg)) ?? 0) - Date.now() <= 90_000;
+
+  let lastError: unknown = null;
+  const skipped: string[] = [];
+  for (const leg of legs) {
+    // A single explicitly-named model is always attempted — there is nothing to fall back to.
+    if (legs.length > 1 && isLegBenched(leg) && !(allBenched && shortBench(leg))) {
+      skipped.push(legKey(leg));
+      continue;
+    }
     try {
-      const res = await genAI.models.generateContent(params);
-      return options.scrub === false ? res : scrubResponse(res);
+      const res =
+        leg.provider === 'gemini'
+          ? await runGeminiLeg(params, leg.model, options)
+          : await groqGenerate(params as GeminiLikeRequest, {
+              ...options,
+              model: leg.model,
+              // gpt-oss-20b spends its room on hidden reasoning at the default effort.
+              reasoningEffort: leg.model === GROQ_SMALL_MODEL ? 'low' : undefined,
+            });
+      if (skipped.length || lastError) console.info(`[ai-router] served by ${legKey(leg)}${skipped.length ? ` (benched: ${skipped.join(', ')})` : ''}`);
+      return res;
     } catch (err) {
-      logGeminiFailure(`generateContent(${params.model})`, err, attempt);
-      const rate = detectGeminiRateLimit(err);
-      // A text call that Gemini refuses — a 429 of ANY kind (per-minute throttle, spent daily
-      // quota, exhausted billing) or a transient outage — is served by Groq instead of surfacing.
-      // Only reached when Groq was not already tried above, i.e. when it is unconfigured or when
-      // its own attempt failed first; in both cases this is the last chance before the operator
-      // sees an error, so it is worth taking.
-      if (textOnly && isGroqConfigured()) {
-        const transient = TRANSIENT_UPSTREAM.test(err instanceof Error ? err.message : String(err));
-        if (rate || transient) {
-          try {
-            console.warn(`[ai-router] gemini ${rate ? `429/${rate.kind}` : 'transient'}, retrying on groq`);
-            return await groqGenerate(params as GeminiLikeRequest, options);
-          } catch (groqErr) {
-            console.warn('[ai-router] groq fallback also failed:', (groqErr as Error)?.message?.slice(0, 200));
-          }
-        }
-      }
-      if (rate) {
-        if (rate.kind !== 'rate' || rateRetries >= RATE_WAITS_MS.length) throw err;
-        const waitMs = Math.max(RATE_WAITS_MS[rateRetries], (rate.retryDelaySeconds ?? 0) * 1000);
-        if (waitMs > MAX_RATE_WAIT_MS) throw err;
-        rateRetries++;
-        await sleep(withJitter(waitMs));
-        continue;
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!TRANSIENT_UPSTREAM.test(msg) || transientRetries >= TRANSIENT_WAITS_MS.length) throw err;
-      await sleep(TRANSIENT_WAITS_MS[transientRetries++]);
+      lastError = err;
+      if (err instanceof GeminiPacedOutError) continue;
+      benchLeg(leg, err);
+      console.warn(`[ai-router] ${legKey(leg)} failed, trying next leg:`, (err as Error)?.message?.replace(/\s+/g, ' ').slice(0, 200));
     }
   }
+  if (lastError) throw lastError;
+  // Every leg was benched: report the soonest recovery rather than a bare failure.
+  const soonest = Math.min(...legs.map((l) => benchedUntil.get(legKey(l)) ?? Infinity));
+  throw new Error(
+    `429 all free models are cooling down (${skipped.join(', ')}); next one frees at ${Number.isFinite(soonest) ? new Date(soonest).toISOString() : 'unknown'} — RESOURCE_EXHAUSTED`
+  );
 }
 
 // ─── response contract ───────────────────────────────────────────────────────────────────────

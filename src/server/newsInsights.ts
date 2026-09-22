@@ -36,6 +36,8 @@ export interface ArticleInsights {
   mrDanielAnalysis: string;
   /** True when the full article body was fetched; false = written from the feed teaser only. */
   fullText: boolean;
+  /** Lead image found while fetching the article — the modal uses it when the feed item had none. */
+  image?: string;
   /** Present only on a cache hit — used for observability, never rendered. */
   cached?: boolean;
 }
@@ -308,14 +310,15 @@ ${input.body || '(המקור סיפק כותרת בלבד — הסתמך עלי�
  * The article's full body, fetched from the publisher. Bounded: the whole import (direct fetch,
  * then Jina Reader) races a budget so a slow origin can never eat the function's time.
  */
-async function fetchFullText(link: string): Promise<string> {
-  if (!/^https?:\/\//i.test(link)) return '';
+async function fetchFullText(link: string): Promise<{ body: string; image: string }> {
+  const none = { body: '', image: '' };
+  if (!/^https?:\/\//i.test(link)) return none;
   try {
     // Google-News mirror entries (Calcalist, Haaretz…) link to a news.google.com redirect whose
     // page is Google's consent wall — resolve it to the publisher's URL first.
     if (/^https?:\/\/news\.google\.com\//i.test(link)) {
       const resolved = await resolveGoogleNewsUrl(link, 5000);
-      if (!resolved) return '';
+      if (!resolved) return none;
       link = resolved;
     }
     const imported = await Promise.race([
@@ -324,10 +327,10 @@ async function fetchFullText(link: string): Promise<string> {
     ]);
     const body = imported?.body?.trim() ?? '';
     if (imported) console.info(`[news-insights] full text via ${imported.via}/${imported.strategy}: ${body.length} chars`);
-    return body;
+    return { body, image: /^https?:\/\//i.test(imported?.image ?? '') ? imported!.image : '' };
   } catch (err) {
     console.warn('[news-insights] full-text fetch failed:', (err as Error)?.message?.slice(0, 200));
-    return '';
+    return none;
   }
 }
 
@@ -374,7 +377,8 @@ export async function generateArticleInsights(input: InsightsInput): Promise<Art
   const run = (async () => {
     const started = Date.now();
     const teaser = String(input.summary || input.excerpt || '').replace(/\s+/g, ' ').trim();
-    const fetched = compactArticle(await fetchFullText(String(input.link || '')));
+    const page = await fetchFullText(String(input.link || ''));
+    const fetched = compactArticle(page.body);
     const fullText = fetched.length >= MIN_FULL_TEXT && fetched.length > teaser.length;
     // Paragraph breaks are kept — they tell the model where the publisher's own sections are.
     const article = fullText ? fetched : teaser;
@@ -402,7 +406,7 @@ export async function generateArticleInsights(input: InsightsInput): Promise<Art
       const t0 = Date.now();
       try {
         const raw = await callEngine(engine, buildPrompt({ ...meta, body: fitToTokens(article, budget) }), Math.min(left, 60_000));
-        const value = toInsights(raw, fullText);
+        const value = { ...toInsights(raw, fullText), ...(page.image ? { image: page.image } : {}) };
         console.info(`[news-insights] ${engine.id} answered in ${Date.now() - t0}ms (fullText=${fullText})`);
         writeCache(key, value);
         return value;

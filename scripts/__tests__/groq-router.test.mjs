@@ -157,10 +157,17 @@ t('an empty turn is dropped rather than sent blank', toGroqMessages({ contents: 
 // ─── the router's wiring ───────────────────────────────────────────────────────────────────────
 
 const client = readFileSync(new URL('../../src/agent/geminiClient.ts', import.meta.url), 'utf8');
-t('the router asks Groq first for text', /if \(textOnly && isGroqConfigured\(\)\)[\s\S]{0,200}groqGenerate/.test(client));
-t('a Groq failure falls through to Gemini', /catch \(err\)[\s\S]{0,600}falling back to gemini/.test(client));
-t('a Gemini 429 falls back to Groq', /if \(textOnly && isGroqConfigured\(\)\)[\s\S]{0,400}retrying on groq/.test(client));
-t('the Gemini fallback covers transient outages too', /const transient = TRANSIENT_UPSTREAM\.test/.test(client));
+// Free-tier waterfall (2026-09-22): the 20/day general flash model is never called; free
+// flash-lite models serve interactive calls first, Groq serves text after them, and background
+// work (translation) starts on Groq's small model so it cannot drain the flash-lite quota.
+t('interactive text starts on free flash-lite, then Groq', /if \(priority === 'background'\) return \[smallGroq, bigGroq, \.\.\.gemini\.slice\(-1\)\];\s*return \[\.\.\.gemini, bigGroq, smallGroq\];/.test(client));
+t('the Gemini legs are the free flash-lite models', /'gemini-3\.1-flash-lite',\s*'gemini-3\.5-flash-lite'/.test(client));
+t('the general flash model is swapped, specialised models are not', /function isGeneralFlashModel/.test(client) && /if \(!isGeneralFlashModel\(requested\)\) return \[\{ provider: 'gemini', model: requested \}\]/.test(client));
+t('media never routes to Groq', /if \(!textOnly \|\| !isGroqConfigured\(\)\) return gemini;/.test(client));
+t('a spent daily quota benches the model until UTC midnight', /rate\.kind === 'rate' \? Date\.now\(\) \+ 60_000 : nextUtcMidnight\(\)/.test(client));
+t('a failed leg falls through to the next one', /benchLeg\(leg, err\);[\s\S]{0,200}trying next leg/.test(client));
+t('the last error is rethrown unchanged', /if \(lastError\) throw lastError;/.test(client));
+t('feed translation is background priority', /priority: 'background'/.test(readFileSync(new URL('../../src/server/newsTranslate.ts', import.meta.url), 'utf8')));
 t('multimodal without a Gemini key reports the real reason', /required for image\/video input/.test(client));
 
 const groq = readFileSync(new URL('../../src/agent/groqClient.ts', import.meta.url), 'utf8');
@@ -187,9 +194,9 @@ t('Groq has its own 429 retry policy', /RATE_WAITS_MS/.test(groq) && /retry-afte
 // whole-file indexOf would compare against its declaration rather than against its call site.
 const routerBody = client.slice(client.indexOf('export async function generateContentWithRetry'));
 t(
-  'the Groq path returns before the Gemini pacing guards',
-  routerBody.indexOf('groqGenerate(params as GeminiLikeRequest, options)') < routerBody.indexOf('consumeDailyBudget('),
-  'groq is routed after the gemini pacing gate, so it would burn a Gemini budget slot'
+  'Groq legs never touch the Gemini pacing / budget guards',
+  !/consumeDailyBudget\(/.test(routerBody.slice(0, routerBody.indexOf('// ─── response contract'))) && /async function runGeminiLeg[\s\S]{0,300}consumeDailyBudget\(model\)/.test(client),
+  'the budget gate must live only inside the Gemini leg'
 );
 
 for (const [state, label, detail] of results) console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);

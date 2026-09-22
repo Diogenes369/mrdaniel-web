@@ -95,6 +95,11 @@ export default function NewsImage({
 }) {
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>(src ? 'loading' : 'error');
   const [contain, setContain] = useState(false);
+  // Hotlink-protected origins (TechTime answers 403 to a cross-site <img>) load fine through the
+  // same-origin relay, which fetches with the publisher's own Referer. One retry through it before
+  // painting the fallback plate.
+  const [viaProxy, setViaProxy] = useState(false);
+  const shown = src && viaProxy ? `/api/img-proxy?url=${encodeURIComponent(src)}` : src;
 
   const fallback = useMemo(() => platePng(topic, seed || src || topic), [topic, seed, src]);
 
@@ -113,7 +118,7 @@ export default function NewsImage({
 
   return (
     <img
-      src={src}
+      src={shown}
       alt=""
       loading="lazy"
       decoding="async"
@@ -128,7 +133,10 @@ export default function NewsImage({
         setContain(ratio > 0 && ratio < 0.92);
         setStatus('ok');
       }}
-      onError={() => setStatus('error')}
+      onError={() => {
+        if (!viaProxy && src && /^https?:\/\//i.test(src)) setViaProxy(true);
+        else setStatus('error');
+      }}
       className={`absolute inset-0 h-full w-full ${
         contain ? 'object-contain bg-black/40' : 'object-cover object-center'
       } ${status === 'ok' ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 ${className}`}

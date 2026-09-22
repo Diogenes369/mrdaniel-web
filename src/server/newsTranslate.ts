@@ -114,7 +114,9 @@ async function translateChunk(targets: TranslateTarget[]): Promise<Map<string, T
       topP: 0.9,
       responseMimeType: 'application/json',
     },
-  });
+    // Runs on every feed refresh with nobody waiting on it: start on Groq's small model so it never
+    // drains the flash-lite daily quota the dashboard agents depend on (see planLegs).
+  }, { priority: 'background' });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow<{ items?: Array<{ id?: unknown; title?: unknown; summary?: unknown }> }>(

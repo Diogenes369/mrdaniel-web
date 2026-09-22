@@ -256,9 +256,39 @@ const OG_IMAGE_RES = [
   /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
   /<meta[^>]+property=["']article:image["'][^>]+content=["']([^"']+)["']/i,
   /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']article:image["']/i,
-  /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
+  /<meta[^>]+(?:name|property)=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
+  /<meta[^>]+content=["']([^"']+)["'][^>]+(?:name|property)=["']twitter:image(?::src)?["']/i,
+  /<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i,
   /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
+  // JSON-LD NewsArticle.image — a string, an ImageObject, or an array of either.
+  /"image"\s*:\s*(?:\[\s*)?(?:\{[^{}]*?"url"\s*:\s*)?"(https?:[^"]+?\.(?:jpe?g|png|webp|avif)(?:\?[^"]*)?)"/i,
 ];
+
+/** Last resort when the page declares no share image at all: the first real <img> inside the
+ *  article body (lazy-load attributes first — those hold the real URL, `src` is often a 1×1). */
+const BODY_IMG_RE = /<img\b[^>]*?\s(?:data-src|data-lazy-src|data-original|src)=["']([^"']+)["'][^>]*>/gi;
+
+function pickBodyImage(html: string, baseUrl: string): string | undefined {
+  const start = html.search(/<article\b|itemprop=["']articleBody["']|class=["'][^"']*(?:article-body|entry-content|post-content|article__body)/i);
+  const region = start >= 0 ? html.slice(start, start + 200_000) : '';
+  if (!region) return undefined;
+  for (const m of region.matchAll(BODY_IMG_RE)) {
+    let candidate = m[1].trim().replace(/&amp;/g, '&');
+    if (candidate.startsWith('data:')) continue;
+    if (candidate.startsWith('//')) candidate = `https:${candidate}`;
+    try {
+      candidate = new URL(candidate, baseUrl).toString();
+    } catch {
+      continue;
+    }
+    if (!/^https?:\/\//i.test(candidate) || JUNK_IMAGE_RE.test(candidate)) continue;
+    if (/\b(?:logo|avatar|icon|sprite|pixel|spacer|author|profile)\b/i.test(candidate)) continue;
+    const upscaled = upscaleImageUrl(candidate);
+    if (isTooSmallByUrl(upscaled)) continue;
+    return upscaled;
+  }
+  return undefined;
+}
 
 function safeHost(u: string): string {
   try {
@@ -288,7 +318,7 @@ function pickOgImage(html: string, baseUrl: string): string | undefined {
     if (isTooSmallByUrl(upscaled)) continue;
     return upscaled;
   }
-  return undefined;
+  return pickBodyImage(html, baseUrl);
 }
 
 // Optional Jina Reader key (https://jina.ai/reader) — lifts the anonymous rate limit. Works
@@ -387,7 +417,35 @@ export async function resolveGoogleNewsUrl(link: string, timeoutMs = 3500): Prom
  * `og:image` (see `fetchOgImage`). Concurrency-limited AND under a single overall deadline so a
  * batch of slow/blocked outlets can never balloon the `/api/news` refresh — whatever's filled
  * when the clock runs out is kept. Best-effort: any individual failure is silently skipped. */
-async function enrichImages(items: NewsItem[], limit = 36, overallMs = 9_000): Promise<void> {
+/**
+ * Article link → recovered lead image, kept across refreshes on a warm instance. Resolving a
+ * Google-News redirect and scraping the page costs ~1–3s per item, so a single 9s refresh window
+ * only ever covered part of the imageless items (≈40 Google-News entries had none on 2026-09-22).
+ * With this, every refresh starts from what the previous ones found and only spends its window on
+ * items nobody has tried yet — coverage grows refresh over refresh instead of resetting.
+ */
+const OG_CACHE_MAX = 600;
+const ogImageCache = new Map<string, string>();
+
+function rememberOgImage(link: string, image: string) {
+  if (ogImageCache.size >= OG_CACHE_MAX) {
+    const oldest = ogImageCache.keys().next().value;
+    if (oldest) ogImageCache.delete(oldest);
+  }
+  ogImageCache.set(link, image);
+}
+
+async function enrichImages(items: NewsItem[], limit = 90, overallMs = 9_000): Promise<void> {
+  let fromCache = 0;
+  for (const it of items) {
+    const cached = !it.image && ogImageCache.get(it.link);
+    if (cached) {
+      it.image = cached;
+      fromCache++;
+    }
+  }
+  if (fromCache) console.info(`[news] og:image cache — ${fromCache} items filled without a fetch`);
+
   // Google-News entries link to a news.google.com redirect (fetching it directly just yields
   // Google's consent-wall og:image), so those are resolved to the publisher URL first. They were
   // skipped outright until 2026-09-22 — which left every Calcalist / Geektime / Haaretz item bare.
@@ -409,11 +467,12 @@ async function enrichImages(items: NewsItem[], limit = 36, overallMs = 9_000): P
       if (og && !assigned.has(og)) {
         it.image = og;
         assigned.add(og);
+        rememberOgImage(it.link, og);
         filled++;
       }
     }
   };
-  const run = Promise.all(Array.from({ length: Math.min(8, targets.length) }, worker));
+  const run = Promise.all(Array.from({ length: Math.min(12, targets.length) }, worker));
   await Promise.race([run, new Promise((r) => setTimeout(r, overallMs + 500))]);
   console.info(
     `[news] og:image enrichment — filled ${filled}/${targets.length} imageless items in ${Date.now() - (deadline - overallMs)}ms`,

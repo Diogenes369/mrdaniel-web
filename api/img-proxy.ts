@@ -4,7 +4,9 @@
 //
 // SSRF guards: http(s) only, private / link-local / loopback hosts blocked, response must be an
 // `image/*` content-type (or sniff as a known image format), hard size cap and request timeout.
-// The dashboard is auth-gated and the only caller; this is not a general-purpose proxy.
+// Callers: the dashboard (canvas rendering) and the public site's NewsImage, which retries a
+// hotlink-blocked news photo through here once before showing its fallback plate. Responses are
+// edge-cached for a week, so a given photo is fetched from the origin roughly once.
 
 const BLOCKED_HOST =
   /^(localhost|0\.0\.0\.0|\[?::1\]?|127(\.\d{1,3}){3}|10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|169\.254(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2})$/i;

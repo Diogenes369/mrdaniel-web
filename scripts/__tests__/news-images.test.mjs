@@ -105,7 +105,9 @@ const newsImageCode = newsImage.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]
 t('NewsImage never returns null any more', !/return null/.test(newsImageCode), 'a null return path is back');
 t('the no-source path paints the plate', /if \(!src \|\| status === 'error'\)[\s\S]{0,200}src=\{fallback\}/.test(newsImage));
 t('the 400x300 floor is still enforced', /naturalWidth < MIN_W \|\| el\.naturalHeight < MIN_H/.test(newsImage));
-t('onError still routes to the plate', /onError=\{\(\) => setStatus\('error'\)\}/.test(newsImage));
+// A failed load retries once through the same-origin relay (hotlink-blocked origins), then plates.
+t('onError retries via the proxy once, then routes to the plate', /if \(!viaProxy && src[^)]*\)\) setViaProxy\(true\);\s*else setStatus\('error'\);/.test(newsImage));
+t('the retry goes through the same-origin image relay', /\/api\/img-proxy\?url=\$\{encodeURIComponent\(src\)\}/.test(newsImage));
 
 for (const f of ['src/components/news/NewsCards.tsx', 'src/components/news/ArticleModal.tsx']) {
   const src = readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8');

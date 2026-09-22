@@ -18,6 +18,8 @@ export interface ArticleInsights {
   mrDanielAnalysis: string;
   /** False when the server could not reach the article and wrote from the feed teaser. */
   fullText: boolean;
+  /** Lead image the server found on the article page, if any. */
+  image?: string;
 }
 
 interface AnalyzeResponse {
@@ -38,7 +40,8 @@ function normalize(raw: unknown): ArticleInsights | null {
   const extendedArticle = cleanList(value?.extendedArticle, 3);
   const mrDanielAnalysis = clean(value?.mrDanielAnalysis);
   if (!executiveSummary.length && !extendedArticle.length && !mrDanielAnalysis) return null;
-  return { headline: clean(value?.headline), executiveSummary, extendedArticle, mrDanielAnalysis, fullText: value?.fullText === true };
+  const image = typeof value?.image === 'string' && /^https?:\/\//i.test(value.image) ? value.image : undefined;
+  return { headline: clean(value?.headline), executiveSummary, extendedArticle, mrDanielAnalysis, fullText: value?.fullText === true, image };
 }
 
 export async function fetchArticleInsights(item: NewsItem): Promise<ArticleInsights> {

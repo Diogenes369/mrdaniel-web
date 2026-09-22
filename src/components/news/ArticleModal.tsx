@@ -119,7 +119,9 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
         <header className="relative aspect-[16/9] w-full overflow-hidden sm:aspect-[2/1]">
           <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
           <Icon className="pointer-events-none absolute -bottom-6 -left-4 h-40 w-40 text-white/[0.06]" aria-hidden="true" />
-          <NewsImage src={item.image} topic={item.topic} seed={item.id} />
+          {/* The feed item may have come without a photo; the analysis fetch reads the article page
+              and brings its lead image back. Keyed so the component remounts on the swap. */}
+          <NewsImage key={item.image || ai?.image || 'none'} src={item.image || ai?.image} topic={item.topic} seed={item.id} />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/55 to-transparent" aria-hidden="true" />
 
           <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
@@ -155,8 +157,14 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
 
         <div dir="rtl" className="space-y-8 p-5 text-right pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:p-7">
           {/* Full-text status — tells the reader whether what follows came from the whole article. */}
+          {/* A normal block in the stack — the negative bottom margin it used to carry pulled the
+              "תקציר מנהלים" heading up underneath it while loading. */}
           {(insights.isPending || ai) && (
-            <p dir="rtl" className="-mb-4 flex items-center gap-2 text-right text-[11.5px] font-semibold text-zinc-500">
+            <p
+              dir="rtl"
+              role="status"
+              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-right text-[11.5px] font-semibold leading-snug text-zinc-400"
+            >
               {insights.isPending ? (
                 <><Loader2 className="h-3.5 w-3.5 animate-spin text-[#9FE870]" aria-hidden="true" /> קורא את הכתבה המלאה מאתר המקור…</>
               ) : (
