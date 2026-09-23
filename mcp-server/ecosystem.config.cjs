@@ -2,8 +2,49 @@
 // loads ecosystem files as CommonJS (same reason as whatsapp-server/ecosystem.config.cjs).
 // The MCP server itself is NOT listed: stdio servers are spawned by their client (Claude Desktop /
 // Claude Code) per session, not kept running.
+const path = require('node:path');
+const fs = require('node:fs');
+
+// Hermes Agent's Telegram gateway (2026-09-23). Moved under PM2 for crash recovery; it used to be
+// started at logon by Hermes's own scheduled task `Hermes_Gateway`, which is now DISABLED — two
+// gateways polling one Telegram bot fight each other (409 Conflict). The command and environment
+// below are copied from Hermes's own launcher (%LOCALAPPDATA%\hermes\gateway-service\
+// Hermes_Gateway.cmd); if a Hermes update changes that launcher, mirror the change here.
+// Skipped entirely on a machine without Hermes, so this file still works anywhere.
+const HERMES_HOME = process.env.HERMES_HOME || path.join(process.env.LOCALAPPDATA || '', 'hermes');
+const HERMES_AGENT = path.join(HERMES_HOME, 'hermes-agent');
+const HERMES_PY = path.join(HERMES_AGENT, 'venv', 'Scripts', 'python.exe');
+const hermesApp = fs.existsSync(HERMES_PY)
+  ? [
+      {
+        name: 'hermes-gateway',
+        script: HERMES_PY,
+        args: ['-m', 'hermes_cli.main', 'gateway', 'run'],
+        interpreter: 'none',
+        cwd: HERMES_HOME,
+        autorestart: true,
+        watch: false,
+        exp_backoff_restart_delay: 2000,
+        min_uptime: '60s',
+        max_restarts: 1_000_000,
+        // Long polling reconnects cleanly; give in-flight replies a moment on stop/restart.
+        kill_timeout: 10000,
+        windowsHide: true,
+        env: {
+          HERMES_HOME,
+          PYTHONIOENCODING: 'utf-8',
+          HERMES_GATEWAY_DETACHED: '1',
+          HERMES_SUPERVISED_CHILD: '1',
+          VIRTUAL_ENV: path.join(HERMES_AGENT, 'venv'),
+          PYTHONPATH: HERMES_AGENT,
+        },
+      },
+    ]
+  : [];
+
 module.exports = {
   apps: [
+    ...hermesApp,
     {
       name: 'mrdaniel-agent',
       script: 'start-agent.js',
