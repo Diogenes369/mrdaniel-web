@@ -104,15 +104,21 @@ async function plannedTopicForToday(db) {
   return today?.topic ? String(today.topic) : null;
 }
 
-/** Fallback rotation when there is no plan — one topic per weekday, stable across restarts. */
+/**
+ * Fallback rotation when there is no plan — one topic per weekday (Sunday first), stable across
+ * restarts. AI-only since 2026-09-23: the previous list still carried cloud-security, backups and
+ * dashboard-metrics topics from before the 2026-09-21 pivot, and the stale `weekly_plan` it sat
+ * behind produced a "wifi7-networking" draft. Topics name no model version on purpose — the draft
+ * engine reads the live news, and a hard-coded "GPT-6" here would age within weeks.
+ */
 const ROTATION = [
-  'סוכני AI שמחליפים משימה ידנית אחת בעסק קטן',
-  'טעות אבטחה אחת שכמעט כל עסק קטן עושה בחשבונות הענן',
-  'אוטומציה עם n8n או Make שחוסכת שעה ביום',
-  'איך לבדוק שהגיבויים שלכם באמת עובדים',
-  'Prompt injection: למה סוכן AI עם גישה למייל הוא סיכון',
-  'המדדים שבאמת צריך לראות בדשבורד של אתר עסקי',
-  'מה לבדוק לפני שמחברים כלי AI לנתוני לקוחות',
+  'סוכני AI אוטונומיים: משימה אחת שאפשר להעביר לסוכן כבר השבוע',
+  'איך כמה מודלי AI עובדים יחד על משימה אחת, ומתי זה שווה את זה',
+  'פרומפט טוב בחמש שורות: המבנה שחוזר בכל פרומפט שעובד',
+  'AI בעסק קטן: איפה הוא חוסך זמן באמת, ואיפה עדיף לוותר',
+  'מה המודל החדש ביותר יודע לעשות שהקודם לא ידע, בדוגמה אחת מהחיים',
+  'AI שרץ על המחשב שלכם: מתי מודל מקומי עדיף על ענן',
+  'Prompt injection: למה סוכן AI עם גישה למייל צריך גבולות',
 ];
 
 /**

@@ -7,8 +7,8 @@
  *   • Guides — STATIC_GUIDES (src/server/leadMagnets.ts). Always available; a guide added there
  *     shows up on the homepage on the next sync with no other edit.
  *   • X @mrdaniel_ai — getXFeed() (src/server/xFeed.ts): free syndication → Grok x_search →
- *     Firebase snapshot. Often EMPTY today: the free endpoint answers 429 and the xAI team has no
- *     credits (403). The leg is wired, so it starts returning posts the day either path opens.
+ *     Firebase snapshot. DISABLED by default since 2026-09-23 (see xLegEnabled): the Grok leg is
+ *     paid. Set SOCIAL_SYNC_X=1 to turn it back on; nothing else needs to change.
  *   • Linktree linktr.ee/mrdaniel.ai — public page; the link list is embedded JSON. Only CONTENT
  *     links are kept (a guide, an article, a video) — profile links (X, Instagram, Threads, TikTok,
  *     LinkedIn, Spotify, the site root) are navigation, not content, and are dropped. As of the probe
@@ -51,6 +51,16 @@ export interface CreatorFeed {
 function ttlMs(): number {
   const min = Number(process.env.SOCIAL_SYNC_TTL_MIN);
   return (Number.isFinite(min) && min >= 5 ? min : 60) * 60_000;
+}
+
+/**
+ * The X leg is OFF unless `SOCIAL_SYNC_X=1` (decided 2026-09-23). Its fallback path is Grok
+ * `x_search`, billed per post fetched, and the operator does not want paid X/xAI usage. Off means
+ * no request at all — not a request whose result is thrown away — and `sources.x.via` reports
+ * `disabled`, so the dashboard shows it as a choice rather than an outage.
+ */
+function xLegEnabled(): boolean {
+  return process.env.SOCIAL_SYNC_X === '1';
 }
 
 /** Hosts whose links on the tree are profiles (navigation), not content. */
@@ -141,8 +151,9 @@ async function linktree(): Promise<{ items: CreatorItem[]; error?: string }> {
 /** One sync run. Never throws. */
 export async function runSocialSync(): Promise<CreatorFeed> {
   const g = guides();
+  const xOn = xLegEnabled();
   const [x, lt] = await Promise.all([
-    getXFeed().catch(() => null),
+    xOn ? getXFeed().catch(() => null) : Promise.resolve(null),
     linktree(),
   ]);
   const posts: CreatorItem[] = (x?.posts ?? [])
@@ -155,7 +166,7 @@ export async function runSocialSync(): Promise<CreatorFeed> {
     items: [...posts, ...lt.items, ...g],
     sources: {
       guides: { ok: true, count: g.length },
-      x: { ok: posts.length > 0, count: posts.length, via: x?.source ?? 'error' },
+      x: { ok: posts.length > 0, count: posts.length, via: xOn ? x?.source ?? 'error' : 'disabled' },
       linktree: { ok: !lt.error, count: lt.items.length, ...(lt.error ? { error: lt.error } : {}) },
       linkedin: { ok: false, reason: 'authwall' },
     },
@@ -166,14 +177,17 @@ export async function runSocialSync(): Promise<CreatorFeed> {
   // Only overwrite the snapshot when this run found at least as much external content as it holds
   // — a run where X and Linktree both failed must not erase posts the last good run found.
   const snap = await readSyncSnapshot('creator_feed_snapshot');
-  const snapExternal = Array.isArray(snap?.items) ? (snap!.items as CreatorItem[]).filter((i) => i.kind !== 'guide').length : 0;
+  // With the X leg switched off, old posts in the snapshot are not "content the last run found" but
+  // content the operator turned off — they must not be kept alive by this comparison.
+  const keepKind = (i: CreatorItem) => i.kind !== 'guide' && (xOn || i.kind !== 'post');
+  const snapExternal = Array.isArray(snap?.items) ? (snap!.items as CreatorItem[]).filter(keepKind).length : 0;
   const external = posts.length + lt.items.length;
   if (external >= snapExternal || !snap) {
     await writeSyncSnapshot('creator_feed_snapshot', feed as unknown as Record<string, unknown>);
     return feed;
   }
   // Keep the snapshot's posts/links, but always the live guide list (it is code, never stale).
-  const kept = (snap!.items as CreatorItem[]).filter((i) => i.kind !== 'guide');
+  const kept = (snap!.items as CreatorItem[]).filter(keepKind);
   return { ...feed, items: [...kept, ...g], source: 'snapshot' };
 }
 

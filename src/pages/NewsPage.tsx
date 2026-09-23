@@ -14,6 +14,7 @@ import {
 import { PageHero } from '../components/content/ContentPrimitives';
 import WebButton from '../components/WebButton';
 import ArticleModal from '../components/news/ArticleModal';
+import TodayTermsSection from '../components/home/TodayTermsSection';
 import { NewsHeroCard, NewsGridCard } from '../components/news/NewsCards';
 import { filterCommandCenter } from '../lib/newsAnalysis';
 import { prefersReducedMotion } from '../lib/gsap';
@@ -288,6 +289,9 @@ export default function NewsPage() {
           </>
         )}
       </div>
+
+      {/* Below the grid on purpose: the stories stay the first thing on this page. */}
+      <TodayTermsSection id="news-ai-terms" compact />
 
       <ArticleModal item={active} onClose={() => setActive(null)} />
     </div>
