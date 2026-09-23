@@ -111,15 +111,23 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
   //     resolve those rows to LTR and flip the whole line to the left. Forcing RTL keeps every
   //     row aligned; embedded English / acronyms / numbers still sit correctly inline (isolated).
   //   • stamp   dir="ltr" — "27.08 · 19:24" never flips; rendered as a subtle pill badge.
-  const Item = ({ row }: { row: TickerRow }) => (
+  //
+  // A render FUNCTION, not a nested component: `const Item = () => …` declared in the body is a new
+  // component type on every render, so React unmounted and remounted every button each time the
+  // ticker re-rendered (e.g. when the modal opened). `focusable: false` is for the marquee's
+  // duplicate group, which is aria-hidden — a hidden subtree must not hold tab stops, or keyboard
+  // users tab through every headline twice and screen readers land on controls they cannot hear.
+  const renderItem = (row: TickerRow, key: string, focusable = true, truncate = false) => (
     <button
+      key={key}
       type="button"
       onClick={() => openRow(row)}
+      tabIndex={focusable ? undefined : -1}
       dir="rtl"
-      className="group inline-flex items-center gap-2.5 leading-none text-[13px] md:text-sm text-zinc-300 hover:text-brand-300 transition-colors [unicode-bidi:isolate]"
+      className="group inline-flex min-w-0 items-center gap-2.5 leading-none text-[13px] md:text-sm text-zinc-300 hover:text-brand-300 transition-colors [unicode-bidi:isolate]"
     >
       <span className="text-brand-500 select-none" aria-hidden="true">•</span>
-      <bdi dir="rtl" className="whitespace-nowrap [unicode-bidi:isolate]">
+      <bdi dir="rtl" className={`${truncate ? 'truncate' : 'whitespace-nowrap'} [unicode-bidi:isolate]`}>
         {row.title}
       </bdi>
       {row.stamp && (
@@ -161,34 +169,17 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
       <div className="pointer-events-none absolute left-0 inset-y-0 z-10 w-10 bg-gradient-to-r from-carbon-950 to-transparent" />
 
       {reduced ? (
+        // Static strip for reduced motion. These were plain <span>s, so a visitor with reduced
+        // motion enabled could see the headlines but not open any of them.
         <div className="flex gap-7 overflow-hidden whitespace-nowrap py-2 pr-24 pl-4" dir="rtl">
-          {rows.slice(0, 6).map((row) => (
-            <span
-              key={row.id}
-              dir="rtl"
-              className="inline-flex items-center gap-2.5 text-[13px] md:text-sm text-zinc-300 [unicode-bidi:isolate]"
-            >
-              <span className="text-brand-500 select-none" aria-hidden="true">•</span>
-              <bdi dir="rtl" className="truncate [unicode-bidi:isolate]">{row.title}</bdi>
-              {row.stamp && (
-                <span
-                  dir="ltr"
-                  className="shrink-0 rounded-full border border-brand-500/25 bg-brand-500/10 px-2 py-0.5 text-[10px] md:text-[11px] font-mono text-brand-300/90 [unicode-bidi:isolate]"
-                >
-                  {row.stamp}
-                </span>
-              )}
-            </span>
-          ))}
+          {rows.slice(0, 6).map((row) => renderItem(row, row.id, true, true))}
         </div>
       ) : (
         <div className="news-ticker__viewport py-2" dir="ltr">
           <div className="news-ticker__track" style={{ animationDuration }}>
             {[0, 1].map((dup) => (
               <div className="news-ticker__group" key={dup} aria-hidden={dup === 1}>
-                {marqueeRows.map((row, i) => (
-                  <Item key={`${dup}-${i}-${row.id}`} row={row} />
-                ))}
+                {marqueeRows.map((row, i) => renderItem(row, `${dup}-${i}-${row.id}`, dup === 0))}
               </div>
             ))}
           </div>

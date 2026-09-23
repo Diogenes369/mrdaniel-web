@@ -40,6 +40,8 @@ import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import AccessibilityPage from './pages/AccessibilityPage';
 import GuideDownloadPage from './pages/GuideDownloadPage';
+import NotFoundPage from './pages/NotFoundPage';
+import ErrorBoundary, { PageErrorFallback } from './components/ErrorBoundary';
 
 function RouteScrollManager() {
   const { pathname } = useLocation();
@@ -113,7 +115,10 @@ export default function App() {
     >
       <RouteScrollManager />
       <RouteSeo />
-      <Suspense fallback={null}>{sceneReady && sceneAllowed && <Scene3D />}</Suspense>
+      {/* Decorative: if the chunk fails to load or WebGL throws, the page simply has no scene. */}
+      <ErrorBoundary name="scene3d" fallback={null}>
+        <Suspense fallback={null}>{sceneReady && sceneAllowed && <Scene3D />}</Suspense>
+      </ErrorBoundary>
       <ScrollProgress />
       {/* Live headline ticker: very top of the layout, above the header, in normal document
           flow, DESKTOP ONLY (the component is `hidden md:block`). It scrolls away with the page;
@@ -122,6 +127,7 @@ export default function App() {
       <NewsTicker placement="top" />
       <Header />
       <main key={location.pathname} className="relative z-[1] w-full max-w-full overflow-x-clip">
+        <ErrorBoundary name="route" resetKey={location.pathname} fallback={(reset) => <PageErrorFallback onRetry={reset} />}>
         <Routes location={location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
@@ -138,8 +144,9 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/accessibility" element={<AccessibilityPage />} />
-          <Route path="*" element={<HomePage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </ErrorBoundary>
       </main>
       <div className="relative z-[1]">
         <Footer />

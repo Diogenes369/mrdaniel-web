@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ExternalLink, Clock, BookOpen, ListChecks, Radar, Sparkles, BrainCircuit, Newspaper, Loader2, FileText, type LucideIcon } from 'lucide-react';
@@ -77,6 +77,16 @@ export default function ArticleModal({ item, onClose }: { item: NewsItem | null;
 }
 
 function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
+  // Focus moves INTO the dialog when it opens and back to whatever opened it (the ticker headline,
+  // the news card) when it closes. Without this a keyboard user opened the modal and kept tabbing
+  // through the page underneath it, and after Escape was dropped back at the top of the document.
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus({ preventScroll: true });
+    return () => opener?.focus({ preventScroll: true });
+  }, []);
+
   const t = TOPIC[item.topic] ?? TOPIC.general;
   const Icon = t.icon;
   const domain = sourceDomain(item.link);
@@ -100,6 +110,7 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
     >
       {/* Prominent sticky close — pinned to the card frame, above the scrolling body. */}
       <button
+        ref={closeRef}
         type="button"
         onClick={onClose}
         aria-label="סגירה"

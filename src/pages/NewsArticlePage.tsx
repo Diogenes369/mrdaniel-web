@@ -44,6 +44,8 @@ export default function NewsArticlePage() {
   if (isError || !item) {
     return (
       <div id="page-top" className="min-h-screen pt-24 md:pt-28 flex items-center justify-center px-6">
+        {/* Feed items expire; an expired slug must not stay in the index as a thin "not found" page. */}
+        <Seo title="הכתבה לא נמצאה — MR. DANIEL" description="הכתבה כבר לא זמינה בפיד." path={`/news/${slug ?? ''}`} noindex />
         <div className="text-center max-w-md">
           <h1 className="font-display text-3xl font-black text-white mb-4">הכתבה לא נמצאה</h1>
           <p className="text-zinc-400 mb-8 leading-relaxed">
@@ -59,18 +61,21 @@ export default function NewsArticlePage() {
   }
 
   const articlePath = `/news/${item.slug}`;
+  // `summary` is typed as a string, but this is JSON from a network endpoint and the type is only a
+  // promise: an item without one made `.slice` on undefined throw and blank the whole route.
+  const summary = item.summary || item.excerpt || '';
 
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
       <Seo
         title={`${item.title} | חדשות — דניאל בן ברוך`}
-        description={item.excerpt || item.summary.slice(0, 160)}
+        description={item.excerpt || summary.slice(0, 160)}
         path={articlePath}
         type="article"
         jsonLd={[
           techArticleLd({
             title: item.title,
-            description: item.excerpt || item.summary.slice(0, 200),
+            description: item.excerpt || summary.slice(0, 200),
             path: articlePath,
             datePublished: item.publishedAt,
             sourceName: item.source,
@@ -134,7 +139,7 @@ export default function NewsArticlePage() {
           <div className="relative overflow-hidden glass-panel glass-panel--info rounded-2xl p-5 sm:p-6 lg:p-10 mb-10">
             <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" aria-hidden="true" />
             <p dir="auto" className="relative text-zinc-300 text-lg leading-[1.9]">
-              {item.summary}
+              {summary}
             </p>
           </div>
 
