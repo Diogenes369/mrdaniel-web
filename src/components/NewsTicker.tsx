@@ -37,10 +37,10 @@ const FALLBACK_ITEM_COUNT = 8;
 
 // Shown while the feed is loading, empty, or errored — the ticker is never blank.
 const FALLBACK_TICKER: TickerRow[] = [
-  { id: 'fb-ai', title: 'סוכני AI אוטונומיים: מה הם באמת יודעים לעשות היום', stamp: 'עדכני', href: '/ai' },
-  { id: 'fb-llm', title: 'מודלי שפה חדשים: איך בוחרים את המודל הנכון למשימה', stamp: 'עדכני', href: '/news' },
-  { id: 'fb-jarvis', title: 'מערכת JARVIS: עוזר AI אישי בעברית למייל, ליומן ולמשימות', stamp: 'עדכני', href: '/jarvis' },
-  { id: 'fb-rag', title: 'RAG בפועל: לחבר מודל שפה למסמכים שלכם בלי להמציא תשובות', stamp: 'עדכני', href: '/ai' },
+  { id: 'fb-ai', title: 'סוכני AI: מה הם באמת יודעים לעשות היום', stamp: 'עדכני', href: '/ai' },
+  { id: 'fb-llm', title: 'מודלי AI חדשים: איך בוחרים את המתאים לכם', stamp: 'עדכני', href: '/news' },
+  { id: 'fb-jarvis', title: 'JARVIS: עוזר AI אישי בעברית למייל, ליומן ולמשימות', stamp: 'עדכני', href: '/jarvis' },
+  { id: 'fb-rag', title: 'איך גורמים ל-AI לענות מהמסמכים שלכם בלי להמציא', stamp: 'עדכני', href: '/ai' },
   { id: 'fb-guides', title: 'מדריכי AI מעשיים צעד אחר צעד, PDF להורדה מיידית', stamp: 'עדכני', href: '/magazines' },
   { id: 'fb-news', title: 'חדשות AI בזמן אמת ממקורות מובילים', stamp: 'עדכני', href: '/news' },
 ];

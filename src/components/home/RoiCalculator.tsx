@@ -104,9 +104,9 @@ export default function RoiCalculator() {
     <section id="roi-calculator" className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
         <div className="max-w-4xl mx-auto text-center mb-12 md:mb-16">
-          <PopHeadline lead="כמה" accent="האוטומציה מחזירה לכם?" />
+          <PopHeadline lead="כמה זמן" accent="סוכן יכול להחזיר לכם" />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
-            אתם (או הצוות הקטן) שורפים שעות על עבודה חוזרת. הזיזו את המחוונים וראו כמה מזה חוזר אליכם — בשעות ובשקלים, כל חודש.
+            הזיזו את שלושת הפסים וראו הערכה גסה: כמה שעות וכמה כסף חוזרים אליכם כל חודש, כשסוכן לוקח חלק מהעבודה החוזרת.
           </p>
         </div>
       </div>
@@ -157,8 +157,8 @@ export default function RoiCalculator() {
               />
             </div>
             <p className="text-xs text-zinc-500 mt-8 leading-relaxed">
-              ההערכה מניחה ש-{Math.round(AUTOMATION_RECLAIM * 100)}% מהשעות החוזרות שזוהו עוברות לאוטומציה / סוכן AI, לפי{' '}
-              {WEEKS_PER_MONTH} שבועות בחודש. מספרים להמחשה בלבד — ההיקף המדויק נקבע בשיחת אפיון.
+              החישוב מניח שסוכן לוקח {Math.round(AUTOMATION_RECLAIM * 100)}% מהשעות החוזרות, ו-{WEEKS_PER_MONTH} שבועות בחודש.
+              זו הערכה להמחשה בלבד. את המספר האמיתי בודקים יחד על העבודה שלכם.
             </p>
           </div>
 
@@ -193,7 +193,7 @@ export default function RoiCalculator() {
 
             <WebButton variant="primary" onClick={requestScoping} className="relative mt-8 w-full justify-center">
               <Send className="w-4 h-4 shrink-0" />
-              נתרגם את המספרים לתוכנית עבודה
+              בואו נבדוק את זה על העבודה שלי
             </WebButton>
           </div>
         </div>

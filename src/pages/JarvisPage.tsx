@@ -40,60 +40,42 @@ interface CapabilityGroup {
   points: { lead: string; text: string }[];
 }
 
+// Copy rewritten 2026-09-23 in the plain client voice (see src/data/siteCopy.ts). Removed with it:
+// claims the page could not back up ("זמן תגובה אפסי", "הצפנת AES-256 תקן צבאי", "משתמשים שעובדים
+// כיום עם JARVIS", "100% פרטיות") and the acronym layer (NLP, STT/TTS, RAG, OAuth, Agentic AI).
 const CAPABILITIES: CapabilityGroup[] = [
   {
     icon: Mic,
-    title: '🎙️ ממשק קולי טבעי ואינטראקטיבי',
+    title: 'מדברים איתו כמו עם אדם',
     points: [
-      {
-        lead: 'הבנת שפה טבעית (NLP)',
-        text: 'אין צורך בפקודות קוליות קשיחות. המערכת מבינה סלנג, כוונת משתמש והקשר מורכב.',
-      },
-      {
-        lead: 'תקשורת דו-כיוונית',
-        text: 'המערכת משיבה בקול אנושי, זורם וטבעי, ומסוגלת לנהל דיון ולשאול שאלות הבהרה.',
-      },
+      { lead: 'בלי פקודות מיוחדות', text: 'מבקשים במילים שלכם, גם בסלנג, והוא מבין מה התכוונתם.' },
+      { lead: 'עונה בקול', text: 'אפשר לדבר איתו ולשמוע תשובה, והוא שואל כשמשהו לא ברור לו.' },
     ],
   },
   {
     icon: Briefcase,
-    title: '💼 ניהול ואוטומציה עסקית מתקדמת',
+    title: 'מסדר לכם את העבודה',
     points: [
-      {
-        lead: 'אינטגרציה מלאה לתוכנות (APIs)',
-        text: 'המערכת מתממשקת ליומנים, תיבות מייל, מערכות CRM, ומנהלי משימות.',
-      },
-      {
-        lead: 'ניהול לו"ז חכם',
-        text: 'תיאום פגישות אוטומטי, שליחת תזכורות וסיכום מיילים נכנסים.',
-      },
-      {
-        lead: 'ניתוח נתונים',
-        text: 'הפקת דוחות, מעקב אחר ביצועים ומתן תובנות עסקיות בזמן אמת.',
-      },
+      { lead: 'מחובר לכלים שלכם', text: 'יומן, מייל, רשימת הלקוחות ורשימת המשימות.' },
+      { lead: 'פגישות ותזכורות', text: 'קובע פגישות, שולח תזכורות ומסכם את המיילים שהגיעו.' },
+      { lead: 'תמונת מצב', text: 'אומר לכם בכל רגע מה פתוח, מה מחכה לכם ומה כבר טופל.' },
     ],
   },
   {
     icon: Home,
-    title: '🏡 שליטה מוחלטת בבית ובמשרד חכם',
+    title: 'גם בבית ובמשרד',
     points: [
-      {
-        lead: 'מערכת בקרה מרכזית',
-        text: 'חיבור למכשירי ה-IoT (תאורה, מיזוג ומולטימדיה).',
-      },
-      {
-        lead: 'תרחישים חכמים',
-        text: 'הפעלת פרופילים מותאמים אישית (למשל: "מצב פגישה" שמחשיך אורות ומפעיל מקרן).',
-      },
+      { lead: 'שליטה במכשירים', text: 'תאורה, מיזוג ומסכים, כשהם מחוברים לרשת.' },
+      { lead: 'מצבים מוכנים', text: 'למשל "מצב פגישה": מחשיך את האור ומדליק את המקרן בבקשה אחת.' },
     ],
   },
 ];
 
 const CUSTOMER_BENEFITS = [
-  'חיסכון של שעות עבודה (אוטומציה אדמיניסטרטיבית).',
-  'זמינות של 24/7 (עוזר שלא מפספס משימה).',
-  'התאמה אישית מלאה (נתפר בדיוק לפי הצרכים).',
-  'פרטיות ושליטה מלאה במידע.',
+  'פחות מטלות קטנות שגוזלות לכם את היום.',
+  'עובד גם כשאתם לא ליד המחשב.',
+  'נבנה סביב הדרך שבה אתם עובדים, לא להפך.',
+  'המידע שלכם נשאר בשליטה שלכם.',
 ];
 
 const DEPLOYMENT_OPTIONS: {
@@ -105,55 +87,48 @@ const DEPLOYMENT_OPTIONS: {
 }[] = [
   {
     icon: Cloud,
-    title: 'תצורת ענן (Cloud) - מומלץ לרוב העסקים',
-    description:
-      'המערכת רצה על השרתים המאובטחים שלנו. אין צורך ברכישת חומרה יקרה, והעדכונים מתבצעים אוטומטית.',
+    title: 'בענן: הכי פשוט להתחיל',
+    description: 'JARVIS רץ על שרת בענן. לא צריך לקנות מחשב מיוחד, והעדכונים מגיעים לבד.',
     featured: true,
     points: [
-      { label: 'חומרה נדרשת', value: 'אין דרישות מיוחדות. עובד מכל מחשב (PC/Mac), טאבלט או סמארטפון.' },
-      { label: 'חיבור רשת', value: 'אינטרנט יציב ומהיר (פס רחב).' },
-      { label: 'ציוד היקפי', value: 'מיקרופון ורמקולים (או אוזניות) לאינטראקציה קולית.' },
-      { label: 'זמן הקמה', value: 'מהיר מאוד.' },
+      { label: 'מחשב', value: 'כל מחשב, טאבלט או טלפון.' },
+      { label: 'אינטרנט', value: 'חיבור יציב.' },
+      { label: 'לשיחה קולית', value: 'מיקרופון ורמקולים, או אוזניות.' },
     ],
   },
   {
     icon: Cpu,
-    title: 'התקנה מקומית (On-Premise) - מודלים מקומיים',
-    description:
-      'המערכת מותקנת פיזית על השרתים או המחשבים בעסק שלך. מבטיח 100% פרטיות וניתוק מוחלט מהאינטרנט במידת הצורך.',
+    title: 'אצלכם במשרד: פרטיות מקסימלית',
+    description: 'JARVIS מותקן על מחשב אצלכם, והמידע לא יוצא החוצה. דורש מחשב חזק במיוחד.',
     points: [
-      { label: 'מעבד (CPU)', value: 'דור עדכני של Intel Core i7 / AMD Ryzen 7 ומעלה.' },
-      { label: 'זיכרון (RAM)', value: 'מינימום 32GB (מומלץ 64GB ומעלה).' },
-      {
-        label: 'כרטיס מסך (GPU)',
-        value:
-          'חובה כרטיס מסך חזק של NVIDIA (סדרת RTX 3090/4090 ומעלה) להרצת מודלי השפה המקומיים.',
-      },
-      { label: 'אחסון', value: 'כונן SSD NVMe מהיר (לפחות 1TB פנוי).' },
+      { label: 'מעבד', value: 'Intel Core i7 או AMD Ryzen 7 מדור עדכני ומעלה.' },
+      { label: 'זיכרון', value: 'לפחות 32GB, עדיף 64GB.' },
+      { label: 'כרטיס מסך', value: 'NVIDIA חזק (RTX 3090 או 4090 ומעלה). בלעדיו המודל לא ירוץ אצלכם.' },
+      { label: 'אחסון', value: 'כונן SSD מהיר עם לפחות 1TB פנוי.' },
     ],
   },
 ];
 
 const FAQ_ITEMS: { q: string; a: string }[] = [
   {
-    q: 'מה זו בעצם מערכת JARVIS ואיך היא שונה מ-ChatGPT רגיל?',
-    a: "JARVIS היא לא רק צ'אט מענה על שאלות, אלא סוכן בינה מלאכותית אוטונומי (Agentic AI) שפועל ומבצע פעולות בפועל. המערכת מתחברת למערכות הליבה של העסק שלך (CRM, מיילים, יומנים, בסיסי נתונים ו-APIs) ויודעת להוציא לפועל משימות מורכבות מקצה לקצה בצורה עצמאית לחלוטין.",
+    q: 'במה JARVIS שונה מ-ChatGPT?',
+    a: 'ChatGPT עונה לכם. JARVIS גם עושה: הוא מחובר ליומן, למייל ולשאר הכלים שלכם, ויכול לקבוע פגישה, לשלוח מייל או לעדכן רשימה, ולעצור לאישור שלכם כשצריך.',
   },
   {
-    q: 'האם המערכת תומכת בתקשורת מלאה בעברית ובדיבור קולי?',
-    a: 'כן, באופן מלא! JARVIS מונעת על ידי מודלי השפה המתקדמים בעולם (GPT-4o, Claude 3.5, Gemini) התומכים בעברית טבעית ברמה אנושית. בנוסף, ניתן לשלב במערכת מנועי קול מתקדמים (TTS/STT) המאפשרים לנהל איתה שיחה קולית רציפה וטבעית בעברית לניהול ותפעול העסק.',
+    q: 'הוא מבין עברית ומדבר בקול',
+    a: 'כן. הוא עובד בעברית טבעית, בכתב ובקול. אפשר לבקש ממנו דברים בדיבור ולקבל תשובה בקול.',
   },
   {
-    q: 'לאיזה סוגי עסקים המערכת מתאימה?',
-    a: 'JARVIS נבנית ומותאמת אישית לכל עסק - החל מחברות הייטק, משרדי נדל"ן, סוכנויות דיגיטל ועד לעסקים קטנים ובינוניים. המערכת מייעלת תהליכי שירות לקוחות, ניהול לידים, אוטומציה של משימות אדמיניסטרטיביות, ניתוח דאטה וניהול פרויקטים.',
+    q: 'למי זה מתאים',
+    a: 'לעצמאים ולעסקים קטנים שמבזבזים זמן על יומן, מיילים, תזכורות ומעקב אחרי לקוחות. בשיחה הראשונה נבדוק יחד אם זה באמת מתאים לכם.',
   },
   {
-    q: 'עד כמה המידע שלי נשאר פרטי?',
-    a: 'הפרטיות שלך בראש סדר העדיפויות. JARVIS עובדת בתוך סביבה מוצפנת ומבודדת, ואפשר להריץ אותה על מודלים מקומיים. המידע העסקי שלך לא משמש לאימון מודלים ציבוריים ונשאר בשליטתך מלאה.',
+    q: 'מה קורה עם המידע שלי',
+    a: 'המידע נשאר שלכם. אפשר להריץ את JARVIS על מחשב אצלכם, כך שהמידע לא יוצא החוצה בכלל. בענן, הוא לא משמש לאימון מודלים ציבוריים.',
   },
   {
-    q: 'איך מתבצע תהליך ההטמעה בעסק שלי?',
-    a: 'התהליך מתחיל בפגישת אפיון מקיפה שבה אנו ממפים את הצורכים והאוטומציות הדרושות לעסק. לאחר מכן, אנו בונים, מגדירים ומחברים את JARVIS למערכות שלכם, מבצעים בדיקות איכות (QA) ומספקים הדרכה מלאה לצוות.',
+    q: 'איך מתחילים',
+    a: 'בשיחה קצרה אנחנו מבינים מה הכי מעמיס עליכם. אחר כך אני בונה ומחבר את JARVIS לכלים שלכם, בודק שהכל עובד, ומראה לכם איך להשתמש בו.',
   },
 ];
 
@@ -279,12 +254,11 @@ export default function JarvisPage() {
           className="container-wide relative z-[1] flex flex-col items-center text-center pt-[46dvh] sm:pt-[50dvh] md:pt-[54dvh] pb-10 md:pb-14"
         >
           <h1 className="font-display font-black text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.15] text-white max-w-4xl [text-shadow:0_2px_24px_rgba(0,0,0,0.85)]">
-            JARVIS: סוכן בינה מלאכותית אוטונומי לניהול העסק שלך
+            JARVIS: עוזר אישי בעברית שבאמת עושה דברים
           </h1>
           <p className="mt-5 md:mt-6 text-sm sm:text-base md:text-lg text-zinc-200 leading-[1.8] md:leading-[1.9] max-w-2xl [text-shadow:0_1px_16px_rgba(0,0,0,0.8)]">
-            מערכת JARVIS (Just A Rather Very Intelligent System) היא דרך אחרת לגמרי לנהל סביבה, פרויקטים
-            ואוטומציות, המבוססת על בינה מלאכותית מתקדמת (AI). המערכת משמשת כמוח מרכזי שמחבר, מתאם ומנהל את כל
-            המערכות הדיגיטליות והפיזיות שלכם, ומספקת חוויית משתמש חלקה, מותאמת אישית ומונעת בקול או בטקסט.
+            מבקשים ממנו בהודעה או בקול, והוא מסדר: קובע פגישות, עונה למיילים, מזכיר מה פתוח ומעדכן את
+            הרשימות שלכם. אתם מחליטים, הוא עושה.
           </p>
         </motion.div>
       </section>
@@ -293,21 +267,20 @@ export default function JarvisPage() {
         <div className="pt-6 md:pt-12">
           {/* ---- Concept card — broad, full-width, centered text ---- */}
           <Reveal className="glass-panel glass-panel--marketing rounded-2xl p-6 sm:p-8 lg:p-10 mb-16 md:mb-24 text-center">
-            <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">🤖 מהי מערכת JARVIS?</h2>
+            <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">מה זה JARVIS</h2>
             <p className="text-base md:text-lg text-zinc-300 leading-[1.85] max-w-full">
-              JARVIS אינה סתם עוד תוכנה או צ'אטבוט רגיל. זהו סוכן בינה מלאכותית פרואקטיבי (
-              <TermTooltip term="AI Agent">AI Agent</TermTooltip>). בעוד שתוכנות רגילות מחכות לפקודות קשיחות,
-              JARVIS מבינה הקשר, לומדת את הרגלי המשתמש ומסוגלת לקבל החלטות ולבצע משימות מורכבות מקצה לקצה באופן
-              עצמאי.
+              צ׳אטבוט רגיל רק עונה לכם. JARVIS הוא{' '}
+              <TermTooltip term="AI Agent">סוכן AI</TermTooltip>: הוא מחובר לכלים שלכם, זוכר איך אתם עובדים,
+              ועושה את הפעולה עצמה. כשמשהו חשוב, הוא עוצר ושואל אתכם לפני שהוא ממשיך.
             </p>
           </Reveal>
 
           {/* ---- Video showcase — cover grid + centered lightbox modal ---- */}
           <Reveal>
             <div className="mt-16 mb-6 text-center">
-              <h2 className="font-display font-black text-2xl md:text-3xl text-white mb-3">משתמשי מערכת JARVIS</h2>
+              <h2 className="font-display font-black text-2xl md:text-3xl text-white mb-3">JARVIS בפעולה</h2>
               <p className="text-zinc-400 text-base md:text-lg leading-relaxed max-w-3xl mx-auto">
-                אלו משתמשים שעובדים כיום עם מערכת JARVIS שיכולה לנהל לכם את כל העסק/רעיון שלכם
+                סרטונים קצרים שמראים איך זה נראה כשמדברים איתו ומבקשים ממנו לעשות משהו.
               </p>
             </div>
             <JarvisShowcaseVideo />
@@ -316,8 +289,8 @@ export default function JarvisPage() {
           {/* ---- Core capabilities ---- */}
           <SectionHeading
             icon={Layers}
-            title="🚀 יכולות הליבה של המערכת"
-            description="שלושה תחומי ליבה שבהם JARVIS פועלת כמוח מרכזי אחד — קול, עסק ובית/משרד חכם. כל תחום מחליף שרשרת של כלים נפרדים בממשק אחד, קולי או טקסטואלי, שמדבר עם כל המערכות שכבר יש לכם."
+            title="מה הוא יודע לעשות"
+            description="שלושה דברים עיקריים: לדבר איתכם, לסדר לכם את העבודה, ולשלוט במכשירים בבית ובמשרד."
           />
           <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-16 md:mb-24">
             {CAPABILITIES.map((group) => (
@@ -330,58 +303,34 @@ export default function JarvisPage() {
             ))}
           </SwipeRow>
 
-          {/* ---- Technical architecture ---- */}
+          {/* ---- What's inside, in plain words (replaced the "technical architecture" block and its
+                 acronym glossary on 2026-09-23) ---- */}
           <SectionHeading
             icon={BrainCircuit}
-            title="הארכיטקטורה הטכנולוגית של מערכת JARVIS"
-            description="חמש תשתיות טכנולוגיות שפועלות במקביל תחת 'מוח מרכזי' אחד — כל אחת אחראית על חלק אחר: הבנת שפה, זיכרון, חיבור לכלים, קול ופרטיות."
+            title="מה יש בפנים, בפשטות"
+            description="ארבעה חלקים שעובדים יחד. לא צריך להבין אותם כדי להשתמש, אבל טוב לדעת מה קורה מאחורי הקלעים."
           />
-          <InfoBox>
-            <p>
-              מאחורי חוויית המשתמש החלקה והאינטראקטיבית של מערכת JARVIS עומד שילוב של מודלי השפה, הזיכרון
-              הווקטורי והאוטומציה המתקדמים ביותר בעולם. המערכת אינה פועלת כתוכנה סגורה, אלא כ'מוח
-              מרכזי' המשלב מספר תשתיות טכנולוגיות במקביל כדי להשיג מהירות תגובה מקסימלית, יציבות מלאה ודיוק גבוה.
-            </p>
-          </InfoBox>
-
-          {/* Beginner-friendly glossary chips — hover / tap each term for a plain-Hebrew explanation. */}
-          <div className="mb-12 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-zinc-400">
-            <span className="font-mono text-xs uppercase tracking-widest text-zinc-500">מונחים בקצרה</span>
-            <TermTooltip term="Agentic AI" />
-            <TermTooltip term="LLM" />
-            <TermTooltip term="RAG" />
-            <TermTooltip term="STT" />
-            <TermTooltip term="TTS" />
-            <TermTooltip term="On-Premise" />
-          </div>
           <ServiceGrid
             items={[
               {
                 icon: BrainCircuit,
-                title: '🧠 מנועי LLM (Large Language Models) מובילים',
-                description: 'מבוסס על Grok, Claude, Gemini ו-GPT להבנת הקשר עמוקה וניהול שיחה דינמית.',
+                title: 'המוח',
+                description: 'מודלי ה-AI המובילים, כמו Claude, Gemini, GPT ו-Grok. לכל משימה נבחר המודל שעושה אותה הכי טוב.',
               },
               {
                 icon: Database,
-                title: '💾 טכנולוגיית RAG וזיכרון וקטורי',
-                description:
-                  'Retrieval-Augmented Generation — זיכרון לטווח ארוך של העדפות ונהלים, ושילוב מידע פנימי בזמן אמת ממסמכים ומיילים.',
-              },
-              {
-                icon: Radio,
-                title: '📡 ממשקי API וסנכרון רשת בזמן אמת',
-                description: 'סוכן עצמאי (AI Agent) עם אוטומציה מקצה לקצה וזמן תגובה אפסי (Low Latency).',
+                title: 'הזיכרון',
+                description: 'זוכר מה אתם מעדיפים ואיך אתם עובדים, ויודע לחפש תשובות בתוך המסמכים והמיילים שלכם.',
               },
               {
                 icon: AudioLines,
-                title: '🎙️ עיבוד קול חכם (STT & TTS)',
-                description: 'STT להמרת דיבור לטקסט עם סינון רעשים, ו-TTS להפקת קול אנושי וטבעי.',
+                title: 'הקול',
+                description: 'מבין דיבור בעברית גם כשיש רעש ברקע, ועונה בקול טבעי.',
               },
               {
                 icon: Lock,
-                title: '🔒 פרטיות מקצה לקצה',
-                description:
-                  'הצפנת AES-256 (תקן צבאי/פיננסי), ניהול הרשאות OAuth 2.0, ואפשרות לסביבה מבודדת בשרתים פרטיים או On-Premise.',
+                title: 'הפרטיות',
+                description: 'אתם קובעים לאילו כלים יש לו גישה. אפשר להריץ אותו אצלכם במשרד, כך שהמידע לא יוצא החוצה.',
               },
             ]}
           />
@@ -389,8 +338,8 @@ export default function JarvisPage() {
           {/* ---- Customer benefits ---- */}
           <SectionHeading
             icon={BarChart3}
-            title="📊 היתרונות המרכזיים עבור הלקוח שלך"
-            description="מה זה אומר בפועל, בשורה התחתונה — פחות עבודה ידנית, זמינות מלאה, התאמה מדויקת ופרטיות מלאה."
+            title="מה זה נותן לכם"
+            description="בשורה התחתונה: יותר זמן לדברים שרק אתם יכולים לעשות."
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-16 md:mb-24">
             {CUSTOMER_BENEFITS.map((benefit) => (
@@ -407,22 +356,21 @@ export default function JarvisPage() {
           </div>
 
           {/* ---- Pricing framing (no public pricing) ---- */}
-          <InfoBox title="פתרון בהתאמה אישית לפי מורכבות הארגון והדרישות">
+          <InfoBox title="כמה זה עולה">
             <p>
-              מערכת JARVIS נתפרת סביב מפת התהליכים, המערכות והרגולציה של כל ארגון — מספר האינטגרציות, מקורות
-              הדאטה, רמת ההרשאות ואופן הפריסה (ענן פרטי או On-Premise) נקבעים באפיון משותף.
+              תלוי במה שאתם צריכים: לכמה כלים הוא מתחבר, כמה דברים הוא עושה, ואם הוא רץ בענן או אצלכם.
             </p>
             <p>
-              לכן <strong className="text-white">אין באתר זה מחירים ציבוריים או עלויות חבילה קבועות</strong>.
-              ההיקף, לוחות הזמנים והתמחור נבנים לאחר פגישת אפיון ומוגשים כהצעה מסודרת.
+              לכן <strong className="text-white">אין כאן מחירון קבוע</strong>. אחרי שיחה קצרה אתם מקבלים הצעה
+              ברורה בכתב, עם מחיר ולוח זמנים.
             </p>
           </InfoBox>
 
           {/* ---- System & hardware requirements ---- */}
           <SectionHeading
             icon={Server}
-            title="דרישות מערכת וחומרה"
-            description="מערכת JARVIS גמישה וניתנת להתקנה בשתי תצורות עיקריות, בהתאם לצרכי הפרטיות והתקציב שלך:"
+            title="איפה הוא רץ"
+            description="שתי אפשרויות. רוב האנשים מתחילים בענן."
           />
           <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16 md:mb-24">
             {DEPLOYMENT_OPTIONS.map((opt) => (
@@ -438,27 +386,23 @@ export default function JarvisPage() {
           {/* ---- FAQ ---- */}
           <SectionHeading
             icon={HelpCircle}
-            title="שאלות ותשובות נפוצות"
-            description="כל מה שצריך לדעת על מערכת האוטונומיה העסקית JARVIS"
+            title="שאלות שאנשים שואלים"
+            description="התשובות הקצרות. על כל השאר מדברים בשיחה."
           />
           <FaqAccordion items={FAQ_ITEMS} />
 
           {/* ---- Single bottom conversion section — the page's ONLY other CTA trigger ---- */}
           <section className="mt-20 md:mt-28 rounded-3xl border border-brand-500/30 bg-gradient-to-bl from-brand-500/15 via-carbon-900 to-carbon-900 p-10 md:p-16 text-center">
             <h2 className="font-display font-black text-2xl md:text-4xl text-white mb-4">
-              נבנה את מערכת JARVIS סביב הצרכים שלכם
+              בואו נבנה לכם JARVIS
             </h2>
             <p className="text-zinc-300 text-base md:text-lg leading-relaxed max-w-2xl mx-auto mb-8">
-              פגישת אפיון קצרה ממפה את התהליכים, המערכות והדרישות — ובסופה הצעה מסודרת עם היקף, לוחות זמנים
-              ותמחור מותאם. פתרון בהתאמה אישית לפי מורכבות הארגון והדרישות, ללא מחירון מדף.
+              שיחה קצרה: אתם מספרים מה מעמיס עליכם, ואני חוזר עם הצעה ברורה, מחיר ולוח זמנים.
             </p>
             <WebButton variant="primary" onClick={() => openJarvisLead('JARVIS Page · Bottom Conversion')}>
               <FileText className="w-4 h-4" />
-              בקשת הצעת מחיר לארגון
+              לקבלת הצעה
             </WebButton>
-            <p className="mt-6 text-xs text-zinc-500">
-              אין באתר זה מחירים ציבוריים או עלויות חבילה קבועות עבור מערכת JARVIS.
-            </p>
           </section>
         </div>
       </div>

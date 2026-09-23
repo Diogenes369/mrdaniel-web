@@ -33,16 +33,18 @@ interface Tech {
 }
 
 const STACK: Tech[] = [
-  { name: 'Grok', icon: Sparkles, detail: 'המודל של xAI: חד, עדכני ומחובר לזרם של X. משמש אצלי לניסוח קרוסלות ושרשורים.' },
-  { name: 'Claude', icon: BrainCircuit, detail: 'מודל חזק לכתיבה ארוכה, לקוד ולעבודה עם כלים. בסיס טוב לסוכנים שמריצים משימות מרובות צעדים.' },
-  { name: 'Gemini', icon: Eye, detail: 'מודל רב-מודלי של Google: קורא תמונות, וידאו ואודיו. משמש לתמלול, לקריאת שקפים ולהקראה.' },
-  { name: 'GPT', icon: MessageSquare, detail: 'משפחת המודלים של OpenAI, כולל gpt-oss הפתוח שרץ אצלי דרך Groq לטקסט מהיר.' },
-  { name: 'Groq', icon: Zap, detail: 'תשתית Inference מהירה במיוחד למודלים פתוחים. כאן רץ רוב הטקסט באתר.' },
-  { name: 'Ollama', icon: Cpu, detail: 'הרצת מודלים מקומיים על המחשב, בלי שהמידע יוצא החוצה. טוב למבנה, JSON ותרגום.' },
-  { name: 'Claude MCP', icon: Plug, detail: 'חיבור סוכני AI לכלים ולמערכות דרך פרוטוקול MCP: סטנדרטי וקל לתחזוקה.' },
-  { name: 'RAG', icon: Database, detail: 'שליפה מתוך המסמכים שלכם לפני שהמודל עונה, כדי שהתשובה תישען על מקור ולא על ניחוש.' },
-  { name: 'Python', icon: Braces, detail: 'אוטומציה בהתאמה אישית, צנרות RAG, סוכנים אוטונומיים ואינטגרציות MCP.' },
-  { name: 'React Three Fiber', icon: Atom, detail: 'ממשקים תלת-ממדיים בדפדפן, כמו חדר הבקרה שמציג את הסוכנים שלי בזמן אמת.' },
+  // Plain-language pass 2026-09-23: each tooltip says what the tool does FOR the reader, in words a
+  // non-technical client follows. The names stay — they are what people search for.
+  { name: 'Grok', icon: Sparkles, detail: 'ה-AI של X. מכיר את מה שקורה ברשת עכשיו, ואני משתמש בו לכתיבת פוסטים.' },
+  { name: 'Claude', icon: BrainCircuit, detail: 'חזק בכתיבה ארוכה ובעבודה צעד אחר צעד. טוב לסוכנים שעושים כמה פעולות ברצף.' },
+  { name: 'Gemini', icon: Eye, detail: 'ה-AI של Google. מבין גם תמונות, וידאו והקלטות, ולכן טוב לתמלול ולקריאת מסמכים סרוקים.' },
+  { name: 'GPT', icon: MessageSquare, detail: 'המודלים של OpenAI, היוצרים של ChatGPT. יש גם גרסה פתוחה שאני מריץ לטקסט מהיר.' },
+  { name: 'Groq', icon: Zap, detail: 'שירות שמריץ מודלי AI מהר מאוד. רוב הטקסט באתר הזה נכתב דרכו.' },
+  { name: 'Ollama', icon: Cpu, detail: 'מריץ AI על המחשב שלכם, בלי שהמידע יוצא החוצה. מתאים כשהפרטיות חשובה.' },
+  { name: 'Claude MCP', icon: Plug, detail: 'הדרך שבה סוכן מתחבר ליומן, למייל ולמסמכים שלכם, כמו שקע סטנדרטי לכל כלי.' },
+  { name: 'RAG', icon: Database, detail: 'השיטה שגורמת ל-AI לענות מתוך המסמכים שלכם, במקום לנחש.' },
+  { name: 'Python', icon: Braces, detail: 'שפת התכנות שבה אני כותב את רוב הסוכנים והאוטומציות.' },
+  { name: 'React Three Fiber', icon: Atom, detail: 'הכלי שבו בניתי את הרקע התלת-ממדי של האתר.' },
 ];
 
 interface Anchor {
@@ -180,10 +182,8 @@ export default function TechMarquee() {
   return (
     <section className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10 mb-10 text-center md:mb-14">
-        <PopHeadline lead="הסטאק" accent="שמפעיל את כל זה" className="mb-3 md:mb-4" />
-        <p className="font-mono text-[11px] md:text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">
-          Infrastructure · Security · AI · Automation
-        </p>
+        <PopHeadline lead="הכלים" accent="שאני עובד איתם" className="mb-3 md:mb-4" />
+        <p className="text-sm md:text-base text-zinc-400">לחצו על כלי כדי לראות מה הוא עושה, במילים פשוטות.</p>
       </div>
 
       {reduced ? (

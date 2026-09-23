@@ -6,7 +6,8 @@
 //   - a placeholder that never got filled,
 //   - rtl() output that is not idempotent or leaves a Latin run un-anchored.
 // Run: npx tsx scripts/__tests__/site-copy.test.mjs
-import { HERO_COPY, ROTATOR_TERMS, SERVICES_COPY, CONTACT_COPY, FOOTER_COPY, ABOUT_COPY } from '../../src/data/siteCopy.ts';
+import { HERO_COPY, HERO_CONSOLE_COPY, PROCESS_COPY, ROTATOR_TERMS, SERVICES_COPY, CONTACT_COPY, FOOTER_COPY, ABOUT_COPY } from '../../src/data/siteCopy.ts';
+import { AI_GUIDE_HERO, AI_GUIDE_WHAT, AI_GUIDE_PREP, AI_GUIDE_PROCESS, AI_GUIDE_CTA } from '../../src/data/aiAgentGuide.ts';
 import { HOME_OFFERS } from '../../src/data/homeOffers.ts';
 import { SERVICES } from '../../src/data/homeServices.ts';
 import { rtl } from '../../src/lib/rtl.ts';
@@ -53,6 +54,31 @@ HOME_OFFERS.forEach((o) => {
     add(`${o.id}.bullets[${i}].body`, b.body, 16);
   });
 });
+// Hero console + process strip + the /ai client guide (2026-09-23 plain-voice rewrite).
+Object.entries(HERO_CONSOLE_COPY).forEach(([k, v]) => {
+  if (typeof v === 'string' && k !== 'label') add(`console.${k}`, v, 14);
+});
+add('process.sub', PROCESS_COPY.sub, 14);
+PROCESS_COPY.steps.forEach((s, i) => {
+  add(`process.steps[${i}].title`, s.title, 5);
+  add(`process.steps[${i}].body`, s.body, 24);
+});
+add('aiGuide.hero.title', AI_GUIDE_HERO.title, 8);
+add('aiGuide.hero.subtitle', AI_GUIDE_HERO.subtitle, 16);
+for (const [name, block] of [['what', AI_GUIDE_WHAT], ['prep', AI_GUIDE_PREP], ['process', AI_GUIDE_PROCESS]]) {
+  add(`aiGuide.${name}.title`, block.title, 6);
+  add(`aiGuide.${name}.intro`, block.intro, 40);
+  for (const card of block.examples ?? block.items ?? block.steps) {
+    add(`aiGuide.${name}:${card.title}.title`, card.title, 5);
+    add(`aiGuide.${name}:${card.title}.body`, card.body, 22);
+  }
+}
+add('aiGuide.what.difference', AI_GUIDE_WHAT.difference, 26);
+add('aiGuide.cta.body', AI_GUIDE_CTA.body, 20);
+// The client guide promises no numbers: a digit in it is almost certainly an invented figure.
+for (const [label, text] of fields.filter(([l]) => l.startsWith('aiGuide'))) {
+  t(`${label}: no figures`, !/\d/.test(text), text);
+}
 SERVICES.forEach((s) => {
   add(`service:${s.id}.title`, s.title, 6);
   add(`service:${s.id}.blurb`, s.blurb, 32);
@@ -77,6 +103,8 @@ const BANNED = [
 t('offer order: AI agents, LLM lab, AI news hub', HOME_OFFERS.map((o) => o.id).join() === 'offer-ai-agents,offer-llm-lab,offer-ai-hub', HOME_OFFERS.map((o) => o.id).join());
 t('hub offer links to the news hub', HOME_OFFERS[2]?.route === '/news', HOME_OFFERS[2]?.route);
 t('hub offer second CTA opens every channel (Linktree)', HOME_OFFERS[2]?.secondary === 'linktree', HOME_OFFERS[2]?.secondary);
+// 2026-09-23: the hero has exactly one CTA (to the agents section); the news button is gone.
+t('hero has a single CTA', !('ctaSecondary' in HERO_COPY), Object.keys(HERO_COPY).join());
 
 // The retired cyber / enterprise offer must not creep back into the marketing copy.
 const RETIRED = /סייבר|אבטחת מידע|cyber|infosec|enterprise|אנטרפרייז|ארגונ|saas|zero[- ]?trust/i;

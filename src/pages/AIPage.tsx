@@ -1,40 +1,33 @@
-import {
-  Sparkles,
-  User,
-  Layers,
-  Cpu,
-  Database,
-  Bot,
-  ShieldAlert,
-  Send,
-  Check,
-  Clapperboard,
-  UserCog,
-  ShoppingCart,
-  Workflow,
-  Network,
-  ArrowLeft,
-  type LucideIcon,
-} from 'lucide-react';
-import { PageHero, SectionHeading, ServiceGrid, UnifiedCta } from '../components/content/ContentPrimitives';
-import AIPulseWidget from '../components/content/AIPulseWidget';
-import AgentFinder from '../components/content/AgentFinder';
-import VideoEmbed from '../components/content/VideoEmbed';
+import { HelpCircle, ClipboardList, Route, Bot, Send, Check, UserCog, ShoppingCart, FileSearch, Workflow, ArrowLeft, type LucideIcon } from 'lucide-react';
+import { PageHero, SectionHeading, UnifiedCta } from '../components/content/ContentPrimitives';
 import WebButton from '../components/WebButton';
-import { useAINewsFeed } from '../services/aiNewsService';
+import {
+  AI_GUIDE_HERO,
+  AI_GUIDE_WHAT,
+  AI_GUIDE_PREP,
+  AI_GUIDE_PROCESS,
+  AI_GUIDE_SHOWCASE,
+  AI_GUIDE_CTA,
+  type GuideCard,
+} from '../data/aiAgentGuide';
+import { rtl } from '../lib/rtl';
 
-// Fallback content only — used while the live /api/ai-news feed is loading for the first time,
-// or if it fails/returns nothing, so the video section is never empty or broken.
-const CURATED_VIDEOS = [
-  { youtubeId: 'PLyCki2K0Lg', title: 'Why we built—and donated—the Model Context Protocol (MCP)', channel: 'Anthropic' },
-  { youtubeId: '5CcL6I3fdcA', title: 'What Is an AI Agent? (Assistant vs Workflow vs Agent)', channel: 'Zenphi' },
-];
+/**
+ * /ai — the AI agents page, rewritten 2026-09-23 as a practical client guide:
+ *   1. What an agent is (plain words + three everyday examples)
+ *   2. What to prepare (a checklist a client can do before the first call)
+ *   3. How we build it together (four steps, each ending in the client's go-ahead)
+ *   → example agents with a direct lead CTA → contact.
+ *
+ * Removed with the rewrite: the "technical depth" grid (RAG / multi-agent / MCP / Guardian), the
+ * AI-news pulse and the demo videos, and every ROI figure — they read as a brochure for engineers
+ * and none of the numbers had a source. All copy lives in src/data/aiAgentGuide.ts.
+ */
 
 interface ShowcaseAgent {
   icon: LucideIcon;
   title: string;
   tagline: string;
-  roi: string;
   features: string[];
   subject: string;
 }
@@ -42,57 +35,55 @@ interface ShowcaseAgent {
 const SHOWCASE_AGENTS: ShowcaseAgent[] = [
   {
     icon: UserCog,
-    title: 'עוזר AI למנהל',
-    tagline: 'ניהול משימות ולו"ז',
-    roi: 'מחזיר 8–12 שעות ניהול בשבוע',
-    features: [
-      'תיאום פגישות וניהול יומן אוטומטי',
-      'סיכום מיילים נכנסים ותדריך בוקר יומי',
-      'הכנת טיוטות מענה, מסמכים וסיכומים',
-    ],
-    subject: 'סוכן AI — עוזר אישי למנהל',
+    title: 'עוזר אישי',
+    tagline: 'יומן, מייל ומשימות',
+    features: ['קובע ומזיז פגישות ביומן', 'מסכם את המיילים של הבוקר', 'מכין טיוטות תשובה לאישור שלכם'],
+    subject: 'סוכן AI · עוזר אישי',
   },
   {
     icon: ShoppingCart,
-    title: 'סוכן מכירות ושירות אוטונומי',
-    tagline: 'מכירות ושירות 24/7',
-    roi: 'זמן תגובה לליד — משעות לשניות',
-    features: [
-      'כשירות לידים ותיאום פגישות אוטומטי',
-      'מענה מלא לפניות שירות מקצה לקצה',
-      'follow-up יזום ועדכון ה-CRM בזמן אמת',
-    ],
-    subject: 'סוכן AI — מכירות ושירות אוטונומי',
+    title: 'סוכן פניות ולקוחות',
+    tagline: 'וואטסאפ ואתר',
+    features: ['עונה מיד על השאלות הקבועות', 'אוסף פרטים מלקוח חדש', 'מעביר אליכם רק פנייה רצינית'],
+    subject: 'סוכן AI · פניות ולקוחות',
   },
   {
-    icon: Database,
-    title: 'סוכן מחקר וניתוח נתונים (RAG)',
-    tagline: 'ידע שאפשר לשאול',
-    roi: 'תשובות מבוססות-מקור בשניות במקום שעות חיפוש',
-    features: [
-      'RAG על מסמכים, מיילים ובסיסי נתונים פנימיים',
-      'הפקת דוחות ותובנות עסקיות לפי דרישה',
-      'סביבה מבודדת ומוצפנת — ללא דליפת מידע',
-    ],
-    subject: 'סוכן AI — מחקר וניתוח נתונים',
+    icon: FileSearch,
+    title: 'סוכן שעונה מהמסמכים שלכם',
+    tagline: 'מחירונים, נהלים, חוזים',
+    features: ['עונה מתוך המסמכים שלכם בלבד', 'מציין מאיפה לקח את התשובה', 'אומר "לא יודע" כשאין תשובה'],
+    subject: 'סוכן AI · תשובות מתוך המסמכים',
   },
   {
     icon: Workflow,
-    title: 'סוכן אוטומציה תפעולית',
-    tagline: 'תהליכים שרצים לבד',
-    roi: 'מבטל עבודה ידנית חוזרת ושגיאות אנוש',
-    features: [
-      'תזרימי עבודה רב-שלביים שמחברים בין מערכות',
-      'לוגיקת החלטה מבוססת AI בתוך התהליך עצמו',
-      'ניטור וטיפול בחריגות ללא התערבות שוטפת',
-    ],
-    subject: 'סוכן AI — אוטומציה תפעולית',
+    title: 'סוכן עבודה משרדית',
+    tagline: 'העתק-הדבק בין מערכות',
+    features: ['מעביר פרטים מטופס לטבלה', 'מפיק הצעות מחיר וחשבוניות', 'מתריע כשמשהו לא מסתדר'],
+    subject: 'סוכן AI · עבודה משרדית',
   },
 ];
 
 function openAgentLead(subject: string) {
-  window.dispatchEvent(
-    new CustomEvent('open-lead-modal', { detail: { subject, sourceSection: 'AI Page · Agents Showcase' } })
+  window.dispatchEvent(new CustomEvent('open-lead-modal', { detail: { subject, sourceSection: 'AI Page · Agents Showcase' } }));
+}
+
+function Card({ card, index }: { card: GuideCard; index?: number }) {
+  const Icon = card.icon;
+  return (
+    <div className="glass-panel glass-panel--marketing relative flex h-full flex-col rounded-2xl p-5 sm:p-6 lg:p-7">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
+          <Icon className="h-5 w-5" />
+        </span>
+        {index !== undefined && (
+          <span className="font-mono text-xs font-bold tracking-[0.2em] text-brand-400/80" dir="ltr" aria-hidden="true">
+            {String(index + 1).padStart(2, '0')}
+          </span>
+        )}
+      </div>
+      <h3 className="mb-2 font-display text-lg font-bold leading-snug text-white">{rtl(card.title)}</h3>
+      <p className="text-base leading-relaxed text-zinc-300">{rtl(card.body)}</p>
+    </div>
   );
 }
 
@@ -105,12 +96,6 @@ function ShowcaseCard({ agent }: { agent: ShowcaseAgent }) {
       </div>
       <h3 className="font-display text-lg font-bold text-white leading-snug">{agent.title}</h3>
       <p className="mt-1 text-sm text-zinc-400">{agent.tagline}</p>
-
-      <div className="mt-4 inline-flex items-start gap-2 rounded-lg border border-brand-500/25 bg-brand-500/[0.06] px-3 py-2 text-sm font-bold text-brand-300">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-brand-400/80 mt-0.5">ROI</span>
-        {agent.roi}
-      </div>
-
       <ul className="mt-5 space-y-2.5 flex-grow">
         {agent.features.map((f) => (
           <li key={f} className="flex items-start gap-2 text-sm text-zinc-300">
@@ -119,12 +104,7 @@ function ShowcaseCard({ agent }: { agent: ShowcaseAgent }) {
           </li>
         ))}
       </ul>
-
-      <WebButton
-        variant="glass"
-        onClick={() => openAgentLead(agent.subject)}
-        className="mt-6 w-full justify-center"
-      >
+      <WebButton variant="glass" onClick={() => openAgentLead(agent.subject)} className="mt-6 w-full justify-center">
         אני רוצה סוכן כזה
         <ArrowLeft className="w-4 h-4" />
       </WebButton>
@@ -133,108 +113,62 @@ function ShowcaseCard({ agent }: { agent: ShowcaseAgent }) {
 }
 
 export default function AIPage() {
-  const { data: aiNews, isLoading: aiNewsLoading } = useAINewsFeed();
-
-  const videos = aiNews && aiNews.videos.length > 0 ? aiNews.videos : CURATED_VIDEOS;
-
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28 pb-24">
       <div className="container-wide">
-        <PageHero
-          badgeIcon={Sparkles}
-          badgeLabel="Custom AI Agents · Architecture & Deployment"
-          title="סוכני AI מותאמים אישית — לעסק ולניהול האישי"
-          subtitle="מ-Chatbot שעונה על שאלות לסוכן אוטונומי שמבצע משימות שלמות מקצה לקצה, מחובר לכלים שכבר יש לכם — עם בקרה אנושית."
-          metaChips={[
-            { icon: User, label: 'מאת: דניאל' },
-            { icon: Layers, label: 'Agentic AI • RAG • MCP' },
-            { icon: ShieldAlert, label: 'Guardian Agents & בקרה אנושית' },
-          ]}
-        />
+        <PageHero title={AI_GUIDE_HERO.title} subtitle={rtl(AI_GUIDE_HERO.subtitle)} />
 
         <div className="pt-8 md:pt-10">
-          {/* ---- Conversion engine: pick a use case → get a tailored setup + CTA ---- */}
-          <SectionHeading
-            icon={Cpu}
-            title="לא בטוחים איזה סוכן מתאים לכם? בואו נמצא ב-30 שניות"
-            description="בחרו את התחום שהכי כואב לכם כרגע, וקבלו מיד המלצה ממוקדת: ארכיטקטורה, יכולות מפתח והפלטפורמות שהסוכן יתחבר אליהן."
-          />
-          <AgentFinder />
+          {/* 1 — What is it */}
+          <section id="what" aria-labelledby="what-title" className="mb-20">
+            <SectionHeading icon={HelpCircle} title={AI_GUIDE_WHAT.title} description={rtl(AI_GUIDE_WHAT.intro)} />
+            <p className="mb-8 max-w-3xl rounded-2xl border border-brand-500/25 bg-brand-500/[0.06] px-5 py-4 text-base font-semibold leading-relaxed text-brand-200">
+              {rtl(AI_GUIDE_WHAT.difference)}
+            </p>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
+              {AI_GUIDE_WHAT.examples.map((c) => (
+                <Card key={c.title} card={c} />
+              ))}
+            </div>
+          </section>
 
-          {/* ---- Showcase grid ---- */}
-          <SectionHeading
-            icon={Bot}
-            title="סוכני AI מותאמים אישית — לעסק ולשימוש אישי"
-            description="כל סוכן נבנה סביב תהליך אחד שהוא עושה טוב יותר מכל כלי כללי — עם ROI ברור ונקודת כניסה ישירה."
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 md:gap-6 mb-16">
+          {/* 2 — What to prepare */}
+          <section id="prepare" className="mb-20">
+            <SectionHeading icon={ClipboardList} title={AI_GUIDE_PREP.title} description={rtl(AI_GUIDE_PREP.intro)} />
+            <ol className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5 md:gap-6">
+              {AI_GUIDE_PREP.items.map((c, i) => (
+                <li key={c.title}>
+                  <Card card={c} index={i} />
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          {/* 3 — How we build it together */}
+          <section id="process" className="mb-20">
+            <SectionHeading icon={Route} title={AI_GUIDE_PROCESS.title} description={rtl(AI_GUIDE_PROCESS.intro)} />
+            <ol className="process-rail relative grid grid-cols-1 gap-5 md:grid-cols-4 md:gap-6">
+              {AI_GUIDE_PROCESS.steps.map((c, i) => (
+                <li key={c.title} className="process-step relative">
+                  <span className="process-step__node" aria-hidden="true" />
+                  <Card card={c} index={i} />
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          {/* Examples */}
+          <SectionHeading icon={Bot} title={AI_GUIDE_SHOWCASE.title} description={rtl(AI_GUIDE_SHOWCASE.intro)} />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 md:gap-6 mb-20">
             {SHOWCASE_AGENTS.map((agent) => (
               <ShowcaseCard key={agent.title} agent={agent} />
             ))}
           </div>
 
-          {/* ---- Technical depth ---- */}
-          <SectionHeading
-            icon={Layers}
-            title="עומק טכני: מהארכיטקטורה עד הפריסה"
-            description="מה שמפריד בין דמו מרשים לסוכן שאפשר לסמוך עליו בייצור — ארבעה רכיבים שכל הטמעה רצינית נשענת עליהם."
-          />
-          <ServiceGrid
-            items={[
-              {
-                icon: Database,
-                title: 'ארכיטקטורת RAG וניהול ידע',
-                description:
-                  'חיבור מודלי שפה (LLMs) למסמכים, ל-PDFים ולמאגרי הנתונים שלכם בשיטות שליפה מתקדמות, עם מיסוך מידע רגיש (PII) בזמן ריצה.',
-              },
-              {
-                icon: Network,
-                title: 'תזמור רב-סוכני (Multi-Agent)',
-                description:
-                  'סוכן-על שמפרק משימה מורכבת לצעדים, מנתב אותם לסוכני-משנה ייעודיים, ומרכיב את התוצאה — עם retries ו-Rollback.',
-              },
-              {
-                icon: Bot,
-                title: 'אינטגרציה דרך MCP',
-                description:
-                  'חיבור הסוכן לכלים (יומן, מייל, מסמכים, APIs) דרך פרוטוקול MCP — סטנדרטי וקל לתחזוקה.',
-              },
-              {
-                icon: ShieldAlert,
-                title: 'Guardian Agents ובקרה',
-                description:
-                  'שכבת פיקוח שמאשרת, חוסמת ומתעדת כל פעולת סוכן — הגנה מפני Prompt Injection, הזיות ודליפת מידע.',
-              },
-            ]}
-          />
-
-          {/* ---- Live AI tools pulse ---- */}
-          <SectionHeading
-            icon={Sparkles}
-            title="מה חדש בעולם ה-AI"
-            description="כלים, מודלים ועדכונים רלוונטיים — מתעדכן אוטומטית."
-          />
-          <AIPulseWidget />
-
-          {/* ---- Video showcase ---- */}
-          <SectionHeading
-            icon={Clapperboard}
-            title="סוכני AI בפעולה: הצצה ליכולות האוטונומיות"
-            description="הדגמות קצרות של סוכנים אוטונומיים מבצעים משימות אמיתיות מקצה לקצה."
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-16">
-            {aiNewsLoading && !aiNews
-              ? Array.from({ length: 2 }).map((_, idx) => (
-                  <div key={idx} className="aspect-video rounded-2xl bg-white/[0.03] border border-white/5 animate-pulse" />
-                ))
-              : videos.map((v) => <VideoEmbed key={v.youtubeId} youtubeId={v.youtubeId} title={v.title} channel={v.channel} />)}
-          </div>
-
-          {/* ---- Final CTA ---- */}
-          <SectionHeading icon={Send} title="הצעד הבא" description="פגישת אפיון קצרה — ממפים את התהליך, בוחרים סוכן ומגדירים שלב ראשון עם מדד הצלחה ברור" />
+          <SectionHeading icon={Send} title={AI_GUIDE_CTA.title} description={rtl(AI_GUIDE_CTA.body)} />
           <UnifiedCta
-            mailSubject="אפיון והטמעת סוכן AI מותאם אישית"
-            whatsappMessage="שלום דניאל, אשמח לתאם פגישת אפיון לסוכן AI מותאם אישית לעסק / לשימוש האישי שלי."
+            mailSubject="שיחת היכרות על סוכן AI"
+            whatsappMessage="היי דניאל, יש לי עבודה שחוזרת כל יום ואני רוצה לבדוק אם סוכן AI יכול לקחת אותה."
           />
         </div>
       </div>

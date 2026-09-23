@@ -35,9 +35,9 @@ const trackField = (field: string, action: 'focus' | 'blur' | 'submit') =>
 const WHATSAPP_NUMBER = '972506473039';
 
 const SERVICES = [
-  { id: 'ai', label: 'סוכן AI מותאם אישית', icon: Bot },
-  { id: 'dev', label: 'אוטומציה ואינטגרציית LLM', icon: Code2 },
-  { id: 'content', label: 'רכישת תוכן / מגזינים', icon: BookOpen },
+  { id: 'ai', label: 'סוכן AI שיעבוד בשבילי', icon: Bot },
+  { id: 'dev', label: 'לחבר בין הכלים שלי', icon: Code2 },
+  { id: 'content', label: 'מדריכים וחוברות', icon: BookOpen },
   { id: 'other', label: 'משהו אחר', icon: MessageCircle },
 ];
 
@@ -46,10 +46,10 @@ const SERVICES = [
  * a priced product/agent CTA has already told us WHAT they're interested in; this question is
  * about HOW it plugs into their world, which is what actually qualifies the lead. */
 const GOALS = [
-  { id: 'crm', label: 'חיבור למערכת CRM קיימת', icon: Network },
-  { id: 'whatsapp', label: 'אוטומציה ב-WhatsApp', icon: MessagesSquare },
-  { id: 'web', label: 'אתר / צ׳אט אתר', icon: Globe },
-  { id: 'internal', label: 'חיפוש חכם במסמכים ובידע שלי', icon: BrainCog },
+  { id: 'crm', label: 'חיבור לרשימת הלקוחות שלי', icon: Network },
+  { id: 'whatsapp', label: 'מענה בוואטסאפ', icon: MessagesSquare },
+  { id: 'web', label: 'צ׳אט באתר שלי', icon: Globe },
+  { id: 'internal', label: 'תשובות מתוך המסמכים שלי', icon: BrainCog },
   { id: 'other', label: 'משהו אחר', icon: MessageCircleQuestion },
 ];
 
@@ -362,7 +362,7 @@ export default function LeadForm() {
                           <div>
                             <p className="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-1.5">
                               <Building2 size={14} />
-                              גודל הארגון
+                              כמה אתם
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {COMPANY_SIZES.map((c) => (

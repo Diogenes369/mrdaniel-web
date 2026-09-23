@@ -85,10 +85,10 @@ result = agent.run(task="Reconcile weekly billing anomalies")`,
 ];
 
 const VALUE_PROPS = [
-  { icon: Check, title: 'אפס תיאוריות — 100% קוד וארכיטקטורה', description: 'כל פרק בנוי סביב דוגמאות אמיתיות, בלוקים של קוד ותבניות מוכנות — לא עוד הסברים כלליים שאי אפשר ליישם.' },
-  { icon: Layers, title: 'מדריכים מעשיים צעד-אחר-צעד', description: 'מבנה מדורג מהיסודות ועד ליישום מלא, כך שאפשר להתחיל לעבוד כבר מהפרק הראשון — לא רק בסוף החוברת.' },
-  { icon: RefreshCw, title: 'גישה לעדכונים עתידיים', description: 'עולם ה-AI משתנה מדי חודש — עדכוני תוכן נשלחים לרוכשים.' },
-  { icon: Users, title: 'נכתב מניסיון בשטח, לא באקדמיה', description: 'כל תוכן מבוסס על סוכנים שנבנו ורצים בפועל — כולל המכשולים וההחלטות שלא כתובים בשום מדריך רשמי.' },
+  { icon: Check, title: 'דוגמאות, לא תיאוריה', description: 'כל פרק בנוי סביב דוגמה אמיתית שאפשר להעתיק ולהתאים, לא הסברים כלליים.' },
+  { icon: Layers, title: 'צעד אחר צעד', description: 'מתחילים מהבסיס ומתקדמים בהדרגה, כך שאפשר ליישם כבר מהפרק הראשון.' },
+  { icon: RefreshCw, title: 'עדכונים בלי תשלום', description: 'AI משתנה כל חודש. כשהמדריך מתעדכן, הרוכשים מקבלים את הגרסה החדשה.' },
+  { icon: Users, title: 'נכתב תוך כדי עבודה', description: 'מבוסס על סוכנים שבניתי ועובדים, כולל הטעויות ומה שלמדתי מהן.' },
 ];
 
 const FAQ_ITEMS = [
@@ -367,8 +367,8 @@ export default function MagazinesPage() {
         <PageHero
           badgeIcon={BookOpen}
           badgeLabel="החנות הדיגיטלית · Premium Guides 2026"
-          title="מגזינים וחוברות פרימיום: המדריכים המעשיים לעולם ה-AI"
-          subtitle="ארכיטקטורה אמיתית, סקריפטים מוכנים לשימוש ואפס פילוסופיה מיותרת — כל מדריך נבנה כדי שתתחילו ליישם כבר מהפרק הראשון."
+          title="מדריכים וחוברות AI"
+          subtitle="מדריכים מעשיים, צעד אחר צעד, שבנויים כדי שתתחילו ליישם כבר מהפרק הראשון."
         />
 
         <div className="flex items-center justify-center gap-2.5 text-center bg-brand-500/10 border border-brand-500/25 rounded-full px-5 py-2.5 mx-auto w-fit mb-8">

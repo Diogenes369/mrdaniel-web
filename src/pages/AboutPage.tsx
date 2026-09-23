@@ -21,8 +21,8 @@ import { rtl } from '../lib/rtl';
 const PILLAR_ICONS = [Bot, Cpu, Network, Rocket];
 
 const HUB_LINKS = [
-  { icon: Terminal, to: '/news', title: 'חדשות ומדריכי AI', description: 'עדכוני AI בזמן אמת ופירוק של מודלי השפה החדשים' },
-  { icon: Bot, to: '/ai', title: 'סוכני AI', description: 'סוכני AI אוטונומיים, RAG וחוברת הלימוד המלאה' },
+  { icon: Terminal, to: '/news', title: 'חדשות ומדריכי AI', description: 'מה חדש ב-AI כל יום, והסבר פשוט על המודלים החדשים' },
+  { icon: Bot, to: '/ai', title: 'סוכני AI', description: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד' },
   { icon: Rocket, to: '/jarvis', title: 'מערכת JARVIS', description: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות' },
   { icon: LayoutGrid, to: '/magazines', title: 'מדריכים וחוברות', description: 'מדריכי AI מעשיים, PDF להורדה מיידית' },
 ];
@@ -94,7 +94,7 @@ export default function AboutPage() {
             <h3 className="font-display font-bold text-xl text-white">עקבו אחרי הפעילות באופן שוטף</h3>
           </div>
           <p className="text-zinc-400 text-sm md:text-base leading-relaxed mb-6 max-w-lg mx-auto">
-            תובנות טכניות, עדכוני AI ותוכן מהשטח — ישירות ברשתות החברתיות או במייל.
+            טיפים, עדכוני AI ומה שאני לומד תוך כדי עבודה, ישירות ברשתות או במייל.
           </p>
           <SocialLinks className="justify-center" iconClassName="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 hover:shadow-[0_0_16px_rgba(0,255,102,0.35)] transition-all outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" glyphClassName="w-5 h-5" />
         </div>
@@ -108,8 +108,8 @@ export default function AboutPage() {
 
         <div className="bg-gradient-to-br from-brand-500/15 via-carbon-900 to-carbon-900 border border-brand-500/30 rounded-2xl p-7 md:p-10 mb-16 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right max-w-5xl mx-auto">
           <div>
-            <h3 className="font-display font-bold text-xl md:text-2xl text-white mb-2">רוצים להעמיק בעצמכם? זה בחנות</h3>
-            <p className="text-zinc-400 max-w-md">חוברות עבודה מקצועיות ומגזינים דיגיטליים על סוכני AI ומודלי שפה — ידע מעשי, לא תיאוריה.</p>
+            <h3 className="font-display font-bold text-xl md:text-2xl text-white mb-2">רוצים ללמוד לבד? יש מדריכים</h3>
+            <p className="text-zinc-400 max-w-md">מדריכים וחוברות על סוכני AI, צעד אחר צעד. דברים שאפשר לעשות, לא תיאוריה.</p>
           </div>
           <Link
             to="/magazines"

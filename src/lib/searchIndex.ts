@@ -22,16 +22,16 @@ export interface SearchEntry {
 export const SEARCH_INDEX: SearchEntry[] = [
   // Home sections
   { id: 'hero', title: 'עמוד הבית', snippet: 'חדשות AI, מודלי שפה וסוכנים אוטונומיים', keywords: 'home דף הבית ראשי', icon: Home, route: '/', targetSelector: '#hero' },
-  { id: 'offer-ai-agents', title: 'סוכני AI אוטונומיים', snippet: 'סוכנים שמתחברים ל-WhatsApp, למייל וליומן ומריצים עבודה חוזרת', keywords: 'agents סוכנים אוטומציה whatsapp', icon: Bot, route: '/', targetSelector: '#offer-ai-agents' },
-  { id: 'offer-llm-lab', title: 'מעבדת LLM', snippet: 'פירוק מודלים חדשים, השוואות ובחירת המודל הנכון למשימה', keywords: 'llm מודלים gpt claude gemini grok llama השוואה', icon: Layers, route: '/', targetSelector: '#offer-llm-lab' },
+  { id: 'offer-ai-agents', title: 'סוכני AI', snippet: 'סוכנים שעונים בוואטסאפ, קובעים פגישות ומכינים מסמכים בשבילכם', keywords: 'agents סוכנים אוטומציה whatsapp', icon: Bot, route: '/', targetSelector: '#offer-ai-agents' },
+  { id: 'offer-llm-lab', title: 'מעבדת מודלים', snippet: 'כל מודל AI חדש נבדק, ומה כדאי לבחור לאיזו עבודה', keywords: 'llm מודלים gpt claude gemini grok llama השוואה', icon: Layers, route: '/', targetSelector: '#offer-llm-lab' },
   { id: 'offer-ai-hub', title: 'חדשות ומדריכי AI', snippet: 'חדשות AI בזמן אמת ומדריכים מעשיים צעד אחר צעד', keywords: 'news חדשות מדריכים tutorials', icon: BookOpen, route: '/', targetSelector: '#offer-ai-hub' },
   { id: 'roi-calculator', title: 'מחשבון חיסכון לסוכן AI', snippet: 'הערכת זמן שנחסך לפי היקף העבודה החוזרת', keywords: 'roi calculator חיסכון עלות מחשבון סוכן', icon: Calculator, route: '/', targetSelector: '#roi-calculator' },
-  { id: 'services', title: 'מה אני בונה', snippet: 'JARVIS, סוכנים, RAG, אוטומציות ואינטגרציות LLM', keywords: 'services שירותים rag jarvis אוטומציה', icon: Layers, route: '/', targetSelector: '#services' },
+  { id: 'services', title: 'מה אני בונה', snippet: 'JARVIS, סוכנים, AI שעונה מהמסמכים ואוטומציות', keywords: 'services שירותים rag jarvis אוטומציה', icon: Layers, route: '/', targetSelector: '#services' },
   { id: 'contact', title: 'יצירת קשר', snippet: 'שיחה ישירה איתי, בלי בוטים', keywords: 'קשר contact פנייה', icon: Mail, route: '/', targetSelector: '#contact-portal' },
 
   // Dedicated pages
   { id: 'about-page', title: 'עמוד אודות מלא', snippet: 'בונה סוכני AI ומפרסם חדשות AI בעברית', keywords: 'about אודות רקע', icon: Bot, route: '/about', targetSelector: '#page-top' },
-  { id: 'ai-page', title: 'עמוד סוכני AI מלא', snippet: 'פירוט סוכנים אוטונומיים, RAG ואינטגרציות LLM', keywords: 'AI page עמוד מלא סוכנים', icon: Bot, route: '/ai', targetSelector: '#page-top' },
+  { id: 'ai-page', title: 'המדריך לסוכני AI', snippet: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד', keywords: 'AI page עמוד מלא סוכנים', icon: Bot, route: '/ai', targetSelector: '#page-top' },
   { id: 'jarvis-page', title: 'מערכת JARVIS', snippet: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות', keywords: 'jarvis עוזר אישי assistant', icon: Bot, route: '/jarvis', targetSelector: '#page-top' },
   { id: 'magazines-page', title: 'מדריכים וחוברות', snippet: 'מדריכי AI מעשיים, PDF להורדה מיידית', keywords: 'מגזין חוברת מדריך AI guide', icon: BookOpen, route: '/magazines', targetSelector: '#page-top' },
   { id: 'news-page', title: 'עמוד החדשות', snippet: 'כל חדשות ה-AI, מתעדכנות בזמן אמת', keywords: 'news חדשות ai', icon: Newspaper, route: '/news', targetSelector: null },

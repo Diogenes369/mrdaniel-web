@@ -9,8 +9,11 @@ import { Bot, BrainCircuit, Cpu, Database, MessageSquare, Sparkles, Workflow, ty
  * `flagship` tiles get the stronger glass-panel bloom; `wide` is the full-row tile whose inner
  * content lays out in two columns on desktop.
  *
- * Content rule: `metric.value` is always an ESTIMATE / range (prefixed "~" or "כ-") or a
- * qualitative shift ("משעות → דקות") — never a hard, unverified number.
+ * Content rules (rewritten 2026-09-23 in the plain client voice — see siteCopy.ts):
+ *   • `metric.value` is a QUALITATIVE shift ("משעות לדקות"), never a figure. The previous
+ *     "כ-15 שעות" and "כ-70%" had no source, and "~" in front of a made-up number is still made up.
+ *   • No acronym the client has to look up: RAG, LLM, CRM and API were translated into what they
+ *     do for the reader.
  */
 export interface ServiceEntry {
   id: string;
@@ -19,9 +22,9 @@ export interface ServiceEntry {
   blurb: string;
   /** 2–4 short proof points — a mini feature list, shown on every tile that has them. */
   points?: string[];
-  /** 2–3 feature chips (e.g. "אוטומציה מלאה", "חיסכון בזמן"). */
+  /** 2–3 feature chips (e.g. "בעברית", "חוסך זמן"). */
   chips?: string[];
-  /** Key-takeaway metric badge — a headline figure + what it means. */
+  /** Key-takeaway badge — a qualitative shift + what it means. */
   metric?: { value: string; label: string };
   to: string;
   flagship?: boolean;
@@ -35,17 +38,16 @@ export const SERVICES: ServiceEntry[] = [
   {
     id: 'jarvis',
     icon: Bot,
-    title: 'מערכת JARVIS',
-    blurb:
-      'עוזר AI אישי בעברית שמתחבר למייל, ליומן ול-CRM. מריץ תהליכים שלמים בפקודה קולית או בטקסט.',
+    title: 'JARVIS: עוזר אישי',
+    blurb: 'עוזר AI בעברית שמחובר למייל, ליומן ולרשימת הלקוחות שלכם. מבקשים ממנו בהודעה או בקול, והוא עושה.',
     points: [
-      'מבצע פעולות במערכות שלכם, לא רק ממליץ',
-      'קליטת לקוח חדש: מסמכים, גישות ומייל פתיחה',
-      'זוכר הקשר ולומד את שגרת העבודה שלכם',
-      'הרשאות ולוגים מלאים על כל פעולה',
+      'עושה את הפעולה בעצמו, לא רק ממליץ',
+      'לקוח חדש: מסמכים, הרשאות ומייל פתיחה',
+      'זוכר איך אתם עובדים ולומד את השגרה',
+      'אתם רואים כל פעולה שהוא עשה',
     ],
-    chips: ['בעברית מלאה', 'אוטומציה מקצה לקצה', 'הרשאות ובקרה', 'זיכרון והקשר'],
-    metric: { value: 'כ-15 שעות', label: 'חיסכון שבועי טיפוסי לבעל תפקיד' },
+    chips: ['בעברית', 'עושה, לא רק עונה', 'אתם בשליטה'],
+    metric: { value: 'פחות מטלות קטנות', label: 'יותר זמן לעבודה שרק אתם יכולים לעשות' },
     to: '/jarvis',
     flagship: true,
     span: 'lg:col-span-3 lg:row-span-2',
@@ -53,16 +55,15 @@ export const SERVICES: ServiceEntry[] = [
   {
     id: 'ai-agents',
     icon: BrainCircuit,
-    title: 'סוכני AI ואוטומציה',
-    blurb:
-      'סוכן ייעודי לכל תהליך: מכירות, שירות ותפעול. אתם מאשרים בנקודות ההכרעה, הוא עושה את השאר.',
+    title: 'סוכני AI לעבודה חוזרת',
+    blurb: 'סוכן אחד לכל משימה: פניות, מכירות או סידורים משרדיים. אתם מאשרים את ההחלטות, הוא עושה את השאר.',
     points: [
-      'מתחבר למקורות הנתונים שלכם ופועל עליהם',
-      'בקרה אנושית בכל החלטה רגישה',
-      'מדידה של הזמן שנחסך בכל תהליך',
+      'עובד בתוך הכלים שכבר יש לכם',
+      'עוצר ושואל לפני כל החלטה רגישה',
+      'רואים כמה זמן הוא חסך לכם',
     ],
-    chips: ['רץ 24/7', 'מותאם אישית', 'ROI נמדד'],
-    metric: { value: 'משעות → דקות', label: 'זמן טיפול במשימה חוזרת' },
+    chips: ['עובד גם בלילה', 'מותאם אליכם', 'חוסך זמן'],
+    metric: { value: 'משעות לדקות', label: 'זמן הטיפול במשימה שחוזרת כל יום' },
     to: '/ai',
     flagship: true,
     span: 'lg:col-span-3',
@@ -70,15 +71,14 @@ export const SERVICES: ServiceEntry[] = [
   {
     id: 'rag-knowledge',
     icon: Database,
-    title: 'RAG: AI שעונה מהמסמכים שלכם',
-    blurb:
-      'מודל שפה שמחובר למסמכים, להערות ולידע שלכם, ועונה עם הפניה למקור במקום להמציא.',
+    title: 'AI שעונה מהמסמכים שלכם',
+    blurb: 'מחברים את ה-AI למסמכים, למחירונים ולנהלים שלכם. הוא עונה רק מתוכם, ומראה מאיפה לקח את התשובה.',
     points: [
-      'שליפה מדויקת מתוך PDF, מסמכים והערות',
-      'כל תשובה עם הפניה למקור',
-      'עובד עם המודל שמתאים למשימה',
+      'מוצא את התשובה בתוך קבצים ומסמכים',
+      'כל תשובה עם הפניה למסמך',
+      'אומר "לא יודע" במקום להמציא',
     ],
-    chips: ['תשובות עם מקור', 'חיפוש סמנטי', 'בלי הזיות'],
+    chips: ['תשובות עם מקור', 'בלי המצאות', 'המסמכים שלכם'],
     to: '/ai',
     flagship: true,
     span: 'lg:col-span-3',
@@ -86,15 +86,14 @@ export const SERVICES: ServiceEntry[] = [
   {
     id: 'llm-selection',
     icon: Cpu,
-    title: 'בחירת מודל LLM',
-    blurb:
-      'Grok, Claude, Gemini, GPT או מודל מקומי. בודקים על המשימה שלכם ובוחרים לפי איכות, מהירות ועלות.',
+    title: 'בחירת המודל הנכון',
+    blurb: 'Grok, Claude, Gemini, GPT או מודל שרץ אצלכם במחשב. בודקים על העבודה שלכם ובוחרים לפי איכות, מהירות ומחיר.',
     points: [
       'השוואה על דוגמאות אמיתיות שלכם',
-      'ניתוב בין מודלים לפי סוג המשימה',
-      'מודל מקומי כשהמידע לא יוצא מהמחשב',
+      'מודל זול למשימות פשוטות, חזק לקשות',
+      'מודל פרטי כשהמידע לא יוצא מהמחשב',
     ],
-    chips: ['השוואה מעשית', 'ניתוב מודלים', 'מודלים מקומיים'],
+    chips: ['השוואה מעשית', 'חוסך כסף', 'פרטיות'],
     to: '/news',
     span: 'lg:col-span-2',
   },
@@ -102,29 +101,27 @@ export const SERVICES: ServiceEntry[] = [
     id: 'content-agents',
     icon: Sparkles,
     title: 'סוכני תוכן',
-    blurb:
-      'סוכן שקורא חדשות, מסכם ומנסח פוסטים, קרוסלות ושרשורים. אתם מאשרים לפני כל פרסום.',
+    blurb: 'סוכן שקורא חדשות מהתחום שלכם, מסכם, ומכין טיוטות לפוסטים. אתם מאשרים לפני שמשהו עולה.',
     points: [
-      'סריקת מקורות ומיון לפי רלוונטיות',
-      'טיוטות מותאמות לכל פלטפורמה',
-      'אישור אנושי לפני פרסום',
+      'מוצא מה חדש ורלוונטי אליכם',
+      'טיוטה מותאמת לכל רשת',
+      'שום דבר לא עולה בלי אישור שלכם',
     ],
-    chips: ['חדשות לתוכן', 'רב-פלטפורמי', 'אישור אנושי'],
+    chips: ['חדשות לתוכן', 'כל הרשתות', 'באישור שלכם'],
     to: '/ai',
     span: 'lg:col-span-2',
   },
   {
     id: 'voice-agents',
     icon: MessageSquare,
-    title: 'סוכני שיחה',
-    blurb:
-      'סוכן שעונה ב-WhatsApp או באתר, בעברית טבעית, ומעביר אליכם רק את מה שדורש החלטה.',
+    title: 'סוכן לוואטסאפ ולאתר',
+    blurb: 'עונה ללקוחות בוואטסאפ או בצ׳אט באתר, בעברית טבעית, ומעביר אליכם רק את מה שצריך החלטה שלכם.',
     points: [
-      'מענה בעברית טבעית',
-      'העברה אליכם כשצריך החלטה',
-      'היסטוריית שיחה מלאה',
+      'עברית טבעית, לא רובוטית',
+      'מעביר אליכם כשצריך אתכם',
+      'כל השיחה שמורה ומסודרת',
     ],
-    chips: ['WhatsApp', 'צ׳אט אתר', 'עברית מלאה'],
+    chips: ['WhatsApp', 'צ׳אט באתר', 'עברית'],
     to: '/ai',
     span: 'lg:col-span-2',
   },
@@ -132,16 +129,15 @@ export const SERVICES: ServiceEntry[] = [
     id: 'process-automation',
     icon: Workflow,
     title: 'אוטומציות שחוסכות זמן',
-    blurb:
-      'סנכרון בין יומן, מייל ומסמכים, בין הכלים שכבר יש לכם, עם מודל שפה באמצע. פחות העתק-הדבק, פחות טעויות.',
+    blurb: 'היומן, המייל והמסמכים מדברים זה עם זה, עם AI באמצע שמבין מה לעשות. פחות העתק-הדבק, פחות טעויות.',
     points: [
       'חשבוניות והצעות מחיר שנשלחות לבד',
-      'סנכרון יומן, CRM ומייל בלי עבודה ידנית',
-      'מעקבים והתראות שלא נופלים בין הכיסאות',
-      'חיבור לכלים הקיימים דרך API',
+      'היומן, המייל ורשימת הלקוחות מסונכרנים',
+      'תזכורות ומעקבים שלא נשכחים',
+      'מתחבר לכלים שכבר יש לכם',
     ],
-    chips: ['אינטגרציה קלה', 'אוטומציה מלאה', 'חיסכון בזמן', 'פחות טעויות'],
-    metric: { value: 'כ-70%', label: 'מהמשימות הידניות החוזרות — הופכות לאוטומטיות' },
+    chips: ['חיבור פשוט', 'חוסך זמן', 'פחות טעויות'],
+    metric: { value: 'פחות עבודה ידנית', label: 'המשימות החוזרות קורות לבד, ואתם רק בודקים' },
     to: '/ai',
     wide: true,
     span: 'lg:col-span-6',

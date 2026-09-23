@@ -194,8 +194,8 @@ export default function NewsPage() {
         <PageHero
           badgeIcon={Rss}
           badgeLabel="AI News Command Center"
-          title={'חמ״ל חדשות AI: מודלים, סוכנים וכלים'}
-          subtitle="ריכוז עדכונים בזמן אמת עם תקציר מנהלים מבוסס AI, ניתוח טכנולוגי ומשמעויות מעשיות לכל כתבה."
+          title={'חדשות AI: מודלים, סוכנים וכלים'}
+          subtitle="מה קרה היום בעולם ה-AI, עם תקציר קצר לכל כתבה ומה זה אומר בשבילכם."
         />
 
         <TelemetryTicker items={items ?? []} updatedAt={dataUpdatedAt} />
