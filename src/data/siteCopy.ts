@@ -27,17 +27,15 @@ export const HERO_COPY = {
 };
 
 /**
- * The hero's console: Daniel's own tips (guides, posts) + new AI models and tools only. General
- * news moved out of it on 2026-09-23 — the ticker above the header already carries that.
+ * The hero's console: AI model updates ONLY (2026-09-23 — guides and posts were taken out; the way
+ * to the guides is the "לומדים AI" nav link). General news stays in the ticker.
  */
 export const HERO_CONSOLE_COPY = {
-  label: 'TIPS · MODELS',
-  title: 'טיפים ועדכוני מודלים',
-  loading: 'טוען את העדכונים האחרונים…',
-  empty: 'אין עדכונים חדשים כרגע. בקרוב יהיו כאן עוד מדריכים.',
-  filters: { all: 'הכל', tips: 'הטיפים שלי', models: 'מודלים וכלים' },
-  kind: { guide: 'מדריך', post: 'פוסט', model: 'עדכון' },
-  cta: 'ללומדים AI',
+  label: 'MODELS · LIVE',
+  title: 'עדכוני מודלים',
+  currentLabel: 'המודלים העדכניים',
+  releasesLabel: 'השקות אחרונות',
+  empty: 'אין השקות חדשות כרגע. הרשימה מתעדכנת לבד.',
 };
 
 /**

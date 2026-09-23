@@ -1,15 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowDown, ArrowLeft, ChevronLeft, BookOpen, Cpu, AtSign } from 'lucide-react';
+import { ArrowDown, ChevronLeft, Cpu, Radio } from 'lucide-react';
 import WebButton from './WebButton';
 import SocialLinks from './SocialLinks';
-import ArticleModal from './news/ArticleModal';
 import { HERO_COPY, HERO_CONSOLE_COPY } from '../data/siteCopy';
 import { useNewsFeed, formatRelativeTime, type NewsItem } from '../services/newsService';
-import { useCreatorFeed } from '../services/creatorFeedService';
+import { useModelCatalog } from '../services/modelCatalogService';
 import { smoothScrollTo } from '../hooks/useLenis';
 import { rtl } from '../lib/rtl';
+
+// Static on purpose: the site-wide NewsTicker already imports ArticleModal, so it is in the main
+// chunk either way and a lazy() here would only add a Suspense boundary and lose its exit animation.
+import ArticleModal from './news/ArticleModal';
 
 const HERO_ICON_CLASS =
   'w-10 h-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 transition-colors';
@@ -21,12 +23,15 @@ const AGENTS_ANCHOR = '#offer-ai-agents';
 
 /**
  * Hero (split layout since 2026-09-23). The right-hand column (RTL start) carries one warm promise
- * and exactly ONE button, which scrolls to the AI agents section — the news button was removed
- * because the ticker above the header already carries the news, and a second CTA split the first
- * click. The left-hand column is the "tips & model updates" console below.
+ * and exactly ONE button, which scrolls to the AI agents section. The left-hand column is the
+ * model-updates console below.
  *
- * Mobile: one column, console under the CTA, so the promise and the button own the first viewport.
- * No sticky/pin anywhere (webview rule, AGENTS.md).
+ * First-paint rules (2026-09-23 performance pass): nothing in the first viewport starts at
+ * `opacity: 0`. The entrance is a transform-only nudge, so the headline — the page's LCP element —
+ * is painted on the first frame instead of after a 1.1 s fade, and the console is never hidden
+ * behind a delayed entrance.
+ *
+ * Mobile: one column, console under the CTA. No sticky/pin anywhere (webview rule, AGENTS.md).
  */
 export default function Hero() {
   const c = HERO_COPY;
@@ -42,9 +47,9 @@ export default function Hero() {
       <div className="container-wide relative z-10">
         <div className="mx-auto grid max-w-[1400px] items-center gap-12 px-4 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.1, ease: EASE }}
+            initial={{ y: 14 }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.9, ease: EASE }}
             className="text-center lg:text-right"
           >
             <h1 className="font-display text-fluid-hero font-black text-white mb-7 [text-shadow:0_2px_18px_rgba(0,0,0,0.85),0_6px_44px_rgba(0,0,0,0.75)]">
@@ -72,107 +77,52 @@ export default function Hero() {
             />
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.1, delay: 0.25, ease: EASE }}
-          >
-            <TipsConsole />
-          </motion.div>
+          <ModelConsole />
         </div>
       </div>
     </section>
   );
 }
 
-// ─── Tips & model-updates console ────────────────────────────────────────────────────────────
-
-type Kind = 'guide' | 'post' | 'model';
-type Filter = 'all' | 'tips' | 'models';
-
-interface ConsoleRow {
-  id: string;
-  kind: Kind;
-  title: string;
-  meta: string;
-  /** Model updates open the article modal; guides and posts are links. */
-  item?: NewsItem;
-  href?: string;
-  external?: boolean;
-}
-
-const CONSOLE_ROWS = 4;
+// ─── Model-updates console ───────────────────────────────────────────────────────────────────
 
 /**
- * Only NEW models, tools and releases — not general AI news (that is the ticker's job). The feed
- * is already Hebrew + AI-only (sanitizeAndKeep); this narrows it to launches. `ai_models` items
- * qualify on their topic; anything else needs a launch verb or a known model/tool name in the
- * headline.
+ * Model updates ONLY (2026-09-23). Guides and posts were removed from here by decision — the one
+ * way to the guides is the "לומדים AI" nav link.
+ *
+ * Two layers, chosen so the console is complete on the first frame and never shifts:
+ *   1. "Current models" — the newest model per lab from ModelUpdateAgent. The query's
+ *      `placeholderData` is the verified seed, so this row has real content before any fetch.
+ *   2. "Latest launches" — model/tool release headlines filtered from /api/news. Until the feed
+ *      answers, FIXED-HEIGHT skeleton rows hold exactly the space the real rows take (each row is
+ *      a fixed height with a 2-line clamp), so nothing below moves when the data lands.
  */
-const LAUNCH = /השיק|משיק|משיקה|השקה|השקת|חשפ|חושפ|גרסה|גרסת|מודל חדש|כלי חדש|קוד פתוח|זמין עכשיו|הכריז|מכריז|\b(?:GPT|Claude|Gemini|Llama|Grok|Mistral|DeepSeek|Qwen|Copilot|Cursor|Sora|Veo|Midjourney|o\d)\b/i;
+const RELEASE_ROWS = 3;
+/** Row height is fixed so skeleton → content is a swap, not a reflow. */
+const ROW_H = 'h-[84px]';
+
+/** Only NEW models, tools and releases — the feed is already Hebrew + AI-only (sanitizeAndKeep). */
+const LAUNCH = /השיק|משיק|משיקה|השקה|השקת|חשפ|חושפ|גרסה|גרסת|מודל חדש|כלי חדש|קוד פתוח|זמין עכשיו|הכריז|מכריז|\b(?:GPT|Claude|Gemini|Llama|Grok|Muse|Mistral|DeepSeek|Qwen|Copilot|Cursor|Sora|Veo|Midjourney|o\d)\b/i;
 
 function isModelUpdate(item: NewsItem): boolean {
   return item.topic === 'ai_models' || LAUNCH.test(item.title);
 }
 
-const KIND_ICON = { guide: BookOpen, post: AtSign, model: Cpu } as const;
-
-function TipsConsole() {
-  const navigate = useNavigate();
+function ModelConsole() {
   const news = useNewsFeed();
-  const creator = useCreatorFeed();
-  const [filter, setFilter] = useState<Filter>('all');
+  const { data: catalog } = useModelCatalog();
   const [active, setActive] = useState<NewsItem | null>(null);
   const k = HERO_CONSOLE_COPY;
 
-  const { tips, models } = useMemo(() => {
+  const releases = useMemo(() => {
     const ts = (iso: string) => {
       const t = new Date(iso).getTime();
       return Number.isNaN(t) ? -Infinity : t;
     };
-    const models: ConsoleRow[] = [...(news.data ?? [])]
-      .filter(isModelUpdate)
-      .sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt))
-      .slice(0, CONSOLE_ROWS)
-      .map((i) => ({ id: `m-${i.id}`, kind: 'model', title: i.title, meta: `${i.source} · ${formatRelativeTime(i.publishedAt)}`, item: i }));
+    return [...(news.data ?? [])].filter(isModelUpdate).sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt)).slice(0, RELEASE_ROWS);
+  }, [news.data]);
 
-    // Already ordered by SocialSyncAgent: posts, then Linktree content links, then the guides.
-    const tips: ConsoleRow[] = (creator.data ?? []).map((c) => ({
-      id: c.id,
-      kind: c.kind === 'guide' ? 'guide' : 'post',
-      title: c.title,
-      meta:
-        c.kind === 'post'
-          ? `@mrdaniel_ai · ${c.publishedAt ? formatRelativeTime(c.publishedAt) : 'X'}`
-          : c.kind === 'link'
-            ? new URL(c.url).hostname.replace(/^www\./, '')
-            : c.blurb ?? '',
-      href: c.url,
-      external: c.kind !== 'guide',
-    }));
-    return { tips, models };
-  }, [news.data, creator.data]);
-
-  // "All" interleaves the two streams (tip, model, tip, model…) so neither buries the other.
-  const rows = useMemo(() => {
-    if (filter === 'tips') return tips.slice(0, CONSOLE_ROWS);
-    if (filter === 'models') return models.slice(0, CONSOLE_ROWS);
-    const out: ConsoleRow[] = [];
-    for (let i = 0; out.length < CONSOLE_ROWS && (i < tips.length || i < models.length); i++) {
-      if (tips[i]) out.push(tips[i]);
-      if (models[i] && out.length < CONSOLE_ROWS) out.push(models[i]);
-    }
-    return out;
-  }, [filter, tips, models]);
-
-  // Guides are local, so only the models tab can be genuinely "loading".
-  const loading = filter === 'models' && news.isLoading;
-
-  const open = (row: ConsoleRow) => {
-    if (row.item) setActive(row.item);
-    else if (row.href && row.external) window.open(row.href, '_blank', 'noopener,noreferrer');
-    else if (row.href) navigate(row.href);
-  };
+  const frontier = (catalog?.frontier ?? []).slice(0, 4);
 
   return (
     <div className="signal-console glass-panel glass-panel--flagship relative overflow-hidden rounded-3xl" dir="rtl">
@@ -194,78 +144,66 @@ function TipsConsole() {
       </div>
 
       <div className="px-5 pb-5 pt-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-lg font-extrabold text-white">{rtl(k.title)}</h2>
-          <div role="tablist" aria-label={k.title} className="flex gap-1 rounded-full border border-white/10 bg-black/30 p-1">
-            {(['all', 'tips', 'models'] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                role="tab"
-                aria-selected={filter === f}
-                onClick={() => setFilter(f)}
-                className={`rounded-full px-3 py-1 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 ${
-                  filter === f ? 'bg-brand-500 text-black' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                {k.filters[f]}
-              </button>
-            ))}
-          </div>
-        </div>
+        <h2 className="mb-3 font-display text-lg font-extrabold text-white">{rtl(k.title)}</h2>
 
-        {loading ? (
-          <ul className="space-y-2.5" aria-busy="true" aria-label={k.loading}>
-            {Array.from({ length: 3 }, (_, i) => (
-              <li key={i} className="space-y-2 rounded-2xl border border-white/[0.06] bg-black/25 p-4">
-                <span className="block h-2.5 w-24 animate-pulse rounded bg-white/[0.08]" />
-                <span className="block h-3.5 w-full animate-pulse rounded bg-white/[0.08]" />
-              </li>
-            ))}
-          </ul>
-        ) : rows.length === 0 ? (
-          <p className="rounded-2xl border border-white/[0.06] bg-black/25 p-4 text-sm text-zinc-400">{rtl(k.empty)}</p>
-        ) : (
-          <ol className="space-y-2.5" key={filter}>
-            {rows.map((row, i) => {
-              const Icon = KIND_ICON[row.kind];
-              return (
-                <li key={row.id} className="signal-row" style={{ animationDelay: `${0.15 + i * 0.08}s` }}>
-                  <button
-                    type="button"
-                    onClick={() => open(row)}
-                    className="group flex w-full items-start gap-3 rounded-2xl border border-white/[0.06] bg-black/25 p-4 text-right transition-colors hover:border-brand-500/40 hover:bg-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
-                  >
-                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${row.kind === 'model' ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300' : 'border-brand-500/30 bg-brand-500/10 text-brand-300'}`}>
-                      <Icon className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="mb-1 flex flex-wrap items-center gap-x-2 text-[11px] text-zinc-500">
-                        <span className="font-bold text-zinc-300">{k.kind[row.kind]}</span>
-                        <span aria-hidden="true">·</span>
-                        <span className="line-clamp-1">{row.meta}</span>
-                      </span>
-                      <bdi dir="rtl" className="line-clamp-2 block text-[15px] font-semibold leading-snug text-zinc-100 group-hover:text-white">
-                        {row.title}
-                      </bdi>
-                    </span>
-                    <ChevronLeft className="mt-2 h-4 w-4 shrink-0 text-zinc-600 transition-transform group-hover:-translate-x-0.5 group-hover:text-brand-400" aria-hidden="true" />
-                  </button>
+        {/* 1 — Current models: real content on the first frame (seed placeholder). */}
+        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold text-zinc-500">
+          <Cpu className="h-3.5 w-3.5 text-brand-400" aria-hidden="true" />
+          {k.currentLabel}
+        </p>
+        <ul className="mb-5 grid grid-cols-2 gap-2">
+          {frontier.map((m) => (
+            <li key={m.id} className="h-[58px] rounded-xl border border-white/[0.07] bg-black/25 px-3 py-2">
+              <span className="block text-[10px] font-bold text-zinc-500">{m.vendor}</span>
+              <bdi dir="ltr" className="block truncate font-display text-sm font-extrabold text-white">
+                {m.name}
+              </bdi>
+            </li>
+          ))}
+        </ul>
+
+        {/* 2 — Latest launches from the feed. */}
+        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold text-zinc-500">
+          <Radio className="h-3.5 w-3.5 text-cyan-300" aria-hidden="true" />
+          {k.releasesLabel}
+        </p>
+        <ol className="space-y-2" aria-busy={news.isLoading}>
+          {news.isLoading
+            ? Array.from({ length: RELEASE_ROWS }, (_, i) => (
+                <li key={i} className={`${ROW_H} space-y-2 rounded-2xl border border-white/[0.06] bg-black/25 p-3.5`} aria-hidden="true">
+                  <span className="block h-2.5 w-24 animate-pulse rounded bg-white/[0.08]" />
+                  <span className="block h-3.5 w-full animate-pulse rounded bg-white/[0.08]" />
+                  <span className="block h-3.5 w-2/3 animate-pulse rounded bg-white/[0.08]" />
                 </li>
-              );
-            })}
-          </ol>
-        )}
-
-        <button
-          type="button"
-          onClick={() => navigate('/magazines')}
-          aria-label="לעמוד לומדים AI"
-          className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-brand-300 hover:text-brand-200 focus-visible:outline-none focus-visible:underline"
-        >
-          {rtl(k.cta)}
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        </button>
+              ))
+            : releases.length === 0
+              ? (
+                  <li className={`${ROW_H} flex items-center rounded-2xl border border-white/[0.06] bg-black/25 p-3.5 text-sm text-zinc-400`}>
+                    {rtl(k.empty)}
+                  </li>
+                )
+              : releases.map((item) => (
+                  <li key={item.id} className={ROW_H}>
+                    <button
+                      type="button"
+                      onClick={() => setActive(item)}
+                      className="group flex h-full w-full items-start gap-3 rounded-2xl border border-white/[0.06] bg-black/25 p-3.5 text-right transition-colors hover:border-brand-500/40 hover:bg-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="mb-1 flex items-center gap-x-2 text-[11px] text-zinc-500">
+                          <span className="truncate font-bold text-zinc-300">{item.source}</span>
+                          <span aria-hidden="true">·</span>
+                          <span className="shrink-0">{formatRelativeTime(item.publishedAt)}</span>
+                        </span>
+                        <bdi dir="rtl" className="line-clamp-2 block text-[14px] font-semibold leading-snug text-zinc-100 group-hover:text-white">
+                          {item.title}
+                        </bdi>
+                      </span>
+                      <ChevronLeft className="mt-5 h-4 w-4 shrink-0 text-zinc-600 transition-transform group-hover:-translate-x-0.5 group-hover:text-brand-400" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+        </ol>
       </div>
 
       <span className="signal-console__scan" aria-hidden="true" />
