@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { AdaptiveDpr, AdaptiveEvents, PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
 import SceneObjects from './SceneObjects';
+import AuroraField from './AuroraField';
 import { useDeviceTier, isIOSWebKit } from '../hooks/useDeviceTier';
 import { usePointerTracking } from '../hooks/usePointer';
 import { getA11yPrefs, subscribeA11y } from '../lib/a11yStore';
@@ -126,6 +127,10 @@ export default function Scene3D() {
             rings, which needed a real light + baked-Environment rig to read at all. Wireframe lines
             are self-colored and GPU-cheap (no lighting computation per fragment), so removing the
             old 3-point rig + baked Environment is a genuine frame-cost saving, not just dead code. */}
+
+        {/* Shader backdrop, drawn first and behind everything. Not on the low tier: it is one
+            full-screen fragment pass, which is exactly the budget that tier does not have. */}
+        {deviceTier !== 'low' && !degraded && <AuroraField />}
 
         <Suspense fallback={null}>
           <SceneObjects tier={deviceTier} bloomEnabled={richEffectsEnabled} extrasEnabled={richEffectsEnabled} />

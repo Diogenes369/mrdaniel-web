@@ -22,6 +22,50 @@ export const HERO_COPY = {
   ctaSecondary: 'לחדשות ה-AI',
 };
 
+/**
+ * The hero's live signal console (homepage redesign, 2026-09-23). The panel shows the three newest
+ * REAL headlines from /api/news — proof that the hub is live, instead of a claim that it is. The
+ * strings here are only its chrome; no counts or stats, because the only honest number on the
+ * panel is the timestamp each item already carries.
+ */
+export const HERO_CONSOLE_COPY = {
+  label: 'SIGNAL · AI',
+  title: 'מה קורה עכשיו ב-AI',
+  loading: 'מושך את הכותרות האחרונות…',
+  empty: 'הפיד מתעדכן. כל החדשות מחכות בעמוד החדשות.',
+  cta: 'לכל החדשות',
+};
+
+/**
+ * The "how it works" strip between the three pillars and the ROI calculator. It answers the
+ * question a visitor has right after the agents pillar and right before being asked to estimate
+ * savings: what actually happens if I say yes. Three steps, each a process fact, no promised
+ * timelines or results.
+ */
+export const PROCESS_COPY = {
+  lead: 'ככה נבנה',
+  accent: 'סוכן שעובד',
+  sub: 'שלושה שלבים, ואתם מחליטים בכל אחד מהם אם ממשיכים.',
+  steps: [
+    {
+      kicker: '01',
+      title: 'ממפים משימה אחת',
+      body: 'בוחרים עבודה חוזרת אחת שגוזלת לכם זמן, ומגדירים מה נחשב הצלחה לפני שכותבים שורת קוד.',
+    },
+    {
+      kicker: '02',
+      title: 'בוחרים מודל ובונים',
+      body: 'המודל נבחר לפי המשימה, לא לפי ההייפ. הסוכן מתחבר לכלים שכבר עובדים אצלכם: WhatsApp, מייל, יומן ומסמכים.',
+    },
+    {
+      kicker: '03',
+      title: 'מפעילים עם אישור אנושי',
+      body: 'הסוכן רץ לבד, ובנקודות ההכרעה הוא עוצר ומחכה לאישור שלכם. מרחיבים רק אחרי שזה עובד.',
+    },
+  ],
+  cta: 'מתחילים משיחת אפיון',
+};
+
 export const ROTATOR_TERMS: readonly string[] = [
   'סוכני AI אוטונומיים',
   'פירוק מודלי LLM חדשים',
