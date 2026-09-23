@@ -42,7 +42,7 @@ Run from the **repo root** for the site, from **`dashboard/`** for the dashboard
 
 **Always** run `npx tsc --noEmit` **and** `npm run build` for every project you touched before calling a change done. `tsc` covers `src`, `api`, `server.ts`, `netlify` at root; `src` in the dashboard.
 
-Deploy uses the Vercel CLI (`vercel --prod`). Both projects are already linked (`.vercel/project.json`). **Do not deploy without the user explicitly asking.**
+**Since 2026-09-23 both Vercel projects are Git-connected to `github.com/Diogenes369/mrdaniel-web`: every push to `main` deploys BOTH to production** (`my-website` builds the repo root, `dashboard` has Root Directory = `dashboard`). So pushing to `main` IS deploying — treat it with the same care, and never push without the user asking. The CLI (`vercel --prod`) still works for a manual deploy; both projects are linked (`.vercel/project.json`). **Do not deploy without the user explicitly asking.**
 
 ---
 
