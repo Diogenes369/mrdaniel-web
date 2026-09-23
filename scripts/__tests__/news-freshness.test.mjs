@@ -156,6 +156,7 @@ t('analysis · returns the two modal sections, no analysis block', ['executiveSu
   t('precompute · generation lives only in the background agent', /generateArticleInsights\(/.test(pre));
   t('precompute · the batch endpoint requires the admin secret', /action === 'precompute'[\s\S]{0,200}x-admin-secret/.test(api));
   t('precompute · a rate limit stops the batch instead of burning the day', /stoppedBy = 'rate-limit'/.test(pre));
+  t('precompute · only an article-caused failure counts against the article (503/outage does not)', /if \(!isArticleFault\(err\)\)/.test(pre) && !/function isRateLimit/.test(pre));
   t('precompute · the modal reads the prefetched map, no per-article request', !/news\/analyze/.test(svc) && /action=insights/.test(svc) && !/fetch\(/.test(modal));
   t('precompute · the map is warmed while idle', /requestIdleCallback/.test(svc));
 }

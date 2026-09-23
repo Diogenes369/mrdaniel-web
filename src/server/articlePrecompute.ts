@@ -56,9 +56,17 @@ export function insightKey(link: string): string {
   return createHash('sha1').update(link).digest('hex').slice(0, 16);
 }
 
-function isRateLimit(err: unknown): boolean {
+/**
+ * Only a failure that is the ARTICLE's fault counts against it: the model answered but the answer
+ * was unusable for this text, or the item has no usable title. Everything else — a 429, a 503
+ * "high demand", every engine down, a timeout, a network error — is the providers' state, not the
+ * article's, and must neither burn one of its bounded retries nor keep the batch hammering.
+ * (First version inverted this and matched only 429 wording; a morning of Gemini 503s marked
+ * healthy articles as failing — 2026-09-23.)
+ */
+function isArticleFault(err: unknown): boolean {
   const m = err instanceof Error ? err.message : String(err);
-  return /429|quota|rate.?limit|RESOURCE_EXHAUSTED|gemini pacing:|benched|cooldown/i.test(m);
+  return /did not return a usable|title is missing|too short to analyze/i.test(m);
 }
 
 export interface PrecomputeResult {
@@ -66,6 +74,7 @@ export interface PrecomputeResult {
   done: number;
   failed: number;
   pending: number;
+  /** `rate-limit` covers every provider-side stop: 429, 503, all engines down, timeouts. */
   stoppedBy?: 'budget' | 'rate-limit' | 'not-configured';
   ms: number;
 }
@@ -115,10 +124,11 @@ export async function runPrecompute(opts: { maxItems?: number; budgetMs?: number
       done++;
     } catch (err) {
       const prev = stored[key];
-      if (isRateLimit(err)) {
-        // Not the article's fault — do not count it against the article, stop the batch.
+      if (!isArticleFault(err)) {
+        // The providers are down or throttled — not this article's fault. Stop the batch; the
+        // next trigger (≤10 min away) tries again with the article's record untouched.
         stoppedBy = 'rate-limit';
-        console.warn('[precompute] rate-limited, stopping batch:', (err as Error)?.message ?? err);
+        console.warn('[precompute] engines unavailable, stopping batch:', ((err as Error)?.message ?? String(err)).slice(0, 200));
         break;
       }
       failed++;
