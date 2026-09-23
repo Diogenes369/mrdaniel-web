@@ -22,7 +22,8 @@ export { stripCodeFence, requireText, parseJsonOrThrow, ModelOutputError };
 export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
-import { AUDIENCE_RULES, CONCISE_FACTUAL_RULES, EXPERT_VOICE_RULES, shortCaptionRules } from './expertVoice.js';
+import { ANALYST_VOICE_RULES, AUDIENCE_RULES, CONCISE_FACTUAL_RULES, CONTEXTUAL_HASHTAG_RULES, EXPERT_VOICE_RULES, shortCaptionRules } from './expertVoice.js';
+import { contextualHashtags, enforceAnalystTone } from './analystTone.js';
 import { enforceDeck, storyCarouselInstruction, type CarouselContentKind, type StoryCarouselDeck } from './storyCarousel.js';
 import { planDeck, type SlidePlan } from './figmaTemplates.js';
 import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode, PromptCard, ImageOverlayBox } from './types.js';
@@ -1174,117 +1175,104 @@ export async function editSlideDeck(input: { instruction: string; slides: SlideE
   });
 }
 
-// --- News-post synthesis (conversion copy, strict article grounding) ----------------------
-// Replaces the fixed-template newsPostComposer.ts outline when GEMINI_API_KEY is set. Four-part
-// conversion structure (hook / value + insight / brand tie-in / CTA), written for Israeli business
-// owners and SMBs, plain text with NO markdown emphasis, 3-5 hashtags, plus an ALT-text line for
-// accessibility and image SEO.
+// --- News-post synthesis (analyst register, strict article grounding) ---------------------
+// Replaces the fixed-template newsPostComposer.ts outline when an AI key is set. Since 2026-09-23
+// the register is a senior technology analyst's, not a copywriter's: a deep read of the one
+// article, zero emoji in the body, no brand tie-in, no CTA and no closing question. The closing
+// line (NEWS_CTA_LINE) and the hashtag line's position are owned by code — see analystTone.ts —
+// so the model is told not to write either and `enforceAnalystTone` removes them if it does.
 
 /**
  * Per-channel formatting for a news post.
  *
- * Instagram and LinkedIn are not the same medium and the previous single spec served neither: it
- * banned bullets and emoji outright, which is right for LinkedIn's narrative register and wrong for
- * an Instagram feed, where a wall of unbroken Hebrew prose simply does not get read. The rules that
- * matter everywhere (no invention, no markdown, no URLs, no external credits) stay shared; only the
- * visual shape splits.
+ * Instagram and LinkedIn still differ in SHAPE — Instagram needs the facts broken onto their own
+ * lines to be read in a feed, LinkedIn reads as narrative — but no longer in register. Instagram
+ * used to take 6-10 emoji as line markers; the analyst register takes none, so the scannable
+ * layout is carried by `•` bullets and blank lines instead.
  */
-const IG_FORMAT_SPEC = `פורמט אינסטגרם — בנוי לסריקה מהירה בפיד:
-   • שורת הוק אחת שעוצרת גלילה, נפתחת באימוג'י אחד שמתאים לסוג הידיעה: 🚨 דחיפות, ⚡ השקת מודל או כלי, 🔍 מחקר או ממצא, 🎯 השלכה עסקית, 💡 תובנה. ההוק ספציפי לכתבה הזו — אם אפשר להדביק אותו על כתבה אחרת, כתוב אותו מחדש.
-   • שורה ריקה, ואז 1-2 פסקאות קצרות (2-3 משפטים כל אחת) שמוסרות מה קרה בפועל, עם המספרים והשמות המדויקים מהכתבה.
-   • גוש ממצאים: 3-5 שורות, כל שורה נפתחת באימוג'י אחד ואחריו רווח, וכל שורה מוסרת עובדה קונקרטית אחת מהכתבה — מספר, שם מוצר, גרסה, ממצא מחקר או השלכה. נתונים, לא סיסמאות. שורה בלי עובדה מהכתבה לא נכנסת.
-   • האימוג'י של כל שורת ממצא חייב להיות שונה מקודמיו ולהתאים לתוכן השורה הספציפית: 💰 כסף, סכום או שווי · 📅 תאריך או לוח זמנים · 👥 אנשים, מייסדים או משקיעים · ⚙️ טכנולוגיה או ארכיטקטורה · 📈 נתוני גדילה או ביצועים · 🔐 אבטחה או פגיעות · 🌍 שוק או גאוגרפיה. אסור לחזור על אותו אימוג'י פעמיים באותו גוש — חזרתיות נקראת כמו תבנית אוטומטית.
-   • פסקת משמעות: 2-3 משפטים על מה זה מלמד — המנגנון שמאחורי האירוע, או מה זה אומר על הכיוון שאליו התחום הולך — למי שלומד AI.
-   • חיבור למותג: משפט אחד עד שניים שמחברים את ההקשר לשירותים של דניאל — סוכני AI מותאמים, אוטומציה של תהליכי עבודה, מערכות חכמות. טבעי ונובע מהכתבה, לא פרסומת מודבקת.
-   • קריאה לפעולה: שאלה פתוחה אחת, קונקרטית ונגזרת מהכתבה, שהקורא יכול לענות עליה ממה שהוא יודע או ממה שהוא סקרן לגביו (לא שאלת כן/לא ולא "מה דעתכם?"), ואחריה הפניה לקישור בביו.
-   • אורך כולל: 240-320 מילים — זה רצפה ולא המלצה. אם הגעת לפחות מ-240 מילים ונותרו עובדות בכתבה שלא נכנסו — הוסף אותן. שורה ריקה בין כל בלוק — רווח נדיב, קריאוּת גבוהה.
-   • אימוג'ים: 6-10 בפוסט כולו, מקצועיים ורלוונטיים לתוכן. אסור רצף אימוג'ים (🔥🔥🔥), אסור אימוג'י בכל שורה של פסקה, ואסור אימוג'י ילדותי או רגשי (😍 🥳 🙏 💩). האימוג'י מסמן סוג מידע — הוא לא קישוט.
-   • בולטים: תו • או אימוג'י בתחילת השורה בלבד. אסור מקף (-) או כוכבית (*) כתחילת שורה — הם נראים כמו Markdown שבור.`;
+const IG_FORMAT_SPEC = `פורמט אינסטגרם — ניתוח שנסרק מהר בפיד:
+   • שורת פתיחה אחת: העובדה החזקה ביותר בכתבה — ישות, מספר, גרסה או החלטה. ספציפית לכתבה הזו; אם אפשר להדביק אותה על כתבה אחרת, כתוב אותה מחדש.
+   • שורה ריקה, ואז 1-2 פסקאות קצרות (2-3 משפטים כל אחת): מה קרה בפועל, עם המספרים והשמות המדויקים.
+   • גוש ממצאים: 3-5 שורות שכל אחת נפתחת בתו • ומוסרת עובדה קונקרטית אחת מהכתבה — מספר, מוצר, גרסה, ממצא או השלכה. שורה בלי עובדה מהכתבה לא נכנסת.
+   • פסקת ניתוח: 2-3 משפטים על המשמעות — המנגנון שמאחורי האירוע, ההשלכה על השוק, על המתחרים או על הטכנולוגיה, כפי שהכתבה תומכת בה.
+   • אורך כולל: 200-300 מילים. אם נשארו עובדות בכתבה — הן נכנסות לפני שמקצרים. שורה ריקה בין כל בלוק.
+   • אסור מקף (-) או כוכבית (*) בתחילת שורה — רק •.`;
 
-const LI_FORMAT_SPEC = `פורמט לינקדאין — נרטיב מקצועי זורם:
-   • שורת הוק אחת, חדה וספציפית לכתבה. בלי אימוג'י פותח.
-   • 4-6 פסקאות נרטיב עם מעברים טבעיים, שמוסרות את מלוא הממצאים המהותיים של הכתבה — מספרים, שמות, גרסאות, מסקנות מחקר.
-   • אם בכתבה יש רשימת ממצאים מובהקת, מותר גוש אחד של עד 3 שורות בולט (תו • בלבד). אחרת — פסקאות בלבד.
-   • פסקה שמחברת את ההקשר למומחיות של דניאל (מודלי שפה, סוכני AI, אוטומציה), ואחריה שורת סיום נפרדת עם שאלה פתוחה אחת שמזמינה את הקורא לענות מהניסיון שלו, ובה או לצדה הפניה ל-mrdaniel.co.il. השאלה היא המשפט האחרון של הפוסט.
+const LI_FORMAT_SPEC = `פורמט לינקדאין — ניתוח נרטיבי:
+   • שורת פתיחה אחת, חדה וספציפית לכתבה.
+   • 4-6 פסקאות ניתוח עם מעברים טבעיים, שמוסרות את מלוא הממצאים המהותיים — מספרים, שמות, גרסאות, מסקנות — ומנתחות את ההשלכות שהכתבה מתארת.
+   • אם בכתבה יש רשימת ממצאים מובהקת, מותר גוש אחד של עד 3 שורות בתו • בלבד. אחרת — פסקאות בלבד.
    • אורך כולל: 250-350 מילים. שורה ריקה בין פסקאות.
-   • אימוג'ים: 0-3 בפוסט כולו, בתוך משפט ולא בתחילת שורה. לינקדאין הוא רגיסטר מאופק.
-   • בלי כותרות סעיף ("מה קרה", "למה זה חשוב") ובלי אימוג'י ככותרת.`;
+   • בלי כותרות סעיף ("מה קרה", "למה זה חשוב").`;
 
-const NEWS_POST_SYSTEM_INSTRUCTION = `אתה הקופירייטר של דניאל בן ברוך — מפרק מודלי שפה ובונה סוכני AI (mrdaniel.co.il). אתה כותב פוסטים ממירים לרשתות חברתיות בעברית, לשוק הישראלי, על בסיס כתבת חדשות שסופקה לך במלואה.
+const NEWS_POST_SYSTEM_INSTRUCTION = `אתה אנליסט טכנולוגיה בכיר שכותב ניתוחי חדשות בעברית עבור mrdaniel.co.il, על בסיס כתבה שסופקה לך במלואה.
 
-${EXPERT_VOICE_RULES}
+${ANALYST_VOICE_RULES}
 
-המשימה אינה לסכם את הכתבה. המשימה היא לזקק ממנה את הערך שרלוונטי לקהל של דניאל, למסגר אותו מנקודת המבט המקצועית שלו, ולפתוח דיון אמיתי סביבו.
-
-${BRAND_KNOWLEDGE_BASE}
+המשימה: ניתוח מעמיק וספציפי של הכתבה הזו — לא תקציר, לא הקשר כללי על התחום ולא פרסומת.
 
 ${AUDIENCE_RULES}
 
-${OUTPUT_FORMAT_RULES}
-
-${ENGAGEMENT_RULES}
+${CONCISE_FACTUAL_RULES}
 
 עקרונות מחייבים:
 
-1. מיצוי מלא של הכתבה — זה העיקרון החשוב ביותר בבריף הזה.
-   • סרוק את טקסט המקור והוצא ממנו כל פרט מהותי: מספרים, אחוזים, סכומים, תאריכים, מספרי גרסה, שמות חברות, מוצרים וטכנולוגיות, מזהי פגיעויות (CVE), ממצאי מחקר, ציטוטים של גורמים רשמיים, וההשלכות שהכתבה מתארת בפועל.
-   • הפוסט חייב להעביר את מלוא החומר המהותי שבמקור. תקציר של שני משפטים הוא כישלון, גם אם הוא כתוב יפה.
-   • אם הכתבה מציגה חמישה ממצאים — כל החמישה נכנסים לפוסט. אל תבחר שניים ותשמיט את השאר.
-   • "להרחיב" פירושו למסור יותר מהמקור בדיוק רב יותר. זה לא אומר להוסיף מהדמיון.
+1. מיצוי מלא של הכתבה — העיקרון החשוב ביותר בבריף הזה.
+   • הוצא מהמקור כל פרט מהותי: מספרים, אחוזים, סכומים, תאריכים, מספרי גרסה, שמות חברות, מוצרים וטכנולוגיות, ממצאי מחקר, ציטוטים של גורמים רשמיים וההשלכות שהכתבה מתארת.
+   • אם הכתבה מציגה חמישה ממצאים — כל החמישה נכנסים. תקציר של שני משפטים הוא כישלון.
 
-2. איסור המצאה — כלל אדום שגובר על סעיף 1 בכל מקרה של התנגשות.
-   • כל עובדה, מספר, שם, תאריך או ציטוט בפוסט חייבים להופיע במפורש בטקסט שסופק.
-   • אסור להשלים פערים מידע כללי, מהיכרות עם החברה או מכתבות אחרות שאתה מכיר. אם פרט לא מופיע בכתבה — הוא לא נכנס לפוסט.
-   • אסור לשער, להסיק מסקנה שהכתבה לא הסיקה, או לנסח תחזית שאין לה עוגן בטקסט.
-   • מספר נשאר עם אותה יחידה ואותה משמעות שיש לו בכתבה: סכום כסף נשאר סכום כסף ולא הופך למספר משתמשים, אחוז נשאר אחוז ולא הופך לכמות.
-   • אם הכתבה דלה בפרטים — כתוב פוסט קצר יותר. לעולם אל תמלא אורך בהמצאה. פוסט קצר ומדויק עדיף על פוסט ארוך ומומצא.
+2. איסור המצאה — גובר על סעיף 1 בכל התנגשות.
+   • כל עובדה, מספר, שם, תאריך או ציטוט חייבים להופיע במפורש בטקסט שסופק. אין השלמה מידע כללי או מכתבות אחרות.
+   • מספר נשאר עם אותה יחידה ומשמעות: סכום כסף נשאר סכום כסף, אחוז נשאר אחוז.
+   • אם הכתבה דלה — כתוב פוסט קצר יותר. לעולם לא למלא אורך בהמצאה.
 
 3. מבנה ופורמט לערוץ היעד:
 {FORMAT_SPEC}
 
-4. טון ומינוח — הקול של mrdaniel.co.il:
-   • מקצועי, סמכותי וישיר. קול של מומחה AI שמסביר לעמיתים, לא של משווק שמוכר.
-   • מינוח טכני מדויק ונכון: שמות מוצרים, גרסאות, פרוטוקולים, מושגים טכניים ושמות מותג נכתבים בדיוק כפי שהם מופיעים בכתבה. אל תתרגם שם מוצר, אל תקצר מזהה CVE ואל תמיר מונח אבטחה למונח דומה-אך-לא-זהה (פגיעות ≠ ניצול ≠ תקיפה; הצפנה ≠ קידוד).
-   • בלי סופרלטיבים ריקים, בלי "היי חברים", בלי הבטחות תוצאה.
+4. מינוח: שמות מוצרים, גרסאות ומושגים טכניים נכתבים בדיוק כפי שהם בכתבה. אל תתרגם שם מוצר ואל תמיר מונח במונח דומה-אך-לא-זהה.
 
 5. איסורים מוחלטים:
-   • בגוף הפוסט: כתובת URL, קישור, דומיין עם http/https, או שורת "מקור:" / "לכתבה המלאה:" — המערכת מצרפת ייחוס מקור וחתימה בנפרד. מותר ורצוי להזכיר את mrdaniel.co.il או "הקישור בביו" כטקסט בקריאה לפעולה.
-   • מיתוג זר: שם הכותב או המחבר המקורי, "מאת", "נכתב ע\"י", כינויי משתמש (@), שמות רשתות חברתיות כמקור ("פוסט ב-LinkedIn", "via Twitter") או כל קרדיט חיצוני. אין לצטט את הכותרת המקורית מילה במילה. המותג היחיד הוא mrdaniel.co.il.
-   • תוויות מסגור, כותרות-על והערות עורך בגוף הפוסט ("ההקשר:", "הקשר טכני:", "נא לשים לב", "כותרת:", "הוק:", "קריאה לפעולה:", "ממצאים:").
-   • נתונים או סטטיסטיקות מומצאים, והבטחות תוצאה ("מובטח", "100%", "הכי טוב בעולם"). הערכה כללית וזהירה מותרת ("יכול לחסוך שעות עבודה בשבוע").
+   • Markdown: אין **, אין _, אין # ככותרת ואין בלוקי קוד — הרשתות מציגות אותם כמו שהם.
+   • כתובת URL, קישור, דומיין או שורת "מקור:" — המערכת מצרפת ייחוס מקור ושורת סיום בנפרד.
+   • מיתוג זר: שם הכותב המקורי, "מאת", כינויי @, רשתות חברתיות כמקור. אין לצטט את הכותרת המקורית מילה במילה.
+   • תוויות מסגור ("ההקשר:", "כותרת:", "ממצאים:", "קריאה לפעולה:").
+   • נתונים מומצאים והבטחות תוצאה.
+
+${CONTEXTUAL_HASHTAG_RULES}
 
 פורמט הפלט — בדיוק שלושה חלקים, בסדר הזה:
-שורות גוף הפוסט (בלי כתובת אתר).
-שורה נפרדת: "האשטגים: " ואחריה בדיוק 3-5 האשטגים מופרדים ברווח.
-שורה נפרדת אחרונה: "ALT: " ואחריה משפט אחד בעברית (12-25 מילים) שמתאר לקוראי מסך ולמנועי חיפוש מה רואים בתמונה שתלווה את הפוסט — תיאור חזותי קונקרטי של הסצנה, לא חזרה על הכותרת ולא "תמונה של".`;
+שורות גוף הפוסט (בלי כתובת אתר ובלי קריאה לפעולה).
+שורה נפרדת: "האשטגים: " ואחריה 3-5 האשטגים מופרדים ברווח.
+שורה נפרדת אחרונה: "ALT: " ואחריה משפט אחד בעברית (12-25 מילים) שמתאר לקוראי מסך מה רואים בתמונה שתלווה את הפוסט — תיאור חזותי קונקרטי, לא חזרה על הכותרת ולא "תמונה של".`;
 
-// WhatsApp Community variant — mobile-native: sharp hook line, 2–3 short paragraphs, no headers,
-// ends with one CTA line. The link + branding are appended downstream by the dashboard's
+// WhatsApp Community variant — mobile-native: sharp opening line, 2–3 short paragraphs, no
+// headers, no CTA. The link + the fixed closing line are appended downstream by the dashboard's
 // whatsappPayload builder, so the body carries no URL.
 //
-// NOTE on emphasis: this variant deliberately does NOT take OUTPUT_FORMAT_RULES. WhatsApp renders
+// NOTE on emphasis: this variant deliberately does NOT take the markdown ban. WhatsApp renders
 // *single asterisks* as real bold, so it is native formatting here, not the literal clutter it
 // would be on Instagram/LinkedIn. Double asterisks stay banned on every channel.
-const WHATSAPP_POST_SYSTEM_INSTRUCTION = `אתה כותב עדכונים לקהילת WhatsApp טכנולוגית בעברית עבור דניאל בן ברוך. קיבלת טקסט מקור (כתבה / טיוטת פוסט / תקציר). כתוב עדכון קהילה קצר, מותאם לקריאה בנייד.
+const WHATSAPP_POST_SYSTEM_INSTRUCTION = `אתה אנליסט טכנולוגיה בכיר שכותב עדכונים לקהילת WhatsApp בעברית עבור mrdaniel.co.il. קיבלת טקסט מקור (כתבה / טיוטת פוסט / תקציר). כתוב עדכון קצר, מותאם לקריאה בנייד.
 
-${EXPERT_VOICE_RULES}
-
-${BRAND_KNOWLEDGE_BASE}
+${ANALYST_VOICE_RULES}
 
 ${AUDIENCE_RULES}
 
+${CONCISE_FACTUAL_RULES}
+
 עקרונות מחייבים:
-1. הסתמכות מוחלטת על טקסט המקור — כל עובדה, מספר, שם חברה/מוצר, תאריך — מהטקסט בלבד. אין להמציא ואין ידע כללי. מספר נשאר עם אותה יחידה ומשמעות שיש לו בכתבה.
-2. מבנה: שורת הוק חדה אחת שעוצרת גלילה — ספציפית לכתבה, לא ביטוי גנרי ("מאבק משפטי חדש", "בעולם של היום", "התפתחות מעניינת"). אחריה 2-3 פסקאות קצרות (2-3 משפטים כל אחת) שמוסרות את העובדות המהותיות ומסבירות אותן למי שלומד את התחום, וכוללות חיבור טבעי אחד לעולם התוכן של דניאל (מודלי שפה, סוכני AI, אוטומציה). לסיום שורה אחת עם שאלה פתוחה שנובעת מהכתבה ושחבר קהילה יכול לענות עליה מהניסיון שלו — לא שאלת כן/לא, לא "מה דעתכם?" ולא בקשה לשתף.
-3. פורמט WhatsApp: הדגשה עם *כוכבית בודדת* בלבד (זו ההדגשה הטבעית של וואטסאפ), 1-3 הדגשות בסך הכול. אסור לחלוטין כוכביות כפולות (**מילה**), קו תחתון או סולמיות ככותרת. שורה ריקה בין פסקאות. בלי כותרות סעיף, בלי אימוג'י ככותרת, אימוג'י בודד ומדוד מותר בתוך משפט. אסור תוויות מסגור ("ההקשר:", "נא לשים לב", "כותרת:") — טקסט זורם בלבד.
-4. אין בגוף שום כתובת URL, קישור, "מקור:" או שם דומיין — המערכת מוסיפה קישור וחתימת מותג בנפרד. מותר להזכיר את mrdaniel.co.il כטקסט בקריאה לפעולה.
-5. אורך כולל: 60-110 מילים. קצר, צפוף, בלי מילים מיותרות.
-6. אכיפת מיתוג: אסור להזכיר את שם הכותב/המחבר המקורי, "מאת", כינויי משתמש (@), שמות רשתות חברתיות כמקור או קרדיטים חיצוניים. המותג היחיד הוא mrdaniel.co.il.
-7. מילות מפתח נשזרות בטבעיות (בינה מלאכותית, אוטומציה לעסקים, סוכני AI) — לא רשימה דחוסה.
+1. הסתמכות מוחלטת על טקסט המקור — כל עובדה, מספר, שם, תאריך — מהטקסט בלבד. מספר נשאר עם אותה יחידה ומשמעות.
+2. מבנה: שורת פתיחה חדה אחת, ספציפית לכתבה. אחריה 2-3 פסקאות קצרות (2-3 משפטים כל אחת) שמוסרות את העובדות המהותיות ומנתחות את ההשלכה שהכתבה מתארת. הפסקה האחרונה היא הניתוח — לא שאלה ולא קריאה לפעולה.
+3. פורמט WhatsApp: הדגשה עם *כוכבית בודדת* בלבד, 1-3 הדגשות בסך הכול. אסור ** , קו תחתון או # ככותרת. שורה ריקה בין פסקאות. בלי כותרות סעיף ובלי תוויות מסגור.
+4. אין בגוף כתובת URL, קישור, "מקור:" או שם דומיין — המערכת מוסיפה קישור ושורת סיום בנפרד.
+5. אורך כולל: 60-110 מילים.
+6. אסור להזכיר את שם הכותב המקורי, "מאת", כינויי @ או רשתות חברתיות כמקור.
+
+${CONTEXTUAL_HASHTAG_RULES}
 
 פורמט הפלט — בדיוק שלושה חלקים, בסדר הזה:
 טקסט העדכון (פסקה אחרי פסקה, בלי כתובת אתר).
-שורה נפרדת: "האשטגים: " ואחריה בדיוק 3-5 האשטגים.
+שורה נפרדת: "האשטגים: " ואחריה 3-5 האשטגים.
 שורה נפרדת אחרונה: "ALT: " ואחריה משפט אחד בעברית (12-25 מילים) שמתאר לקוראי מסך מה רואים בתמונה שתלווה את העדכון — תיאור חזותי קונקרטי, לא חזרה על הכותרת ולא "תמונה של".`;
 
 /**
@@ -1354,32 +1342,17 @@ export async function synthesizeNewsPost(input: {
   if (clean.trim().length < 60) throw new Error('article text too thin to synthesise');
 
   const isWhatsapp = input.variant === 'whatsapp';
-  // Instagram gets the emoji + bullet layout, LinkedIn the narrative one. The longer budgets here
-  // (220-350 words vs the previous 90-250) are what let a post carry the article's actual findings
-  // instead of a two-sentence gloss; Flash still returns well inside the 60s serverless ceiling.
+  // Instagram gets the bullet layout, LinkedIn the narrative one. The longer budgets are what let
+  // a post carry the article's actual findings instead of a two-sentence gloss.
   const formatSpec = input.platform === 'linkedin' ? LI_FORMAT_SPEC : IG_FORMAT_SPEC;
-  // CONCISE_FACTUAL_RULES is appended LAST on purpose: it revokes the closing-question rule that
-  // ENGAGEMENT_RULES (folded into NEWS_POST_SYSTEM_INSTRUCTION) asks for, and on a direct conflict
-  // a model follows the later instruction. Its own text also says it overrides, so the resolution
-  // is explicit rather than positional luck.
-  // CONCISE_FACTUAL_RULES REPLACES ENGAGEMENT_RULES here rather than being appended after it.
-  //
-  // Appending was the obvious move and it was wrong twice over. First, the two blocks directly
-  // contradict: ENGAGEMENT_RULES mandates a closing open question to farm comments, and the whole
-  // point of the new block is that a reader of a security advisory should not be asked how it makes
-  // them feel. Relying on "the later instruction wins" is a coin flip, not a contract.
-  //
-  // Second, and the reason this is a correctness fix rather than a style one: the assembled
-  // instruction measured ~6.6k tokens, and Groq's free tier allows 8000 per MINUTE including the
-  // completion reservation. Every news-post call therefore 429'd on a completely full bucket and
-  // fell through to Gemini's 20-per-day cap — which is precisely the "429 blocks my copy" symptom.
-  // Dropping the superseded block is what makes the request fit the engine that is supposed to
-  // serve it.
-  const baseInstruction = isWhatsapp
-    ? WHATSAPP_POST_SYSTEM_INSTRUCTION
-    : NEWS_POST_SYSTEM_INSTRUCTION.replace('{FORMAT_SPEC}', formatSpec).replace(ENGAGEMENT_RULES, CONCISE_FACTUAL_RULES);
-  // WhatsApp's instruction never embedded ENGAGEMENT_RULES, so it still needs the block appended.
-  const systemInstruction = isWhatsapp ? `${baseInstruction}\n\n${CONCISE_FACTUAL_RULES}` : baseInstruction;
+  // Both instructions now embed CONCISE_FACTUAL_RULES directly and neither embeds ENGAGEMENT_RULES
+  // (its closing-question mandate is exactly what the analyst register bans). The earlier
+  // `.replace(ENGAGEMENT_RULES, CONCISE_FACTUAL_RULES)` swap also existed for a size reason that
+  // still binds: Groq's free tier allows 8000 tokens per MINUTE including the completion
+  // reservation, and a ~6.6k-token instruction 429'd every call onto Gemini's 20-per-day cap.
+  // Dropping BRAND_KNOWLEDGE_BASE and EXPERT_VOICE_RULES from these two prompts keeps them smaller
+  // than that — and BRAND_KNOWLEDGE_BASE's "מעבדת LLM" line was where the "in my lab" asides came from.
+  const systemInstruction = isWhatsapp ? WHATSAPP_POST_SYSTEM_INSTRUCTION : NEWS_POST_SYSTEM_INSTRUCTION.replace('{FORMAT_SPEC}', formatSpec);
 
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,
@@ -1425,16 +1398,18 @@ export async function synthesizeNewsPost(input: {
   if (tagIdx !== -1) {
     // Hard cap at 5 — the brief calls for exactly 3-5 and a long tag block reads as spam. The
     // prompt asks for it; this is what actually guarantees it.
-    hashtags = (stripBidiMarks(lines[tagIdx]).replace(/^\s*(האשטגים|hashtags)\s*:/i, '').match(/#[^\s#]+/g) ?? []).slice(0, 5);
+    hashtags = (stripBidiMarks(lines[tagIdx]).replace(/^\s*(האשטגים|hashtags)\s*:/i, '').match(/#[^\s#]+/g) ?? []);
     bodyLines = lines.slice(0, tagIdx);
   }
 
   // WhatsApp keeps its native *single asterisk* bold; every other channel gets plain text.
-  const body = stripMarkdownEmphasis(bodyLines.join('\n'), isWhatsapp)
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  // enforceAnalystTone runs last: emoji, meta-talk sentences, a model-written CTA and a dangling
+  // closing question all go, whatever the prompt managed.
+  const body = enforceAnalystTone(stripMarkdownEmphasis(bodyLines.join('\n'), isWhatsapp));
   if (body.length < 120) throw new Error('model returned too little body text');
-  return { body, hashtags, altText };
+  // Generic tags (#AI, #Tech…) are dropped and the line is topped up from the article's own
+  // entities; the 3-5 cap is enforced inside contextualHashtags.
+  return { body, hashtags: contextualHashtags(hashtags, `${input.title}\n${body}\n${clean}`), altText };
 }
 
 // --- IG Growth Intelligence — Trend Radar + Engagement replies --------------------------------

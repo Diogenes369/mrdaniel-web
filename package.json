@@ -29,13 +29,14 @@
     "test:bidi": "tsx scripts/__tests__/hebrew-bidi.test.mjs",
     "test:higgsfield": "tsx scripts/__tests__/openhiggsfield-bridge.test.mjs",
     "test:screenshot": "tsx scripts/__tests__/screenshot-to-code.test.mjs",
-    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma && npm run test:bidi && npm run test:higgsfield && npm run test:screenshot && npm run test:x && npm run test:newsimg && npm run test:groq && npm run test:news && npm run test:copy && npm run test:xalgo",
+    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma && npm run test:bidi && npm run test:higgsfield && npm run test:screenshot && npm run test:x && npm run test:newsimg && npm run test:groq && npm run test:news && npm run test:copy && npm run test:xalgo && npm run test:tone",
     "test:x": "tsx scripts/__tests__/x-import.test.mjs",
     "test:newsimg": "tsx scripts/__tests__/news-images.test.mjs",
     "test:groq": "tsx scripts/__tests__/groq-router.test.mjs",
     "test:news": "tsx scripts/__tests__/news-freshness.test.mjs",
     "test:copy": "tsx scripts/__tests__/site-copy.test.mjs",
-    "test:xalgo": "tsx scripts/__tests__/x-algorithm.test.mjs"
+    "test:xalgo": "tsx scripts/__tests__/x-algorithm.test.mjs",
+    "test:tone": "tsx scripts/__tests__/analyst-tone.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

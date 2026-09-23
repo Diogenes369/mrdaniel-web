@@ -1,4 +1,5 @@
 // Shared types + constants for the news-driven Content Agent (NewsContentAgent.tsx).
+import { NEWS_CTA_LINE } from './analystTone';
 
 export type NewsTopic = 'ai' | 'ai_models' | 'ai_agents' | 'general';
 
@@ -52,9 +53,10 @@ export const ASPECT_SIZE: Record<ImageAspect, { w: number; h: number }> = {
 
 export const SITE_DOMAIN = 'mrdaniel.co.il';
 
-/** MANDATORY on every generated post — appended verbatim as the final block. */
-export const SITE_PROMO_FOOTER =
-  '💡 אהבתם את התוכן? לעוד עדכונים, חדשות בזמן אמת ופתרונות סוכני AI מתקדמים – היכנסו עכשיו לאתר: mrdaniel.co.il';
+/** MANDATORY closing line on every generated post, appended verbatim — only the hashtag line
+ *  follows it. Owned by analystTone.ts (NEWS_CTA_LINE) so the server's auto-publisher and the
+ *  dashboard can never ship two different closers. */
+export const SITE_PROMO_FOOTER = NEWS_CTA_LINE;
 
 /** The deterministic post composer's stock engagement prompts (newsPostComposer.ts · postTail).
  *  Exported so the Growth caption composer can drop them when a lead-magnet CTA takes the closing

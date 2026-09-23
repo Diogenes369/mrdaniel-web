@@ -1,4 +1,5 @@
 import { GENERIC_ENGAGEMENT_LINES, SITE_PROMO_FOOTER, type NewsTopic } from './newsAgentTypes';
+import { isGenericHashtag } from './analystTone';
 import { deckToCaption } from './socialPublish';
 import type { StoryPayload } from './storySlides';
 import type { HookOption, HookPattern, ReelScript } from './agentTypes';
@@ -302,8 +303,8 @@ export function isHashtagLine(line: string): boolean {
 
 /**
  * The publish-ready caption: the host's base caption, minus any tag block it already carried,
- * plus the lead-magnet CTA (when the Engagement Trigger is on), the blended hashtag set, the
- * mandatory promo footer kept last among the visible blocks, and the SEO keyword line below the
+ * plus the lead-magnet CTA (when the Engagement Trigger is on), the mandatory closing line, then
+ * the blended hashtag set (generic tags dropped) as the last visible block, and the SEO keyword line below the
  * fold. Idempotent — composing an already-composed caption does not stack a second copy of anything.
  */
 export function composeGrowthCaption(base: string, pack: GrowthPack | null, leadMagnet: LeadMagnet | null, includeLeadMagnet: boolean): string {
@@ -331,8 +332,11 @@ export function composeGrowthCaption(base: string, pack: GrowthPack | null, lead
 
   const blocks = [body];
   if (includeLeadMagnet && leadMagnet?.captionCta) blocks.push(leadMagnet.captionCta);
-  if (pack.hashtags.length) blocks.push(pack.hashtags.join(' '));
+  // Closing line, then the tag line as the very last visible block (2026-09-23 layout). Generic
+  // tags are dropped here too, so a growth pack cannot re-add the #AI the post itself filtered out.
   if (footer) blocks.push(footer);
+  const tags = pack.hashtags.filter((t) => !isGenericHashtag(t));
+  if (tags.length) blocks.push(tags.join(' '));
 
   const seo = seoLine(pack.seoKeywords);
   return `${blocks.filter(Boolean).join('\n\n')}${seo ? `\n${SEO_SPACER}\n${SEO_SPACER}\n${seo}` : ''}`;

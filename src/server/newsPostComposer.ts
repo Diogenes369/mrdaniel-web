@@ -1,144 +1,18 @@
 import type { NewsItem, NewsTopic } from './newsFeed.js';
 import { stripMetaPhrases } from './storySlides.js';
+import { NEWS_CTA_LINE, contextualHashtags, enforceAnalystTone } from '../agent/analystTone.js';
 
 /**
  * Server-side counterpart of dashboard/src/lib/newsPostComposer.ts — kept as a separate copy
  * because the two run in different build graphs (Vercel Function vs the dashboard bundle). Same
- * structure and content banks: Hook → מה קרה → למה זה חשוב → עיקרי הדברים → זווית המומחה →
- * source → engagement → hashtags → MANDATORY site-promo footer (always last).
+ * layout: body → source → NEWS_CTA_LINE (fixed closing line) → 3-5 article-specific hashtags.
+ * The topic-level content banks were removed on 2026-09-23 (see the dashboard copy's header for
+ * why); the fallback carries only what the article says.
  */
 
 export type SocialPlatform = 'linkedin' | 'instagram';
 
-export const SITE_PROMO_FOOTER =
-  '💡 אהבתם את התוכן? לעוד עדכונים, חדשות בזמן אמת ופתרונות סוכני AI מתקדמים – היכנסו עכשיו לאתר: mrdaniel.co.il';
-
-const TOPIC_HASHTAGS: Record<NewsTopic, string[]> = {
-  ai: ['#בינה_מלאכותית', '#AI', '#GenAI', '#סוכני_AI', '#AgenticAI', '#LLM', '#RAG', '#Automation'],
-  ai_models: ['#מודלי_AI', '#LLM', '#GenerativeAI', '#OpenWeights', '#MachineLearning', '#AIResearch', '#GPT', '#Claude'],
-  ai_agents: ['#בינה_מלאכותית', '#AI', '#GenAI', '#סוכני_AI', '#AgenticAI', '#LLM', '#RAG', '#Automation'],
-  general: ['#טכנולוגיה', '#Tech', '#חדשנות', '#Innovation', '#דיגיטל', '#אוטומציה', '#טרנספורמציה_דיגיטלית'],
-};
-
-const GLOBAL_HASHTAGS = ['#הייטק', '#TechIL', '#ישראל', '#StartupNation', '#טכנולוגיה_ישראלית'];
-
-const HOOKS: Record<NewsTopic, string[]> = {
-  ai: [
-    '{title}. מי שעדיין מחכה ש"זה יתבהר" — כבר מאחר.',
-    'הפער בין מי שמדבר על AI לבין מי שבאמת מבין איך הוא עובד רק הולך ומתרחב. {title}',
-    '{title} — עוד סימן שהשאלה כבר לא "האם AI" אלא "איפה, איך, ובאיזו בקרה".',
-    'כל תהליך חוזר וצפוי הוא מועמד לאוטומציה מבוססת סוכן — וזה אחד הדברים הראשונים שכדאי להבין בתחום. {title}',
-  ],
-  ai_models: [
-    '{title} — עוד מודל, עוד יכולות, ועוד הזדמנות להבין לאן התחום הזה זז.',
-    'קצב שחרור המודלים הפך למרוץ שקט בין המעבדות הגדולות. {title}',
-    '{title}. הפער בין מודל שמככב בבנצ׳מרק לבין מודל שעובד בפרודקשן הולך ומצטמצם.',
-    'מי שעדיין בונה על גרסת מודל אחת בלי אסטרטגיית מעבר — כדאי שיעצור רגע. {title}',
-  ],
-  ai_agents: [
-    '{title}. מי שעדיין מחכה ש"זה יתבהר" — כבר מאחר.',
-    'הפער בין מי שמדבר על AI לבין מי שבאמת מבין איך הוא עובד רק הולך ומתרחב. {title}',
-    '{title} — עוד סימן שהשאלה כבר לא "האם AI" אלא "איפה, איך, ובאיזו בקרה".',
-    'כל תהליך חוזר וצפוי הוא מועמד לאוטומציה מבוססת סוכן — וזה אחד הדברים הראשונים שכדאי להבין בתחום. {title}',
-  ],
-  general: [
-    '{title}. הטכנולוגיה זזה מהר — היתרון שייך למי שמתרגם אותה לערך, לא למי שרק עוקב.',
-    '{title} — ושוב מתברר שהחדשנות האמיתית היא לא הכלי, אלא איך משלבים אותו בתהליך.',
-    'בעולם רווי באזז, {title} מזכיר שמה שנשאר בסוף זה מה שעובד בשטח.',
-  ],
-};
-
-const WHY_IT_MATTERS: Record<NewsTopic, string> = {
-  ai:
-    'סוכני AI (Agentic AI) כבר לא דמו: לא עוד צ׳אטבוט שעונה על שאלה, אלא מערכת שמפרקת משימה מורכבת לצעדים, מפעילה כלים ומערכות אמיתיות (CRM, מייל, בסיסי נתונים) דרך פרוטוקולים כמו MCP, ומחזירה תוצאה מקצה לקצה. ההבדל בין דמו מרשים למערכת שבאמת עובדת הוא לא ביכולת של המודל אלא במה שעוטף אותו: חיבור לנתונים הנכונים (RAG), ושכבת בקרה שמאשרת פעולות רגישות לפני שהן קורות. מי שלומד את התחום — שם נמצאת העבודה האמיתית.',
-  ai_models:
-    'מעבר לכותרת: כל שחרור מודל חדש מזיז את עקומת היכולת-מול-עלות, ולא תמיד לכיוון שברור מיד — מודל "חכם יותר" לפי בנצ׳מרק לא בהכרח זול יותר, מהיר יותר, או יציב יותר במשימה הספציפית שלכם. ההבדל בין מעבדות מציג פערים אמיתיים: מודלים קנייניים (Closed) מול מודלים פתוחי-משקל (Open-Weight) שאפשר לארח ולכוונן עצמאית, חלונות הקשר (Context Window) שגדלים אבל לא תמיד נוצלים נכון, ועלויות Inference שמצטברות בשקט בקנה מידה.',
-  ai_agents:
-    'סוכני AI (Agentic AI) כבר לא דמו: לא עוד צ׳אטבוט שעונה על שאלה, אלא מערכת שמפרקת משימה מורכבת לצעדים, מפעילה כלים ומערכות אמיתיות (CRM, מייל, בסיסי נתונים) דרך פרוטוקולים כמו MCP, ומחזירה תוצאה מקצה לקצה. ההבדל בין דמו מרשים למערכת שבאמת עובדת הוא לא ביכולת של המודל אלא במה שעוטף אותו: חיבור לנתונים הנכונים (RAG), ושכבת בקרה שמאשרת פעולות רגישות לפני שהן קורות. מי שלומד את התחום — שם נמצאת העבודה האמיתית.',
-  general:
-    'מעבר לכותרת: הכלי עצמו הוא רק חצי מהסיפור. הערך נוצר כשמחברים אותו לעבודה האמיתית — למסמכים, להודעות וליומן — ומודדים כמה זמן הוא באמת חוסך. מי שלומד את התחום מרוויח מלהבין את החיבור הזה, לא רק את הכלי.',
-};
-
-const TAKEAWAYS: Record<NewsTopic, string[]> = {
-  ai: [
-    'סוכן AI מוצלח נבנה סביב משימה אחת שהוא עושה טוב יותר מכל כלי כללי — לא סביב "צ׳אט עם הכל".',
-    'RAG (שליפה מבוססת-מקור) הוא ההבדל בין תשובה סמכותית לבין הזיה בטוחה בעצמה.',
-    'שכבת Guardian שמאשרת, חוסמת ומתעדת כל פעולה — הכרחית לפני שמחברים סוכן למערכות ייצור.',
-    'אינטגרציה דרך MCP הופכת חיבור למערכות (CRM, ERP, יומן, מייל) לסטנדרטי, מאובטח וקל לתחזוקה.',
-    'ה-ROI נמדד בשעות שמוחזרות לצוות ובזמן תגובה ללקוח — הגדירו את המדד לפני הפיילוט, לא אחריו.',
-    'Prompt Injection ודליפת מידע דרך פרומפטים הם וקטורי תקיפה חדשים — אבטחת AI היא חלק מהאפיון.',
-    'התחילו קטן: תהליך אחד, מדד הצלחה אחד, שבועיים להטמעה — ואז מרחיבים בהדרגה.',
-  ],
-  ai_models: [
-    'לפני שמאמצים מודל חדש — בדקו על המשימה שלכם, לא על בנצ׳מרק כללי. תוצאות משתנות דרמטית בין תחומים.',
-    'עלות Inference בקנה מידה יכולה לעלות על עלות ה-API עצמה — מדדו טוקנים בפועל, לא רק את המחיר לטוקן.',
-    'מודל פתוח-משקל (Open-Weight) נותן שליטה, פרטיות ועצמאות מספק — במחיר של תחזוקת תשתית ואירוח עצמאי.',
-    'חלון הקשר גדול לא פותר בעיית עיצוב פרומפט — RAG ממוקד עדיין מנצח "לזרוק הכל למודל".',
-    'תכננו מראש למעבר בין גרסאות מודל — API ותיקה מוצאת משימוש (Deprecated) מהר יותר ממה שנדמה.',
-    'הערכה (Evaluation) שיטתית עם מדגם מקרים אמיתיים — לא תחושת בטן — היא מה שמבדיל אימוץ מוצלח מכישלון שקט.',
-  ],
-  ai_agents: [
-    'סוכן AI מוצלח נבנה סביב משימה אחת שהוא עושה טוב יותר מכל כלי כללי — לא סביב "צ׳אט עם הכל".',
-    'RAG (שליפה מבוססת-מקור) הוא ההבדל בין תשובה סמכותית לבין הזיה בטוחה בעצמה.',
-    'שכבת Guardian שמאשרת, חוסמת ומתעדת כל פעולה — הכרחית לפני שמחברים סוכן למערכות ייצור.',
-    'אינטגרציה דרך MCP הופכת חיבור למערכות (CRM, ERP, יומן, מייל) לסטנדרטי, מאובטח וקל לתחזוקה.',
-    'ה-ROI נמדד בשעות שמוחזרות לצוות ובזמן תגובה ללקוח — הגדירו את המדד לפני הפיילוט, לא אחריו.',
-    'Prompt Injection ודליפת מידע דרך פרומפטים הם וקטורי תקיפה חדשים — אבטחת AI היא חלק מהאפיון.',
-    'התחילו קטן: תהליך אחד, מדד הצלחה אחד, שבועיים להטמעה — ואז מרחיבים בהדרגה.',
-  ],
-  general: [
-    'אינטגרציה לפני כלים חדשים: מערכת שמדברת עם המערכות הקיימות שווה יותר מעוד רכש.',
-    'אוטומציה של תהליך חוזר אחד, עם מדד הצלחה ברור, מחזירה השקעה מהר יותר מ"טרנספורמציה" רחבה.',
-    'אבטחה ופרטיות הן חלק מהאפיון (Security by Design), לא שלב אחרי הפיתוח.',
-    'מדדו את מה שחשוב: שעות שנחסכו, זמן תגובה, שגיאות שירדו — לא כמות הפיצ׳רים.',
-    'ראייה מערכתית: תשתית, אבטחה ואוטומציה הן מקשה אחת — לא שלושה פרויקטים נפרדים.',
-  ],
-};
-
-const EXPERT_INSIGHT: Record<NewsTopic, string> = {
-  ai:
-    'מהשטח: הפרויקטים שמצליחים הם אלה שמתחילים מתהליך כואב וספציפי, מגדירים מדד הצלחה מספרי, ומטמיעים סוכן צר עם בקרה — ולא אלה שמנסים "להכניס AI לכל מקום" בבת אחת. הטכנולוגיה בשלה; מה שמבדיל הוא המשמעת בהגדרת ההיקף.',
-  ai_models:
-    'מהשטח: מי שמפיק הכי הרבה ערך ממודלים חדשים הם אלה שבנו שכבת הפשטה (Abstraction) מעל ספק המודל — כך שמעבר מ-GPT ל-Claude ל-Gemini, או משדרוג גרסה, הוא שינוי קונפיגורציה ולא כתיבה מחדש. מי שחיבר את המודל ישירות לכל שכבות המוצר משלם על כך בכל עדכון.',
-  ai_agents:
-    'מהשטח: הפרויקטים שמצליחים הם אלה שמתחילים מתהליך כואב וספציפי, מגדירים מדד הצלחה מספרי, ומטמיעים סוכן צר עם בקרה — ולא אלה שמנסים "להכניס AI לכל מקום" בבת אחת. הטכנולוגיה בשלה; מה שמבדיל הוא המשמעת בהגדרת ההיקף.',
-  general:
-    'מהשטח: היתרון התחרותי לא מגיע מאימוץ מוקדם של כל טרנד, אלא מהיכולת לבחור את הקרב הנכון — תהליך אחד, מדד אחד — ולבצע אותו עד הסוף עם תשתית, אבטחה ומדידה.',
-};
-
-/** A concrete technical-context paragraph per topic — names the actual architecture / attack
- * chain so the post reads as researched, not hand-wavy. Included on LinkedIn (long-form) only. */
-const TECH_CONTEXT: Record<NewsTopic, string> = {
-  ai:
-    'הקשר הטכני: סוכן אג׳נטי אמיתי = מודל שפה (Claude / GPT / Gemini) + שכבת תזמור שמפרקת משימה לצעדים + כלים דרך פרוטוקולים כמו MCP + RAG על בסיס הידע הפנימי + שכבת Guardian שמאשרת פעולות רגישות. הנקודה הקריטית היא צמצום היקף: תהליך אחד, מדד הצלחה מספרי אחד, והרחבה בהדרגה.',
-  ai_models:
-    'הקשר הטכני: מודל שפה חדש נמדד בכמה צירים במקביל — איכות תשובה (בנצ׳מרק ומשימה אמיתית), חלון הקשר, מהירות Inference, עלות לטוקן, ותמיכה ב-Function/Tool Calling. ההבדל בין מודל סגור (API בלבד) למודל פתוח-משקל (ניתן להורדה ואירוח עצמי) הוא לא רק רישוי — הוא שליטה על Fine-Tuning, פרטיות נתונים, ותלות בזמינות ספק חיצוני.',
-  ai_agents:
-    'הקשר הטכני: סוכן אג׳נטי אמיתי = מודל שפה (Claude / GPT / Gemini) + שכבת תזמור שמפרקת משימה לצעדים + כלים דרך פרוטוקולים כמו MCP + RAG על בסיס הידע הפנימי + שכבת Guardian שמאשרת פעולות רגישות. הנקודה הקריטית היא צמצום היקף: תהליך אחד, מדד הצלחה מספרי אחד, והרחבה בהדרגה.',
-  general:
-    'הקשר הטכני: הערך נוצר באינטגרציה — API שמחבר בין מערכות, תהליך אוטומטי מקצה לקצה, ושכבת מדידה על התוצאה. תשתית רשת יציבה, אבטחה מודרנית ואוטומציה חכמה הן מקשה אחת, לא שלושה פרויקטים נפרדים.',
-};
-
-function seededInt(text: string): number {
-  let h = 0;
-  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
-function seededPick<T>(arr: T[], seed: number): T {
-  return arr[seed % arr.length];
-}
-
-function seededSubset<T>(arr: T[], count: number, seed: number): T[] {
-  const pool = [...arr];
-  const out: T[] = [];
-  let s = seed || 1;
-  while (out.length < count && pool.length > 0) {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    out.push(pool.splice(s % pool.length, 1)[0]);
-  }
-  return out;
-}
+export const SITE_PROMO_FOOTER = NEWS_CTA_LINE;
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -164,18 +38,6 @@ export interface ComposedPost {
   footer: string;
   /** true when the body was written by the adaptive LLM synthesis step; false = deterministic. */
   synthesized: boolean;
-}
-
-/** Close a fragment with a full stop so takeaways read as flowing sentences, not a list. */
-function asSentence(s: string): string {
-  const t = (s || '').replace(/^[▪️•\-–—*\s]+/, '').trim();
-  return !t || /[.!?…]$/.test(t) ? t : `${t}.`;
-}
-
-function topicHashtags(topic: NewsTopic, isLinkedin: boolean): string[] {
-  const topicTags = isLinkedin ? TOPIC_HASHTAGS[topic].slice(0, 6) : TOPIC_HASHTAGS[topic];
-  const globalTags = isLinkedin ? GLOBAL_HASHTAGS.slice(0, 3) : GLOBAL_HASHTAGS;
-  return [...topicTags, ...globalTags];
 }
 
 /** Publisher display-name → canonical domain for the clean text citation. Covers the outlets in
@@ -260,8 +122,7 @@ function canonicalArticleUrl(link: string): string | null {
   return u.search ? s : s.replace(/\/$/, '');
 }
 
-/** Source attribution, engagement prompt, hashtag line and the mandatory promo footer —
- * appended after both the deterministic body and an LLM-synthesised one.
+/** Source attribution, the fixed closing line, then the hashtag line as the very last block.
  *
  * Instagram captions can't carry clickable links, so IG gets a bare-domain text citation only
  * ("מקור: ynet.co.il · 01.09.2026"). LinkedIn gets that same citation plus the canonical article
@@ -274,58 +135,36 @@ function postTail(item: NewsItem, platform: SocialPlatform, hashtags: string[]):
   const articleUrl = isLinkedin ? canonicalArticleUrl(item.link) : null;
   const sourceLine = articleUrl ? `${citation}\nלכתבה המלאה: ${articleUrl}` : citation;
 
-  const engagement = isLinkedin
-    ? 'מה הדבר שהכי לא היה ברור לכם כאן? כתבו בתגובות.'
-    : 'שתפו בתגובות מה הכי מפתיע אתכם כאן 👇';
-  return [sourceLine, engagement, hashtags.join(' '), SITE_PROMO_FOOTER];
+  return [sourceLine, SITE_PROMO_FOOTER, hashtags.join(' ')].filter(Boolean);
 }
 
-/**
- * DETERMINISTIC FALLBACK (no API key / synthesis failed). Organic flow — no fixed
- * "📌 / 🔍 / 📋 / 🎯" header blocks: hook, then the article's own facts, then the analysis and
- * technical context as running paragraphs, one header-free takeaway cluster with a varied
- * lead-in, and the field note to close.
- */
+/** Everything the post may draw entity tags from — the headline weighs in first. */
+function tagContext(item: NewsItem, body: string): string {
+  return [item.title, item.summary, item.excerpt, body].filter(Boolean).join('\n');
+}
+
+/** DETERMINISTIC FALLBACK (no API key / synthesis failed): headline + the article's own summary. */
 export function composeNewsPost(item: NewsItem, platform: SocialPlatform): ComposedPost {
-  const topic = item.topic;
-  const seed = seededInt(item.title);
   const isLinkedin = platform === 'linkedin';
-
-  const hook = seededPick(HOOKS[topic], seed).replace('{title}', item.title.trim());
-  const context = contextParagraph(item.summary || item.excerpt, isLinkedin ? 900 : 520);
-  // Takeaways woven into ONE flowing paragraph — no bullet markers, no "📋 / כמה נקודות" label.
-  const takeaways = seededSubset(TAKEAWAYS[topic], isLinkedin ? 5 : 4, seed).map(asSentence).filter(Boolean).join(' ');
-  const hashtags = topicHashtags(topic, isLinkedin);
-
-  const body = stripMetaPhrases(
-    [
-      hook,
-      context,
-      WHY_IT_MATTERS[topic],
-      isLinkedin ? TECH_CONTEXT[topic] : '',
-      takeaways,
-      EXPERT_INSIGHT[topic],
-    ]
-      .filter(Boolean)
-      .join('\n\n')
-  );
+  const headline = item.title.trim().replace(/[.׃]+$/, '');
+  const context = contextParagraph(item.summary || item.excerpt, isLinkedin ? 1400 : 900);
+  const body = enforceAnalystTone(stripMetaPhrases([`${headline}.`, context].filter(Boolean).join('\n\n')));
+  const hashtags = contextualHashtags([], tagContext(item, body));
 
   const fullText = [body, ...postTail(item, platform, hashtags)].join('\n\n');
   return { fullText, hashtags, footer: SITE_PROMO_FOOTER, synthesized: false };
 }
 
-/** Wraps an LLM-synthesised post body (adaptive structure, article-typed) with the standard
- * source line, engagement prompt, hashtags and mandatory promo footer. */
+/** Wraps an LLM-synthesised post body with the standard source line, closing line and hashtags. */
 export function assembleComposedPost(
   item: NewsItem,
   platform: SocialPlatform,
   body: string,
   aiHashtags: string[]
 ): ComposedPost {
-  const hashtags = (
-    aiHashtags && aiHashtags.length >= 3 ? aiHashtags : topicHashtags(item.topic, platform === 'linkedin')
-  ).slice(0, 12);
-  const fullText = [stripMetaPhrases(body.trim()), ...postTail(item, platform, hashtags)].join('\n\n');
+  const cleanBody = enforceAnalystTone(stripMetaPhrases(body.trim()));
+  const hashtags = contextualHashtags(aiHashtags ?? [], tagContext(item, cleanBody));
+  const fullText = [cleanBody, ...postTail(item, platform, hashtags)].join('\n\n');
   return { fullText, hashtags, footer: SITE_PROMO_FOOTER, synthesized: true };
 }
 

@@ -132,7 +132,12 @@ t('rules · the block sets an IT-peer tone', /עמית למקצוע/.test(CONCIS
 t('rules · the block declares it overrides earlier conflicts', /גובר על כל הנחיה סותרת/.test(CONCISE_FACTUAL_RULES));
 
 const engine = readFileSync(new URL('../../src/agent/SocialAgentEngine.ts', import.meta.url), 'utf8');
-t('rules · news post drafting appends the block LAST', /\$\{baseInstruction\}\\n\\n\$\{CONCISE_FACTUAL_RULES\}/.test(engine));
+// Since 2026-09-23 both news-post instructions embed the block directly and neither carries
+// ENGAGEMENT_RULES, so there is no conflicting block left for it to have to come after.
+{
+  const news = engine.slice(engine.indexOf('const NEWS_POST_SYSTEM_INSTRUCTION'), engine.indexOf('export function stripMarkdownEmphasis'));
+  t('rules · news post + WhatsApp drafting both carry the block', (news.match(/\$\{CONCISE_FACTUAL_RULES\}/g) ?? []).length === 2 && !news.includes('${ENGAGEMENT_RULES}'));
+}
 const insights = readFileSync(new URL('../../src/server/newsInsights.ts', import.meta.url), 'utf8');
 // The analysis prompt inlines the concision contract instead of the full block: the shared blocks
 // cost ~4k tokens, which on Groq's 8k/min free tier truncated the three-section JSON.

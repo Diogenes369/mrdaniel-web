@@ -35,6 +35,37 @@ export const EXPERT_VOICE_RULES = `קול הכותב — כלל אדום:
 - אין פתיח ואין סיכום. לא "במאמר הזה נסקור", לא "לסיכום, ראינו ש". הנקודה האחרונה היא הסוף.`;
 
 /**
+ * The analyst register — replaces EXPERT_VOICE_RULES for article-derived posts only (news post and
+ * WhatsApp update). Decided 2026-09-23.
+ *
+ * EXPERT_VOICE_RULES is a teacher's voice: it glosses every term and invites "לדעתי / מניסיון
+ * בשטח". On a carousel that is the product. On a post about one specific article it produced the
+ * drift the operator flagged — a paragraph on how language models work in general, "in my lab"
+ * asides, and a closing poll about which parameters the reader would add. An analyst writes about
+ * the article; this block says so, and `enforceAnalystTone` (analystTone.ts) removes what slips.
+ *
+ * The CTA and the hashtag line's position are owned by code, so the model is told NOT to write a
+ * CTA at all — two closing lines competing is worse than either.
+ */
+export const ANALYST_VOICE_RULES = `קול הכותב — אנליסט טכנולוגיה בכיר, כלל אדום:
+- אתה כותב כמו אנליסט טכנולוגיה בכיר בגוף מחקר מוביל: רציני, מדויק, סמכותי ונקי. כל משפט עוסק בכתבה הזו — בישויות, במספרים, בגרסאות ובהשלכות שהיא מתארת.
+- ניתוח עומק, לא הסבר כללי: מה בדיוק קרה, מה המנגנון שמאחוריו לפי הכתבה, מה ההשלכה על השוק, על המתחרים או על הכלים שהכתבה מזכירה. אסור להסביר "איך מודלי שפה עובדים" באופן כללי ואסור רקע כללי על התחום.
+- אסור מטא-שיח: אין "במעבדה שלי", "בדקתי אצלי", "מניסיוני", אין התייחסות לכותב או למודל שכותב, ואין פנייה לקורא בשאלות ("אילו פרמטרים הייתם מוסיפים?", "מה דעתכם?").
+- בלי מילוי ובלי התלהבות: אין סימני קריאה, אין סופרלטיבים, אין "חשוב לציין". משפטים קצרים ומלאים.
+- אימוג'י: אפס בגוף הפוסט.
+- אין קריאה לפעולה, אין הפניה לאתר ואין "קישור בביו" — המערכת מוסיפה שורת סיום קבועה. הפוסט מסתיים בנקודת הניתוח האחרונה.
+- מונח טכני נכתב בשמו המדויק כפי שמופיע בכתבה. מותר להסביר מונח בחצי משפט רק אם בלעדיו הניתוח לא מובן.`;
+
+/**
+ * Hashtag contract for article-derived posts. Generic tags are also filtered in code
+ * (`contextualHashtags`), so this block is about getting SPECIFIC ones back, not about the ban.
+ */
+export const CONTEXTUAL_HASHTAG_RULES = `האשטגים — כלל אדום:
+- 3 עד 5 האשטגים, כל אחד שם של ישות, טכנולוגיה, מוצר, חברה, תקן או סמן שוק שמופיעים בכתבה הזו בפועל (למשל #OpenAI #GPT5 #MCP #Nvidia #רגולציית_AI).
+- אסור תגים גנריים שמתאימים לכל פוסט: #AI #Tech #טכנולוגיה #בינה_מלאכותית #חדשנות #הייטק #חדשות #Innovation.
+- בלי רווחים, מקפים או נקודות בתוך תג — מילים מחוברות בקו תחתון.`;
+
+/**
  * WHO every generator writes for. Retargeted 2026-09-20, by explicit decision: the audience is
  * people LEARNING the field, not people running a company.
  *

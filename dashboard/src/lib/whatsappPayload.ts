@@ -3,9 +3,11 @@
  * WhatsApp Business Cloud API endpoint can post directly.
  *
  * The synthesised body already follows WhatsApp conventions (sharp hook, 2–3 short paragraphs,
- * `*single-asterisk*` bold, one CTA line). This module normalises it, appends a clean isolated
+ * `*single-asterisk*` bold, no CTA). This module normalises it, appends a clean isolated
  * link + the brand line + hashtags, and produces the deep links + API skeleton.
  */
+
+import { NEWS_CTA_LINE, isGenericHashtag } from './analystTone';
 
 const SITE_URL = 'mrdaniel.co.il';
 const LTR_OPEN = '⁦';
@@ -14,7 +16,7 @@ const LTR_CLOSE = '⁩';
 export interface WhatsappPayload {
   /** The complete message text, ready to paste / send. */
   text: string;
-  /** Just the synthesised narrative (hook + paragraphs + CTA), before link/brand/hashtags. */
+  /** Just the synthesised narrative (hook + paragraphs), before link/closing line/hashtags. */
   bodyText: string;
   hashtags: string[];
   link: string;
@@ -55,7 +57,7 @@ function isolateLink(s: string): string {
 /**
  * Deterministic WhatsApp-shaped rewrite for when the AI rewrite is unavailable (429 / offline).
  * NOT a verbatim dump: restructures the source into a hook line + two balanced paragraphs + a
- * CTA line, so the community update still reads like a message, not a pasted article.
+ * closing line appended by the payload builder, so the community update still reads like a message, not a pasted article.
  */
 export function deterministicWhatsappBody(text: string, title?: string): string {
   const clean = (text || '').replace(/\s+/g, ' ').trim();
@@ -68,8 +70,8 @@ export function deterministicWhatsappBody(text: string, title?: string): string 
   const mid = Math.ceil(rest.length / 2);
   const p1 = rest.slice(0, mid).join(' ');
   const p2 = rest.slice(mid).join(' ');
-  const cta = 'שווה לצלול לפרטים — מוזמנים להגיב, לשתף או לשאול.';
-  return [hook, p1, p2, cta].filter((s) => s && s.trim()).join('\n\n');
+  // No closing ask here: buildWhatsappPayload appends the fixed NEWS_CTA_LINE to every update.
+  return [hook, p1, p2].filter((s) => s && s.trim()).join('\n\n');
 }
 
 export function buildWhatsappPayload(input: {
@@ -79,12 +81,15 @@ export function buildWhatsappPayload(input: {
   link?: string;
 }): WhatsappPayload {
   const bodyText = normaliseBody(input.body);
-  const hashtags = (input.hashtags ?? []).map((h) => (h.startsWith('#') ? h : `#${h}`)).slice(0, 6);
+  const hashtags = (input.hashtags ?? [])
+    .map((h) => (h.startsWith('#') ? h : `#${h}`))
+    .filter((h) => !isGenericHashtag(h))
+    .slice(0, 5);
   const link = (input.link ?? '').trim();
 
   const lines: string[] = [bodyText, ''];
   if (link) lines.push(`🔗 המקור המלא: ${isolateLink(link)}`);
-  lines.push(`📲 עוד עדכונים והצטרפות לקהילה: ${isolateLink(SITE_URL)}`);
+  lines.push(NEWS_CTA_LINE.replace(SITE_URL, isolateLink(SITE_URL)));
   if (hashtags.length) lines.push('', hashtags.join(' '));
 
   const text = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
