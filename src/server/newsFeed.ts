@@ -124,7 +124,9 @@ const SOURCES: FeedSource[] = [
   },
   {
     name: 'Google News · Meta AI',
-    url: gnewsEn(`("Meta AI" OR "Llama 4" OR "Llama model" OR "Meta's AI model")`),
+    // "Muse Spark" added 2026-09-23: Meta's current model line (proprietary, since 2026-04); Llama
+    // is kept for the open-weights stories that still use the name.
+    url: gnewsEn(`("Meta AI" OR "Muse Spark" OR "Llama model" OR "Meta's AI model")`),
     priority: 6, lang: 'en', forceTopic: 'ai_models', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
   },
   // ── AI agents — the agentic tooling beat (frameworks, MCP, computer-use, coding agents) ──

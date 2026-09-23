@@ -67,5 +67,7 @@ export const config = {
     /** Local hour (Asia/Jerusalem) for the daily draft. -1 disables auto-generation. */
     draftHour: process.env.AGENT_DRAFT_HOUR === undefined ? 9 : Number(process.env.AGENT_DRAFT_HOUR),
     draftPlatform: clean(process.env.AGENT_DRAFT_PLATFORM) || 'linkedin',
+    /** How often to force the site's two sync agents (creator feed + model catalog). 0 disables. */
+    siteSyncEveryMin: process.env.AGENT_SITE_SYNC_EVERY_MIN === undefined ? 60 : Number(process.env.AGENT_SITE_SYNC_EVERY_MIN),
   },
 };

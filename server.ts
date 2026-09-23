@@ -141,6 +141,17 @@ app.get('/api/news', async (_req: Request, res: Response) => {
     res.json({ ok: true, ...(await getXFeed(_req.query?.refresh === '1')) });
     return;
   }
+  // Local mirrors of the two autonomous sync agents (api/news.ts `?action=creator-feed|models`).
+  if (_req.query?.action === 'creator-feed') {
+    const { getCreatorFeed } = await import('./src/server/agents/socialSyncAgent.js');
+    res.json({ ok: true, ...(await getCreatorFeed(_req.query?.refresh === '1')) });
+    return;
+  }
+  if (_req.query?.action === 'models') {
+    const { getModelCatalog } = await import('./src/server/agents/modelUpdateAgent.js');
+    res.json({ ok: true, ...(await getModelCatalog(_req.query?.refresh === '1')) });
+    return;
+  }
   const data = await getNewsItems();
   res.json(data);
 });

@@ -7,6 +7,8 @@
  *   - metrics   every AGENT_METRICS_EVERY_MIN (360) → snapshot to .agent-state/metrics-<date>.json
  *   - draft     once a day at AGENT_DRAFT_HOUR (09, Asia/Jerusalem; -1 disables) → one post into
  *               agent_queue as pending_approval. It never publishes.
+ *   - site-sync every AGENT_SITE_SYNC_EVERY_MIN (60; 0 disables) → forces the site's creator-feed
+ *               and model-catalog agents (runSiteSync below).
  *
  * Why a local worker and not another Vercel cron: the Hobby plan allows one daily cron and it is
  * already spent on the auto-publisher, and there are no free function slots (AGENTS.md). This
@@ -146,6 +148,37 @@ async function maybeDraft(force = false) {
   else if (code === 'billing_exhausted') await notify('💳 Gemini prepaid credits are depleted — top up in AI Studio; daily draft skipped');
 }
 
+/**
+ * Forces the live site's two autonomous sync agents (src/server/agents/socialSyncAgent.ts and
+ * modelUpdateAgent.ts) — the "24/7" half of their schedule. Vercel Hobby allows one DAILY cron, so
+ * without this the site would only re-sync once a day or when a visitor arrives after the TTL.
+ * Read-only on every social network; the site does the fetching, this only says "now".
+ */
+async function runSiteSync() {
+  if (!config.adminSecret) {
+    log('warn', 'site sync skipped: no admin secret (needed for ?refresh=1)');
+    return;
+  }
+  const results = {};
+  for (const action of ['creator-feed', 'models']) {
+    try {
+      const res = await fetch(`${config.siteOrigin}/api/news?action=${action}&refresh=1`, {
+        headers: { 'x-admin-secret': config.adminSecret, Accept: 'application/json' },
+        signal: AbortSignal.timeout(45_000),
+      });
+      const body = await res.json().catch(() => ({}));
+      results[action] =
+        action === 'models'
+          ? { status: res.status, source: body.source, frontier: (body.frontier ?? []).map((m) => m.name) }
+          : { status: res.status, items: body.items?.length ?? 0, x: body.sources?.x?.count, linktree: body.sources?.linktree?.count };
+    } catch (err) {
+      results[action] = { error: String(err?.message ?? err) };
+    }
+  }
+  log('info', 'site sync', results);
+  writeState({ lastSiteSync: new Date().toISOString(), lastSiteSyncResult: results });
+}
+
 // ─── loop ───────────────────────────────────────────────────────────────────────────────────
 
 /** Runs `fn` now and then every `minutes`, never overlapping itself, and never letting a throw escape. */
@@ -191,6 +224,7 @@ async function main() {
     every(config.schedule.healthEveryMin, 'health', runHealth),
     every(config.schedule.metricsEveryMin, 'metrics', runMetrics),
     every(10, 'draft', () => maybeDraft()),
+    ...(config.schedule.siteSyncEveryMin > 0 ? [every(config.schedule.siteSyncEveryMin, 'site-sync', runSiteSync)] : []),
   ];
 
   const shutdown = async (signal) => {

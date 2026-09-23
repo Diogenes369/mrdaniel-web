@@ -33,7 +33,7 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { id: 'about-page', title: 'עמוד אודות מלא', snippet: 'בונה סוכני AI ומפרסם חדשות AI בעברית', keywords: 'about אודות רקע', icon: Bot, route: '/about', targetSelector: '#page-top' },
   { id: 'ai-page', title: 'המדריך לסוכני AI', snippet: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד', keywords: 'AI page עמוד מלא סוכנים', icon: Bot, route: '/ai', targetSelector: '#page-top' },
   { id: 'jarvis-page', title: 'מערכת JARVIS', snippet: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות', keywords: 'jarvis עוזר אישי assistant', icon: Bot, route: '/jarvis', targetSelector: '#page-top' },
-  { id: 'magazines-page', title: 'מדריכים וחוברות', snippet: 'מדריכי AI מעשיים, PDF להורדה מיידית', keywords: 'מגזין חוברת מדריך AI guide', icon: BookOpen, route: '/magazines', targetSelector: '#page-top' },
+  { id: 'magazines-page', title: 'לומדים AI', snippet: 'מדריכים ומגזינים חדשים על AI, בקרוב', keywords: 'מגזין חוברת מדריך AI guide', icon: BookOpen, route: '/magazines', targetSelector: '#page-top' },
   { id: 'news-page', title: 'עמוד החדשות', snippet: 'כל חדשות ה-AI, מתעדכנות בזמן אמת', keywords: 'news חדשות ai', icon: Newspaper, route: '/news', targetSelector: null },
 ];
 

@@ -59,6 +59,36 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  // `GET /api/news?action=creator-feed` and `?action=models` — the two autonomous sync agents
+  // (src/server/agents/socialSyncAgent.ts, modelUpdateAgent.ts). Folded in here for the same
+  // 12-function reason. A plain GET serves the cached result and re-syncs once the agent's TTL has
+  // passed; `?refresh=1` + the admin secret forces a run (the local 24/7 worker does this hourly).
+  if (req.query?.action === 'creator-feed' || req.query?.action === 'models') {
+    const secret = process.env.ADMIN_API_SECRET;
+    const force = String(req.query?.refresh ?? '') === '1' && (!secret || req.headers?.['x-admin-secret'] === secret);
+    try {
+      let payload: Record<string, unknown>;
+      let cdn: number;
+      if (req.query.action === 'models') {
+        const { getModelCatalog, modelCatalogCdnSeconds } = await import('../src/server/agents/modelUpdateAgent.js');
+        payload = { ...(await getModelCatalog(force)) };
+        cdn = modelCatalogCdnSeconds();
+      } else {
+        const { getCreatorFeed, creatorFeedCdnSeconds } = await import('../src/server/agents/socialSyncAgent.js');
+        payload = { ...(await getCreatorFeed(force)) };
+        cdn = creatorFeedCdnSeconds();
+      }
+      res.setHeader('Cache-Control', force ? 'no-store' : 'public, max-age=300');
+      if (!force) res.setHeader('Vercel-CDN-Cache-Control', `max-age=${cdn}, stale-while-revalidate=86400`);
+      res.status(200).json({ ok: true, ...payload });
+    } catch (err) {
+      console.error(`[${req.query.action}] failed:`, (err as Error)?.message ?? err);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ ok: false });
+    }
+    return;
+  }
+
   if (req.query?.action === 'analyze' || req.method === 'POST') {
     await handleAnalyze(req, res);
     return;

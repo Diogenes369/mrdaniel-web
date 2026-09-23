@@ -572,6 +572,38 @@ export async function writeXFeedSnapshot(payload: Record<string, unknown>): Prom
 }
 
 // ---------------------------------------------------------------------------
+// Autonomous-sync snapshots (src/server/agents/socialSyncAgent.ts, modelUpdateAgent.ts)
+// One node per agent — `creator_feed_snapshot` and `model_catalog` — holding the last good sync,
+// so every cold instance serves what the last run (cron, local worker or a visitor) found instead
+// of starting empty. Public data only. Each needs a read/write rule in the RTDB console like
+// `x_feed_snapshot`; without one both calls degrade to no-ops and the agents run memory-only.
+// ---------------------------------------------------------------------------
+
+export type SyncSnapshotKey = 'creator_feed_snapshot' | 'model_catalog';
+
+export async function readSyncSnapshot(key: SyncSnapshotKey): Promise<Record<string, unknown> | null> {
+  const db = getServerDb();
+  if (!db) return null;
+  try {
+    const snap = await get(ref(db, key));
+    return snap.exists() ? (snap.val() as Record<string, unknown>) : null;
+  } catch (err) {
+    console.error(`[${key}] failed to read snapshot:`, (err as Error)?.message ?? err);
+    return null;
+  }
+}
+
+export async function writeSyncSnapshot(key: SyncSnapshotKey, payload: Record<string, unknown>): Promise<void> {
+  const db = getServerDb();
+  if (!db) return;
+  try {
+    await set(ref(db, key), payload);
+  } catch (err) {
+    console.error(`[${key}] failed to write snapshot:`, (err as Error)?.message ?? err);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // News snapshot (src/server/newsFeed.ts)
 // The last good /api/news refresh, so a cold instance whose refresh comes back empty (every feed
 // timing out, a WAF wave) still serves real stories instead of an empty grid. Public data only.

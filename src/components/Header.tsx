@@ -18,7 +18,7 @@ type NavLink = { name: string; to?: string; action?: 'contact' };
 const navLinks: NavLink[] = [
   { name: 'סוכני AI', to: '/ai' },
   { name: 'מערכת JARVIS', to: '/jarvis' },
-  { name: 'מדריכים', to: '/magazines' },
+  { name: 'לומדים AI', to: '/magazines' },
   { name: 'דברו איתי', action: 'contact' },
 ];
 

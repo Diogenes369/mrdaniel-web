@@ -1,12 +1,11 @@
-import { HelpCircle, ClipboardList, Route, Bot, Send, Check, UserCog, ShoppingCart, FileSearch, Workflow, ArrowLeft, type LucideIcon } from 'lucide-react';
+import { HelpCircle, ClipboardList, Route, Send } from 'lucide-react';
 import { PageHero, SectionHeading, UnifiedCta } from '../components/content/ContentPrimitives';
-import WebButton from '../components/WebButton';
+import AiAgentsSection from '../components/AiAgentsSection';
 import {
   AI_GUIDE_HERO,
   AI_GUIDE_WHAT,
   AI_GUIDE_PREP,
   AI_GUIDE_PROCESS,
-  AI_GUIDE_SHOWCASE,
   AI_GUIDE_CTA,
   type GuideCard,
 } from '../data/aiAgentGuide';
@@ -15,57 +14,15 @@ import { rtl } from '../lib/rtl';
 /**
  * /ai — the AI agents page, rewritten 2026-09-23 as a practical client guide:
  *   1. What an agent is (plain words + three everyday examples)
+ *   → the ready-made agents for sale (AiAgentsSection, live model names)
  *   2. What to prepare (a checklist a client can do before the first call)
  *   3. How we build it together (four steps, each ending in the client's go-ahead)
- *   → example agents with a direct lead CTA → contact.
+ *   → contact.
  *
  * Removed with the rewrite: the "technical depth" grid (RAG / multi-agent / MCP / Guardian), the
  * AI-news pulse and the demo videos, and every ROI figure — they read as a brochure for engineers
  * and none of the numbers had a source. All copy lives in src/data/aiAgentGuide.ts.
  */
-
-interface ShowcaseAgent {
-  icon: LucideIcon;
-  title: string;
-  tagline: string;
-  features: string[];
-  subject: string;
-}
-
-const SHOWCASE_AGENTS: ShowcaseAgent[] = [
-  {
-    icon: UserCog,
-    title: 'עוזר אישי',
-    tagline: 'יומן, מייל ומשימות',
-    features: ['קובע ומזיז פגישות ביומן', 'מסכם את המיילים של הבוקר', 'מכין טיוטות תשובה לאישור שלכם'],
-    subject: 'סוכן AI · עוזר אישי',
-  },
-  {
-    icon: ShoppingCart,
-    title: 'סוכן פניות ולקוחות',
-    tagline: 'וואטסאפ ואתר',
-    features: ['עונה מיד על השאלות הקבועות', 'אוסף פרטים מלקוח חדש', 'מעביר אליכם רק פנייה רצינית'],
-    subject: 'סוכן AI · פניות ולקוחות',
-  },
-  {
-    icon: FileSearch,
-    title: 'סוכן שעונה מהמסמכים שלכם',
-    tagline: 'מחירונים, נהלים, חוזים',
-    features: ['עונה מתוך המסמכים שלכם בלבד', 'מציין מאיפה לקח את התשובה', 'אומר "לא יודע" כשאין תשובה'],
-    subject: 'סוכן AI · תשובות מתוך המסמכים',
-  },
-  {
-    icon: Workflow,
-    title: 'סוכן עבודה משרדית',
-    tagline: 'העתק-הדבק בין מערכות',
-    features: ['מעביר פרטים מטופס לטבלה', 'מפיק הצעות מחיר וחשבוניות', 'מתריע כשמשהו לא מסתדר'],
-    subject: 'סוכן AI · עבודה משרדית',
-  },
-];
-
-function openAgentLead(subject: string) {
-  window.dispatchEvent(new CustomEvent('open-lead-modal', { detail: { subject, sourceSection: 'AI Page · Agents Showcase' } }));
-}
 
 function Card({ card, index }: { card: GuideCard; index?: number }) {
   const Icon = card.icon;
@@ -83,31 +40,6 @@ function Card({ card, index }: { card: GuideCard; index?: number }) {
       </div>
       <h3 className="mb-2 font-display text-lg font-bold leading-snug text-white">{rtl(card.title)}</h3>
       <p className="text-base leading-relaxed text-zinc-300">{rtl(card.body)}</p>
-    </div>
-  );
-}
-
-function ShowcaseCard({ agent }: { agent: ShowcaseAgent }) {
-  const Icon = agent.icon;
-  return (
-    <div className="flex h-full flex-col glass-panel glass-panel--marketing rounded-2xl p-5 sm:p-6 lg:p-8">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
-        <Icon className="w-6 h-6" />
-      </div>
-      <h3 className="font-display text-lg font-bold text-white leading-snug">{agent.title}</h3>
-      <p className="mt-1 text-sm text-zinc-400">{agent.tagline}</p>
-      <ul className="mt-5 space-y-2.5 flex-grow">
-        {agent.features.map((f) => (
-          <li key={f} className="flex items-start gap-2 text-sm text-zinc-300">
-            <Check className="mt-0.5 w-4 h-4 shrink-0 text-brand-400" />
-            {f}
-          </li>
-        ))}
-      </ul>
-      <WebButton variant="glass" onClick={() => openAgentLead(agent.subject)} className="mt-6 w-full justify-center">
-        אני רוצה סוכן כזה
-        <ArrowLeft className="w-4 h-4" />
-      </WebButton>
     </div>
   );
 }
@@ -131,6 +63,12 @@ export default function AIPage() {
               ))}
             </div>
           </section>
+
+          {/* Ready-made agents for sale — right after "what is it", where a shopper decides.
+              Moved here from the guides page 2026-09-23; model names on the cards are live. */}
+          <div className="mb-20">
+            <AiAgentsSection />
+          </div>
 
           {/* 2 — What to prepare */}
           <section id="prepare" className="mb-20">
@@ -156,14 +94,6 @@ export default function AIPage() {
               ))}
             </ol>
           </section>
-
-          {/* Examples */}
-          <SectionHeading icon={Bot} title={AI_GUIDE_SHOWCASE.title} description={rtl(AI_GUIDE_SHOWCASE.intro)} />
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 md:gap-6 mb-20">
-            {SHOWCASE_AGENTS.map((agent) => (
-              <ShowcaseCard key={agent.title} agent={agent} />
-            ))}
-          </div>
 
           <SectionHeading icon={Send} title={AI_GUIDE_CTA.title} description={rtl(AI_GUIDE_CTA.body)} />
           <UnifiedCta

@@ -1182,6 +1182,86 @@ html.a11y-large-cursor * {
   to   { transform: scaleY(1); }
 }
 
+/* ══ "לומדים AI" coming-soon hero (2026-09-23) ═════════════════════════════════════════════════
+   Three blurred brand-colour orbs drifting slowly, a masked grid, an oversized headline with
+   breathing dots, and the live model names floating at the edges. Transform/opacity only. */
+.learn-headline {
+  font-size: clamp(4.5rem, 16vw, 13rem);
+  letter-spacing: -0.02em;
+  filter: drop-shadow(0 0 48px rgba(118, 185, 0, 0.35));
+}
+.learn-dots span {
+  display: inline-block;
+  color: #9fe870;
+  animation: learn-dot 1.6s ease-in-out infinite;
+}
+.learn-dots span:nth-child(2) { animation-delay: 0.2s; }
+.learn-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes learn-dot {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50%      { opacity: 1;    transform: translateY(-0.08em); }
+}
+.learn-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.5;
+  pointer-events: none;
+  will-change: transform;
+}
+.learn-orb--a { width: 42vw; height: 42vw; top: -10%; right: -8%; background: radial-gradient(circle, rgba(118, 185, 0, 0.55), transparent 65%); animation: learn-drift-a 18s ease-in-out infinite alternate; }
+.learn-orb--b { width: 36vw; height: 36vw; bottom: -12%; left: -6%; background: radial-gradient(circle, rgba(34, 211, 238, 0.45), transparent 65%); animation: learn-drift-b 22s ease-in-out infinite alternate; }
+.learn-orb--c { width: 24vw; height: 24vw; top: 38%; left: 38%; background: radial-gradient(circle, rgba(159, 232, 112, 0.35), transparent 65%); animation: learn-drift-a 26s ease-in-out infinite alternate-reverse; }
+@keyframes learn-drift-a { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(-6vw, 5vh, 0) scale(1.12); } }
+@keyframes learn-drift-b { from { transform: translate3d(0, 0, 0) scale(1.05); } to { transform: translate3d(5vw, -6vh, 0) scale(0.95); } }
+.learn-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(118, 185, 0, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(118, 185, 0, 0.07) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 75%);
+}
+.learn-chip {
+  position: absolute;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(118, 185, 0, 0.35);
+  background: rgba(8, 9, 12, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-family: var(--font-display, inherit);
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #d9f7c2;
+  box-shadow: 0 0 28px -8px rgba(118, 185, 0, 0.6);
+  animation: learn-float 9s ease-in-out infinite;
+}
+.learn-chip--0 { top: 22%; right: 8%; }
+.learn-chip--1 { top: 30%; left: 7%; animation-delay: -2.2s; }
+.learn-chip--2 { bottom: 24%; right: 12%; animation-delay: -4.5s; }
+.learn-chip--3 { bottom: 18%; left: 11%; animation-delay: -6.7s; }
+@keyframes learn-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+
+html.motion-reduced .learn-orb,
+html.motion-reduced .learn-chip,
+html.motion-reduced .learn-dots span {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .learn-orb,
+  .learn-chip,
+  .learn-dots span {
+    animation: none;
+  }
+}
+html.perf-lite .learn-orb {
+  filter: blur(48px);
+}
+
 /* ══ Graceful degradation ═══════════════════════════════════════════════════════════════════════
    html.perf-lite / html.motion-reduced are set once before first paint by src/lib/perfMode.ts. */
 

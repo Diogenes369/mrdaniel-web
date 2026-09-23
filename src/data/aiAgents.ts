@@ -1,13 +1,33 @@
 import { Users, Headset, Share2, BrainCog, Rocket, UserCog, type LucideIcon } from 'lucide-react';
 
-/** Who the agent is packaged for — drives the "עסקים" / "פרילנסרים ואנשים פרטיים"
- * filter and the wizard's audience question. */
+/** Who the agent is packaged for — drives the "לעסקים" / "לעצמאים" filter and the wizard. */
 export type AgentAudience = 'business' | 'individual';
 
-/** The problem the agent is built to solve — drives the wizard's goal question and the
- * recommendation match. */
+/** The problem the agent is built to solve — drives the wizard's goal question and the match. */
 export type AgentGoal = 'lead-gen' | 'support' | 'social' | 'knowledge';
 
+/** A frontier lab whose CURRENT model an agent uses. The name is resolved at render time from the
+ *  live model catalog (ModelUpdateAgent → /api/news?action=models), never written here. */
+export type ModelVendor = 'OpenAI' | 'Anthropic' | 'Google' | 'xAI';
+
+export interface AgentModel {
+  vendor: ModelVendor;
+  /** What that model does inside this agent, in plain words. */
+  role: string;
+}
+
+/**
+ * Ready-made agents for sale, shown on /ai (moved from the guides page 2026-09-23).
+ *
+ * Copy rules (2026-09-23 rewrite, same as src/data/siteCopy.ts): plain Hebrew for a non-technical
+ * business owner, no acronyms that need a glossary, and NO figures other than the price. The
+ * previous version promised "+35% lead conversion", "70% of tickets", "90% less time", "8 hours a
+ * week" and "under 30 seconds" — none of it sourced. `benefit` says what changes, not by how much.
+ *
+ * Models: `models` names the LAB and the job, not the model version. The previous hard-coded
+ * "Claude Opus 4.5 + GPT-5.2 / Gemini 2.5 Flash" was a year out of date within months; the card
+ * now shows each lab's newest model as the sync agent last found it.
+ */
 export interface AiAgent {
   id: string;
   name: string;
@@ -18,10 +38,11 @@ export interface AiAgent {
   icon: LucideIcon;
   accent: string;
   glow: string;
-  /** The underlying multi-model architecture — deliberately named, not "AI-powered" hand-waving. */
-  modelFoundation: string;
+  models: AgentModel[];
+  /** What the agent does, in one or two plain sentences. */
   coreCapability: string;
-  roiEstimate: string;
+  /** What changes for the buyer. Qualitative on purpose — see the header. */
+  benefit: string;
   integrations: string[];
   useCase: string;
   price: number;
@@ -29,121 +50,142 @@ export interface AiAgent {
 }
 
 export const GOAL_LABEL: Record<AgentGoal, string> = {
-  'lead-gen': 'ייצור וסינון לידים',
-  support: 'שירות ותמיכת לקוחות',
-  social: 'אוטומציית תוכן ורשתות',
-  knowledge: 'ידע פנימי',
+  'lead-gen': 'פניות ולקוחות חדשים',
+  support: 'שירות ללקוחות',
+  social: 'תוכן ורשתות',
+  knowledge: 'תשובות מהמסמכים',
 };
 
 export const AUDIENCE_LABEL: Record<AgentAudience, string> = {
-  business: 'עסקים ועצמאים',
-  individual: 'פרילנסרים ואנשים פרטיים',
+  business: 'עסקים',
+  individual: 'עצמאים ופרילנסרים',
 };
 
 export const AI_AGENTS: AiAgent[] = [
   {
     id: 'agent-sales-autopilot',
-    name: 'סוכן מכירות ולידים אוטונומי',
-    tagline: 'עונה, מסנן ומתזמן פגישות עם כל ליד — תוך פחות מ-30 שניות, מסביב לשעון.',
+    name: 'סוכן פניות ומכירות',
+    tagline: 'עונה מיד לכל פנייה, מבין מי באמת רוצה לקנות, וקובע לו פגישה איתכם.',
     audience: ['business'],
     goals: ['lead-gen'],
-    tierLabel: 'Business · Growth',
+    tierLabel: 'לעסקים',
     icon: Rocket,
     accent: 'text-brand-400',
     glow: 'group-hover:shadow-[0_20px_70px_rgba(0,255,102,0.2)]',
-    modelFoundation: 'Claude Opus 4.5 + GPT-5.2 — ניתוב רב-מודלי חכם לפי מורכבות הפנייה',
-    coreCapability: 'מזהה כוונת רכישה בזמן אמת, אוסף פרטי ליד מלאים, ומזמן פגישה ישירות ביומן הצוות — ללא מגע יד אדם עד לשלב הסגירה.',
-    roiEstimate: 'מקצר זמן תגובה ראשוני מ-4 שעות בממוצע ל-30 שניות, ומעלה שיעור המרת לידים ב-35% בממוצע.',
-    integrations: ['WhatsApp Business API', 'CRM (HubSpot / Salesforce / Priority)', 'אתר ו-Web Chat', 'REST API'],
-    useCase: 'עסקי B2B ו-B2C בעלי נפח פניות גבוה שבו כל דקת עיכוב בתגובה עולה כסף — נדל"ן, שירותים פיננסיים, סוכנויות דיגיטל.',
+    models: [
+      { vendor: 'Anthropic', role: 'מנהל את השיחה' },
+      { vendor: 'OpenAI', role: 'עונה מהר על שאלות פשוטות' },
+    ],
+    coreCapability: 'מדבר עם הלקוח בוואטסאפ או באתר, אוסף את הפרטים, וקובע פגישה ישר ביומן שלכם.',
+    benefit: 'אף פנייה לא מחכה לכם, ואתם מגיעים רק לשיחות עם מי שבאמת מתעניין.',
+    integrations: ['וואטסאפ', 'צ׳אט באתר', 'יומן Google', 'מערכת הלקוחות שלכם'],
+    useCase: 'עסקים שמקבלים הרבה פניות, כמו נדל״ן, שירותים ומשרדים, שבהם כל שעת המתנה מפסידה לקוח.',
     price: 7900,
     badge: 'הכי מבוקש',
   },
   {
     id: 'agent-support-247',
-    name: 'סוכן שירות לקוחות 24/7',
-    tagline: 'פותר את רוב הפניות בעצמו, ומעביר לנציג אנושי רק כשבאמת נדרש.',
+    name: 'סוכן שירות לקוחות',
+    tagline: 'עונה על השאלות שחוזרות כל יום, ומעביר אליכם רק את מה שבאמת דורש אתכם.',
     audience: ['business'],
     goals: ['support'],
-    tierLabel: 'Business · Growth',
+    tierLabel: 'לעסקים',
     icon: Headset,
     accent: 'text-brand-300',
     glow: 'group-hover:shadow-[0_20px_60px_rgba(159,232,112,0.15)]',
-    modelFoundation: 'Claude Sonnet 4.5 (מענה מהיר) + Gemini 2.5 Flash (ניתוב וסיווג פניות)',
-    coreCapability: 'מבין את היסטוריית הלקוח, עונה מתוך בסיס הידע שלכם, ומסלים לנציג אנושי עם סיכום מלא כשמדובר במקרה חריג.',
-    roiEstimate: 'חוסך כ-70% מנפח הפניות השגרתיות לנציגים אנושיים, וזמינות מלאה 24/7 ללא עלות משמרות לילה.',
-    integrations: ['WhatsApp', 'Zendesk / Freshdesk', 'צ׳אט אתר', 'REST API'],
-    useCase: 'חנויות אונליין ונותני שירות עם נפח פניות תמיכה גבוה וחוזר על עצמו.',
+    models: [
+      { vendor: 'Anthropic', role: 'עונה ללקוח' },
+      { vendor: 'Google', role: 'ממיין את הפניות לפי נושא' },
+    ],
+    coreCapability: 'עונה מתוך המידע של העסק שלכם, וכשמשהו חריג הוא מעביר לכם את הפנייה עם סיכום קצר.',
+    benefit: 'הלקוחות מקבלים תשובה גם בלילה ובשבת, ואתם מטפלים רק במקרים שצריכים אתכם.',
+    integrations: ['וואטסאפ', 'צ׳אט באתר', 'מערכת פניות', 'מייל'],
+    useCase: 'חנויות אונליין ונותני שירות שמקבלים את אותן שאלות שוב ושוב.',
     price: 9400,
   },
   {
     id: 'agent-knowledge-rag',
-    name: 'סוכן ידע פנימי (RAG)',
-    tagline: 'כל הידע של העסק — מדיניות, נהלים, מסמכים — במקום אחד, עם תשובה מדויקת ומצוטטת תוך שניות.',
+    name: 'סוכן שעונה מהמסמכים שלכם',
+    tagline: 'שואלים אותו שאלה, והוא עונה מתוך הנהלים, המחירונים והמסמכים שלכם, ומראה מאיפה.',
     audience: ['business'],
     goals: ['knowledge'],
-    tierLabel: 'ידע',
+    tierLabel: 'לעסקים',
     icon: BrainCog,
     accent: 'text-brand-400',
     glow: 'group-hover:shadow-[0_20px_70px_rgba(0,255,102,0.2)]',
-    modelFoundation: 'Claude Opus 4.5 + Vector DB ייעודי (Pinecone / Weaviate) על בסיס הידע שלכם',
-    coreCapability: 'מאנדקס את כל מאגרי הידע שלכם (Notion, Google Drive, Confluence, PDF-ים) ועונה עם ציטוט מקור מדויק — לא ניחוש.',
-    roiEstimate: 'מקצר זמן איתור מידע מ-20 דקות בממוצע לפחות מדקה — עשרות שעות בחודש שחוזרות אליכם או לצוות הקטן.',
-    integrations: ['Slack / Teams', 'Notion / Confluence', 'Google Drive / SharePoint', 'REST API'],
-    useCase: 'עצמאים, יועצים וצוותים קטנים עם ידע מפוזר בין כלים שונים, שמבזבזים שעות בחיפוש מידע שכבר קיים.',
+    models: [
+      { vendor: 'Anthropic', role: 'קורא את המסמכים ועונה' },
+      { vendor: 'Google', role: 'קורא גם קבצים סרוקים ותמונות' },
+    ],
+    coreCapability: 'עובר על כל המסמכים שלכם, ועונה רק מתוכם, עם הפניה למסמך המדויק. כשאין תשובה, הוא אומר את זה.',
+    benefit: 'מפסיקים לחפש מסמכים ולשאול את אותו אדם את אותה שאלה.',
+    integrations: ['Google Drive', 'Notion', 'קבצי PDF', 'Slack'],
+    useCase: 'עצמאים, יועצים וצוותים קטנים שהמידע שלהם מפוזר בין הרבה קבצים ותיקיות.',
     price: 14900,
   },
   {
     id: 'agent-orchestration-flagship',
-    name: 'צוות סוכנים מתואם (Multi-Agent)',
-    tagline: 'כמה סוכנים ייעודיים — מכירות, תמיכה וידע — עובדים יחד תחת שכבת בקרה אחת.',
+    name: 'צוות סוכנים לעסק',
+    tagline: 'כמה סוכנים שעובדים יחד: פניות, שירות ומסמכים, עם מסך אחד שבו אתם רואים הכל.',
     audience: ['business'],
     goals: ['knowledge', 'lead-gen', 'support'],
-    tierLabel: 'דגל',
+    tierLabel: 'החבילה המלאה',
     icon: UserCog,
     accent: 'text-black',
     glow: 'group-hover:shadow-[0_20px_80px_rgba(0,255,102,0.3)]',
-    modelFoundation: 'Claude Opus 4.5 + Gemini 3 Pro + GPT-5.2 — Multi-Agent Orchestration עם Guardian Agents לבקרה',
-    coreCapability: 'מתאם בין מספר סוכנים ייעודיים (מכירות, תמיכה, ידע) תחת שכבת Guardian Agents אחת שמפקחת על הרשאות, עלויות ואיכות תשובה.',
-    roiEstimate: 'מחליף החזקה של כמה כלי אוטומציה נפרדים, ונותן לכם תמונה אחת על כל מה שרץ אוטומטית.',
-    integrations: ['CRM / ERP', 'Slack / Teams', 'WhatsApp Business API', 'REST / GraphQL API'],
-    useCase: 'עסקים קטנים עם כמה תהליכים אוטומטיים במקביל שרוצים שכבת ניהול ובקרת עלויות אחת, במקום פתרונות מבודדים.',
+    models: [
+      { vendor: 'Anthropic', role: 'מנהל את הצוות ובודק את העבודה' },
+      { vendor: 'OpenAI', role: 'משימות מהירות ושגרתיות' },
+      { vendor: 'Google', role: 'מסמכים, תמונות וקבצים' },
+      { vendor: 'xAI', role: 'מה שקורה עכשיו ברשת' },
+    ],
+    coreCapability: 'כל סוכן עושה את התפקיד שלו, ושכבת בקרה אחת דואגת שאף אחד לא יעשה משהו בלי הרשאה, ושהעלויות בשליטה.',
+    benefit: 'במקום כמה כלים נפרדים, מערכת אחת שאתם מבינים ורואים מה היא עושה.',
+    integrations: ['וואטסאפ', 'מערכת הלקוחות', 'Slack', 'יומן ומייל'],
+    useCase: 'עסקים שכבר מבינים שיש להם כמה משימות חוזרות, ורוצים לטפל בכולן במקום אחד.',
     price: 18500,
-    badge: 'Flagship 2026',
+    badge: 'הכי מקיף',
   },
   {
     id: 'agent-freelancer-assistant',
-    name: 'סוכן ניהול לקוחות לפרילנסרים',
-    tagline: 'מתאם פגישות, שולח תזכורות ועונה על שאלות נפוצות של לקוחות — כאילו יש לכם עוזר/ת אישית.',
+    name: 'עוזר אישי לעצמאים',
+    tagline: 'קובע פגישות, שולח תזכורות ועונה ללקוחות, כאילו יש לכם עוזר אישי.',
     audience: ['individual'],
     goals: ['lead-gen', 'support'],
-    tierLabel: 'Individual · Starter',
+    tierLabel: 'לעצמאים',
     icon: Users,
     accent: 'text-brand-300',
     glow: 'group-hover:shadow-[0_20px_60px_rgba(159,232,112,0.15)]',
-    modelFoundation: 'Gemini 2.5 Flash + Claude Haiku 4.5 — עלות הפעלה נמוכה במיוחד',
-    coreCapability: 'עונה ללקוחות פוטנציאליים ב-WhatsApp, מתאם פגישות ביומן, ושולח תזכורות תשלום — כל זה בלי שתצטרכו לעצור באמצע עבודה.',
-    roiEstimate: 'חוסך כ-8 שעות שבועיות בניהול תיאומים, תזכורות ומענה ללקוחות — זמן שחוזר ישירות לעבודה בתשלום.',
-    integrations: ['WhatsApp', 'Google Calendar', 'טופס אתר', 'API'],
-    useCase: 'פרילנסרים, יועצים ובעלי עסקים עצמאיים שמנהלים לבד את כל התקשורת מול לקוחות ורוצים להחזיר לעצמם שעות.',
+    models: [
+      { vendor: 'Google', role: 'עונה מהר ובזול' },
+      { vendor: 'OpenAI', role: 'מנסח הודעות ותזכורות' },
+    ],
+    coreCapability: 'עונה ללקוחות בוואטסאפ, קובע פגישות ביומן ושולח תזכורות תשלום, בלי שתצטרכו לעצור באמצע העבודה.',
+    benefit: 'פחות הודעות ותיאומים, יותר זמן לעבודה שמשלמים לכם עליה.',
+    integrations: ['וואטסאפ', 'יומן Google', 'טופס באתר'],
+    useCase: 'פרילנסרים, יועצים ועצמאים שמנהלים לבד את כל הקשר עם הלקוחות.',
     price: 4800,
-    badge: 'נקודת כניסה',
+    badge: 'הכי קל להתחיל',
   },
   {
     id: 'agent-content-social',
-    name: 'סוכן אוטומציית תוכן ורשתות',
-    tagline: 'מייצר, מעצב ומתזמן תוכן שבועי לרשתות החברתיות — מרעיון ראשוני ועד פרסום.',
+    name: 'סוכן תוכן לרשתות',
+    tagline: 'מציע רעיונות, כותב פוסטים ומתזמן אותם, ואתם רק מאשרים.',
     audience: ['individual'],
     goals: ['social'],
-    tierLabel: 'Individual · Growth',
+    tierLabel: 'לעצמאים',
     icon: Share2,
     accent: 'text-brand-400',
     glow: 'group-hover:shadow-[0_20px_60px_rgba(0,255,102,0.15)]',
-    modelFoundation: 'Claude Opus 4.5 (כתיבה ואסטרטגיית תוכן) + Gemini 3 Pro (ניתוח מגמות ותמונה)',
-    coreCapability: 'בונה לוח תוכן שבועי מותאם למותג האישי שלכם, מנסח פוסטים ולוכד תזמון פרסום אוטומטי בפלטפורמות הרלוונטיות.',
-    roiEstimate: 'מייצר ומתזמן תוכן שבועי מלא ב-90% פחות זמן לעומת כתיבה ותכנון ידניים.',
-    integrations: ['Instagram / LinkedIn API', 'WhatsApp Business', 'לוח תזמון Web'],
-    useCase: 'יוצרי תוכן, פרילנסרים ובעלי עסקים קטנים שרוצים נוכחות עקבית ברשתות בלי להקדיש לכך שעות מדי שבוע.',
+    models: [
+      { vendor: 'Anthropic', role: 'כותב את הפוסטים' },
+      { vendor: 'xAI', role: 'מזהה על מה מדברים עכשיו' },
+      { vendor: 'Google', role: 'עובד עם תמונות' },
+    ],
+    coreCapability: 'בונה לוח תוכן שבועי שמתאים לסגנון שלכם, כותב את הפוסטים ומכין אותם לפרסום.',
+    benefit: 'נוכחות קבועה ברשתות בלי לשבת על זה שעות כל שבוע.',
+    integrations: ['Instagram', 'LinkedIn', 'וואטסאפ'],
+    useCase: 'יוצרי תוכן, עצמאים ועסקים קטנים שרוצים להופיע ברשתות באופן קבוע.',
     price: 6200,
   },
 ];

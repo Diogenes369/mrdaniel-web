@@ -24,7 +24,7 @@ const HUB_LINKS = [
   { icon: Terminal, to: '/news', title: 'חדשות ומדריכי AI', description: 'מה חדש ב-AI כל יום, והסבר פשוט על המודלים החדשים' },
   { icon: Bot, to: '/ai', title: 'סוכני AI', description: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד' },
   { icon: Rocket, to: '/jarvis', title: 'מערכת JARVIS', description: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות' },
-  { icon: LayoutGrid, to: '/magazines', title: 'מדריכים וחוברות', description: 'מדריכי AI מעשיים, PDF להורדה מיידית' },
+  { icon: LayoutGrid, to: '/magazines', title: 'לומדים AI', description: 'מדריכים ומגזינים חדשים על AI, בקרוב' },
 ];
 
 export default function AboutPage() {

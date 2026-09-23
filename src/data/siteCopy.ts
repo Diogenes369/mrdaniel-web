@@ -34,10 +34,25 @@ export const HERO_CONSOLE_COPY = {
   label: 'TIPS · MODELS',
   title: 'טיפים ועדכוני מודלים',
   loading: 'טוען את העדכונים האחרונים…',
-  empty: 'אין עדכונים חדשים כרגע. כל המדריכים מחכים בעמוד המדריכים.',
+  empty: 'אין עדכונים חדשים כרגע. בקרוב יהיו כאן עוד מדריכים.',
   filters: { all: 'הכל', tips: 'הטיפים שלי', models: 'מודלים וכלים' },
   kind: { guide: 'מדריך', post: 'פוסט', model: 'עדכון' },
-  cta: 'לכל המדריכים',
+  cta: 'ללומדים AI',
+};
+
+/**
+ * The "לומדים AI" page (/magazines) while the new guides and magazines are being written —
+ * 2026-09-23. The headline and body are the operator's own wording, lightly edited.
+ */
+export const LEARN_AI_COPY = {
+  kicker: 'לומדים AI',
+  headline: 'בקרוב',
+  sub: 'המדריכים והמגזינים העדכניים ביותר, שיעשו לכם סדר בעולם הבינה המלאכותית.',
+  body: 'נסביר בגובה העיניים על כל המודלים החדשים, כדי שתוכלו להוביל את העסק שלכם קדימה.',
+  notifyCta: 'עדכנו אותי כשזה עולה',
+  freeTitle: 'בינתיים, אפשר להתחיל מכאן',
+  freeSub: 'שני מדריכים מלאים שכבר זמינים להורדה חינם.',
+  followCta: 'או עקבו אחריי ברשתות',
 };
 
 /**

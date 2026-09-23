@@ -74,12 +74,6 @@ export const AI_GUIDE_PROCESS = {
   ] satisfies GuideCard[],
 };
 
-/** Ready-made agent examples, each with a direct "I want this one" lead. No promised numbers. */
-export const AI_GUIDE_SHOWCASE = {
-  title: 'דוגמאות לסוכנים שאפשר לבנות',
-  intro: 'דוגמאות שאפשר לקחת כמו שהן או להתאים לעבודה שלכם.',
-};
-
 export const AI_GUIDE_CTA = {
   title: 'הצעד הבא: שיחה קצרה',
   body: 'ספרו לי מה חוזר אצלכם כל יום, ואגיד לכם בכנות אם סוכן יפתור את זה.',

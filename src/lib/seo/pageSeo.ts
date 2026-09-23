@@ -69,8 +69,8 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
     jsonLd: organizationLd(),
   },
   '/magazines': {
-    title: 'מדריכי AI ומגזינים מקצועיים | דניאל בן ברוך',
-    description: 'מדריכים ומגזינים מעשיים על סוכני AI ומודלי שפה, PDF להורדה מיידית.',
+    title: 'לומדים AI: מדריכים ומגזינים בקרוב | דניאל בן ברוך',
+    description: 'בקרוב: מדריכים ומגזינים שמסבירים בגובה העיניים את מודלי ה-AI החדשים, כדי שתוכלו להוביל את העסק שלכם קדימה.',
     path: '/magazines',
   },
   '/privacy': {

@@ -176,7 +176,20 @@ export default async function handler(req: any, res: any) {
       publishResult = { ok: false, error: 'auto-publish failed' };
     }
 
-    res.status(200).json({ ok: true, content: contentResult, autoPublish: publishResult });
+    // Jobs 3 + 4: the site's autonomous sync agents (2026-09-23). They also run hourly from the
+    // local worker and on any request past their TTL; this is the floor that holds even when the
+    // local machine is off and nobody visits. Dynamically imported — no AI key needed for either.
+    const [{ runSocialSync }, { runModelUpdate }] = await Promise.all([
+      import('../src/server/agents/socialSyncAgent.js'),
+      import('../src/server/agents/modelUpdateAgent.js'),
+    ]);
+    const [social, models] = await Promise.allSettled([runSocialSync(), runModelUpdate()]);
+    const syncResult = {
+      social: social.status === 'fulfilled' ? { items: social.value.items.length, sources: social.value.sources } : { ok: false },
+      models: models.status === 'fulfilled' ? { source: models.value.source, frontier: models.value.frontier.map((m) => m.name) } : { ok: false },
+    };
+
+    res.status(200).json({ ok: true, content: contentResult, autoPublish: publishResult, sync: syncResult });
     return;
   }
 

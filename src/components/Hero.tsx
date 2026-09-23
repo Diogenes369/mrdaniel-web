@@ -6,9 +6,8 @@ import WebButton from './WebButton';
 import SocialLinks from './SocialLinks';
 import ArticleModal from './news/ArticleModal';
 import { HERO_COPY, HERO_CONSOLE_COPY } from '../data/siteCopy';
-import { CREATOR_GUIDES } from '../data/creatorContent';
 import { useNewsFeed, formatRelativeTime, type NewsItem } from '../services/newsService';
-import { useCreatorPosts } from '../services/creatorFeedService';
+import { useCreatorFeed } from '../services/creatorFeedService';
 import { smoothScrollTo } from '../hooks/useLenis';
 import { rtl } from '../lib/rtl';
 
@@ -121,7 +120,7 @@ const KIND_ICON = { guide: BookOpen, post: AtSign, model: Cpu } as const;
 function TipsConsole() {
   const navigate = useNavigate();
   const news = useNewsFeed();
-  const posts = useCreatorPosts();
+  const creator = useCreatorFeed();
   const [filter, setFilter] = useState<Filter>('all');
   const [active, setActive] = useState<NewsItem | null>(null);
   const k = HERO_CONSOLE_COPY;
@@ -137,20 +136,22 @@ function TipsConsole() {
       .slice(0, CONSOLE_ROWS)
       .map((i) => ({ id: `m-${i.id}`, kind: 'model', title: i.title, meta: `${i.source} · ${formatRelativeTime(i.publishedAt)}`, item: i }));
 
-    // Posts first (newest content), then the guides as the evergreen floor.
-    const tips: ConsoleRow[] = [
-      ...(posts.data ?? []).map((p) => ({
-        id: `p-${p.id}`,
-        kind: 'post' as const,
-        title: p.text.replace(/\s+/g, ' ').trim(),
-        meta: `@mrdaniel_ai · ${p.createdAt ? formatRelativeTime(p.createdAt) : 'X'}`,
-        href: p.url,
-        external: true,
-      })),
-      ...CREATOR_GUIDES.map((g) => ({ id: `g-${g.slug}`, kind: 'guide' as const, title: g.title, meta: g.blurb, href: `/g/${g.slug}` })),
-    ];
+    // Already ordered by SocialSyncAgent: posts, then Linktree content links, then the guides.
+    const tips: ConsoleRow[] = (creator.data ?? []).map((c) => ({
+      id: c.id,
+      kind: c.kind === 'guide' ? 'guide' : 'post',
+      title: c.title,
+      meta:
+        c.kind === 'post'
+          ? `@mrdaniel_ai · ${c.publishedAt ? formatRelativeTime(c.publishedAt) : 'X'}`
+          : c.kind === 'link'
+            ? new URL(c.url).hostname.replace(/^www\./, '')
+            : c.blurb ?? '',
+      href: c.url,
+      external: c.kind !== 'guide',
+    }));
     return { tips, models };
-  }, [news.data, posts.data]);
+  }, [news.data, creator.data]);
 
   // "All" interleaves the two streams (tip, model, tip, model…) so neither buries the other.
   const rows = useMemo(() => {
@@ -259,6 +260,7 @@ function TipsConsole() {
         <button
           type="button"
           onClick={() => navigate('/magazines')}
+          aria-label="לעמוד לומדים AI"
           className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-brand-300 hover:text-brand-200 focus-visible:outline-none focus-visible:underline"
         >
           {rtl(k.cta)}
