@@ -9,6 +9,8 @@
  *               agent_queue as pending_approval. It never publishes.
  *   - site-sync every AGENT_SITE_SYNC_EVERY_MIN (60; 0 disables) → forces the site's creator-feed
  *               and model-catalog agents (runSiteSync below).
+ *   - precompute every AGENT_PRECOMPUTE_EVERY_MIN (10; 0 disables) → one batch of the site's
+ *               article precompute agent, so articles are analysed before anyone opens them.
  *
  * Why a local worker and not another Vercel cron: the Hobby plan allows one daily cron and it is
  * already spent on the auto-publisher, and there are no free function slots (AGENTS.md). This
@@ -179,6 +181,29 @@ async function runSiteSync() {
   writeState({ lastSiteSync: new Date().toISOString(), lastSiteSyncResult: results });
 }
 
+/**
+ * One batch of the site's ArticlePrecomputeAgent (src/server/articlePrecompute.ts): the newest
+ * not-yet-analysed articles are scraped and summarised on the server and stored in Firebase, so a
+ * reader who opens one gets it instantly. Logs only when something happened, not every idle tick.
+ */
+async function runPrecomputeBatch() {
+  if (!config.adminSecret) return;
+  try {
+    const res = await fetch(`${config.siteOrigin}/api/news?action=precompute`, {
+      method: 'POST',
+      headers: { 'x-admin-secret': config.adminSecret, Accept: 'application/json' },
+      signal: AbortSignal.timeout(95_000),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.status !== 200 || body.done || body.failed || body.stoppedBy) {
+      log(res.status === 200 ? 'info' : 'warn', 'precompute', { status: res.status, done: body.done, failed: body.failed, pending: body.pending, stoppedBy: body.stoppedBy, ms: body.ms });
+    }
+    writeState({ lastPrecompute: new Date().toISOString(), lastPrecomputeResult: { status: res.status, ...body } });
+  } catch (err) {
+    log('warn', 'precompute request failed', { error: String(err?.message ?? err) });
+  }
+}
+
 // ─── loop ───────────────────────────────────────────────────────────────────────────────────
 
 /** Runs `fn` now and then every `minutes`, never overlapping itself, and never letting a throw escape. */
@@ -225,6 +250,7 @@ async function main() {
     every(config.schedule.metricsEveryMin, 'metrics', runMetrics),
     every(10, 'draft', () => maybeDraft()),
     ...(config.schedule.siteSyncEveryMin > 0 ? [every(config.schedule.siteSyncEveryMin, 'site-sync', runSiteSync)] : []),
+    ...(config.schedule.precomputeEveryMin > 0 ? [every(config.schedule.precomputeEveryMin, 'precompute', runPrecomputeBatch)] : []),
   ];
 
   const shutdown = async (signal) => {

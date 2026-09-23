@@ -89,6 +89,39 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  // `GET /api/news?action=insights` — every PRECOMPUTED article analysis for the current feed, keyed
+  // by item id (src/server/articlePrecompute.ts). The page prefetches this while idle, so opening
+  // an article is a lookup in memory. Read-only: nothing here can start a scrape or a model call.
+  if (req.query?.action === 'insights') {
+    try {
+      const { getInsightsMap } = await import('../src/server/articlePrecompute.js');
+      const { map, coverage } = await getInsightsMap();
+      res.setHeader('Cache-Control', 'public, max-age=120');
+      res.setHeader('Vercel-CDN-Cache-Control', 'max-age=300, stale-while-revalidate=3600');
+      res.status(200).json({ ok: true, coverage, insights: map });
+    } catch (err) {
+      console.error('[insights] failed:', (err as Error)?.message ?? err);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ ok: false, insights: {} });
+    }
+    return;
+  }
+
+  // `POST /api/news?action=precompute` (admin secret) — one background batch of the agent. Called
+  // by the local worker every few minutes and by the daily cron; never by a page.
+  if (req.query?.action === 'precompute') {
+    const secret = process.env.ADMIN_API_SECRET;
+    if (!secret || req.headers?.['x-admin-secret'] !== secret) {
+      res.status(401).json({ ok: false, error: 'unauthorized' });
+      return;
+    }
+    const { runPrecompute } = await import('../src/server/articlePrecompute.js');
+    const max = Number(req.query?.max);
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).json(await runPrecompute({ maxItems: Number.isFinite(max) && max > 0 ? Math.min(max, 8) : undefined }));
+    return;
+  }
+
   if (req.query?.action === 'analyze' || req.method === 'POST') {
     await handleAnalyze(req, res);
     return;
@@ -122,13 +155,11 @@ export default async function handler(req: any, res: any) {
 }
 
 /**
- * `GET|POST /api/news/analyze` — executive summary, extended article and MR. DANIEL analysis,
- * generated from THIS article's full text (fetched from the publisher; see newsInsights.ts).
- *
- * GET is what the modal uses: the query string is deterministic per article, so the edge caches
- * one generation for every visitor — the free text engines allow only a couple of dozen full-text
- * analyses a day, and without the CDN each modal open would spend one. POST is kept for callers
- * that send a body. No boilerplate fallback: any failure answers `available: false`, uncached.
+ * `GET|POST /api/news/analyze` — kept for old links and cached clients, but READ-ONLY since
+ * 2026-09-23: it returns the analysis the background agent already stored for this article
+ * (src/server/articlePrecompute.ts) and never scrapes or calls a model. A request for an article
+ * the agent has not reached yet gets `available: false`, and the caller shows its teaser sections.
+ * Generation happens only in `runPrecompute`, off the click path.
  */
 async function handleAnalyze(req: any, res: any) {
   if (req.method === 'OPTIONS') {
@@ -139,44 +170,20 @@ async function handleAnalyze(req: any, res: any) {
     res.status(405).json({ error: 'method not allowed', available: false });
     return;
   }
-
-  const { generateArticleInsights, isInsightsConfigured } = await import('../src/server/newsInsights.js');
-  if (!isInsightsConfigured()) {
-    res.status(503).json({ error: 'analysis unavailable', available: false });
-    return;
-  }
-
   const body: Record<string, unknown> =
     req.method === 'GET' ? req.query ?? {} : typeof req.body === 'string' ? safeParse(req.body) : req.body ?? {};
-
-  try {
-    const insights = await generateArticleInsights({
-      title: String(body.title || ''),
-      summary: String(body.summary || ''),
-      excerpt: String(body.excerpt || ''),
-      source: String(body.source || ''),
-      topic: String(body.topic || 'general'),
-      link: String(body.link || ''),
-    });
-    // A published article does not change, so the edge holds one generation for a day and every
-    // visitor after the first is served without touching a model's free quota.
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.setHeader('Vercel-CDN-Cache-Control', 'max-age=86400, stale-while-revalidate=604800');
-    res.status(200).json({ available: true, insights });
-  } catch (err) {
-    console.error('[api/news?action=analyze] failed to generate article insights:', err);
-    res.setHeader('Cache-Control', 'no-store');
-    const message = err instanceof Error ? err.message : 'unknown error';
-    // A locally paced-out call is a 429 too: same meaning to the client ("too fast, retry"), but it
-    // comes back immediately instead of burning the function's remaining time on a wait.
-    const pacedOut = /gemini pacing:/.test(message);
-    const rateLimited = pacedOut || /429|quota|rate.?limit|RESOURCE_EXHAUSTED/i.test(message);
-    if (pacedOut) {
-      const seconds = Number(message.match(/is (\d+)s away/)?.[1]);
-      if (Number.isFinite(seconds)) res.setHeader('Retry-After', String(seconds));
-    }
-    res.status(rateLimited ? 429 : 502).json({ error: message, available: false, rateLimited, pacedOut });
+  const link = String(body.link || '');
+  const { getStoredInsight } = await import('../src/server/articlePrecompute.js');
+  const insights = link ? await getStoredInsight(link) : null;
+  if (!insights) {
+    // Short cache: the agent may well have it within minutes.
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.status(200).json({ available: false, pending: true });
+    return;
   }
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Vercel-CDN-Cache-Control', 'max-age=86400, stale-while-revalidate=604800');
+  res.status(200).json({ available: true, insights });
 }
 
 function safeParse(raw: string): Record<string, unknown> {

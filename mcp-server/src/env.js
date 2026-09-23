@@ -69,5 +69,7 @@ export const config = {
     draftPlatform: clean(process.env.AGENT_DRAFT_PLATFORM) || 'linkedin',
     /** How often to force the site's two sync agents (creator feed + model catalog). 0 disables. */
     siteSyncEveryMin: process.env.AGENT_SITE_SYNC_EVERY_MIN === undefined ? 60 : Number(process.env.AGENT_SITE_SYNC_EVERY_MIN),
+    /** How often to run one batch of the site's article precompute agent. 0 disables. */
+    precomputeEveryMin: process.env.AGENT_PRECOMPUTE_EVERY_MIN === undefined ? 10 : Number(process.env.AGENT_PRECOMPUTE_EVERY_MIN),
   },
 };

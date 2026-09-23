@@ -604,6 +604,38 @@ export async function writeSyncSnapshot(key: SyncSnapshotKey, payload: Record<st
 }
 
 // ---------------------------------------------------------------------------
+// Precomputed article analyses (src/server/articlePrecompute.ts)
+// `article_insights/<sha1(link)[0..16]>` — one child per article, written by the background agent
+// and read by the public modal. Public, non-personal data. Needs a read/write rule for
+// `article_insights` in the RTDB console; without it both calls degrade to no-ops/empty.
+// ---------------------------------------------------------------------------
+
+export async function readArticleInsights(): Promise<Record<string, Record<string, unknown>>> {
+  const db = getServerDb();
+  if (!db) return {};
+  try {
+    const snap = await get(ref(db, 'article_insights'));
+    return snap.exists() ? (snap.val() as Record<string, Record<string, unknown>>) : {};
+  } catch (err) {
+    console.error('[article-insights] failed to read:', (err as Error)?.message ?? err);
+    return {};
+  }
+}
+
+export async function writeArticleInsight(key: string, value: Record<string, unknown> | null): Promise<boolean> {
+  const db = getServerDb();
+  if (!db) return false;
+  try {
+    // RTDB rejects `undefined` anywhere in the tree; a JSON round-trip drops those keys.
+    await set(ref(db, `article_insights/${key}`), value === null ? null : JSON.parse(JSON.stringify(value)));
+    return true;
+  } catch (err) {
+    console.error('[article-insights] failed to write:', (err as Error)?.message ?? err);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // News snapshot (src/server/newsFeed.ts)
 // The last good /api/news refresh, so a cold instance whose refresh comes back empty (every feed
 // timing out, a WAF wave) still serves real stories instead of an empty grid. Public data only.

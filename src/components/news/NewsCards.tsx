@@ -43,7 +43,7 @@ export function NewsHeroCard({ item, onOpen, className = '' }: { item: NewsItem;
         <div className="flex min-w-0 flex-col justify-center gap-3 p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[#76B900]/45 bg-[#76B900]/12 px-2.5 py-1 text-[11px] font-bold text-[#9FE870]">
-              <Radar className="h-3.5 w-3.5" /> כתבה נבחרת · ניתוח חמ״ל
+              <Radar className="h-3.5 w-3.5" /> כתבה נבחרת
             </span>
             <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${t.ring}`}>
               <Icon className="h-3.5 w-3.5" /> {t.label}

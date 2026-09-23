@@ -5,9 +5,12 @@ import { importUrlContent } from './contentImport.js';
 import { resolveGoogleNewsUrl } from './newsFeed.js';
 
 /**
- * The article modal's three generated sections — executive summary, extended article and the
- * "ניתוח חמ״ל · MR. DANIEL Analysis" block — produced in ONE model call from the article's FULL
- * text.
+ * The article modal's two generated sections — executive summary and extended article — produced
+ * in ONE model call from the article's FULL text. (The third, "ניתוח חמ״ל · MR. DANIEL Analysis",
+ * was removed by decision on 2026-09-23; the model no longer writes it.)
+ *
+ * RUNS IN THE BACKGROUND ONLY since 2026-09-23 (src/server/articlePrecompute.ts): the modal reads
+ * a stored result and never triggers this. A reader must not wait on a publisher fetch + a model.
  *
  * Why the full text: the feed only carries the RSS teaser (or og:description), and every section
  * used to be shaped from that same 1–2 sentences, so the summary, the "extended" article and the
@@ -32,8 +35,6 @@ export interface ArticleInsights {
   executiveSummary: string[];
   /** 2–3 paragraph synthesis of the full article. */
   extendedArticle: string[];
-  /** One analytical paragraph — implications, in first-person plural. */
-  mrDanielAnalysis: string;
   /** True when the full article body was fetched; false = written from the feed teaser only. */
   fullText: boolean;
   /** Lead image found while fetching the article — the modal uses it when the feed item had none. */
@@ -63,17 +64,16 @@ const TOPIC_LENS: Record<string, string> = {
   general: 'זווית ההבנה — מה המנגנון שמסביר את מה שקרה בכתבה, ולמה זה מעניין למי שלומד את התחום.',
 };
 
-const SYSTEM_INSTRUCTION = `אתה דניאל בן ברוך — בונה סוכני AI ומפרק מודלי שפה. אתה עורך את חלון הכתבה המורחב באתר MrDaniel.co.il: תקציר מנהלים, כתבה מורחבת, ומקטע "ניתוח חמ״ל · MR. DANIEL Analysis".
+const SYSTEM_INSTRUCTION = `אתה עורך את חלון הכתבה באתר MrDaniel.co.il: תקציר קצר וכתבה מורחבת, בעברית פשוטה שכל אחד מבין.
 
 ${AUDIENCE_RULES}
 
 קיבלת כתבה אחת ספציפית — הטקסט המלא שלה כפי שנשלף מאתר המקור. כל מה שתכתוב נגזר אך ורק ממנה.
 
-שלושה חלקים, ולכל אחד תפקיד אחר. אסור ששני חלקים יחזרו על אותו משפט או על אותה נקודה באותו ניסוח:
+שני חלקים, ולכל אחד תפקיד אחר. אסור ששניהם יחזרו על אותו משפט או על אותה נקודה באותו ניסוח:
 
-1. executiveSummary — מערך של 3 עד 4 תבליטים עובדתיים. כל תבליט משפט אחד (12-28 מילים) שנושא עובדה אחת מהכתבה: מי, מה, כמה, מתי. בלי פרשנות.
-2. extendedArticle — מערך של 2 עד 3 פסקאות (כל אחת 40-75 מילים) שמספרות את הכתבה המלאה ברצף: ההקשר, הפרטים, המספרים, הציטוטים והמשמעות כפי שהכתבה עצמה מציגה אותם. זו עריכה קוהרנטית של הכתבה, לא חזרה על התקציר. בלי פרשנות משלך.
-3. mrDanielAnalysis — פסקה אחת (70-110 מילים) של ניתוח: מה המשמעות הטכנולוגית והעסקית של הידיעה, איזה מנגנון עומד מאחוריה, ומה היא מלמדת על הכיוון שאליו תחום ה-AI הולך. כתוב בגוף ראשון רבים, בטון מקצועי של אנשי טכנולוגיה ("מה שאנחנו רואים כאן...", "מבחינתנו, הנקודה המעניינת היא..."). כאן — ורק כאן — מותר להסיק ולפרש, בתנאי שכל מסקנה נשענת על פרט שמופיע בכתבה.
+1. executiveSummary — מערך של 3 עד 4 תבליטים עובדתיים. כל תבליט משפט אחד (12-24 מילים) שנושא עובדה אחת מהכתבה: מי, מה, כמה, מתי. בלי פרשנות.
+2. extendedArticle — מערך של 2 עד 3 פסקאות (כל אחת 35-65 מילים) שמספרות את הכתבה המלאה ברצף: ההקשר, הפרטים, המספרים, הציטוטים והמשמעות כפי שהכתבה עצמה מציגה אותם. זו עריכה קוהרנטית של הכתבה, לא חזרה על התקציר. בלי פרשנות משלך.
 
 השדה headline: משפט אחד קצר (עד 12 מילים) שאומר מה הדבר המעניין ללמוד מהכתבה הזאת. לא כותרת הכתבה מחדש.
 
@@ -85,10 +85,10 @@ ${AUDIENCE_RULES}
 - אל תפתח שורה במקף, כוכבית או תבליט — הממשק מוסיף את התבליט בעצמו. בלי אימוג'ים, בלי סימני קריאה.
 - אל תזכיר את שם כלי ה-AI ואל תכתוב "לפי הכתבה" יותר מפעם אחת.
 - בלי מילוי: לא "חשוב לציין", "בעידן ה-AI", "ללא ספק", "לסיכום", "מהפכני", "פורץ דרך". בלי שאלות רטוריות. המשפט הראשון בכל חלק הוא כבר תוכן.
-- executiveSummary ו-extendedArticle עובדתיים בלבד — בלי דעה, הערכה או תחזית שלא הופיעו בכתבה. הפרשנות שמורה ל-mrDanielAnalysis.
+- שני החלקים עובדתיים בלבד — בלי דעה, הערכה או תחזית שלא הופיעו בכתבה.
 
 החזר JSON תקני בלבד, בלי code fence:
-{"headline":"...","executiveSummary":["...","...","..."],"extendedArticle":["...","..."],"mrDanielAnalysis":"..."}`;
+{"headline":"...","executiveSummary":["...","...","..."],"extendedArticle":["...","..."]}`;
 
 /**
  * Normalizes one generated line: drops a leading bullet/hyphen the model may still emit (a raw
@@ -355,16 +355,14 @@ function toInsights(raw: string, fullText: boolean): ArticleInsights {
   const tidy = (v: unknown) => scrubAiPhrases(normalizeModelUnicode(String(v ?? '')));
   const executiveSummary = cleanList(asList(parsed.executiveSummary).map(tidy), 15, 4);
   const extendedArticle = cleanList(asList(parsed.extendedArticle).map(tidy), 60, 3);
-  const analysisRaw = parsed.mrDanielAnalysis;
-  const mrDanielAnalysis = cleanLine(tidy(Array.isArray(analysisRaw) ? analysisRaw.join(' ') : analysisRaw));
-  if (executiveSummary.length < 2 || extendedArticle.length < 1 || mrDanielAnalysis.length < 80) {
+  if (executiveSummary.length < 2 || extendedArticle.length < 1) {
     // Counts, not content — enough to tell which field a model keeps getting wrong.
     throw new Error(
-      `model did not return a usable summary / article / analysis (bullets ${executiveSummary.length}, paragraphs ${extendedArticle.length}, analysis ${mrDanielAnalysis.length} chars; keys ${Object.keys(parsed).join(',')})`
+      `model did not return a usable summary / article (bullets ${executiveSummary.length}, paragraphs ${extendedArticle.length}; keys ${Object.keys(parsed).join(',')})`
     );
   }
-  // No filler headline: if the model omitted it the modal renders the analysis without one.
-  return { headline: cleanLine(tidy(parsed.headline)), executiveSummary, extendedArticle, mrDanielAnalysis, fullText };
+  // No filler headline: if the model omitted it the modal simply shows none.
+  return { headline: cleanLine(tidy(parsed.headline)), executiveSummary, extendedArticle, fullText };
 }
 
 // Concurrent opens of the same story share one generation instead of each spending quota.

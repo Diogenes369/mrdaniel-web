@@ -5,7 +5,6 @@ import type { Request, Response } from 'express';
 import nodemailer from 'nodemailer';
 import { GoogleGenAI } from '@google/genai';
 import { getNewsItemBySlug, getNewsItems } from './src/server/newsFeed';
-import { generateArticleInsights, isInsightsConfigured } from './src/server/newsInsights';
 import { getAINews } from './src/server/aiNewsFeed';
 import { AI_ASSISTANT_SYSTEM_INSTRUCTION } from './src/server/aiSystemPrompt';
 import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, transcribeAudio, detectGeminiRateLimit, classifyGeminiError, generateVisualSearchQuery, generateImageGenerationPrompt } from './src/agent/SocialAgentEngine';
@@ -152,6 +151,18 @@ app.get('/api/news', async (_req: Request, res: Response) => {
     res.json({ ok: true, ...(await getModelCatalog(_req.query?.refresh === '1')) });
     return;
   }
+  // Local mirrors of the article precompute agent (api/news.ts `?action=insights|precompute`).
+  if (_req.query?.action === 'insights') {
+    const { getInsightsMap } = await import('./src/server/articlePrecompute.js');
+    const { map, coverage } = await getInsightsMap();
+    res.json({ ok: true, coverage, insights: map });
+    return;
+  }
+  if (_req.query?.action === 'precompute') {
+    const { runPrecompute } = await import('./src/server/articlePrecompute.js');
+    res.json(await runPrecompute({ maxItems: Number(_req.query?.max) || undefined }));
+    return;
+  }
   const data = await getNewsItems();
   res.json(data);
 });
@@ -228,28 +239,13 @@ app.get('/api/news/item/:slug', async (req: Request, res: Response) => {
 // Local-dev mirror of api/news-analyze.ts — the Gemini-generated "ניתוח טכנולוגי ומשמעויות"
 // block of the article modal. No boilerplate fallback: an unconfigured key or a model failure
 // answers `available: false` and the modal hides the section.
+// Read-only since 2026-09-23 (mirrors api/news.ts handleAnalyze): serves the analysis the
+// background agent stored, never generates on request.
 app.all('/api/news/analyze', async (req: Request, res: Response) => {
-  if (!isInsightsConfigured()) {
-    res.status(503).json({ error: 'analysis unavailable', available: false });
-    return;
-  }
   const b: Record<string, unknown> = (req.method === 'GET' ? req.query : req.body) ?? {};
-  try {
-    const insights = await generateArticleInsights({
-      title: String(b.title || ''),
-      summary: String(b.summary || ''),
-      excerpt: String(b.excerpt || ''),
-      source: String(b.source || ''),
-      topic: String(b.topic || 'general'),
-      link: String(b.link || ''),
-    });
-    res.json({ available: true, insights });
-  } catch (err) {
-    console.error('[api/news/analyze] failed to generate article insights:', err);
-    const message = err instanceof Error ? err.message : 'unknown error';
-    const rateLimited = /429|quota|rate.?limit|RESOURCE_EXHAUSTED/i.test(message);
-    res.status(rateLimited ? 429 : 502).json({ error: message, available: false, rateLimited });
-  }
+  const { getStoredInsight } = await import('./src/server/articlePrecompute.js');
+  const insights = b.link ? await getStoredInsight(String(b.link)) : null;
+  res.json(insights ? { available: true, insights } : { available: false, pending: true });
 });
 
 app.get('/api/ai-news', async (_req: Request, res: Response) => {

@@ -183,10 +183,14 @@ export default async function handler(req: any, res: any) {
       import('../src/server/agents/socialSyncAgent.js'),
       import('../src/server/agents/modelUpdateAgent.js'),
     ]);
-    const [social, models] = await Promise.allSettled([runSocialSync(), runModelUpdate()]);
+    // Job 5: one batch of the article precompute agent — the floor under the local worker's
+    // 10-minute cadence, so articles still get analysed on days the local machine is off.
+    const { runPrecompute } = await import('../src/server/articlePrecompute.js');
+    const [social, models, precompute] = await Promise.allSettled([runSocialSync(), runModelUpdate(), runPrecompute({ maxItems: 4, budgetMs: 60_000 })]);
     const syncResult = {
       social: social.status === 'fulfilled' ? { items: social.value.items.length, sources: social.value.sources } : { ok: false },
       models: models.status === 'fulfilled' ? { source: models.value.source, frontier: models.value.frontier.map((m) => m.name) } : { ok: false },
+      precompute: precompute.status === 'fulfilled' ? precompute.value : { ok: false },
     };
 
     res.status(200).json({ ok: true, content: contentResult, autoPublish: publishResult, sync: syncResult });

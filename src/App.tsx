@@ -17,6 +17,7 @@ import { useDeferredMount } from './hooks/useDeferredMount';
 import { ScrollTrigger } from './lib/gsap';
 import RouteSeo from './components/seo/RouteSeo';
 import { shouldMountScene } from './lib/perfMode';
+import { useInsightsPrefetch } from './services/newsInsightsService';
 
 // The site's standard background: the R3F cosmic scene. Lazy so its Three.js/R3F bundle stays out
 // of the initial payload until the page is idle (see useDeferredMount).
@@ -66,6 +67,9 @@ function RouteScrollManager() {
 export default function App() {
   useLenis();
   const location = useLocation();
+  // Warm the precomputed article analyses while idle, so opening any headline is instant. Not on
+  // the bare guide-download pages, which exist to load as little as possible over mobile data.
+  useInsightsPrefetch(!/^\/(?:download|g)(?:\/|$)/.test(location.pathname));
   const sceneReady = useDeferredMount();
   // Decided once: reduced motion, Save-Data and weak hardware never download the Three.js chunk.
   const [sceneAllowed] = useState(shouldMountScene);

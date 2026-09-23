@@ -145,13 +145,26 @@ t('rules · the news-analysis path carries the concision contract inline', /בל
 t('rules · the news-analysis path keeps the audience block', /\$\{AUDIENCE_RULES\}/.test(insights));
 t('analysis · reads the FULL article, not the teaser', /importUrlContent\(link\)/.test(insights) && /resolveGoogleNewsUrl/.test(insights));
 t('analysis · the prompt is sized to the Groq window', /fitToTokens\(/.test(insights) && /maxOutputTokens: OUTPUT_TOKENS/.test(insights));
-t('analysis · returns the three modal sections', ['executiveSummary', 'extendedArticle', 'mrDanielAnalysis'].every((k) => insights.includes(k)));
+// 2026-09-23: two sections; the "MR. DANIEL Analysis" block was removed by decision.
+t('analysis · returns the two modal sections, no analysis block', ['executiveSummary', 'extendedArticle'].every((k) => insights.includes(k)) && !insights.includes('mrDanielAnalysis'));
+{
+  const api = readFileSync(new URL('../../api/news.ts', import.meta.url), 'utf8');
+  const pre = readFileSync(new URL('../../src/server/articlePrecompute.ts', import.meta.url), 'utf8');
+  const svc = readFileSync(new URL('../../src/services/newsInsightsService.ts', import.meta.url), 'utf8');
+  const modal = readFileSync(new URL('../../src/components/news/ArticleModal.tsx', import.meta.url), 'utf8');
+  t('precompute · the click path cannot generate: api/news never calls generateArticleInsights', !/generateArticleInsights\(/.test(api));
+  t('precompute · generation lives only in the background agent', /generateArticleInsights\(/.test(pre));
+  t('precompute · the batch endpoint requires the admin secret', /action === 'precompute'[\s\S]{0,200}x-admin-secret/.test(api));
+  t('precompute · a rate limit stops the batch instead of burning the day', /stoppedBy = 'rate-limit'/.test(pre));
+  t('precompute · the modal reads the prefetched map, no per-article request', !/news\/analyze/.test(svc) && /action=insights/.test(svc) && !/fetch\(/.test(modal));
+  t('precompute · the map is warmed while idle', /requestIdleCallback/.test(svc));
+}
 t('analysis · first engine is a free flash-lite, not the 20/day 3.6-flash', /ENGINES: Engine\[\] = \[\s*\{[^}]*'gemini-3\.1-flash-lite'/.test(insights) && !/'gemini-3\.6-flash'/.test(insights));
 t('analysis · stays off the shared router (Groq main model / 3.6-flash pacing)', !/generateContentWithRetry\(/.test(insights));
 t('analysis · a daily 429 benches the model until UTC midnight', /nextUtcMidnight\(\)/.test(insights));
 t('analysis · concurrent opens share one generation', /inFlight\.get\(key\)/.test(insights));
 t('analysis · the voice scrub still runs', /scrubAiPhrases\(/.test(insights));
-t('analysis · edge caches a generation for a day', /max-age=86400/.test(readFileSync(new URL('../../api/news.ts', import.meta.url), 'utf8')));
+t('analysis · edge caches a stored analysis for a day', /max-age=86400/.test(readFileSync(new URL('../../api/news.ts', import.meta.url), 'utf8')));
 
 // ─── text generation never carries media ───────────────────────────────────────────────────────
 

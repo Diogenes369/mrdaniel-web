@@ -1,32 +1,28 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { NewsItem } from './newsService';
 
 /**
- * Client side of the article modal's generated sections: posts the article's title + link to
- * `POST /api/news/analyze`, which fetches the FULL article from the publisher and returns an
- * executive summary, an extended article and the MR. DANIEL analysis paragraph
- * (see src/server/newsInsights.ts).
+ * Client side of the article modal's sections — READ-ONLY since 2026-09-23.
  *
- * No client-side fallback copy for the analysis on purpose. If the endpoint fails, the modal keeps
- * its teaser-based summary/article and drops the analysis block.
+ * Every article is analysed in the background by the precompute agent
+ * (src/server/articlePrecompute.ts) and stored in Firebase. The page fetches ONE bulk map of those
+ * stored analyses (`GET /api/news?action=insights`, CDN-cached) while the browser is idle, so by
+ * the time anyone clicks a headline the answer is already in memory: opening the modal is a
+ * dictionary lookup, never a request, a scrape or a model call.
+ *
+ * An article the agent has not reached yet is simply absent from the map; the modal then shows the
+ * deterministic teaser sections (src/lib/newsAnalysis.ts), also instantly.
  */
 
 export interface ArticleInsights {
   headline: string;
   executiveSummary: string[];
   extendedArticle: string[];
-  mrDanielAnalysis: string;
   /** False when the server could not reach the article and wrote from the feed teaser. */
   fullText: boolean;
   /** Lead image the server found on the article page, if any. */
   image?: string;
-}
-
-interface AnalyzeResponse {
-  available?: boolean;
-  insights?: ArticleInsights;
-  error?: string;
-  rateLimited?: boolean;
 }
 
 const clean = (v: unknown) => String(v ?? '').replace(/^[\s\-–—•*·>]+/, '').trim();
@@ -38,47 +34,64 @@ function normalize(raw: unknown): ArticleInsights | null {
   const value = raw as Partial<ArticleInsights> | undefined;
   const executiveSummary = cleanList(value?.executiveSummary, 4);
   const extendedArticle = cleanList(value?.extendedArticle, 3);
-  const mrDanielAnalysis = clean(value?.mrDanielAnalysis);
-  if (!executiveSummary.length && !extendedArticle.length && !mrDanielAnalysis) return null;
+  if (!executiveSummary.length && !extendedArticle.length) return null;
   const image = typeof value?.image === 'string' && /^https?:\/\//i.test(value.image) ? value.image : undefined;
-  return { headline: clean(value?.headline), executiveSummary, extendedArticle, mrDanielAnalysis, fullText: value?.fullText === true, image };
+  return { headline: clean(value?.headline), executiveSummary, extendedArticle, fullText: value?.fullText === true, image };
 }
 
-export async function fetchArticleInsights(item: NewsItem): Promise<ArticleInsights> {
-  // GET, not POST: the query is deterministic per article, so Vercel's edge caches the generation
-  // and every later visitor gets it for free. The teaser is clipped to keep the URL short — the
-  // server reads the full article itself and only falls back to this when the fetch fails.
-  const params = new URLSearchParams({
-    title: item.title,
-    link: item.link,
-    source: item.source || '',
-    topic: item.topic || 'general',
-    summary: (item.summary || item.excerpt || '').slice(0, 280),
-  });
-  const res = await fetch(`/api/news/analyze?${params}`);
+type InsightsMap = Record<string, ArticleInsights>;
+const QUERY_KEY = ['news-insights-map-v1'];
 
-  const data: AnalyzeResponse = await res.json().catch(() => ({}) as AnalyzeResponse);
-  if (!res.ok || data.available === false) {
-    throw new Error(data.error || `analysis endpoint responded ${res.status}`);
+async function fetchInsightsMap(): Promise<InsightsMap> {
+  try {
+    const res = await fetch('/api/news?action=insights', { headers: { Accept: 'application/json' } });
+    if (!res.ok) return {};
+    const data = (await res.json()) as { insights?: Record<string, unknown> };
+    const out: InsightsMap = {};
+    for (const [id, raw] of Object.entries(data.insights ?? {})) {
+      const v = normalize(raw);
+      if (v) out[id] = v;
+    }
+    return out;
+  } catch {
+    return {};
   }
+}
 
-  const insights = normalize(data.insights);
-  if (!insights) throw new Error('analysis response contained no usable insights');
-  return insights;
+const QUERY_OPTIONS = {
+  queryKey: QUERY_KEY,
+  queryFn: fetchInsightsMap,
+  staleTime: 5 * 60 * 1000,
+  gcTime: 60 * 60 * 1000,
+  refetchOnWindowFocus: false,
+  retry: 1,
+} as const;
+
+export function prefetchInsights(client: QueryClient): Promise<void> {
+  return client.prefetchQuery(QUERY_OPTIONS);
 }
 
 /**
- * Runs only while a modal is actually open (`enabled`), so the grid never fires an LLM call per
- * card. The result is cached per article id for the session — reopening the same story is free.
+ * Mounted once (App.tsx): warms the map as soon as the browser is idle after first paint, so it
+ * never competes with the page's own loading, and refreshes it with the feed.
  */
-export function useArticleInsights(item: NewsItem | null) {
-  return useQuery({
-    queryKey: ['news-article-insights-v2', item?.id ?? item?.link ?? ''],
-    queryFn: () => fetchArticleInsights(item as NewsItem),
-    enabled: Boolean(item),
-    staleTime: 6 * 60 * 60 * 1000,
-    gcTime: 12 * 60 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    retry: 1,
-  });
+export function useInsightsPrefetch(enabled = true): void {
+  const client = useQueryClient();
+  useEffect(() => {
+    if (!enabled) return;
+    const run = () => void prefetchInsights(client);
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(run, { timeout: 3000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = window.setTimeout(run, 1200);
+    return () => window.clearTimeout(t);
+  }, [client, enabled]);
+}
+
+/** The stored analysis for one article, straight from the prefetched map — no request of its own. */
+export function useArticleInsights(item: NewsItem | null): ArticleInsights | undefined {
+  const { data } = useQuery({ ...QUERY_OPTIONS, enabled: Boolean(item) });
+  return item ? data?.[item.id] : undefined;
 }
