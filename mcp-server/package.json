@@ -14,7 +14,10 @@
     "selftest": "node src/selftest.js",
     "figma:bridge": "node start-bridge.js",
     "test:bridge": "node src/figma-bridge.selftest.js",
-    "test:copy": "node src/copy-rules.selftest.js"
+    "test:copy": "node src/copy-rules.selftest.js",
+    "pm2:restart": "pm2 startOrReload ecosystem.config.cjs --update-env && pm2 save",
+    "pm2:save": "pm2 save",
+    "pm2:status": "pm2 status mrdaniel-agent"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
