@@ -20,6 +20,7 @@ import { findStaticGuide, findCampaignGuide } from '../src/server/leadMagnets.js
 //   • POST (no `action`)                 → a site lead: store it in `leads`, then email the owner.
 //   • POST { action: 'qualification' }    → the agent quiz result: store it in `leads`, no email.
 //   • POST { action: 'manychat-lead' }    → ManyChat External Request: save a Comment-to-DM lead.
+//   • POST { action: 'guide-signup' }     → a visitor signed in to download a free guide.
 //
 // The site no longer writes `leads` from the browser, and the pending rules lock (PROJECT_STATE.md
 // §6) closes it to browsers, so this endpoint is the only way a visitor's lead reaches it. Every
@@ -117,6 +118,12 @@ export default async function handler(req: any, res: any) {
   // ---- ManyChat Comment-to-DM lead (server-to-server, secret-gated) -------------------------
   if (action === 'manychat-lead') {
     await handleManychatLead(req, res, body);
+    return;
+  }
+
+  // ---- Signed-in free-guide download (identity from a Firebase ID token) ---------------------
+  if (action === 'guide-signup') {
+    await handleGuideSignup(res, body);
     return;
   }
 
@@ -424,4 +431,82 @@ async function handleManychatLead(req: any, res: any, body: Record<string, unkno
     guideUrl: guide?.url ?? '',
     guideTitle: guide?.title ?? '',
   });
+}
+
+/**
+ * `POST { action: 'guide-signup', idToken, guide }` — a visitor signed in (Google or email/password,
+ * src/lib/siteAuth.ts) to download a free static guide.
+ *
+ * The body carries NO name or email. Both come from the Firebase account the ID token belongs to,
+ * resolved by Identity Toolkit's `accounts:lookup` — which also rejects a forged, expired or
+ * foreign-project token. That keeps this open endpoint from becoming a way to plant arbitrary
+ * addresses in `leads`, the list email campaigns send to. It needs only the public web API key,
+ * not a service account, so it works before FIREBASE_SERVICE_ACCOUNT exists.
+ *
+ * Deduped per (uid, guide) through the same windowed upsert ManyChat uses: the visitor re-opening
+ * the PDF next week bumps `count`/`lastTs` instead of adding a row.
+ */
+async function handleGuideSignup(res: any, body: Record<string, unknown>) {
+  const idToken = typeof body.idToken === 'string' ? body.idToken.trim() : '';
+  const slug = formText(body.guide, 64).toLowerCase();
+  const guide = findStaticGuide(slug);
+  if (!idToken || idToken.length > 4096 || !guide) {
+    res.status(400).json({ ok: false, error: !guide ? 'unknown guide' : 'missing token' });
+    return;
+  }
+  const apiKey = process.env.VITE_FIREBASE_API_KEY;
+  if (!apiKey) {
+    res.status(503).json({ ok: false, error: 'auth not configured' });
+    return;
+  }
+
+  type Account = {
+    localId?: string;
+    email?: string;
+    emailVerified?: boolean;
+    displayName?: string;
+    providerUserInfo?: { providerId?: string }[];
+  };
+  let account: Account | undefined;
+  try {
+    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) {
+      res.status(401).json({ ok: false, error: 'invalid token' });
+      return;
+    }
+    account = ((await r.json()) as { users?: Account[] }).users?.[0];
+  } catch (err) {
+    console.error('[api/leads] guide-signup token lookup failed:', err);
+    res.status(502).json({ ok: false, error: 'token lookup failed' });
+    return;
+  }
+  const email = (account?.email || '').toLowerCase();
+  if (!account?.localId || !isEmail(email)) {
+    res.status(401).json({ ok: false, error: 'invalid token' });
+    return;
+  }
+
+  const provider = account.providerUserInfo?.[0]?.providerId === 'google.com' ? 'google' : 'password';
+  const key = createHash('sha256').update(`guide-auth|${account.localId}|${guide.slug}`).digest('hex').slice(0, 24);
+  const saved = await upsertManychatLead(key, {
+    name: formText(account.displayName, 120) || email.split('@')[0],
+    email,
+    uid: account.localId,
+    authProvider: provider,
+    emailVerified: account.emailVerified ? 'yes' : 'no',
+    guide: guide.slug,
+    project: guide.title,
+    sourceSection: `מדריך חינמי · ${provider === 'google' ? 'Google' : 'אימייל'}`,
+    source: 'guide-auth',
+  });
+  if (!saved) {
+    res.status(500).json({ ok: false, error: 'lead not saved' });
+    return;
+  }
+  res.status(200).json({ ok: true, deduped: saved.deduped });
 }

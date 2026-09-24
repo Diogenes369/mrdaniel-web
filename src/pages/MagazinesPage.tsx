@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Bell, BookOpen, ArrowLeft, Sparkles } from 'lucide-react';
+import { Bell, ArrowLeft, Lock, Sparkles } from 'lucide-react';
 import WebButton from '../components/WebButton';
 import SocialLinks from '../components/SocialLinks';
+import GuideCover from '../components/guides/GuideCover';
 import { LEARN_AI_COPY } from '../data/siteCopy';
 import { CREATOR_GUIDES } from '../data/creatorContent';
 import { useModelCatalog } from '../services/modelCatalogService';
@@ -16,6 +17,8 @@ import { rtl } from '../lib/rtl';
  *
  * Three things keep it from being a dead end: a "notify me" CTA (the site's lead modal, tagged so
  * the dashboard can filter these), the two free guides that already exist, and the social links.
+ * The guide cards carry code-drawn 3D covers (GuideCover); the download itself asks for a free
+ * sign-in on the guide page (2026-09-24).
  * The floating chips are the live model catalog (ModelUpdateAgent) — "the models we'll explain" —
  * so even the placeholder page stays current.
  *
@@ -133,14 +136,19 @@ export default function MagazinesPage() {
               onClick={() => navigate(`/g/${g.slug}`)}
               className="glass-panel glass-panel--marketing group flex h-full flex-col items-start rounded-2xl p-6 text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
             >
-              <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-brand-400">
-                <BookOpen className="h-5 w-5" aria-hidden="true" />
-              </span>
+              {/* Code-drawn cover (GuideCover), not an image — see the component for why. */}
+              <GuideCover slug={g.slug} title={g.title} style={g.cover} className="mx-auto mb-2 max-w-[17rem]" />
               <h3 className="mb-2 font-display text-lg font-bold text-white">{rtl(g.title)}</h3>
               <p className="mb-5 flex-grow text-zinc-400">{rtl(g.blurb)}</p>
               <span className="inline-flex items-center gap-1.5 text-sm font-bold text-brand-300 group-hover:text-brand-200">
                 להורדה חינם
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              </span>
+              {/* The download is gated behind a free sign-in (GuideDownloadPage) — say so before the
+                  click, so the modal is expected rather than a bait-and-switch. */}
+              <span className="mt-2 inline-flex items-center gap-1 text-xs text-zinc-500">
+                <Lock className="h-3 w-3" aria-hidden="true" />
+                בהרשמה חינמית עם Google או אימייל
               </span>
             </button>
           ))}

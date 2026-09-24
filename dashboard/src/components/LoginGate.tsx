@@ -1,13 +1,20 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Lock, LogIn } from 'lucide-react';
-import { login } from '../lib/auth';
+import { login, logout } from '../lib/auth';
 import { firebaseConfigured } from '../firebase';
 
-export default function LoginGate() {
+/** `denied`: signed in, but not an admin (see isDashboardAdmin) — sign that session straight out. */
+export default function LoginGate({ denied = false }: { denied?: boolean }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (!denied) return;
+    setError('לחשבון הזה אין הרשאת גישה ללוח הבקרה.');
+    logout();
+  }, [denied]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

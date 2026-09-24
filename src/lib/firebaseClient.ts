@@ -1,4 +1,4 @@
-import { initializeApp, type FirebaseOptions } from 'firebase/app';
+import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
 import { getDatabase, type Database } from 'firebase/database';
 
 const config: FirebaseOptions = {
@@ -13,7 +13,16 @@ const config: FirebaseOptions = {
 
 export const firebaseConfigured = typeof window !== 'undefined' && Boolean(config.apiKey && config.databaseURL);
 
+let appInstance: FirebaseApp | null = null;
 let dbInstance: Database | null = null;
+
+/** The one Firebase app on the public site. `getDb()` and the guide-download sign-in
+ * (`siteAuth.ts`, lazy-loaded) both hang off it — two `initializeApp` calls would throw. */
+export function getFirebaseApp(): FirebaseApp | null {
+  if (!firebaseConfigured) return null;
+  if (!appInstance) appInstance = initializeApp(config);
+  return appInstance;
+}
 
 /** Lazily initializes (once) and returns the shared Realtime Database instance — every caller on
  * the public site (tracker.ts, the newsletter form, anything added later) must go through this
@@ -21,10 +30,8 @@ let dbInstance: Database | null = null;
  * named app is initialized twice. Returns null when unconfigured so callers can no-op instead of
  * crashing. */
 export function getDb(): Database | null {
-  if (!firebaseConfigured) return null;
-  if (!dbInstance) {
-    const app = initializeApp(config);
-    dbInstance = getDatabase(app);
-  }
+  const app = getFirebaseApp();
+  if (!app) return null;
+  if (!dbInstance) dbInstance = getDatabase(app);
   return dbInstance;
 }

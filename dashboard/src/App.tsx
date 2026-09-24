@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LayoutGrid, Users2, Activity, UserPlus, LogOut, ShieldAlert, Bot, Calendar, Newspaper, Rocket, Film, Mail, Wifi, WifiOff, Recycle, TrendingUp, LayoutTemplate, GraduationCap, AtSign, ImagePlus, Code2, Twitter, Sparkles, Radar, Box } from 'lucide-react';
-import { useAuthUser, logout } from './lib/auth';
+import { useAuthUser, logout, isDashboardAdmin } from './lib/auth';
 import { usePresence, useLiveEvents, useHealth, useLeads, useNewsletterSignups, useFirebaseConnection } from './lib/useLiveEvents';
 import { useHeartbeat, useSiteHealthPing, SITE_ORIGIN } from './lib/useDashboardRefresh';
 import { firebaseConfigured } from './firebase';
@@ -154,8 +154,9 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return <LoginGate />;
+  // A session alone is not enough: visitors can now create accounts in this Firebase project.
+  if (!user || !isDashboardAdmin(user)) {
+    return <LoginGate denied={Boolean(user)} />;
   }
 
   return (

@@ -1,11 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   Download, FileText, ArrowLeft, ShieldCheck, Clock, AlertTriangle,
-  Loader2, MessageSquare, Check, Lock, BookOpen, Quote, FlaskConical,
+  Loader2, MessageSquare, Check, Lock, BookOpen, Quote, FlaskConical, LogOut,
 } from 'lucide-react';
 import Seo from '../components/seo/Seo';
 import { loadTracker } from '../lib/loadTracker';
+import GuideCover from '../components/guides/GuideCover';
+import { guideCoverStyle } from '../data/creatorContent';
+import type { User } from '../lib/siteAuth';
+
+// Sign-in is only needed once someone presses download on a static guide, so the modal and the
+// `firebase/auth` behind it load on demand instead of riding in the bundle every visitor pays for.
+const AuthModal = lazy(() => import('../components/auth/AuthModal'));
+const loadAuth = () => import('../lib/siteAuth');
 import {
   DEMO_GUIDE, DEMO_IDS, DEMO_STATIC_GUIDE, DEMO_STATIC_IDS, type GuideMeta, type GuideSection,
 } from './guideDemoFixture';
@@ -31,6 +39,16 @@ import {
  *
  * Bare route (no site chrome) because the visitor tapped a link in an Instagram DM on a phone, and
  * `noindex` because every URL here is a per-recipient capability token.
+ *
+ * STATIC guides (the free PDFs) are gated behind a free sign-in since 2026-09-24: download opens
+ * AuthModal (Google first, then email/password), and on success the modal closes and the download
+ * starts by itself. Each signed-in download is recorded as a lead through `api/leads`
+ * (`guide-signup`), which reads the identity from the Firebase ID token rather than trusting the
+ * browser. Bridge guides (32-hex ids) stay ungated — those links are already per-recipient.
+ *
+ * The gate is a lead-capture step, not DRM: the PDF itself is still a public CDN file under
+ * /guides/. Serving it through a function would put ~2 MB of PDFs in a Hobby function bundle for a
+ * free guide; not worth it while the point is the lead, not secrecy.
  */
 
 type State =
@@ -154,11 +172,16 @@ export default function GuideDownloadPage() {
   const meta = state.kind === 'ready' ? state.meta : null;
   const campaign = useMemo(() => campaignFrom(search), [search]);
 
-  const download = useCallback(
-    (variant?: 'pdf') => {
+  const isStatic = meta?.kind === 'static';
+  const [visitor, setVisitor] = useState<User | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+
+  const startDownload = useCallback(
+    (variant?: 'pdf', user: User | null = null) => {
       // The demo has no file behind it (its banner says so), so its buttons stay inert.
       if (!meta || meta.isDemo) return;
       const isStatic = meta.kind === 'static';
+      if (isStatic && user) loadAuth().then((a) => a.recordGuideLead(user, guideId));
       // Static guides open the CDN file directly — only ever a /guides/ path, whatever the API said.
       // Bridge guides use plain navigation, not fetch+blob: the API answers 302 and the bridge sends
       // Content-Disposition, so the browser saves natively and a 5MB ZIP never enters page memory.
@@ -177,6 +200,48 @@ export default function GuideDownloadPage() {
     [meta, guideId, campaign]
   );
 
+  // Static guides only: know who is signed in, and finish a Google sign-in that had to fall back
+  // from a blocked popup to a full-page redirect — the download the visitor asked for resumes here.
+  useEffect(() => {
+    if (!isStatic) return;
+    let alive = true;
+    let unsub = () => {};
+    loadAuth().then(async (a) => {
+      if (!alive) return;
+      unsub = a.watchUser((u) => {
+        if (alive) setVisitor(u);
+      });
+      const resumed = await a.takeRedirectResume();
+      const u = a.siteAuth()?.currentUser ?? null;
+      if (alive && resumed === guideId && u) startDownload(undefined, u);
+    });
+    return () => {
+      alive = false;
+      unsub();
+    };
+  }, [isStatic, guideId, startDownload]);
+
+  const download = useCallback(
+    (variant?: 'pdf') => {
+      // The demo opens the modal too, so the gate is reviewable at /g/demo-pdf; its download stays inert.
+      if (meta?.kind === 'static' && !visitor) {
+        setAuthOpen(true);
+        return;
+      }
+      startDownload(variant, visitor);
+    },
+    [meta, visitor, startDownload]
+  );
+
+  const onAuthed = useCallback(
+    (u: User) => {
+      setVisitor(u);
+      setAuthOpen(false);
+      startDownload(undefined, u);
+    },
+    [startDownload]
+  );
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-carbon-950" dir="rtl">
       <Seo
@@ -192,7 +257,15 @@ export default function GuideDownloadPage() {
         <BrandMark />
 
         {state.kind === 'loading' && <LoadingBlock />}
-        {state.kind === 'ready' && <GuideArticle meta={state.meta} guideId={guideId} onDownload={download} />}
+        {state.kind === 'ready' && (
+          <GuideArticle
+            meta={state.meta}
+            guideId={guideId}
+            onDownload={download}
+            visitor={visitor}
+            onSignOut={() => loadAuth().then((a) => a.signOutVisitor())}
+          />
+        )}
         {state.kind === 'missing' && (
           <ProblemBlock title="הקישור לא נמצא" body="הקישור שגוי או שהמדריך הוסר. אם קיבלתם אותו בהודעה, בקשו קישור מעודכן." />
         )}
@@ -215,6 +288,18 @@ export default function GuideDownloadPage() {
       </main>
 
       {state.kind === 'ready' && <StickyBar meta={state.meta} onDownload={download} />}
+
+      {authOpen && meta && (
+        <Suspense fallback={null}>
+          <AuthModal
+            open={authOpen}
+            guideSlug={guideId}
+            guideTitle={meta.title || 'המדריך'}
+            onClose={() => setAuthOpen(false)}
+            onAuthed={onAuthed}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -222,11 +307,13 @@ export default function GuideDownloadPage() {
 // ─── article ────────────────────────────────────────────────────────────────────────────────────
 
 function GuideArticle({
-  meta, guideId, onDownload,
+  meta, guideId, onDownload, visitor, onSignOut,
 }: {
   meta: GuideMeta;
   guideId: string;
   onDownload: (variant?: 'pdf') => void;
+  visitor: User | null;
+  onSignOut: () => void;
 }) {
   const sections = meta.sections ?? [];
   const hasBody = sections.length > 0;
@@ -276,7 +363,7 @@ function GuideArticle({
 
       {/* COVER */}
       {isStatic ? (
-        <StaticCover meta={meta} />
+        <StaticCover meta={meta} guideId={guideId} />
       ) : (
         <SlidePreview guideId={guideId} n={1} total={meta.slides} eager isDemo={meta.isDemo} />
       )}
@@ -367,7 +454,7 @@ function GuideArticle({
             <SpecRow label="שקופיות" value={`${meta.slides}`} />
           )}
           <SpecRow label="שפה" value="עברית" />
-          <SpecRow label="הרשמה" value="לא נדרשת — הורדה ישירה" last={!expiry} />
+          <SpecRow label="הרשמה" value={isStatic ? 'חינמית — Google או אימייל' : 'לא נדרשת — הורדה ישירה'} last={!expiry} />
           {expiry && <SpecRow label="זמינות הקישור" value={expiry} last />}
         </dl>
       </section>
@@ -415,10 +502,32 @@ function GuideArticle({
           </a>
         </div>
 
-        <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-zinc-500">
-          <Lock className="h-3 w-3" />
-          הורדה ישירה, בלי הרשמה ובלי השארת פרטים.
-        </p>
+        {!isStatic ? (
+          <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-zinc-500">
+            <Lock className="h-3 w-3" />
+            הורדה ישירה, בלי הרשמה ובלי השארת פרטים.
+          </p>
+        ) : visitor ? (
+          <p className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] text-zinc-500">
+            <Check className="h-3 w-3 text-brand-500" />
+            <span>
+              מחוברים בתור <bdi className="text-zinc-300">{visitor.displayName || visitor.email}</bdi>
+            </span>
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="inline-flex cursor-pointer items-center gap-1 underline-offset-2 hover:text-zinc-300 hover:underline"
+            >
+              <LogOut className="h-3 w-3" />
+              התנתקות
+            </button>
+          </p>
+        ) : (
+          <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-zinc-500">
+            <Lock className="h-3 w-3" />
+            הרשמה חינמית בלחיצה אחת עם Google, או עם אימייל.
+          </p>
+        )}
       </section>
     </article>
   );
@@ -443,39 +552,26 @@ function SpecRow({ label, value, last = false }: { label: string; value: string;
 }
 
 /**
- * Cover for a static guide. There are no rendered slides to preview, so it is either the cover image
- * shipped beside the PDF or a typographic card built from the title — never a placeholder dressed up
- * as a page of the guide.
+ * Cover for a static guide: the code-drawn 3D book (GuideCover) on a soft pool of light. It replaced
+ * the shipped `.webp` cover on 2026-09-24 — the brief was explicit that covers are drawn natively,
+ * not pictures. The title still reaches screen readers through the article's <h1>.
  */
-function StaticCover({ meta }: { meta: GuideMeta }) {
-  const [failed, setFailed] = useState(false);
-
-  if (meta.coverUrl && !failed) {
-    return (
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-carbon-800/50">
-        <img
-          src={meta.coverUrl}
-          alt={`כריכת המדריך: ${meta.title}`}
-          loading="eager"
-          onError={() => setFailed(true)}
-          className="block h-auto w-full"
-        />
-      </div>
-    );
-  }
-
+function StaticCover({ meta, guideId }: { meta: GuideMeta; guideId: string }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-brand-500/25 bg-carbon-900/70 px-6 py-10 sm:px-10 sm:py-14">
+    <div className="relative flex justify-center py-2">
       <span
         aria-hidden
-        className="absolute -top-24 -left-24 h-64 w-64 rounded-full opacity-30 blur-[80px]"
+        className="pointer-events-none absolute top-1/2 left-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-25 blur-[90px]"
         style={{ background: 'radial-gradient(circle, #76B900 0%, transparent 70%)' }}
       />
-      <FileText className="relative mb-5 h-8 w-8 text-brand-400" />
-      <p className="relative font-display text-2xl leading-tight font-extrabold text-white sm:text-3xl">{meta.title}</p>
-      <p className="relative mt-5 font-tech text-[10px] tracking-[0.25em] text-zinc-500 uppercase">
-        PDF{meta.pages ? ` · ${meta.pages} עמודים` : ''} · mrdaniel.co.il
-      </p>
+      <GuideCover
+        hero
+        slug={guideId}
+        title={meta.title}
+        style={guideCoverStyle(guideId)}
+        meta={`PDF${meta.pages ? ` · ${meta.pages} עמודים` : ''}`}
+        className="max-w-[22rem]"
+      />
     </div>
   );
 }
