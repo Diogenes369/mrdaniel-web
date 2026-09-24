@@ -1,0 +1,32 @@
+{
+  "rules": {
+    ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || (auth.token.email === 'daniel@mrdaniel.co.il' && auth.token.email_verified === true))",
+    ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || (auth.token.email === 'daniel@mrdaniel.co.il' && auth.token.email_verified === true))",
+
+    "admins": {
+      ".read": false,
+      ".write": false
+    },
+
+    "events": {
+      "$eventId": {
+        ".write": "!data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['type', 'ts'])"
+      }
+    },
+
+    "presence": {
+      "$sessionId": {
+        ".write": "$sessionId.length <= 64",
+        ".validate": "!newData.exists() || newData.hasChildren()"
+      }
+    },
+
+    "health": {
+      "latest": {
+        ".write": true,
+        ".validate": "newData.hasChildren(['latencyMs', 'ts']) && newData.child('latencyMs').isNumber() && newData.child('ts').isNumber()"
+      }
+    }
+  }
+}
