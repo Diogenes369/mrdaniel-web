@@ -134,12 +134,19 @@ export default async function handler(req: any, res: any) {
       res.status(400).json({ ok: false, error: 'invalid email' });
       return;
     }
-    await pushNewsletterSignup({
+    const signupId = await pushNewsletterSignup({
       email,
       name: typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '',
       source: typeof body.source === 'string' ? body.source.slice(0, 80) : 'site',
       ts: Date.now(),
     });
+    // A refused or failed write (e.g. the rules lock refusing an unauthenticated server) must
+    // surface as an error: answering ok here once hid a whole outage of lost signups. And no
+    // welcome email for a signup that was never stored.
+    if (!signupId) {
+      res.status(500).json({ ok: false, error: 'signup not saved' });
+      return;
+    }
 
     const cfg = await readEmailConfig();
     if (cfg.autoWelcome && isEmailConfigured()) {
