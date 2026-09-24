@@ -58,8 +58,22 @@ export async function getDb() {
   const fb = await import('firebase/database');
   const app = getApps().find((a) => a.name === 'mcp-client') ?? initializeApp(config.firebase, 'mcp-client');
   const db = fb.getDatabase(app);
+  // Signed in as the service user when configured: it is listed under `admins/`, so the locked
+  // paths open to it exactly as they do to firebase-admin. Anonymous otherwise (pre-lock behaviour).
+  let privileged = false;
+  if (config.serverEmail && config.serverPassword) {
+    try {
+      const { getAuth, inMemoryPersistence, setPersistence, signInWithEmailAndPassword } = await import('firebase/auth');
+      const auth = getAuth(app);
+      await setPersistence(auth, inMemoryPersistence);
+      await signInWithEmailAndPassword(auth, config.serverEmail, config.serverPassword);
+      privileged = true;
+    } catch (err) {
+      console.error('[mcp] service-user sign-in failed; continuing anonymous:', err?.code || err);
+    }
+  }
   handle = {
-    privileged: false,
+    privileged,
     read: async (p) => (await fb.get(fb.ref(db, p))).val(),
     readLast: async (p, n) => (await fb.get(fb.query(fb.ref(db, p), fb.orderByKey(), fb.limitToLast(n)))).val(),
     push: async (p, v) => (await fb.push(fb.ref(db, p), v)).key,

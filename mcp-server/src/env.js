@@ -40,6 +40,9 @@ export const config = {
   },
   serviceAccount: clean(process.env.FIREBASE_SERVICE_ACCOUNT),
   serviceAccountPath: clean(process.env.FIREBASE_SERVICE_ACCOUNT_PATH),
+  /** The server's service USER (see getServerDb in src/agent/firebaseServer.ts) — root .env. */
+  serverEmail: clean(process.env.FIREBASE_SERVER_EMAIL),
+  serverPassword: clean(process.env.FIREBASE_SERVER_PASSWORD),
   /** Everything the file tools can touch. Defaults to the monorepo. */
   workspaceRoot: path.resolve(clean(process.env.MCP_WORKSPACE_ROOT) || REPO_ROOT),
   /** Where the worker writes its rolling log and lock file. */

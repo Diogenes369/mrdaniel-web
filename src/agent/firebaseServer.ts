@@ -24,14 +24,50 @@ const config = {
 export const agentFirebaseConfigured = Boolean(config.apiKey && config.databaseURL);
 
 let dbInstance: Database | null = null;
+let signIn: Promise<void> | null = null;
+let signInFailedAt = 0;
 
-function getServerDb(): Database | null {
+/**
+ * The server's client-SDK connection, SIGNED IN as a dedicated service user when
+ * FIREBASE_SERVER_EMAIL / FIREBASE_SERVER_PASSWORD are set (2026-09-24).
+ *
+ * Why a user and not the Admin SDK: creating a service-account key failed repeatedly in the Google
+ * console (PROJECT_STATE.md §6), and the RTDB rules lock cannot ship while every server write is
+ * anonymous. A plain email/password account listed under `admins/<uid>` in the database passes the
+ * same admin rule the dashboard owner does (database.rules.json), with nothing but two env vars.
+ * When FIREBASE_SERVICE_ACCOUNT does exist, privilegedDb() still prefers firebase-admin.
+ *
+ * Awaited before the first read/write because an RTDB op issued before sign-in completes goes out
+ * unauthenticated and is refused. The session lives in memory for the warm instance, and the SDK
+ * refreshes its ID token on its own. A failed sign-in is not cached for long (a transient network
+ * blip must not strand a warm instance as anonymous) and degrades to the anonymous connection,
+ * which is exactly the pre-change behaviour — it only starts failing once the rules are locked.
+ */
+export async function getServerDb(): Promise<Database | null> {
   if (!agentFirebaseConfigured) return null;
   if (!dbInstance) {
     // getApps() guard: a Vercel Function's module scope can be reused warm across invocations,
     // which would otherwise hit Firebase's "app already initialized" throw on the second call.
-    const app = getApps()[0] ?? initializeApp(config, 'agent-server');
+    const app = getApps().find((a) => a.name === 'agent-server') ?? initializeApp(config, 'agent-server');
     dbInstance = getDatabase(app);
+  }
+  const email = process.env.FIREBASE_SERVER_EMAIL?.trim();
+  const password = process.env.FIREBASE_SERVER_PASSWORD?.trim();
+  if (email && password) {
+    if (!signIn && Date.now() - signInFailedAt > 30_000) {
+      signIn = (async () => {
+        const { getAuth, inMemoryPersistence, setPersistence, signInWithEmailAndPassword } = await import('firebase/auth');
+        const auth = getAuth(dbInstance!.app);
+        if (auth.currentUser?.email === email.toLowerCase()) return;
+        await setPersistence(auth, inMemoryPersistence);
+        await signInWithEmailAndPassword(auth, email, password);
+      })().catch((err) => {
+        console.error('[firebase] server service-user sign-in failed; continuing anonymous:', (err as { code?: string }).code || err);
+        signInFailedAt = Date.now();
+        signIn = null;
+      });
+    }
+    if (signIn) await signIn;
   }
   return dbInstance;
 }
@@ -39,7 +75,7 @@ function getServerDb(): Database | null {
 /** Requires an `agent_queue` read/write rule in the live database rules. Resolves to null
  * silently rather than throwing so a missing rule degrades to "queue item not saved", not a 500. */
 export async function pushQueueItem(item: Record<string, unknown>): Promise<string | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const result = await push(ref(db, 'agent_queue'), item);
@@ -70,7 +106,7 @@ export interface CommentDmCampaignRow {
  *  The collection is small (authored by hand in the dashboard), so reading it whole beats adding an
  *  `.indexOn` rule just to query by guideSlug. */
 export async function readCommentDmCampaigns(): Promise<CommentDmCampaignRow[]> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return [];
   try {
     const snap = await get(ref(db, 'comment_dm_campaigns'));
@@ -84,7 +120,7 @@ export async function readCommentDmCampaigns(): Promise<CommentDmCampaignRow[]> 
 }
 
 export async function readAgentMode(): Promise<string | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const snapshot = await get(ref(db, 'agent_config/mode'));
@@ -96,7 +132,7 @@ export async function readAgentMode(): Promise<string | null> {
 }
 
 export async function readAgentWebhooks(): Promise<{ whatsapp?: string; telegram?: string } | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const snapshot = await get(ref(db, 'agent_config/webhooks'));
@@ -108,7 +144,7 @@ export async function readAgentWebhooks(): Promise<{ whatsapp?: string; telegram
 }
 
 export async function writeAutoPilotRunTimestamp(): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await set(ref(db, 'agent_config/lastAutoPilotRun'), Date.now());
@@ -118,7 +154,7 @@ export async function writeAutoPilotRunTimestamp(): Promise<void> {
 }
 
 export async function readStrategicContext(): Promise<string[]> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return [];
   try {
     const snapshot = await get(ref(db, 'agent_config/strategicContext'));
@@ -133,7 +169,7 @@ export async function readStrategicContext(): Promise<string[]> {
  * api/agent-whatsapp-webhook.ts) to the rolling context window, trimming to the most recent
  * STRATEGIC_CONTEXT_LIMIT entries. */
 export async function appendStrategicContext(note: string): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     const existing = await readStrategicContext();
@@ -150,7 +186,7 @@ export async function appendStrategicContext(note: string): Promise<void> {
  * capped at ~100 recent items everywhere else it's read (see the dashboard's `limitToLast(100)`),
  * so this avoids requiring a Firebase query-index rule just for one lookup. */
 export async function findLatestPendingQueueItem(): Promise<{ id: string; item: Record<string, unknown> } | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const snapshot = await get(ref(db, 'agent_queue'));
@@ -169,7 +205,7 @@ export async function findLatestPendingQueueItem(): Promise<{ id: string; item: 
 }
 
 export async function updateQueueItemStatus(id: string, status: string): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await update(ref(db, `agent_queue/${id}`), { status });
@@ -179,7 +215,7 @@ export async function updateQueueItemStatus(id: string, status: string): Promise
 }
 
 export async function updateQueueItemBody(id: string, body: string): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await update(ref(db, `agent_queue/${id}`), { body });
@@ -191,7 +227,7 @@ export async function updateQueueItemBody(id: string, body: string): Promise<voi
 /** One-item WhatsApp "edit" flow state — see api/agent-whatsapp-webhook.ts's two-step edit flow
  * (reply "2"/"ערוך" sets this, the next non-shortcut message clears it and applies the edit). */
 export async function readAwaitingEditFor(): Promise<string | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const snapshot = await get(ref(db, 'agent_config/awaitingEditFor'));
@@ -203,7 +239,7 @@ export async function readAwaitingEditFor(): Promise<string | null> {
 }
 
 export async function setAwaitingEditFor(id: string | null): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await set(ref(db, 'agent_config/awaitingEditFor'), id);
@@ -215,7 +251,7 @@ export async function setAwaitingEditFor(id: string | null): Promise<void> {
 /** "Generate New Weekly Plan" always REPLACES the current plan wholesale (a full `set`, not a
  * `push`) — there is exactly one active weekly plan at a time, not a growing history. */
 export async function writeWeeklyPlan(plan: object): Promise<boolean> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return false;
   try {
     await set(ref(db, 'weekly_plan'), plan);
@@ -232,7 +268,7 @@ export async function writeWeeklyPlan(plan: object): Promise<boolean> {
  * usefully hold open — the dashboard polls GET /api/generate-video?id=... across many separate
  * cold-or-warm invocations, and this is the only state any of them share. */
 export async function createVideoJob(id: string, job: Record<string, unknown>): Promise<boolean> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return false;
   try {
     await set(ref(db, `video_jobs/${id}`), job);
@@ -244,7 +280,7 @@ export async function createVideoJob(id: string, job: Record<string, unknown>): 
 }
 
 export async function readVideoJob(id: string): Promise<Record<string, unknown> | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const snapshot = await get(ref(db, `video_jobs/${id}`));
@@ -256,7 +292,7 @@ export async function readVideoJob(id: string): Promise<Record<string, unknown> 
 }
 
 export async function updateVideoJob(id: string, patch: Record<string, unknown>): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await update(ref(db, `video_jobs/${id}`), patch);
@@ -303,7 +339,7 @@ export interface PublishedPostRecord {
 }
 
 export async function readAutoPublishConfig(): Promise<AutoPublishConfig | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const snapshot = await get(ref(db, 'auto_publish_config'));
@@ -316,7 +352,7 @@ export async function readAutoPublishConfig(): Promise<AutoPublishConfig | null>
 
 /** Every history record — used both for the dashboard log and as the dedup source. */
 export async function readPublishedPosts(): Promise<Record<string, PublishedPostRecord>> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return {};
   try {
     const snapshot = await get(ref(db, 'published_posts'));
@@ -328,7 +364,7 @@ export async function readPublishedPosts(): Promise<Record<string, PublishedPost
 }
 
 export async function recordPublishedPost(record: PublishedPostRecord): Promise<string | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const result = await push(ref(db, 'published_posts'), record);
@@ -340,7 +376,7 @@ export async function recordPublishedPost(record: PublishedPostRecord): Promise<
 }
 
 export async function updatePublishedPost(id: string, patch: Partial<PublishedPostRecord>): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await update(ref(db, `published_posts/${id}`), patch);
@@ -351,7 +387,7 @@ export async function updatePublishedPost(id: string, patch: Partial<PublishedPo
 
 /** Mirrors the 4-slide Story payload to `story_drafts/<newsId>` (overwrites — one draft per item). */
 export async function writeStoryDraft(newsId: string, payload: Record<string, unknown>): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await set(ref(db, `story_drafts/${newsId.replace(/[.#$\/[\]]/g, '_')}`), payload);
@@ -381,7 +417,7 @@ interface PrivilegedDb {
  * paths open. That fallback is transitional: once the rules lock is deployed it is refused, so a
  * missing service account fails closed instead of quietly reopening anything.
  */
-function privilegedDb(): PrivilegedDb | null {
+async function privilegedDb(): Promise<PrivilegedDb | null> {
   const admin = getAdminDb();
   if (admin) {
     return {
@@ -391,7 +427,7 @@ function privilegedDb(): PrivilegedDb | null {
       update: (path, patch) => admin.ref(path).update(patch),
     };
   }
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   return {
     read: async (path) => (await get(ref(db, path))).val(),
@@ -408,7 +444,7 @@ export interface EmailConfig {
 }
 
 export async function pushNewsletterSignup(record: Record<string, unknown>): Promise<string | null> {
-  const db = privilegedDb();
+  const db = await privilegedDb();
   if (!db) return null;
   try {
     return await db.push('newsletter_signups', record);
@@ -429,7 +465,7 @@ function collectEmails(node: unknown): string[] {
 }
 
 export async function readNewsletterEmails(): Promise<string[]> {
-  const db = privilegedDb();
+  const db = await privilegedDb();
   if (!db) return [];
   try {
     return collectEmails(await db.read('newsletter_signups'));
@@ -440,7 +476,7 @@ export async function readNewsletterEmails(): Promise<string[]> {
 }
 
 export async function readLeadEmails(): Promise<string[]> {
-  const db = privilegedDb();
+  const db = await privilegedDb();
   if (!db) return [];
   try {
     return collectEmails(await db.read('leads'));
@@ -453,7 +489,7 @@ export async function readLeadEmails(): Promise<string[]> {
 /** Saves a lead from one of the site's own forms into `leads`. The caller has already validated and
  *  capped every field. Returns the new key, or null when the write failed or is not configured. */
 export async function pushSiteLead(record: Record<string, unknown>): Promise<string | null> {
-  const db = privilegedDb();
+  const db = await privilegedDb();
   if (!db) return null;
   try {
     return await db.push('leads', record);
@@ -484,7 +520,7 @@ export async function upsertManychatLead(
   mcKey: string,
   record: Record<string, string>
 ): Promise<{ id: string; deduped: boolean } | null> {
-  const db = privilegedDb();
+  const db = await privilegedDb();
   if (!db) return null;
   try {
     const now = Date.now();
@@ -509,7 +545,7 @@ export async function upsertManychatLead(
 }
 
 export async function readEmailConfig(): Promise<EmailConfig> {
-  const db = privilegedDb();
+  const db = await privilegedDb();
   if (!db) return {};
   try {
     return ((await db.read('email_config')) ?? {}) as EmailConfig;
@@ -520,7 +556,7 @@ export async function readEmailConfig(): Promise<EmailConfig> {
 }
 
 export async function readEmailTemplate(id: string): Promise<{ subject?: string; html?: string; name?: string } | null> {
-  const db = privilegedDb();
+  const db = await privilegedDb();
   if (!db || !id) return null;
   try {
     const tpl = await db.read(`email_templates/${id.replace(/[.#$\/[\]]/g, '_')}`);
@@ -533,7 +569,7 @@ export async function readEmailTemplate(id: string): Promise<{ subject?: string;
 
 /** Records a campaign send into `email_campaigns` for the dashboard history. */
 export async function recordEmailCampaign(record: Record<string, unknown>): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await push(ref(db, 'email_campaigns'), record);
@@ -550,7 +586,7 @@ export async function recordEmailCampaign(record: Record<string, unknown>): Prom
 // ---------------------------------------------------------------------------
 
 export async function readXFeedSnapshot(): Promise<Record<string, unknown> | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const snap = await get(ref(db, 'x_feed_snapshot'));
@@ -562,7 +598,7 @@ export async function readXFeedSnapshot(): Promise<Record<string, unknown> | nul
 }
 
 export async function writeXFeedSnapshot(payload: Record<string, unknown>): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await set(ref(db, 'x_feed_snapshot'), payload);
@@ -582,7 +618,7 @@ export async function writeXFeedSnapshot(payload: Record<string, unknown>): Prom
 export type SyncSnapshotKey = 'creator_feed_snapshot' | 'model_catalog';
 
 export async function readSyncSnapshot(key: SyncSnapshotKey): Promise<Record<string, unknown> | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const snap = await get(ref(db, key));
@@ -594,7 +630,7 @@ export async function readSyncSnapshot(key: SyncSnapshotKey): Promise<Record<str
 }
 
 export async function writeSyncSnapshot(key: SyncSnapshotKey, payload: Record<string, unknown>): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     await set(ref(db, key), payload);
@@ -611,7 +647,7 @@ export async function writeSyncSnapshot(key: SyncSnapshotKey, payload: Record<st
 // ---------------------------------------------------------------------------
 
 export async function readArticleInsights(): Promise<Record<string, Record<string, unknown>>> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return {};
   try {
     const snap = await get(ref(db, 'article_insights'));
@@ -623,7 +659,7 @@ export async function readArticleInsights(): Promise<Record<string, Record<strin
 }
 
 export async function writeArticleInsight(key: string, value: Record<string, unknown> | null): Promise<boolean> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return false;
   try {
     // RTDB rejects `undefined` anywhere in the tree; a JSON round-trip drops those keys.
@@ -643,7 +679,7 @@ export async function writeArticleInsight(key: string, value: Record<string, unk
 // ---------------------------------------------------------------------------
 
 export async function readNewsSnapshot(): Promise<{ items: unknown[]; fetchedAt: number } | null> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return null;
   try {
     const snap = await get(ref(db, 'news_snapshot'));
@@ -656,7 +692,7 @@ export async function readNewsSnapshot(): Promise<{ items: unknown[]; fetchedAt:
 }
 
 export async function writeNewsSnapshot(payload: { items: unknown[]; fetchedAt: number }): Promise<void> {
-  const db = getServerDb();
+  const db = await getServerDb();
   if (!db) return;
   try {
     // RTDB rejects `undefined` anywhere in the tree; a JSON round-trip drops those keys.
