@@ -27,6 +27,13 @@
         ".write": true,
         ".validate": "newData.hasChildren(['latencyMs', 'ts']) && newData.child('latencyMs').isNumber() && newData.child('ts').isNumber()"
       }
-    }
+    },
+
+    "leads": { ".indexOn": "ts" },
+    "newsletter_signups": { ".indexOn": "ts" },
+    "agent_queue": { ".indexOn": "created_at" },
+    "published_posts": { ".indexOn": "created_at" },
+    "story_drafts": { ".indexOn": "created_at" },
+    "comment_dm_campaigns": { ".indexOn": "created_at" }
   }
 }
