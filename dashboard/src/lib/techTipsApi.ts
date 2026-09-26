@@ -298,17 +298,22 @@ const VISUAL_BASE =
   'abstract dark futuristic AI technology background, deep obsidian, subtle circuit and node grid geometry, neon green and cyan accents, no text, no people, cinematic depth';
 
 /** Deterministic local deck — real structure with the operator's own topic, used whenever AI
- * synthesis is unavailable. Deliberately honest: it does NOT invent code, it prompts for it. */
+ * synthesis is unavailable. Deliberately honest: it does NOT invent code, it prompts for it.
+ * Ten slides, matching the 10–12 contract the AI deck is held to, and no domain on any slide —
+ * the link lives in the caption (`tipDeckCaption`), where it can actually be tapped. */
 function buildFallbackDeck(topic: string, reason: string): TechTipDeck {
   const short = topic.trim().slice(0, 90);
   const slides: TechTipSlide[] = [
     { kind: 'cover', kicker: 'מדריך', title: short, body: 'מדריך קצר למפתחים — הרעיון, הקוד, והצעדים המעשיים.', bullets: [], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
     { kind: 'concept', kicker: 'הרעיון', title: 'מה זה בעצם', body: `${short} — כאן נכנס ההסבר הקצר של הרעיון: מה הבעיה שהוא פותר ולמי זה רלוונטי.`, bullets: [], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
+    { kind: 'concept', kicker: 'למה עכשיו', title: 'למה זה שווה את הזמן', body: 'כאן נכנס הנימוק: איזו עבודה חוזרת זה חוסך, ומה משתנה ברגע שזה עובד.', bullets: [], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
     { kind: 'step', kicker: 'שלב 1', title: 'הכנה', body: 'התקינו את התלויות והגדירו את משתני הסביבה הנדרשים.', bullets: [], code: '', codeLang: '', stepNumber: 1, visualPrompt: VISUAL_BASE },
     { kind: 'step', kicker: 'שלב 2', title: 'מימוש', body: 'כתבו את הליבה — פונקציה אחת שעושה את העבודה, בלי הפשטות מיותרות.', bullets: [], code: '', codeLang: '', stepNumber: 2, visualPrompt: VISUAL_BASE },
     { kind: 'step', kicker: 'שלב 3', title: 'בדיקה', body: 'הריצו על מקרה אמיתי אחד, ומדדו את התוצאה מול קריטריון ברור.', bullets: [], code: '', codeLang: '', stepNumber: 3, visualPrompt: VISUAL_BASE },
+    { kind: 'step', kicker: 'שלב 4', title: 'הרחבה', body: 'רק אחרי שהמקרה הראשון עובד, מוסיפים את המקרה הבא — אחד בכל פעם.', bullets: [], code: '', codeLang: '', stepNumber: 4, visualPrompt: VISUAL_BASE },
+    { kind: 'tool', kicker: 'טעויות נפוצות', title: 'איפה זה נשבר', body: '', bullets: ['מדלגים על בדיקה במקרה אמיתי', 'מרחיבים לפני שהבסיס יציב', 'שומרים מפתחות בתוך הקוד'], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
     { kind: 'takeaway', kicker: 'השורה התחתונה', title: 'מה עושים מחר בבוקר', body: '', bullets: ['התחילו מתהליך אחד קטן', 'מדדו לפני שמרחיבים', 'אבטחה כברירת מחדל, לא כתוספת'], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
-    { kind: 'cta', kicker: 'צעד הבא', title: 'רוצים את המדריך המלא?', body: 'עוד מדריכים, כלים ודוגמאות קוד — ב-mrdaniel.co.il. עקבו לעוד פירוקים של AI.', bullets: [], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
+    { kind: 'cta', kicker: 'צעד הבא', title: 'רוצים את המדריך המלא?', body: 'שמרו את הפוסט ועקבו לעוד מדריכים, כלים ודוגמאות קוד.', bullets: [], code: '', codeLang: '', stepNumber: 0, visualPrompt: VISUAL_BASE },
   ];
   return {
     title: short,

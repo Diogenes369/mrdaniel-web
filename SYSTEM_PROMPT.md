@@ -41,7 +41,12 @@ Deck contract (mirrors `TechTipDeck` in `src/agent/types.ts` and
 `TECH_TIP_SYSTEM_INSTRUCTION` in `src/agent/SocialAgentEngine.ts`):
 
 - **10–12 slides**, each one `kind` of `cover · concept · code · step · tool · takeaway · cta`.
-- Exactly one `cover` first and one `cta` last; **at least two `code` slides** in between.
+- Exactly one `cover` first and one `cta` last; **at least two `code` slides** in between. A
+  topic that names a count ("5 טיפים") means that many `step` slides — the deck is still 10–12
+  in total. A short draft gets one corrective retry in code (`synthesizeTechTipDeck`).
+- No link, domain (including mrdaniel.co.il), "link in bio" or comment-trigger on any slide — the
+  CTA is a closing card and the link rides in the caption. `stripSlideCta` (`src/agent/slideCta.ts`)
+  removes them in code on every slide.
 - `code` must be **real, runnable, ≤12 lines**, with a `codeLang` from
   `python · ts · js · bash · json`. Never pseudo-code, never a snippet you have not reasoned
   through. Code stays in English/LTR — it is deliberately **not** run through the Hebrew

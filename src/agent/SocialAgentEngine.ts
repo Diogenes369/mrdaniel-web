@@ -22,6 +22,7 @@ export { stripCodeFence, requireText, parseJsonOrThrow, ModelOutputError };
 export type { RateLimitInfo };
 import { sanitizeInput } from './AgentSecurityGuard.js';
 import { sanitizeHebrewText } from './hebrewTextSanitizer.js';
+import { stripSlideCta } from './slideCta.js';
 import { ANALYST_VOICE_RULES, AUDIENCE_RULES, CONCISE_FACTUAL_RULES, CONTEXTUAL_HASHTAG_RULES, EXPERT_VOICE_RULES, shortCaptionRules } from './expertVoice.js';
 import { contextualHashtags, enforceAnalystTone } from './analystTone.js';
 import { enforceDeck, storyCarouselInstruction, type CarouselContentKind, type StoryCarouselDeck } from './storyCarousel.js';
@@ -1737,7 +1738,9 @@ ${HEBREW_COPY_RULES}
    • kind:"tool" — סקירת כלים: title + bullets של 3–5 כלים, כל אחד "שם — מה הוא עושה בפועל".
    • kind:"takeaway" — סיכום פעולה: title + bullets של 2–4 נקודות ליישום מיידי.
    דרישות תמהיל: לפחות 2 שקופיות code ולפחות 2 שקופיות step או concept. אל תשתמש באותו kind יותר מ-4 פעמים ברצף.
-אחרונה. kind:"cta" — title קצר + body שמפנה ל-mrdaniel.co.il ולעקוב, לא מכירתי אגרסיבי.
+אחרונה. kind:"cta" — כרטיס סגירה: title קצר שמסכם את הערך + body של משפט אחד שמזמין לשמור את הפוסט ולעקוב לעוד מדריכים. אסור בו קישור, אסור כתובת אתר (גם לא mrdaniel.co.il), אסור "הלינק בביו" ואסור "כתבו X בתגובות" — הקישור נמצא בכיתוב של הפוסט, לא על התמונה.
+
+אורך הדק — חובה: בין 10 ל-12 שקופיות בסך הכול, כולל הפתיחה והסגירה. דק של פחות מ-10 שקופיות נפסל.
 
 חוקי אמת מחייבים (קריטי — אין כאן טקסט מקור לעגן בו):
 1. קוד חייב להיות תקין, מודרני, ורץ באמת. אסור להמציא שמות פונקציות/פרמטרים/חבילות שלא קיימים. אם אתה לא בטוח ב-API מסוים — כתוב קוד גנרי ונכון במקום לנחש חתימה ספציפית.
@@ -1828,44 +1831,48 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
   const countDirective = wanted
     ? `\n\nחובה מוחלטת: הנושא מבקש בדיוק ${wanted} טריקים/טיפים. הפק בדיוק ${wanted} שקופיות מסוג `
       + `"step" — לא פחות ולא יותר — ממוספרות ברצף 1..${wanted}, וה-kicker של כל אחת חייב להיות `
-      + `"טריק N" בהתאמה למספרה. כותרת הקאבר חייבת לומר ${wanted}. אל תדלג על אף מספר.`
+      + `"טריק N" בהתאמה למספרה. כותרת הקאבר חייבת לומר ${wanted}. אל תדלג על אף מספר. `
+      // The count is the number of STEP slides, not the deck length. Without this line the model
+      // read "5 טיפים" as "5 slides plus a cover and a CTA" and shipped a 7-slide deck.
+      + `בנוסף לשקופיות ה-step, השלם את הדק ל-${MIN_TIP_SLIDES}–${MAX_TIP_SLIDES} שקופיות בסך הכול `
+      + `עם שקופיות concept, code ו-takeaway (לפחות 2 code), ושקופית פתיחה ושקופית סגירה.`
     : '';
 
-  const response = await generateContentWithRetry({
-    model: GEMINI_TEXT_MODEL,
-    contents: [{ role: 'user', parts: [{ text: `נושא המדריך:\n"""\n${clean}\n"""${countDirective}` }] }],
-    config: { systemInstruction: TECH_TIP_SYSTEM_INSTRUCTION, temperature: 0.6, topP: 0.9, responseMimeType: 'application/json' },
-  }, { textOnly: true });
+  const draft = async (extra: string) => {
+    const response = await generateContentWithRetry({
+      model: GEMINI_TEXT_MODEL,
+      contents: [{ role: 'user', parts: [{ text: `נושא המדריך:\n"""\n${clean}\n"""${countDirective}${extra}` }] }],
+      config: { systemInstruction: TECH_TIP_SYSTEM_INSTRUCTION, temperature: 0.6, topP: 0.9, responseMimeType: 'application/json' },
+    }, { textOnly: true });
+    const raw = stripCodeFence(requireText(response));
+    const parsed = parseJsonOrThrow(raw, 'synthesizeTechTipDeck') as Record<string, unknown>;
+    return { parsed, slides: parseTipSlides(parsed) };
+  };
 
-  const raw = stripCodeFence(requireText(response));
-  const parsed = parseJsonOrThrow(raw, 'synthesizeTechTipDeck') as Record<string, unknown>;
-  const slidesRaw = Array.isArray(parsed.slides) ? parsed.slides : [];
-
-  const slides: TechTipSlide[] = slidesRaw
-    .map((s): TechTipSlide => {
-      const rec = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
-      const kind = mapTipKind(rec.kind);
-      const lang = String(rec.codeLang ?? '').toLowerCase().trim();
-      return {
-        kind,
-        kicker: stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.kicker ?? '').trim()))).slice(0, 40) || 'טיפ',
-        title: stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.title ?? '').trim()))).slice(0, 120),
-        body: stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(rec.body ?? '').trim()))).slice(0, 420),
-        bullets: Array.isArray(rec.bullets)
-          ? rec.bullets.map((b) => stripMetaFraming(stripSourceCredits(sanitizeHebrewText(String(b ?? '').trim()))).slice(0, 140)).filter((b) => b.length > 1).slice(0, 5)
-          : [],
-        // Code is NOT run through the Hebrew sanitiser — it would mangle operators/quotes/RLM-wrap
-        // Latin runs. It's already-generated source, kept verbatim minus any stray markdown fence.
-        code: stripCodeFence(String(rec.code ?? '').trim()).slice(0, 900),
-        codeLang: VALID_CODE_LANGS.has(lang) ? lang : kind === 'code' ? 'python' : '',
-        stepNumber: Number.isFinite(Number(rec.stepNumber)) ? Math.max(0, Math.min(20, Number(rec.stepNumber))) : 0,
-        visualPrompt: String(rec.visualPrompt ?? '').trim().slice(0, 400),
-        note: parseNote(rec.note),
-      };
-    })
-    .filter((s) => s.title.length > 1 || s.body.length > 10 || s.code.length > 5 || s.bullets.length > 0);
+  // Length is enforced here, not trusted to the prompt: a short deck gets ONE corrective retry that
+  // names the shortfall, and the longer of the two drafts wins. The deck is never padded in code —
+  // a filler slide would be invented content — so if the retry also runs short (or fails on a rate
+  // limit), the first draft still ships rather than dropping to the dashboard's local template.
+  let result = await draft('');
+  if (result.slides.length < MIN_TIP_SLIDES) {
+    const got = result.slides.length;
+    const retry = await draft(
+      `\n\nתיקון חובה: הטיוטה הקודמת הכילה רק ${got} שקופיות. הדק חייב להכיל בין ${MIN_TIP_SLIDES} ל-${MAX_TIP_SLIDES} `
+        + `שקופיות בסך הכול. הוסף שקופיות concept, code או takeaway אמיתיות על אותו נושא, בלי לחזור על תוכן.`
+    ).catch(() => null);
+    if (retry && retry.slides.length > result.slides.length) result = retry;
+  }
+  const { parsed, slides } = result;
 
   if (slides.length < 5) throw new Error('model returned too few usable tip slides');
+
+  // Keeps the closing card a closing card when the CTA stripper emptied its title ("בואו
+  // ל-MrDaniel.co.il" is nothing once the domain is gone). Generic on purpose: it asserts nothing.
+  const last = slides[slides.length - 1];
+  if (last.kind === 'cta' && last.title.split(/\s+/).filter(Boolean).length < 2) {
+    last.title = 'שמרו את המדריך לפעם הבאה';
+  }
+
   capDeckNotes(slides);
 
   // Renumber step slides from their POSITION rather than trusting the model's stepNumber. Models
@@ -1877,8 +1884,8 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
     if (slide.kind === 'step') {
       slide.stepNumber = ++stepSeq;
       // Keep the visible kicker in step with the badge, so "טריק 3" can never sit on badge 4.
-      if (/^\s*(\u05d8\u05e8\u05d9\u05e7|\u05e9\u05dc\u05d1|\u05d8\u05d9\u05e4|step|tip|trick)\b/i.test(slide.kicker)) {
-        slide.kicker = `\u05d8\u05e8\u05d9\u05e7 ${stepSeq}`;
+      if (/^\s*(טריק|שלב|טיפ|step|tip|trick)\b/i.test(slide.kicker)) {
+        slide.kicker = `טריק ${stepSeq}`;
       }
     } else {
       slide.stepNumber = 0;
@@ -1896,9 +1903,46 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
       stripMetaFraming(sanitizeHebrewText(String(parsed.title ?? input.topic).trim())),
       stepSeq
     ).slice(0, 140),
-    slides: slides.slice(0, 12),
+    slides: slides.slice(0, MAX_TIP_SLIDES),
     hashtags: hashtags.length ? hashtags : ['#פיתוח', '#AI', '#קוד', '#כלים_למפתחים'],
   };
+}
+
+const MIN_TIP_SLIDES = 10;
+const MAX_TIP_SLIDES = 12;
+
+/**
+ * One model draft → slides. Every prose field goes through `stripSlideCta` BEFORE the Hebrew
+ * sanitizer: a URL, a bare mrdaniel.co.il or "link in bio" painted into a PNG is dead pixels, and
+ * stripping the raw text first means the sanitizer never wraps a domain in bidi isolates that
+ * would then be left behind empty. `code` is exempt — a URL inside a snippet is part of it.
+ */
+function parseTipSlides(parsed: Record<string, unknown>): TechTipSlide[] {
+  const slidesRaw = Array.isArray(parsed.slides) ? parsed.slides : [];
+  const prose = (v: unknown) => sanitizeHebrewText(stripSlideCta(String(v ?? '').trim()));
+  return slidesRaw
+    .map((s): TechTipSlide => {
+      const rec = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+      const kind = mapTipKind(rec.kind);
+      const lang = String(rec.codeLang ?? '').toLowerCase().trim();
+      return {
+        kind,
+        kicker: stripMetaFraming(stripSourceCredits(prose(rec.kicker))).slice(0, 40) || 'טיפ',
+        title: stripMetaFraming(stripSourceCredits(prose(rec.title))).slice(0, 120),
+        body: stripMetaFraming(stripSourceCredits(prose(rec.body))).slice(0, 420),
+        bullets: Array.isArray(rec.bullets)
+          ? rec.bullets.map((b) => stripMetaFraming(stripSourceCredits(prose(b))).slice(0, 140)).filter((b) => b.length > 1).slice(0, 5)
+          : [],
+        // Code is NOT run through the Hebrew sanitiser — it would mangle operators/quotes/RLM-wrap
+        // Latin runs. It's already-generated source, kept verbatim minus any stray markdown fence.
+        code: stripCodeFence(String(rec.code ?? '').trim()).slice(0, 900),
+        codeLang: VALID_CODE_LANGS.has(lang) ? lang : kind === 'code' ? 'python' : '',
+        stepNumber: Number.isFinite(Number(rec.stepNumber)) ? Math.max(0, Math.min(20, Number(rec.stepNumber))) : 0,
+        visualPrompt: String(rec.visualPrompt ?? '').trim().slice(0, 400),
+        note: parseNote(stripSlideCta(String(rec.note ?? ''))),
+      };
+    })
+    .filter((s) => s.title.length > 1 || s.body.length > 10 || s.code.length > 5 || s.bullets.length > 0);
 }
 
 // --- Threads → Hebrew carousel — translate & adapt an imported thread -------------------------

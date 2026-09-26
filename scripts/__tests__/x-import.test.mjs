@@ -32,6 +32,7 @@ import {
 } from '../../src/server/xSubtitles.ts';
 import { buildLocalXDeck, buildXSegments, segmentTranscript } from '../../src/server/agents/xPostAgent.ts';
 import { analyzeThreadTopic } from '../../src/server/agents/threadsThreadAgent.ts';
+import { stripSlideCta } from '../../src/agent/slideCta.ts';
 import * as clientCues from '../../dashboard/src/lib/xSubtitleFormat.ts';
 import { readFileSync } from 'node:fs';
 
@@ -451,6 +452,22 @@ t('burner · encodes through the same mp4-muxer pipeline as the Motion Studio', 
 t('burner · warms the Hebrew faces before the first frame', /ensureDeckFonts/.test(burner));
 t('burner · sets RTL direction on the caption canvas', /ctx\.direction = 'rtl'/.test(burner));
 t('burner · times frames from mediaTime, not from the capture rate', /meta\.mediaTime \* 1e6/.test(burner));
+
+// ─── stripSlideCta — shared by the importers and (since 2026-09-26) the tech-tip generator ───
+// The tech-tip CTA shipped "בואו ל-MrDaniel.co.il" onto a PNG. Removing the domain alone left a
+// dangling "ל-", so the prefix cleanup is pinned here along with the cases it must NOT touch.
+for (const [input, expected] of [
+  ['בואו ל-MrDaniel.co.il', 'בואו'],
+  ['בואו ל-⁦MrDaniel.co.il⁩', 'בואו'],
+  ['עוד מדריכים ב-mrdaniel.co.il. עקבו לעוד.', 'עוד מדריכים. עקבו לעוד.'],
+  ['היכנסו ל-https://mrdaniel.co.il/g/x ותורידו', 'היכנסו ותורידו'],
+  ['כלים כמו make.com ו-n8n.io', 'כלים כמו make.com ו-n8n.io'],
+  ['שלב 1 ב-Make', 'שלב 1 ב-Make'],
+  ['פותחים את ה-Settings', 'פותחים את ה-Settings'],
+]) {
+  const got = stripSlideCta(input);
+  t(`stripSlideCta · ${JSON.stringify(input)}`, got === expected, `got ${JSON.stringify(got)}`);
+}
 
 for (const [state, label, detail] of results) console.log(`${state} ${label}${detail ? ` — ${detail}` : ''}`);
 const failed = results.filter((r) => r[0] === 'FAIL').length;
