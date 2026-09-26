@@ -1675,6 +1675,51 @@ export async function synthesizeSpeech(text: string, voiceName: string = DEFAULT
 // the grounding rule shifts from "only what's in the text" to "only what's actually true and
 // standard" — the anti-fabrication rules below are the substitute for article grounding.
 
+/**
+ * The handwritten margin note (`TechTipSlide.note`) — the personal mark of the deck design
+ * (DESIGN.md → "The Annotated Workbench"). The renderer sets it in a handwriting face with a doodle
+ * arrow aimed at the slide's content, so the model writes the words and the code owns where and how
+ * often: `capDeckNotes` keeps at most MAX_DECK_NOTES, never on the cover or the closing card and
+ * never on two slides in a row. The note may only point at what is already on the slide. A note
+ * that says "tried it, doubled my output" is exactly the invented first-person claim the brand
+ * rules forbid, and a handwriting face makes it look MORE credible, not less.
+ */
+const MAX_DECK_NOTES = 3;
+const DECK_NOTE_RULES = `הערות בכתב יד (שדה "note"):
+- בעד 3 שקופיות בלבד (לא בשקופית הפתיחה ולא בשקופית האחרונה) מוסיפים "note" — הערת שוליים קצרה שדניאל כאילו כתב בטוש על השקופית, עם חץ שמצביע על התוכן.
+- עד 6 מילים, בלי נקודה בסוף. היא מפנה תשומת לב למשהו שכבר מופיע בשקופית: "שימו לב לסדר השורות", "זה החלק שמעתיקים", "פה רוב האנשים נתקעים".
+- אסור שההערה תוסיף עובדה, מספר, תוצאה או חוויה אישית ("ניסיתי וזה הכפיל לי..."). אסור קישור, אסור קריאה להגיב.
+- בכל שאר השקופיות "note" הוא "".`;
+
+/**
+ * Enforces the note contract after the model: notes on at most MAX_DECK_NOTES interior slides,
+ * never two consecutive, each clamped to six words with its closing full stop dropped (a margin
+ * note is a fragment, not a sentence). Prompting alone never held a frequency cap in this repo —
+ * the same lesson as `stripSlideCta` — so the cap lives here.
+ */
+function capDeckNotes(slides: TechTipSlide[]): void {
+  let kept = 0;
+  let lastIdx = -2;
+  slides.forEach((slide, i) => {
+    const raw = String(slide.note ?? '').trim();
+    const interior = i > 0 && i < slides.length - 1 && slide.kind !== 'cover' && slide.kind !== 'cta';
+    const text = raw ? clampWords(raw, 6).replace(/[.\s]+$/, '') : '';
+    if (!text || !interior || kept >= MAX_DECK_NOTES || i === lastIdx + 1 || /https?:|www\.|\.co\.il/i.test(text)) {
+      delete slide.note;
+      return;
+    }
+    slide.note = text;
+    kept += 1;
+    lastIdx = i;
+  });
+}
+
+/** Parses the model's `note` field through the same Hebrew hygiene as every other prose field. */
+function parseNote(v: unknown): string | undefined {
+  const s = sanitizeHebrewText(stripMetaFraming(stripSourceCredits(String(v ?? '').trim()))).slice(0, 60);
+  return s.length > 1 ? s : undefined;
+}
+
 const TECH_TIP_SYSTEM_INSTRUCTION = `אתה כותב תוכן לימודי טכני עבור דניאל בן ברוך — מדריכים קצרים למפתחים, בפורמט קרוסלת אינסטגרם.
 
 ${BRAND_KNOWLEDGE_BASE}
@@ -1701,10 +1746,12 @@ ${HEBREW_COPY_RULES}
 4. כל טקסט ההסבר בעברית תקנית. הקוד עצמו באנגלית (זה קוד). מונחים טכניים באנגלית בתוך משפט עברי — תקין ורצוי.
 5. אסור תוויות מסגור ("הקשר:", "כותרת:", "הערה:") בתוך body/title.
 
+${DECK_NOTE_RULES}
+
 לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית** לרקע השקופית: אבסטרקטי-טכני, כהה, מתאים למותג (dark futuristic, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent, no text, no people, no logos). ספציפי לתוכן השקופית.
 
 פלט: JSON תקין בלבד, בלי markdown code fence:
-{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"visualPrompt":"..."}]}
+{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"note":"","visualPrompt":"..."}]}
 שדות שאינם רלוונטיים ל-kind: "" או [] או 0.`;
 
 function mapTipKind(v: unknown): TipSlideKind {
@@ -1813,11 +1860,13 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
         codeLang: VALID_CODE_LANGS.has(lang) ? lang : kind === 'code' ? 'python' : '',
         stepNumber: Number.isFinite(Number(rec.stepNumber)) ? Math.max(0, Math.min(20, Number(rec.stepNumber))) : 0,
         visualPrompt: String(rec.visualPrompt ?? '').trim().slice(0, 400),
+        note: parseNote(rec.note),
       };
     })
     .filter((s) => s.title.length > 1 || s.body.length > 10 || s.code.length > 5 || s.bullets.length > 0);
 
   if (slides.length < 5) throw new Error('model returned too few usable tip slides');
+  capDeckNotes(slides);
 
   // Renumber step slides from their POSITION rather than trusting the model's stepNumber. Models
   // routinely emit 1, 2 and then 0 or a repeat for later steps, and the renderer only draws a badge
@@ -1955,10 +2004,12 @@ ${AUDIENCE_RULES}
 6. אסור תוויות מסגור ("הקשר:", "כותרת:", "תרגום:") בתוך title או body.
 7. אסור לקרדט את מחבר השרשור המקורי או לאזכר את Threads בתוך הדק. שם המחבר ניתן לך כהקשר לטון בלבד — המותג היחיד שמופיע בפלט הוא mrdaniel.co.il.
 
+${DECK_NOTE_RULES}
+
 לכל שקופית הפק גם "visualPrompt" — תיאור ויזואלי **באנגלית בלבד**, נטול טקסט: רקע אבסטרקטי-טכני כהה שמתאים לתוכן השקופית (dark futuristic, circuit/node/grid geometry, deep obsidian background, subtle neon green or cyan accent). חובה לכלול בסוף: "no text, no letters, no words, no logos, no watermark". אין אנשים, אין לוגואים.
 
 פלט: JSON תקין בלבד, בלי markdown code fence:
-{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"visualPrompt":"..."}]}
+{"title":"...","hashtags":["#..."],"slides":[{"kind":"cover|concept|code|step|tool|takeaway|cta","kicker":"...","title":"...","body":"...","bullets":["..."],"code":"...","codeLang":"...","stepNumber":0,"note":"","visualPrompt":"..."}]}
 שדות שאינם רלוונטיים ל-kind: "" או [] או 0.`;
 
 /** The text-free guard every visualPrompt must carry — the overlay pipeline draws the real text. */
@@ -2111,6 +2162,7 @@ function parseAdaptedDeck(
         codeLang: VALID_CODE_LANGS.has(lang) ? lang : kind === 'code' ? 'python' : '',
         stepNumber: Number.isFinite(Number(rec.stepNumber)) ? Math.max(0, Math.min(20, Number(rec.stepNumber))) : 0,
         visualPrompt: normalizeVisualPrompt(String(rec.visualPrompt ?? '')),
+        note: parseNote(rec.note),
         // Cream-preset extras. Both optional and both harmless for a deck the dark presets render —
         // `drawTipSlide`'s slate path never reads either field. `subtitle` is genuinely the model's
         // job (a translated tagline); `slashCommand` and `install` are NOT read here on purpose —
@@ -2132,6 +2184,7 @@ function parseAdaptedDeck(
   // it doesn't, coercing the kind is enough — the copy on those two slides is already right.
   deck[0].kind = 'cover';
   deck[deck.length - 1].kind = 'cta';
+  capDeckNotes(deck);
 
   let stepSeq = 0;
   for (const slide of deck) {

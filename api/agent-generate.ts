@@ -441,7 +441,7 @@ ${typeof notes === 'string' ? notes : ''}`);
       }
       // Code is excluded from the output guard on purpose: sanitizeOutput's heuristics flag ordinary
       // source (URLs, key-like identifiers) as leaks. The Hebrew prose is what gets checked.
-      const prose = deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
+      const prose = deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}\n${s.note ?? ''}`).join('\n\n');
       const security = sanitizeOutput(prose);
       if (!security.passed) {
         res.status(200).json({ ok: true, blocked: true, security });
@@ -535,7 +535,7 @@ ${typeof notes === 'string' ? notes : ''}`);
       // Same carve-out as tech-tip-deck: the guard's heuristics flag ordinary source code as a
       // leak, so only the Hebrew prose is checked. The prompt box rides with the code exemption —
       // it is a verbatim quote of a model instruction, not generated prose.
-      const prose = result.deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
+      const prose = result.deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}\n${s.note ?? ''}`).join('\n\n');
       const security = sanitizeOutput(prose);
       if (!security.passed) {
         res.status(200).json({ ok: true, blocked: true, security });
@@ -696,7 +696,7 @@ ${typeof notes === 'string' ? notes : ''}`);
       });
       // Same carve-out as thread-deck: the guard's heuristics flag ordinary source code as a leak,
       // so only the Hebrew prose is checked.
-      const prose = result.deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}`).join('\n\n');
+      const prose = result.deck.slides.map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}\n${s.note ?? ''}`).join('\n\n');
       const security = sanitizeOutput(prose);
       if (!security.passed) {
         res.status(200).json({ ok: true, blocked: true, security });
@@ -764,7 +764,7 @@ ${typeof notes === 'string' ? notes : ''}`);
       // code as a leak, so only the Hebrew prose is checked. Prompt-library slides carry their
       // visible copy in `promptCards`, not `title`/`body`, so those are folded in too.
       const prose = result.deck.slides
-        .map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}\n${(s.promptCards ?? []).map((c) => `${c.body}\n${c.whyIUseThis}`).join('\n')}`)
+        .map((s) => `${s.title}\n${s.body}\n${s.bullets.join('\n')}\n${s.note ?? ''}\n${(s.promptCards ?? []).map((c) => `${c.body}\n${c.whyIUseThis}`).join('\n')}`)
         .join('\n\n');
       const security = sanitizeOutput(prose);
       if (!security.passed) {

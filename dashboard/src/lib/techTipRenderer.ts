@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { loadImage, getLogo, wrapRtl } from './newsImageComposer';
+import { loadImage, getLogo, wrapRtl, wrapRtlBalanced } from './newsImageComposer';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
 import { highlightCode, TOKEN_PALETTE } from './syntaxHighlight';
 import type { TechTipDeck, TechTipSlide } from './techTipsApi';
@@ -7,11 +7,11 @@ import { resolveSlidePhotoUrl, loadPhoto } from './pexelsBackground';
 import {
   BRAND_GREEN,
   CYBER_CYAN,
-  SILVER,
   THEME_ACCENT,
   TOOL_STYLE,
   ensureDeckFonts,
   setDisplay,
+  setHeadline,
   setBody,
   setMono,
   metricsFor,
@@ -26,6 +26,7 @@ import {
   markerHighlight,
   scribbleCircle,
   doodleArrow,
+  drawHandNote,
   paintSlateBackdrop,
   hexToRgba,
   TERRACOTTA,
@@ -347,7 +348,9 @@ function drawTopBar(
     ctx.direction = 'rtl';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    setMono(ctx, b.W * 0.018, 600);
+    // Body face, not mono: the kicker is Hebrew, JetBrains Mono has no Hebrew glyphs, and the
+    // fallback it lands on keeps mono's wide advance, which spaces the letters apart.
+    setBody(ctx, b.W * 0.019, 700);
     const kw = ctx.measureText(kicker).width + b.W * 0.035;
     const kh = b.W * 0.038;
     const kx = b.W - b.PAD - kw;
@@ -423,8 +426,12 @@ function drawTitle(
   markerSeed?: number
 ): number {
   if (!title) return r.y;
-  const { lines, px } = autoFit(ctx, sanitizeHebrewText(title), r.w, startPx, b.W * 0.032, maxLines, (c, p) => setDisplay(c, p, 800));
-  setDisplay(ctx, px, 800);
+  const clean = sanitizeHebrewText(title);
+  const { px } = autoFit(ctx, clean, r.w, startPx, b.W * 0.032, maxLines, (c, p) => setHeadline(c, p, 800));
+  setHeadline(ctx, px, 800);
+  // autoFit settles the size; the final break is balanced so a two-line headline doesn't read as a
+  // full line followed by a stub. Same line count, so the height it returns is unchanged.
+  const lines = wrapRtlBalanced(ctx, clean, r.w);
   ctx.direction = 'rtl';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'alphabetic';
@@ -434,22 +441,23 @@ function drawTitle(
     // is painted first so the swipe sits under the glyphs instead of greying them out.
     if (markerSeed !== undefined && i === lines.length - 1) {
       const w = Math.min(ctx.measureText(line).width, r.w);
-      markerHighlight(ctx, r.x + r.w - w, r.y + px + i * px * 1.18, w, px, accent, markerSeed);
-      setDisplay(ctx, px, 800);
+      markerHighlight(ctx, r.x + r.w - w, r.y + px + i * px * 1.12, w, px, accent, markerSeed);
+      setHeadline(ctx, px, 800);
       ctx.direction = 'rtl';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'alphabetic';
     }
   });
-  for (const line of lines) {
-    const grad = ctx.createLinearGradient(r.x + r.w, 0, r.x, 0);
-    grad.addColorStop(0, '#FFFFFF');
-    grad.addColorStop(0.6, SILVER);
-    grad.addColorStop(1, accent);
-    ctx.fillStyle = grad;
+  // Solid ink, no gradient: emphasis comes from the condensed weight and from colour, never from a
+  // fade across the glyphs (DESIGN.md → "The Solid Ink Rule"). On a multi-line title the closing
+  // line — where a Hebrew claim usually lands — takes the accent, unless the marker swipe is
+  // already under it: accent type on an accent wash would lose the contrast the swipe exists for.
+  const accentLast = lines.length > 1 && markerSeed === undefined;
+  lines.forEach((line, i) => {
+    ctx.fillStyle = accentLast && i === lines.length - 1 ? accent : '#FFFFFF';
     ctx.fillText(line, r.x + r.w, y);
-    y += px * 1.18;
-  }
+    y += px * 1.12;
+  });
   return y;
 }
 
@@ -498,19 +506,22 @@ function drawQuoteLayout(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, 
   const colW = r.w * 0.88;
   const top = y + b.W * 0.12;
   const avail = r.y + r.h - top - b.W * 0.06;
-  const { lines, px } = autoFit(ctx, sanitizeHebrewText(slide.body), colW, b.W * 0.082, b.W * 0.046, 6, (c, p) => setDisplay(c, p, 800));
+  const statement = sanitizeHebrewText(slide.body);
+  const { px } = autoFit(ctx, statement, colW, b.W * 0.082, b.W * 0.046, 6, (c, p) => setHeadline(c, p, 800));
+  setHeadline(ctx, px, 800);
+  const lines = wrapRtlBalanced(ctx, statement, colW);
   const lh = px * 1.22;
   let ty = top + Math.max(0, (avail - lines.length * lh) * 0.35) + px;
   const last = lines.length - 1;
   lines.forEach((line, i) => {
-    setDisplay(ctx, px, 800);
+    setHeadline(ctx, px, 800);
     ctx.direction = 'rtl';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'alphabetic';
     if (i === last) {
       const w = Math.min(ctx.measureText(line).width, colW);
       markerHighlight(ctx, r.x + r.w - w, ty, w, px, accent, index * 613 + 29);
-      setDisplay(ctx, px, 800);
+      setHeadline(ctx, px, 800);
     }
     ctx.fillStyle = i === last ? '#FFFFFF' : 'rgba(241,245,249,0.92)';
     ctx.fillText(line, r.x + r.w, ty);
@@ -737,6 +748,10 @@ function drawPromptBox(
   const barH = terminalBarHeight(b.W);
   if (!clean || maxH <= barH * 1.6) return;
   const rtl = /[֐-׿]/.test(clean.slice(0, 80));
+  // A Latin prompt is a literal and stays mono. A Hebrew one is prose: JetBrains Mono has no Hebrew
+  // glyphs, so it would fall back to a face stretched to mono's advance width — set it in the body
+  // face instead, where the terminal frame alone says "this is a prompt".
+  const setPromptFace = (size: number) => (rtl ? setBody(ctx, size, 400) : setMono(ctx, size, 400));
 
   // The card is MEASURED before it is drawn: a prompt that needs four lines gets a four-line card,
   // not one stretched to the bottom of the slide. Sizing it to the region left short prompts
@@ -750,12 +765,12 @@ function drawPromptBox(
   const minPx = b.W * 0.015;
   let lines: string[] = [];
   for (let i = 0; i < 24; i++) {
-    setMono(ctx, px, 400);
+    setPromptFace(px);
     lines = rtl ? wrapRtl(ctx, sanitizeHebrewText(clean), innerW) : wrapLtr(ctx, clean, innerW);
     if (lines.length * px * 1.55 <= budget || px <= minPx) break;
     px = Math.max(minPx, px * 0.94);
   }
-  setMono(ctx, px, 400);
+  setPromptFace(px);
   // A prompt too long even at the floor size is clipped, not allowed to grow the card past maxH.
   const textH = Math.min(budget, lines.length * px * 1.55);
   const inner = terminalFrame(ctx, r.x, top, r.w, chromeH + textH, b.W, b.m, accent, 'prompt', { copyGlyph: true });
@@ -765,6 +780,7 @@ function drawPromptBox(
   ctx.beginPath();
   ctx.rect(inner.x - px * 0.4, inner.y - px, inner.w + px * 0.8, textH + px);
   ctx.clip();
+  setPromptFace(px);
   ctx.direction = rtl ? 'rtl' : 'ltr';
   ctx.textAlign = rtl ? 'right' : 'left';
   ctx.textBaseline = 'alphabetic';
@@ -972,8 +988,10 @@ function autoFitLtr(
  *  gradient, which would wash out against a light ground. Reuses `autoFit`'s wrap/shrink loop. */
 function drawCreamTitle(ctx: CanvasRenderingContext2D, b: SlideBox, r: Region, title: string, startPx: number, maxLines: number): number {
   if (!title) return r.y;
-  const { lines, px } = autoFit(ctx, sanitizeHebrewText(title), r.w, startPx, b.W * 0.036, maxLines, (c, p) => setDisplay(c, p, 800));
-  setDisplay(ctx, px, 800);
+  const clean = sanitizeHebrewText(title);
+  const { px } = autoFit(ctx, clean, r.w, startPx, b.W * 0.036, maxLines, (c, p) => setHeadline(c, p, 800));
+  setHeadline(ctx, px, 800);
+  const lines = wrapRtlBalanced(ctx, clean, r.w);
   ctx.direction = 'rtl';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'alphabetic';
@@ -1166,8 +1184,10 @@ function drawCreamSlide(
     ctx.direction = 'rtl';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'alphabetic';
-    const { lines: tLines, px: tPx } = autoFit(ctx, sanitizeHebrewText(slide.title), headW, b.W * 0.05, b.W * 0.03, 2, (c, p) => setDisplay(c, p, 800));
-    setDisplay(ctx, tPx, 800);
+    const headClean = sanitizeHebrewText(slide.title);
+    const { px: tPx } = autoFit(ctx, headClean, headW, b.W * 0.05, b.W * 0.03, 2, (c, p) => setHeadline(c, p, 800));
+    setHeadline(ctx, tPx, 800);
+    const tLines = wrapRtlBalanced(ctx, headClean, headW);
     ctx.fillStyle = CREAM_INK;
     let ty = y + tileSize * 0.42;
     for (const line of tLines) {
@@ -1516,10 +1536,18 @@ export function drawTipSlide(
   const region: Region = { ...r };
   let cursorY = region.y;
 
+  // The handwritten margin note's band is reserved BEFORE anything is laid out: every painter
+  // below auto-fits into the region it is handed, so the copy shrinks to make room and the note
+  // can never be drawn over a line of it. Never on the cover or the closing card — those two
+  // slides already carry the deck's loudest type and the brand lockup.
+  const noteText = slide.kind !== 'cover' && slide.kind !== 'cta' ? (slide.note ?? '').trim() : '';
+  const noteBand = noteText ? b.W * 0.15 : 0;
+  region.h -= noteBand;
+
   if (slide.kind === 'step' && slide.stepNumber > 0) {
     cursorY = drawStepBadge(ctx, b, region, slide.stepNumber, accent, slide.scribble === 'circle');
     region.y = cursorY;
-    region.h = r.y + r.h - cursorY;
+    region.h = r.y + r.h - noteBand - cursorY;
   }
 
   if (slide.kind === 'cover' || slide.kind === 'cta') {
@@ -1544,25 +1572,31 @@ export function drawTipSlide(
       ctx.restore();
     }
 
-    const { lines, px } = autoFit(ctx, sanitizeHebrewText(slide.title), region.w, b.W * 0.085, b.W * 0.042, 5, (c, p) => setDisplay(c, p, 800));
-    setDisplay(ctx, px, 800);
+    // The cover is the loudest type in the deck: condensed 900, larger than any interior title
+    // (which starts at 0.052W), balanced so a two-line claim reads as two halves, not a line and a
+    // stub. White ink with the closing line in the slide's accent — the hierarchy is size, weight
+    // and one colour, never a gradient across the glyphs.
+    const coverTitle = sanitizeHebrewText(slide.title);
+    const { px } = autoFit(ctx, coverTitle, region.w, b.W * 0.1, b.W * 0.05, 4, (c, p) => setHeadline(c, p, 900));
+    setHeadline(ctx, px, 900);
+    const lines = wrapRtlBalanced(ctx, coverTitle, region.w);
     ctx.direction = 'rtl';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    let y = region.y + region.h * 0.3 - ((lines.length - 1) * px * 1.18) / 2;
+    const coverLh = px * 1.08;
+    let y = region.y + region.h * 0.3 - ((lines.length - 1) * coverLh) / 2;
+    // A three-line condensed cover is tall enough to climb into the tool lockup above it; the
+    // block is pushed down to clear the lockup rather than shrunk, because size is its hierarchy.
+    if (slide.tool) y = Math.max(y, region.y + region.h * 0.1 + b.W * 0.036 + b.W * 0.03 + px * 0.85);
     let lastBaseline = y;
     let lastWidth = 0;
-    for (const line of lines) {
-      const grad = ctx.createLinearGradient(region.x + region.w, 0, region.x, 0);
-      grad.addColorStop(0, '#FFFFFF');
-      grad.addColorStop(0.55, SILVER);
-      grad.addColorStop(1, accent);
-      ctx.fillStyle = grad;
+    lines.forEach((line, i) => {
+      ctx.fillStyle = lines.length > 1 && i === lines.length - 1 ? accent : '#FFFFFF';
       ctx.fillText(line, b.W / 2, y);
       lastBaseline = y;
       lastWidth = ctx.measureText(line).width;
-      y += px * 1.18;
-    }
+      y += coverLh;
+    });
     // Marker underline beneath the closing line of the headline — the one hand-drawn mark on a
     // cover. Measured off the line actually painted, so it tracks the auto-fitted type size.
     if (slide.scribble === 'underline' && lastWidth > 0) {
@@ -1630,7 +1664,7 @@ export function drawTipSlide(
     const plain = !slide.code.trim() && !slide.promptBox?.trim() && !slide.workflowPath?.length;
     const markerSeed = plain && slide.scribble !== 'underline' && index % 2 === 1 ? index * 389 + 11 : undefined;
     let afterTitle =
-      drawTitle(ctx, b, region, slide.title, codeHeavy ? b.W * 0.042 : b.W * 0.052, codeHeavy ? 2 : 3, accent, markerSeed) + b.m.gap;
+      drawTitle(ctx, b, region, slide.title, codeHeavy ? b.W * 0.048 : b.W * 0.062, codeHeavy ? 2 : 3, accent, markerSeed) + b.m.gap;
     // The click-path sits directly beneath the title: it IS the slide's instruction, and the body,
     // prompt card or snippet below it are the elaboration.
     if (slide.workflowPath?.length) {
@@ -1691,6 +1725,25 @@ export function drawTipSlide(
       drawBulletList(ctx, b, region, slide.bullets, afterTitle, remaining, slide.kind === 'takeaway' ? 'check' : 'dot', accent);
     } else {
       drawParagraph(ctx, b, region, slide.body || slide.bullets.join('. '), afterTitle, remaining, accent);
+    }
+  }
+
+  if (noteText) {
+    // Bottom-left of the slide: RTL copy is anchored right, so the left margin is the empty side a
+    // hand would write in. The arrow leaves the note's right shoulder and curves up into the copy.
+    const bandTop = region.y + region.h;
+    const box = { x: region.x, y: bandTop + b.W * 0.02, w: region.w * 0.56, h: noteBand - b.W * 0.03 };
+    const ink = drawHandNote(ctx, sanitizeHebrewText(noteText), box, b.W, accent, index * 211 + 17);
+    if (ink) {
+      doodleArrow(
+        ctx,
+        ink.x + ink.w + b.W * 0.022,
+        ink.y + ink.h * 0.3,
+        ink.x + ink.w + b.W * 0.12,
+        bandTop - b.W * 0.004,
+        accent,
+        index * 97 + 3
+      );
     }
   }
 

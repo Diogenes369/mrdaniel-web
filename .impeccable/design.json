@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T00:00:00Z",
+  "title": "Design System: mrdaniel.co.il",
+  "extensions": {
+    "colorMeta": {
+      "brand-green": { "role": "primary", "displayName": "Workbench Green", "canonical": "#76B900", "tonalRamp": ["#2E4800", "#446A00", "#5C9200", "#76B900", "#8FD400", "#9FE870", "#C4F2A6", "#E8FBDB"] },
+      "signal-glow": { "role": "primary", "displayName": "Live Glow", "canonical": "#00FF66" },
+      "neon-cyan": { "role": "secondary", "displayName": "Neon Cyan", "canonical": "#22D3EE", "tonalRamp": ["#0B4650", "#0E6674", "#0891B2", "#06B6D4", "#22D3EE", "#67E8F9", "#A5F3FC", "#ECFEFF"] },
+      "electric-blue": { "role": "secondary", "displayName": "Electric Blue", "canonical": "#38BDF8" },
+      "terracotta": { "role": "tertiary", "displayName": "Terracotta", "canonical": "#D96B52", "tonalRamp": ["#4A1D13", "#72301F", "#9C442D", "#C0573E", "#D96B52", "#E6927E", "#F0C9BC", "#FAEDE8"] },
+      "cream-paper": { "role": "tertiary", "displayName": "Cream Paper", "canonical": "#FAF6F0" },
+      "carbon-950": { "role": "neutral", "displayName": "Carbon Ground", "canonical": "#08090C", "tonalRamp": ["#08090C", "#121212", "#1E1E24", "#2A2D34", "#3A3D46", "#64748B", "#94A3B8", "#CBD5E1"] },
+      "slide-slate": { "role": "neutral", "displayName": "Slide Slate", "canonical": "#08090E" },
+      "ink-bright": { "role": "neutral", "displayName": "Bright Ink", "canonical": "#F1F5F9" },
+      "ink-body": { "role": "neutral", "displayName": "Body Ink", "canonical": "#E2E8F0" },
+      "ink-muted": { "role": "neutral", "displayName": "Muted Ink", "canonical": "#CBD5E1" },
+      "ink-faint": { "role": "neutral", "displayName": "Faint Ink", "canonical": "#94A3B8" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Site hero only." },
+      "headline": { "displayName": "Headline", "purpose": "Site section headings, balanced." },
+      "title": { "displayName": "Title", "purpose": "Card and sub-section titles." },
+      "body": { "displayName": "Body", "purpose": "Paragraphs, text-wrap: pretty." },
+      "label": { "displayName": "Label", "purpose": "Latin mono chrome: handles, counters, status. Never Hebrew prose." },
+      "slide-headline": { "displayName": "Slide Headline (condensed)", "purpose": "Every Hebrew headline on a carousel or video frame; auto-fit, then balanced." },
+      "slide-body": { "displayName": "Slide Body", "purpose": "Slide paragraphs and bullets, widow-controlled." },
+      "slide-note": { "displayName": "Handwritten Note", "purpose": "Margin notes only, ≤ 3 per deck, with a doodle arrow." },
+      "slide-code": { "displayName": "Slide Code", "purpose": "Code and Latin prompts inside terminal frames." }
+    },
+    "shadows": [
+      { "name": "overlay-lift", "value": "0 30px 80px rgba(0,0,0,0.9)", "purpose": "Modals and floating overlays." },
+      { "name": "live-glow", "value": "0 0 8px rgba(0,255,102,0.8)", "purpose": "Live indicator dots and active progress." },
+      { "name": "selected-glow", "value": "0 0 20px rgba(0,255,102,0.15)", "purpose": "Selected option cards." }
+    ],
+    "motion": [
+      { "name": "button-color", "value": "200ms ease", "purpose": "Button colour/border transitions." },
+      { "name": "slide-intro", "value": "rise 0.02W + fade", "purpose": "Motion Studio: slide body rises and fades in, holds, crossfades out." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single primary action; one per decision.",
+      "html": "<button class=\"ds-btn-primary\">איך זה עובד אצלכם</button>",
+      "css": ".ds-btn-primary { direction: rtl; font-family: Heebo, 'Segoe UI', sans-serif; font-weight: 700; letter-spacing: 0.025em; padding: 12px 24px; border-radius: 9999px; background: #76B900; color: #08090C; border: 1px solid #76B900; cursor: pointer; transition: background-color 200ms, border-color 200ms; } .ds-btn-primary:hover { background: #8FD400; border-color: #8FD400; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(143,212,0,0.6); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action on carbon.",
+      "html": "<button class=\"ds-btn-ghost\">לכל המדריכים</button>",
+      "css": ".ds-btn-ghost { direction: rtl; font-family: Heebo, 'Segoe UI', sans-serif; font-weight: 700; padding: 12px 24px; border-radius: 9999px; background: transparent; color: #F1F5F9; border: 1px solid rgba(255,255,255,0.15); cursor: pointer; transition: border-color 200ms; } .ds-btn-ghost:hover { border-color: rgba(143,212,0,0.5); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(143,212,0,0.6); }"
+    },
+    {
+      "name": "Dashboard Card",
+      "kind": "card",
+      "refersTo": "dash-card",
+      "description": "The shared container for every dashboard tab.",
+      "html": "<div class=\"ds-dash-card\"><h3>סוכן חדשות</h3><p>12 פריטים ממתינים לאישור</p></div>",
+      "css": ".ds-dash-card { direction: rtl; padding: 20px; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)), #121212; color: #E2E8F0; font-family: Heebo, sans-serif; } .ds-dash-card h3 { margin: 0 0 6px; font-family: Rubik, Heebo, sans-serif; font-weight: 700; color: #F1F5F9; } .ds-dash-card p { margin: 0; color: #94A3B8; }"
+    },
+    {
+      "name": "Live Chip",
+      "kind": "chip",
+      "description": "Status pill with a live dot.",
+      "html": "<span class=\"ds-chip\"><i></i>LIVE</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; border: 1px solid rgba(118,185,0,0.4); background: rgba(118,185,0,0.1); color: #9FE870; font: 600 11px 'JetBrains Mono', monospace; letter-spacing: 0.08em; } .ds-chip i { width: 6px; height: 6px; border-radius: 50%; background: #8FD400; box-shadow: 0 0 8px rgba(0,255,102,0.8); }"
+    },
+    {
+      "name": "Slide Headline + Note",
+      "kind": "custom",
+      "description": "Condensed balanced slide headline with accent closing line and a handwritten margin note.",
+      "html": "<div class=\"ds-slide\"><h2>מה זה בכלל סוכן, ולמה <span>זה שונה מצ׳אטבוט</span></h2><p class=\"ds-note\">פה רוב האנשים מתבלבלים ↗</p></div>",
+      "css": ".ds-slide { direction: rtl; background: #08090E; padding: 32px; border-radius: 12px; } .ds-slide h2 { margin: 0; font-family: 'Noto Sans Hebrew', Rubik, sans-serif; font-stretch: 75%; font-weight: 800; font-size: 40px; line-height: 1.12; color: #FFFFFF; text-wrap: balance; } .ds-slide h2 span { display: block; color: #76B900; } .ds-note { margin: 28px 0 0; text-align: left; font-family: 'Playpen Sans Hebrew', Assistant, sans-serif; font-weight: 600; font-size: 20px; color: #76B900; transform: rotate(-2deg); }"
+    },
+    {
+      "name": "Terminal Frame",
+      "kind": "custom",
+      "description": "Container for code and prompts on slides.",
+      "html": "<div class=\"ds-term\"><div class=\"ds-term-bar\"><b></b><b></b><b></b><span>PYTHON</span></div><pre>client = Anthropic()\nprint(msg.content[0].text)</pre></div>",
+      "css": ".ds-term { border-radius: 12px; background: rgba(11,13,18,0.92); border: 1px solid rgba(255,255,255,0.10); overflow: hidden; } .ds-term-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: rgba(255,255,255,0.045); } .ds-term-bar b { width: 8px; height: 8px; border-radius: 50%; background: #3A3D46; } .ds-term-bar span { margin-inline: auto; font: 600 10px 'JetBrains Mono', monospace; color: #22D3EE; letter-spacing: 0.1em; } .ds-term pre { margin: 0; padding: 14px 16px; font: 500 13px/1.6 'JetBrains Mono', monospace; color: #E2E8F0; direction: ltr; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Annotated Workbench",
+    "overview": "A practitioner's bench at night. The surfaces are dark carbon, cool and quiet; one green signal marks what is live, chosen or important; the real tools sit on the table (a terminal frame, a code block, a vector product mark, a click-path of actual menu labels); and in the margins there is a person's own handwriting pointing at the part that matters. Everything reads as made by one hands-on individual rather than assembled by a platform.",
+    "keyCharacteristics": [
+      "Dark carbon ground, one saturated green (`brand-green`) as the signal; cyan only as a secondary data/tech accent.",
+      "Hebrew-first, RTL everywhere; Latin product names stay Latin and correctly ordered inside RTL lines.",
+      "Slide headlines in bold **condensed** Hebrew, balanced across lines; body in a calm humanist sans.",
+      "Human marks — handwritten notes, doodle arrows, marker swipes, scribbled circles — used sparingly, always pointing at real content.",
+      "Real technical artefacts (terminal frames, highlighted code, vector tool marks) instead of stock imagery."
+    ],
+    "rules": [
+      { "name": "The One Signal Rule", "body": "Green marks what is live, chosen or important. If everything on a screen is green, nothing is; a slide carries at most one accent-coloured headline line, one marker swipe or one note.", "section": "colors" },
+      { "name": "The Solid Ink Rule", "body": "Text is set in solid colour. No gradient fills across glyphs — emphasis comes from the condensed weight, size and one accent colour.", "section": "colors" },
+      { "name": "The Condensed Voice Rule", "body": "Every Hebrew headline on a slide is set in the condensed headline role (`setHeadline`); Rubik is the fallback, not an alternative. Numerals, slash commands and quote glyphs keep the regular display face.", "section": "typography" },
+      { "name": "The Balanced Headline Rule", "body": "A headline is auto-fitted for size, then re-broken at the same line count with even line lengths (`wrapRtlBalanced`; on the web, `text-wrap: balance`). No headline ends on a stranded stub.", "section": "typography" },
+      { "name": "The No Widow Rule", "body": "A paragraph never ends on a single word alone: `wrapRtl` pulls the previous line's last word down whenever that keeps the line count (web: `text-wrap: pretty`). Every slide renderer wraps through it.", "section": "typography" },
+      { "name": "The One Hand Rule", "body": "The handwriting face appears only in margin notes. Never for a headline, body or button.", "section": "typography" },
+      { "name": "The Glow Means Live Rule", "body": "A green glow says \"active, selected or live\". It is never decoration on a static element.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** set every Hebrew slide headline with `setHeadline` (condensed 800/900) and re-break it with `wrapRtlBalanced` after auto-fit.",
+      "**Do** wrap every Hebrew paragraph through `wrapRtl` so widow control applies, and run Hebrew through `sanitizeHebrewText` before measuring.",
+      "**Do** make the closing line of a multi-line headline the accent colour, unless a marker swipe already sits under it.",
+      "**Do** warm every new face/weight in `ensureDeckFonts()` before the first slide is drawn.",
+      "**Do** reserve layout space for a note before laying out the content.",
+      "**Do** keep Latin product names, menu labels and handles Latin (LTR runs inside RTL lines)."
+    ],
+    "donts": [
+      "**Don't** fill text with a gradient.",
+      "**Don't** set Hebrew prose in JetBrains Mono or Orbitron; those faces have no Hebrew.",
+      "**Don't** use the handwriting face outside margin notes, or put a note on more than three slides.",
+      "**Don't** paint a URL, \"link in bio\" or \"comment X\" onto a slide; the link lives in the caption.",
+      "**Don't** put a stock photo behind a prompt, code or workflow slide.",
+      "**Don't** add a light theme to the site or dashboard; they are dark-only by decision.",
+      "**Don't** invent numbers, clients or results in any visual, including a handwritten note."
+    ]
+  }
+}

@@ -449,6 +449,7 @@ export function layOutDeck(deck: TechTipDeck, thread: DeckSource, topic: ThreadT
     // no-op for every deck that never sets it (Threads decks, and Instagram decks outside the
     // cream-skill preset).
     if (slide.subtitle) slide.subtitle = stripSlideCta(slide.subtitle);
+    if (slide.note) slide.note = stripSlideCta(slide.note).trim() || undefined;
     // A slide that names its own tool wins over the deck's — a round-up thread walks through
     // several, and each of those slides should wear the mark it is actually talking about. Brand
     // names survive the Hebrew adaptation as Latin text (source-fidelity rule 3), so this reads the

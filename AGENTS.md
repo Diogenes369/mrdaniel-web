@@ -63,6 +63,30 @@ Run from the **repo root** for the site, from **`dashboard/`** for the dashboard
 - **Dashboard**: **no react-query** — Firebase `onValue` + `useState`. Auth-gated (`LoginGate`, Firebase Auth). Every tab wrapped in `ErrorBoundary`; canvas/preview subtrees also in `PreviewErrorBoundary`. Shared card style: `.dash-card`.
 - Match the surrounding file's comment density and idiom. Comments in this codebase explain *why*, often at length.
 
+### Design system — `PRODUCT.md` + `DESIGN.md` (since 2026-09-26)
+
+`PRODUCT.md` holds product truth (audiences, positioning, evidence you must not fabricate);
+`DESIGN.md` is the visual system, **"The Annotated Workbench"**, with machine-readable tokens in its
+frontmatter and extensions in `.impeccable/design.json`. Read DESIGN.md before any UI or renderer
+change. The rules every generated carousel, guide and video frame follows:
+
+- **Type roles** (`dashboard/src/lib/designAssets.ts`): `setHeadline` = Noto Sans Hebrew
+  **condensed** 800/900 (loaded with its `wdth` axis in `dashboard/index.html`) for every Hebrew
+  slide headline; `setBody` = Assistant; `setMono` = JetBrains Mono for code/Latin only;
+  `setHand` = Playpen Sans Hebrew for margin notes only. The stretch rides in the `font`
+  shorthand, never `ctx.fontStretch` — the shorthand resets it for the next `setBody`.
+- **Hebrew typesetting** lives in `newsImageComposer.ts`: `wrapRtl` (widow control — every
+  renderer wraps through it) and `wrapRtlBalanced` (headlines: auto-fit for size, then balance at
+  the same line count). Headlines are solid ink — white, closing line in the accent — never a
+  gradient fill.
+- **Human marks**: `TechTipSlide.note` (optional, mirrored in `src/agent/types.ts` ↔
+  `dashboard/src/lib/techTipsApi.ts`) is a ≤ 6-word handwritten note with a `doodleArrow`, drawn by
+  `drawHandNote` in a band reserved before layout. The model writes it (`DECK_NOTE_RULES` in both
+  the tech-tip and adapted-deck prompts); `capDeckNotes` enforces ≤ 3 per deck, interior slides,
+  non-consecutive; `stripSlideCta` and the `sanitizeOutput` prose guard cover it too.
+- New faces or weights must be added to `ensureDeckFonts()` (or the renderer's own `ensureFonts`),
+  or the first exported slide ships in a fallback face.
+
 ---
 
 ## The content-agent API (`/api/agent-generate.ts`)

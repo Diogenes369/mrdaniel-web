@@ -53,6 +53,15 @@ Deck contract (mirrors `TechTipDeck` in `src/agent/types.ts` and
   backdrop description (it is sent verbatim to a free image generator).
 - **Never fabricate benchmarks, prices, version numbers or vendor claims.** If a number isn't
   verified, phrase it as an estimate or drop it.
+- Optional `note`: a handwritten margin note (≤ 6 Hebrew words, no full stop) on **at most 3
+  interior slides**, never the cover or CTA, never two slides in a row. It points at something
+  already on the slide ("שימו לב לסדר השורות", "זה החלק שמעתיקים"). It must never add a fact, a
+  number, a result or a personal experience. Code enforces the cap (`capDeckNotes`).
+
+Visual system: **`DESIGN.md`** ("The Annotated Workbench"). Titles are set large in a bold
+condensed Hebrew face and balanced across lines, so write each `title` as one claim that reads
+well split in two halves; the renderer handles widows, balance and RTL — never pad or break
+lines by hand, and never add line breaks, emoji or decorative symbols to shape the layout.
 
 The dashboard renders this deck two ways from the same data — a PNG carousel and an animated 9:16
 reel (`dashboard/src/lib/techTipRenderer.ts` + `motionStudioService.ts`). Keep both in mind:

@@ -187,8 +187,37 @@ export const FONT_MONO = "'JetBrains Mono', Assistant, Heebo, ui-monospace, mono
 export const FONT_VINTAGE_DISPLAY = "'Secular One', Rubik, Heebo, 'Segoe UI', sans-serif";
 export const FONT_VINTAGE_PLAQUE = "Karantina, Rubik, Heebo, 'Segoe UI', sans-serif";
 
+/**
+ * The headline role: bold CONDENSED Hebrew. DESIGN.md → Typography, "The Condensed Voice Rule".
+ *
+ * Rubik 800 at headline size spends a lot of width per word, so a 7-word Hebrew claim broke into
+ * three or four short lines and the auto-fit shrank it until it stopped reading as a headline.
+ * Noto Sans Hebrew is loaded with its width axis (62.5–100%), and at `condensed` (75%) the same
+ * claim sits in two confident lines at a larger size. Rubik stays second in the stack, so a blocked
+ * webfont degrades to the previous look rather than to a system face.
+ *
+ * The stretch goes in the `font` SHORTHAND, not in `ctx.fontStretch`: the shorthand resets every
+ * sub-property it omits, so the very next `setBody` is back to normal width on its own. Setting the
+ * property instead would leak `condensed` into every later body line and chip on the same context.
+ */
+export const FONT_HEADLINE = "'Noto Sans Hebrew', Rubik, Assistant, Heebo, 'Segoe UI', sans-serif";
+
+/**
+ * The handwritten role — Daniel's own margin notes on a slide (`TechTipSlide.note`). Playpen Sans
+ * Hebrew is a marker hand that stays legible at the ~38px a note is set at, which the skinnier
+ * hand-lettered faces are not. Used for notes ONLY: a handwritten headline or body reads as a
+ * costume, a handwritten aside reads as a person.
+ */
+export const FONT_HAND = "'Playpen Sans Hebrew', Assistant, Heebo, 'Segoe UI', sans-serif";
+
 export const setDisplay = (ctx: CanvasRenderingContext2D, px: number, w = 800) => {
   ctx.font = `${w} ${Math.round(px)}px ${FONT_DISPLAY}`;
+};
+export const setHeadline = (ctx: CanvasRenderingContext2D, px: number, w = 800) => {
+  ctx.font = `${w} condensed ${Math.round(px)}px ${FONT_HEADLINE}`;
+};
+export const setHand = (ctx: CanvasRenderingContext2D, px: number, w = 600) => {
+  ctx.font = `${w} ${Math.round(px)}px ${FONT_HAND}`;
 };
 export const setBody = (ctx: CanvasRenderingContext2D, px: number, w = 400) => {
   ctx.font = `${w} ${Math.round(px)}px ${FONT_BODY}`;
@@ -217,6 +246,11 @@ export async function ensureDeckFonts(): Promise<void> {
     `500 28px ${FONT_MONO}`,
     `700 20px ${FONT_MONO}`,
     `400 22px ${FONT_MONO}`,
+    `800 condensed 96px ${FONT_HEADLINE}`,
+    `900 condensed 60px ${FONT_HEADLINE}`,
+    `700 condensed 44px ${FONT_HEADLINE}`,
+    `600 38px ${FONT_HAND}`,
+    `700 38px ${FONT_HAND}`,
     `400 64px ${FONT_VINTAGE_DISPLAY}`,
     `400 40px ${FONT_VINTAGE_DISPLAY}`,
     `700 26px ${FONT_VINTAGE_PLAQUE}`,
@@ -672,6 +706,93 @@ export function doodleArrow(
     ctx.stroke();
   }
   ctx.restore();
+}
+
+export interface HandNoteBounds {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Splits a short note into one line, or into the two most even lines — the balanced break a
+ * handwritten aside gets when someone actually writes it in a margin. Local rather than
+ * newsImageComposer's `wrapRtlBalanced`: a note is ≤ 6 words and never more than two lines, and
+ * this module stays free of imports from the renderers that import it.
+ */
+function splitNote(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length < 2 || ctx.measureText(text).width <= maxW) return [text];
+  let best: string[] = [text];
+  let bestW = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const a = words.slice(0, i).join(' ');
+    const bLine = words.slice(i).join(' ');
+    const w = Math.max(ctx.measureText(a).width, ctx.measureText(bLine).width);
+    if (w < bestW) {
+      bestW = w;
+      best = [a, bLine];
+    }
+  }
+  return best;
+}
+
+/**
+ * A handwritten margin note — the "a person marked this slide up" signature of the Annotated
+ * Workbench (DESIGN.md). Set in FONT_HAND, tilted a couple of degrees, centred in its box and
+ * balanced over at most two lines; the size steps down until it fits, so the note never grows
+ * the box the caller reserved for it.
+ *
+ * Returns the bounds of the ink actually drawn, so the caller can aim a `doodleArrow` from the
+ * note's edge at whatever it is annotating. The arrow is deliberately NOT drawn here: only the
+ * layout knows where the thing being pointed at sits.
+ */
+export function drawHandNote(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  box: HandNoteBounds,
+  W: number,
+  colour: string,
+  seed: number
+): HandNoteBounds | null {
+  const clean = text.trim();
+  if (!clean) return null;
+  let px = W * 0.04;
+  const minPx = W * 0.026;
+  let lines: string[] = [clean];
+  for (let i = 0; i < 16; i++) {
+    setHand(ctx, px, 600);
+    lines = splitNote(ctx, clean, box.w);
+    const widest = Math.max(...lines.map((l) => ctx.measureText(l).width));
+    if ((lines.length <= 2 && widest <= box.w && lines.length * px * 1.25 <= box.h) || px <= minPx) break;
+    px = Math.max(minPx, px * 0.93);
+  }
+  lines = lines.slice(0, 2);
+  const lh = px * 1.25;
+  const inkW = Math.min(box.w, Math.max(...lines.map((l) => ctx.measureText(l).width)));
+  const inkH = lines.length * lh;
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+
+  ctx.save();
+  // A fixed tilt per seed, between -3° and -1°: always the same way, never the same amount twice
+  // in a deck, which is how a real hand drifts.
+  const tilt = -(0.018 + rand(seed)() * 0.035);
+  ctx.translate(cx, cy);
+  ctx.rotate(tilt);
+  setHand(ctx, px, 600);
+  ctx.direction = 'rtl';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = colour;
+  let y = -inkH / 2 + px * 0.95;
+  for (const line of lines) {
+    ctx.fillText(line, 0, y);
+    y += lh;
+  }
+  ctx.restore();
+  return { x: cx - inkW / 2, y: cy - inkH / 2, w: inkW, h: inkH };
 }
 
 // ─── tool marks ─────────────────────────────────────────────────────────────────────────────

@@ -372,6 +372,14 @@ export interface TechTipSlide {
   /** Hand-drawn accent for this slide. Assigned in code from the slide's role, not by the model. */
   scribble?: ScribbleKind;
   /**
+   * A handwritten margin note (≤ 6 Hebrew words) drawn in the handwriting face with a doodle arrow
+   * aimed at the slide's content — the personal mark of the deck design (DESIGN.md → Components,
+   * "Handwritten note"). Written by the model, but kept to at most `MAX_DECK_NOTES` slides in code
+   * (`capDeckNotes`), because on every slide a note stops reading as emphasis. It points at what is
+   * already on the slide; it must never claim a result or a personal experience that did not happen.
+   */
+  note?: string;
+  /**
    * Forbids a searched/generated photo on this slide — the backdrop stays the procedural dark
    * gradient. Set on every technical slide (prompt, code, workflow, tool), because a stock photo
    * behind a prompt box is the single strongest tell that a deck was assembled rather than made.

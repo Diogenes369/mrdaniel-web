@@ -1,4 +1,5 @@
-import { getLogo, loadFont, wrapRtl } from './newsImageComposer';
+import { getLogo, loadFont, wrapRtl, wrapRtlBalanced } from './newsImageComposer';
+import { FONT_HEADLINE } from './designAssets';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
 import type { NewsTopic } from './newsAgentTypes';
 import type { LayoutKind, StudioDeck, StudioSlide } from './carouselStudioTypes';
@@ -62,6 +63,10 @@ function setBold(ctx: CanvasRenderingContext2D, px: number, weight = 800) {
 function setBody(ctx: CanvasRenderingContext2D, px: number, weight = 400) {
   ctx.font = `${weight} ${px}px Heebo, Rubik, sans-serif`;
 }
+/** Hebrew headlines: the deck-wide condensed headline role (designAssets `FONT_HEADLINE`). */
+function setHeadline(ctx: CanvasRenderingContext2D, px: number, weight = 800) {
+  ctx.font = `${weight} condensed ${px}px ${FONT_HEADLINE}`;
+}
 function setItalic(ctx: CanvasRenderingContext2D, px: number, weight = 700) {
   ctx.font = `italic ${weight} ${px}px Rubik, Heebo, sans-serif`;
 }
@@ -96,7 +101,10 @@ function autoFit(
   startPx: number,
   minPx: number,
   maxLines: number,
-  set: (c: CanvasRenderingContext2D, px: number) => void
+  set: (c: CanvasRenderingContext2D, px: number) => void,
+  /** Headlines only: re-break the settled size at the same line count with even line lengths
+   *  (`wrapRtlBalanced`), so a two-line headline never reads as a full line and a stub. */
+  balance = false
 ): { lines: string[]; px: number } {
   let px = startPx;
   let lines: string[] = [];
@@ -106,6 +114,7 @@ function autoFit(
     if (lines.length <= maxLines || px <= minPx) break;
     px = Math.max(minPx, px * 0.93);
   }
+  if (balance && lines.length > 1) lines = wrapRtlBalanced(ctx, text, maxW);
   return { lines, px };
 }
 
@@ -289,7 +298,7 @@ function eyebrow(ctx: CanvasRenderingContext2D, text: string, y: number, accent:
 function renderHero({ ctx, s, style }: Ctx) {
   cornerGlyph(ctx, style);
   let y = CONTENT_TOP + 60;
-  const { lines, px } = autoFit(ctx, he(s.headline), W - PAD * 2, 92, 52, 5, (c, p) => setBold(c, p, 800));
+  const { lines, px } = autoFit(ctx, he(s.headline), W - PAD * 2, 92, 52, 5, (c, p) => setHeadline(c, p, 800), true);
   const lh = px * 1.16;
   ctx.direction = 'rtl';
   ctx.textAlign = 'right';
@@ -329,7 +338,7 @@ function renderValue({ ctx, s, style }: Ctx) {
   let y = CONTENT_TOP + 20;
   y = eyebrow(ctx, s.kicker, y + 10, style.accent);
   if (s.headline) {
-    const { lines, px } = autoFit(ctx, he(s.headline), W - PAD * 2, 52, 36, 3, (c, p) => setBold(c, p, 800));
+    const { lines, px } = autoFit(ctx, he(s.headline), W - PAD * 2, 52, 36, 3, (c, p) => setHeadline(c, p, 800), true);
     ctx.direction = 'rtl';
     ctx.textAlign = 'right';
     ctx.fillStyle = INK;
@@ -378,7 +387,7 @@ function bulletList(ctx: CanvasRenderingContext2D, items: string[], x: number, t
 function renderChecklist({ ctx, s, style }: Ctx) {
   let y = CONTENT_TOP + 20;
   y = eyebrow(ctx, s.kicker, y + 10, style.accent);
-  const { lines, px } = autoFit(ctx, he(s.headline || 'הנקודות'), W - PAD * 2, 50, 34, 2, (c, p) => setBold(c, p, 800));
+  const { lines, px } = autoFit(ctx, he(s.headline || 'הנקודות'), W - PAD * 2, 50, 34, 2, (c, p) => setHeadline(c, p, 800), true);
   ctx.direction = 'rtl';
   ctx.textAlign = 'right';
   ctx.fillStyle = INK;
@@ -408,8 +417,8 @@ function renderStat({ ctx, s, style }: Ctx) {
 
   let y = numY + 90;
   if (s.headline) {
-    const { lines, px: hpx } = autoFit(ctx, he(s.headline), W - PAD * 2, 46, 32, 2, (c, p) => setBold(c, p, 800));
-    setBold(ctx, hpx, 800);
+    const { lines, px: hpx } = autoFit(ctx, he(s.headline), W - PAD * 2, 46, 32, 2, (c, p) => setHeadline(c, p, 800), true);
+    setHeadline(ctx, hpx, 800);
     ctx.direction = 'rtl';
     ctx.textAlign = 'center';
     ctx.fillStyle = INK;
@@ -435,7 +444,7 @@ function renderComparison({ ctx, s, style }: Ctx) {
   let y = CONTENT_TOP + 20;
   y = eyebrow(ctx, s.kicker, y + 10, style.accent);
   if (s.headline) {
-    const { lines, px } = autoFit(ctx, he(s.headline), W - PAD * 2, 46, 32, 2, (c, p) => setBold(c, p, 800));
+    const { lines, px } = autoFit(ctx, he(s.headline), W - PAD * 2, 46, 32, 2, (c, p) => setHeadline(c, p, 800), true);
     ctx.direction = 'rtl';
     ctx.textAlign = 'right';
     ctx.fillStyle = INK;
@@ -471,7 +480,7 @@ function renderPrompt({ ctx, s, style }: Ctx) {
   let y = CONTENT_TOP + 20;
   y = eyebrow(ctx, s.kicker || 'פרומפט', y + 10, style.accent);
   if (s.headline) {
-    const { lines, px } = autoFit(ctx, he(s.headline), W - PAD * 2, 46, 32, 2, (c, p) => setBold(c, p, 800));
+    const { lines, px } = autoFit(ctx, he(s.headline), W - PAD * 2, 46, 32, 2, (c, p) => setHeadline(c, p, 800), true);
     ctx.direction = 'rtl';
     ctx.textAlign = 'right';
     ctx.fillStyle = INK;
@@ -556,7 +565,7 @@ function renderQuote({ ctx, s, style }: Ctx) {
 
 function renderCta({ ctx, s, style }: Ctx) {
   let y = CONTENT_TOP + 140;
-  const { lines, px } = autoFit(ctx, he(s.headline || 'רוצים ליישם את זה נכון?'), W - PAD * 2, 72, 44, 4, (c, p) => setBold(c, p, 800));
+  const { lines, px } = autoFit(ctx, he(s.headline || 'רוצים ליישם את זה נכון?'), W - PAD * 2, 72, 44, 4, (c, p) => setHeadline(c, p, 800), true);
   const lh = px * 1.18;
   ctx.direction = 'rtl';
   ctx.textAlign = 'center';
@@ -610,6 +619,8 @@ const RENDERERS: Record<LayoutKind, (c: Ctx) => void> = {
 async function ensureFonts() {
   await Promise.all([
     loadFont('800 92px Rubik'),
+    loadFont(`800 condensed 96px ${FONT_HEADLINE}`),
+    loadFont(`700 condensed 46px ${FONT_HEADLINE}`),
     loadFont('800 46px Rubik'),
     loadFont('700 30px Rubik'),
     loadFont('italic 700 40px Rubik'),

@@ -122,6 +122,8 @@ export interface TechTipSlide {
   workflowPath?: string[];
   /** Hand-drawn accent for this slide. */
   scribble?: ScribbleKind;
+  /** Handwritten margin note (≤ 6 words) with a doodle arrow. See src/agent/types.ts. */
+  note?: string;
   /** Forbids a searched/generated photo here — technical slides keep the procedural backdrop.
    *  An image the thread itself published still renders; it is not stock. */
   noPhoto?: boolean;

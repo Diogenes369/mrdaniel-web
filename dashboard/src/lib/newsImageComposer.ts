@@ -153,6 +153,16 @@ function drawKicker(ctx: CanvasRenderingContext2D, label: string, rightX: number
   ctx.fillText(label, rightX - padX, y + boxH / 2 + fontSize * 0.04);
 }
 
+/**
+ * Greedy word wrap for the current `ctx.font`, with widow control.
+ *
+ * Every slide renderer in the dashboard wraps through here, so this is the one place a typesetting
+ * rule reaches all generated content. Greedy fill alone regularly strands a single word on the last
+ * line of a paragraph — on a 1080px slide that lone word sits in a sea of empty line and reads as a
+ * layout fault. When that happens the previous line's last word is pulled down to keep it company,
+ * but only if the line it leaves still holds two words and the pair still fits: the LINE COUNT never
+ * changes, which is what every `autoFit` loop and height budget downstream is sized against.
+ */
 export function wrapRtl(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -167,7 +177,46 @@ export function wrapRtl(ctx: CanvasRenderingContext2D, text: string, maxWidth: n
     }
   }
   if (current) lines.push(current);
+
+  const n = lines.length;
+  if (n >= 2 && !/\s/.test(lines[n - 1])) {
+    const prev = lines[n - 2].split(' ');
+    if (prev.length >= 3) {
+      const moved = `${prev[prev.length - 1]} ${lines[n - 1]}`;
+      if (ctx.measureText(moved).width <= maxWidth) {
+        lines[n - 2] = prev.slice(0, -1).join(' ');
+        lines[n - 1] = moved;
+      }
+    }
+  }
   return lines;
+}
+
+/**
+ * Balanced wrap for headlines — the canvas equivalent of CSS `text-wrap: balance`.
+ *
+ * A greedy headline fills line one to the edge and drops a stub onto line two, so the eye reads a
+ * full line and then a fragment. This keeps the greedy LINE COUNT (so a caller's auto-fit decision
+ * still holds) and binary-searches the narrowest width that produces that same count, which evens
+ * the lines out. Headlines only: on a paragraph the narrower measure would just waste the column.
+ */
+export function wrapRtlBalanced(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const greedy = wrapRtl(ctx, text, maxWidth);
+  if (greedy.length < 2) return greedy;
+  let lo = maxWidth * 0.5;
+  let hi = maxWidth;
+  let best = greedy;
+  for (let i = 0; i < 12 && hi - lo > 2; i++) {
+    const mid = (lo + hi) / 2;
+    const trial = wrapRtl(ctx, text, mid);
+    if (trial.length <= greedy.length) {
+      best = trial;
+      hi = mid;
+    } else {
+      lo = mid;
+    }
+  }
+  return best;
 }
 
 export interface NewsImageOptions {

@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
-import { getLogo, loadFont, wrapRtl } from './newsImageComposer';
+import { getLogo, loadFont, wrapRtl, wrapRtlBalanced } from './newsImageComposer';
+import { FONT_HEADLINE } from './designAssets';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
 import type { AccentKey, LayoutKind, StudioDeck, StudioSlide } from './carouselStudioTypes';
 
@@ -180,9 +181,17 @@ function setDisplay(ctx: CanvasRenderingContext2D, px: number, weight = 800) {
 function setBody(ctx: CanvasRenderingContext2D, px: number, weight = 400) {
   ctx.font = `${weight} ${px}px Heebo, Rubik, sans-serif`;
 }
+/** Hebrew headlines: the deck-wide condensed headline role (designAssets `FONT_HEADLINE`). */
+function setHeadline(ctx: CanvasRenderingContext2D, px: number, weight = 800) {
+  ctx.font = `${weight} condensed ${px}px ${FONT_HEADLINE}`;
+}
 
-/** Gradient-filled headline lines (white → slate → accent), RTL, right-aligned unless centered. */
-function drawGradientLines(
+/**
+ * Headline lines in solid ink, RTL, right-aligned unless centered. White, with the closing line of
+ * a multi-line headline in the accent — the gradient that used to run across the glyphs is gone:
+ * emphasis comes from the condensed weight and one colour (DESIGN.md → "The Solid Ink Rule").
+ */
+function drawHeadlineLines(
   ctx: CanvasRenderingContext2D,
   lines: string[],
   rightX: number,
@@ -196,15 +205,11 @@ function drawGradientLines(
   ctx.textAlign = centered ? 'center' : 'right';
   ctx.textBaseline = 'alphabetic';
   let y = startY;
-  for (const line of lines) {
-    const grad = ctx.createLinearGradient(rightX, y - lh, rightX - (W - PAD * 2), y);
-    grad.addColorStop(0, '#FFFFFF');
-    grad.addColorStop(0.55, SILVER);
-    grad.addColorStop(1, accent);
-    ctx.fillStyle = grad;
+  lines.forEach((line, i) => {
+    ctx.fillStyle = lines.length > 1 && i === lines.length - 1 ? accent : '#FFFFFF';
     ctx.fillText(line, centered ? W / 2 : rightX, y);
     y += lh;
-  }
+  });
   ctx.restore();
   return y;
 }
@@ -380,7 +385,10 @@ function autoFitLines(
   startPx: number,
   minPx: number,
   maxLines: number,
-  set: (c: CanvasRenderingContext2D, px: number) => void
+  set: (c: CanvasRenderingContext2D, px: number) => void,
+  /** Headlines only: re-break the settled size at the same line count with even line lengths
+   *  (`wrapRtlBalanced`), so a two-line headline never reads as a full line and a stub. */
+  balance = false
 ): { lines: string[]; px: number } {
   let px = startPx;
   let lines: string[] = [];
@@ -390,6 +398,7 @@ function autoFitLines(
     if (lines.length <= maxLines || px <= minPx) break;
     px = Math.max(minPx, px * 0.93);
   }
+  if (balance && lines.length > 1) lines = wrapRtlBalanced(ctx, text, maxW);
   return { lines, px };
 }
 
@@ -397,7 +406,7 @@ function renderHero(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   const b = contentBox();
   const accent = accentHex(s.accent);
   const headText = sanitizeHebrewText(s.headline);
-  const { lines, px } = autoFitLines(ctx, headText, b.w, 96, 52, 5, (c, p) => setDisplay(c, p, 800));
+  const { lines, px } = autoFitLines(ctx, headText, b.w, 96, 52, 5, (c, p) => setHeadline(c, p, 800), true);
   const lh = px * 1.2;
   const blockH = lines.length * lh;
   let y = b.y + Math.max(40, (b.h - blockH) * 0.42) + px;
@@ -414,7 +423,7 @@ function renderHero(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   ctx.stroke();
   ctx.restore();
 
-  y = drawGradientLines(ctx, lines, b.x + b.w, y, lh, accent, false);
+  y = drawHeadlineLines(ctx, lines, b.x + b.w, y, lh, accent, false);
 
   // sub-headline
   if (s.subhead) {
@@ -457,8 +466,8 @@ function renderValue(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   let y = b.y + 26;
 
   if (s.headline) {
-    const { lines, px } = autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, 58, 40, 3, (c, p) => setDisplay(c, p, 800));
-    y = drawGradientLines(ctx, lines, b.x + b.w, y + px, px * 1.16, accent, false);
+    const { lines, px } = autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, 58, 40, 3, (c, p) => setHeadline(c, p, 800), true);
+    y = drawHeadlineLines(ctx, lines, b.x + b.w, y + px, px * 1.16, accent, false);
     // accent rule
     ctx.save();
     ctx.fillStyle = accent;
@@ -494,8 +503,8 @@ function renderChecklist(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   const b = contentBox();
   const accent = accentHex(s.accent);
   let y = b.y + 26;
-  const { lines, px } = autoFitLines(ctx, sanitizeHebrewText(s.headline || 'מה חשוב לדעת'), b.w, 56, 40, 2, (c, p) => setDisplay(c, p, 800));
-  y = drawGradientLines(ctx, lines, b.x + b.w, y + px, px * 1.16, accent, false);
+  const { lines, px } = autoFitLines(ctx, sanitizeHebrewText(s.headline || 'מה חשוב לדעת'), b.w, 56, 40, 2, (c, p) => setHeadline(c, p, 800), true);
+  y = drawHeadlineLines(ctx, lines, b.x + b.w, y + px, px * 1.16, accent, false);
   y += 44;
 
   const items = (s.bullets.length ? s.bullets : s.bulletsLeft).slice(0, 5).map((t) => sanitizeHebrewText(t));
@@ -565,8 +574,8 @@ function renderStat(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   // headline under the number
   let y = numY + px * 0.5 + 40;
   if (s.headline) {
-    const { lines, px: hpx } = autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, 46, 32, 2, (c, p) => setDisplay(c, p, 700));
-    setDisplay(ctx, hpx, 700);
+    const { lines, px: hpx } = autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, 46, 32, 2, (c, p) => setHeadline(c, p, 700), true);
+    setHeadline(ctx, hpx, 700);
     ctx.direction = 'rtl';
     ctx.textAlign = 'center';
     ctx.fillStyle = SILVER;
@@ -595,8 +604,8 @@ function renderComparison(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   const accent = accentHex(s.accent);
   let y = b.y + 22;
   if (s.headline) {
-    const { lines, px } = autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, 52, 36, 2, (c, p) => setDisplay(c, p, 800));
-    y = drawGradientLines(ctx, lines, b.x + b.w, y + px, px * 1.16, accent, false);
+    const { lines, px } = autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, 52, 36, 2, (c, p) => setHeadline(c, p, 800), true);
+    y = drawHeadlineLines(ctx, lines, b.x + b.w, y + px, px * 1.16, accent, false);
     y += 34;
   }
 
@@ -647,8 +656,8 @@ function renderPrompt(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   const accent = accentHex(s.accent);
   let y = b.y + 22;
   if (s.headline) {
-    const { lines, px } = autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, 52, 36, 2, (c, p) => setDisplay(c, p, 800));
-    y = drawGradientLines(ctx, lines, b.x + b.w, y + px, px * 1.16, accent, false);
+    const { lines, px } = autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, 52, 36, 2, (c, p) => setHeadline(c, p, 800), true);
+    y = drawHeadlineLines(ctx, lines, b.x + b.w, y + px, px * 1.16, accent, false);
     y += 30;
   }
 
@@ -722,10 +731,10 @@ function renderQuote(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   ctx.fillText('”', W / 2, b.y + 150);
   ctx.restore();
 
-  const { lines, px } = autoFitLines(ctx, quote, b.w * 0.92, 60, 34, 6, (c, p) => setDisplay(c, p, 700));
+  const { lines, px } = autoFitLines(ctx, quote, b.w * 0.92, 60, 34, 6, (c, p) => setHeadline(c, p, 700), true);
   const lh = px * 1.32;
   let y = b.y + b.h * 0.34;
-  y = drawGradientLines(ctx, lines, W / 2, y, lh, accent, true);
+  y = drawHeadlineLines(ctx, lines, W / 2, y, lh, accent, true);
 
   if (s.body) {
     y += 30;
@@ -753,10 +762,10 @@ function renderCta(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   const b = contentBox();
   const accent = accentHex(s.accent);
   const headText = sanitizeHebrewText(s.headline || 'רוצים ליישם את זה נכון?');
-  const { lines, px } = autoFitLines(ctx, headText, b.w * 0.94, 78, 46, 4, (c, p) => setDisplay(c, p, 800));
+  const { lines, px } = autoFitLines(ctx, headText, b.w * 0.94, 78, 46, 4, (c, p) => setHeadline(c, p, 800), true);
   const lh = px * 1.2;
   let y = b.y + b.h * 0.26;
-  y = drawGradientLines(ctx, lines, W / 2, y, lh, accent, true);
+  y = drawHeadlineLines(ctx, lines, W / 2, y, lh, accent, true);
 
   if (s.body) {
     y += 26;
@@ -816,6 +825,8 @@ const LAYOUT_RENDERERS: Record<LayoutKind, (ctx: CanvasRenderingContext2D, s: St
 async function ensureFonts() {
   await Promise.all([
     loadFont("800 96px Rubik"),
+    loadFont(`800 condensed 96px ${FONT_HEADLINE}`),
+    loadFont(`700 condensed 46px ${FONT_HEADLINE}`),
     loadFont("900 200px Rubik"),
     loadFont("700 46px Rubik"),
     loadFont("500 40px Heebo"),
