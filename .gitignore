@@ -24,3 +24,7 @@ video-projects/
 # Cloned upstream repos (vendor/open-higgsfield — re-clone with the URL in docs/openhiggsfield-bridge.md)
 vendor/
 scratch-*
+
+# Hybrid 3D reel pipeline (reels/README.md): frame/font caches and rendered MP4s
+reels/.cache/
+reels/out/
