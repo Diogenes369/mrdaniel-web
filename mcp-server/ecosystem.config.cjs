@@ -64,5 +64,25 @@ module.exports = {
       kill_timeout: 8000,
       env: { NODE_ENV: 'production' },
     },
+    // carousel-bridge (2026-09-27): the Hermes carousel orchestrator AND `/relay/img`, the
+    // residential image relay the dashboard falls back to when a source site blocks every
+    // datacenter IP (jerusalem.muni.il behind Akamai). While it is down, those articles render on
+    // the branded background instead of their own photo — so it gets the same never-give-up
+    // restart policy as the worker. cwd is its own folder: it loads carousel-bridge/.env relative
+    // to itself and writes jobs under carousel-bridge/output.
+    {
+      name: 'carousel-bridge',
+      script: path.join(__dirname, '..', 'carousel-bridge', 'index.js'),
+      cwd: path.join(__dirname, '..', 'carousel-bridge'),
+      autorestart: true,
+      watch: false,
+      exp_backoff_restart_delay: 1000,
+      min_uptime: '60s',
+      max_restarts: 1_000_000,
+      max_memory_restart: '600M',
+      // Lets an in-flight Hermes job's child processes wind down on stop/restart.
+      kill_timeout: 10000,
+      windowsHide: true,
+    },
   ],
 };
