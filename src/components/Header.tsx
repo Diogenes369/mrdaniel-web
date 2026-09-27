@@ -19,6 +19,9 @@ const navLinks: NavLink[] = [
   { name: 'סוכני AI', to: '/ai' },
   { name: 'מערכת JARVIS', to: '/jarvis' },
   { name: 'לומדים AI', to: '/magazines' },
+  // Restored 2026-09-27 at Daniel's request (removed in fe0311e): /news is the full live feed, and
+  // the ticker it relied on instead is desktop-only, so phones had no visible way in.
+  { name: 'חדשות', to: '/news' },
   { name: 'דברו איתי', action: 'contact' },
 ];
 

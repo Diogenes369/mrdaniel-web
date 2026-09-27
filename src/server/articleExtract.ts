@@ -317,28 +317,63 @@ export function extractArticleFromHtml(html: string): ExtractedArticle {
   return { text: '', strategy: 'none', selector: '' };
 }
 
-/** Lead image from OG/Twitter metadata or the first in-body `<img>`, ignoring tracking pixels. */
-export function extractLeadImage(html: string): string {
+/** Absolute http(s) URL for `src` relative to `baseUrl`; '' for data:/blob:/javascript: or junk. */
+export function absoluteUrl(src: string, baseUrl?: string): string {
+  const raw = (src || '').trim().replace(/&amp;/g, '&');
+  if (!raw || /^(?:data|blob|javascript):/i.test(raw)) return '';
+  try {
+    const u = baseUrl ? new URL(raw.startsWith('//') ? `https:${raw}` : raw, baseUrl) : new URL(raw.startsWith('//') ? `https:${raw}` : raw);
+    return /^https?:$/.test(u.protocol) ? u.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
+const NOT_A_PHOTO = /\b(?:1x1|pixel|spacer|blank|tracking|logo|icon|sprite|avatar|emoji|badge)s?\b|\.svg(?:[?#]|$)|\/icons?\//i;
+
+/**
+ * Lead image: OG/Twitter/itemprop metadata first, then the first real in-body `<img>`.
+ *
+ * `baseUrl` resolves relative values — a CMS that writes `og:image="/media/x.png"` or
+ * `<img src="../img.jpg">` used to be dropped outright, because only absolute `https://` sources
+ * were accepted. Lazy-loaded images are read from `data-src` / `data-lazy-src` / the largest
+ * `srcset` candidate, since on those pages `src` is a placeholder until JavaScript runs.
+ */
+export function extractLeadImage(html: string, baseUrl?: string): string {
   try {
     const $ = cheerio.load(html);
     for (const sel of [
       'meta[property="og:image:secure_url"]',
       'meta[property="og:image"]',
+      'meta[property="og:image:url"]',
       'meta[name="twitter:image"]',
       'meta[property="twitter:image"]',
+      'meta[name="twitter:image:src"]',
       'meta[itemprop="image"]',
+      'link[rel="image_src"]',
     ]) {
-      const c = $(sel).attr('content')?.trim();
-      if (c) return c;
+      const el = $(sel).first();
+      const abs = absoluteUrl(el.attr('content') ?? el.attr('href') ?? '', baseUrl);
+      if (abs) return abs;
     }
-    const img = $('article img, .article-body img, .content img, main img')
-      .filter((_i, el) => {
-        const src = $(el).attr('src') ?? '';
-        return /^https?:\/\//i.test(src) && !/\b(?:1x1|pixel|spacer|blank|tracking)\b/i.test(src);
-      })
-      .first()
-      .attr('src');
-    return img?.trim() ?? '';
+    const fromSrcset = (v: string | undefined): string => {
+      const parts = (v ?? '').split(',').map((p) => p.trim().split(/\s+/)).filter((p) => p[0]);
+      parts.sort((a, b) => (parseFloat(b[1] ?? '0') || 0) - (parseFloat(a[1] ?? '0') || 0));
+      return parts[0]?.[0] ?? '';
+    };
+    const imgs = $('article img, [itemprop="articleBody"] img, .article-body img, .entry-content img, .post-content img, .content img, main img, img').toArray();
+    for (const el of imgs) {
+      const $el = $(el);
+      const candidate =
+        $el.attr('data-src') || $el.attr('data-lazy-src') || $el.attr('data-original') || fromSrcset($el.attr('data-srcset') || $el.attr('srcset')) || $el.attr('src') || '';
+      const abs = absoluteUrl(candidate, baseUrl);
+      if (!abs || NOT_A_PHOTO.test(abs)) continue;
+      const w = Number($el.attr('width') || 0);
+      const h = Number($el.attr('height') || 0);
+      if ((w && w < 200) || (h && h < 120)) continue; // thumbnails, share buttons, event-meta icons
+      return abs;
+    }
+    return '';
   } catch {
     return '';
   }

@@ -1,4 +1,4 @@
-import { fetchFullArticleBody } from './repurposeApi';
+import { fetchFullArticle } from './repurposeApi';
 import type { NewsItem } from './newsAgentTypes';
 
 /**
@@ -31,14 +31,18 @@ import type { NewsItem } from './newsAgentTypes';
 const TEASER_IS_ENOUGH = 2500;
 
 /** Below this the fetched body is not an improvement worth preferring over the teaser. */
-const MIN_USEFUL_BODY = 200;
+const MIN_USEFUL_BODY = 100;
 
-/** Hard ceiling on the scrape, so a slow origin cannot hang the operator's "generate" click. */
-const FETCH_TIMEOUT_MS = 16000;
+/**
+ * Hard ceiling on the scrape, so a slow origin cannot hang the operator's "generate" click.
+ * 16s → 28s (2026-09-27): a WAF-blocked origin now costs a Google News resolve plus a
+ * browser-rendered Jina pass (~6-12s) before the body arrives, and 16s cut that path off.
+ */
+const FETCH_TIMEOUT_MS = 28000;
 
-const cache = new Map<string, string>();
+const cache = new Map<string, FullArticle>();
 /** De-duplicates concurrent resolves for the same link (post + reel + carousel fire together). */
-const inFlight = new Map<string, Promise<string>>();
+const inFlight = new Map<string, Promise<FullArticle>>();
 
 export interface ResolvedArticleText {
   text: string;
@@ -52,30 +56,55 @@ function withDeadline<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
 }
 
-/** A link worth scraping: real http(s), and not a Google News redirect stub (no article there). */
+/**
+ * A link worth scraping: any real http(s) URL.
+ *
+ * Google News redirect links used to be refused here ("no article there"), which is why 52 of 119
+ * feed items (measured 2026-09-27) could never get a body and failed with "לא ניתן היה לשלוף את
+ * גוף הכתבה מהמקור". The server importer now follows the redirect to the publisher first
+ * (resolveGoogleNewsUrl), so these are as scrapable as any direct link.
+ */
 function isScrapable(link: string): boolean {
-  return /^https?:\/\//i.test(link) && !/(^|\.)news\.google\.com/i.test(link);
+  return /^https?:\/\//i.test(link);
 }
 
-async function loadFullBody(link: string): Promise<string> {
+interface FullArticle {
+  body: string;
+  image: string;
+}
+
+async function loadFullArticle(link: string): Promise<FullArticle> {
   const cached = cache.get(link);
   if (cached !== undefined) return cached;
   const pending = inFlight.get(link);
   if (pending) return pending;
 
-  const run = withDeadline(fetchFullArticleBody(link), FETCH_TIMEOUT_MS, '')
-    .then((body) => {
-      const text = (body || '').trim();
+  const empty: FullArticle = { body: '', image: '' };
+  const run = withDeadline(fetchFullArticle(link), FETCH_TIMEOUT_MS, empty)
+    .then((got) => {
+      const result = { body: (got.body || '').trim(), image: (got.image || '').trim() };
       // Only a real result is cached — a timeout or a transient 5xx should be retried on the
       // operator's next click rather than remembered as "this article has no body".
-      if (text) cache.set(link, text);
-      return text;
+      if (result.body || result.image) cache.set(link, result);
+      return result;
     })
-    .catch(() => '')
+    .catch(() => empty)
     .finally(() => inFlight.delete(link));
 
   inFlight.set(link, run);
   return run;
+}
+
+/**
+ * The article's own lead image when the feed item carries none. Shares the body fetch's cache and
+ * in-flight slot, so a post + image generated for the same item cost one import between them.
+ * '' when the page has no usable image — only THEN may a renderer consider anything else.
+ */
+export async function resolveArticleImage(item: NewsItem): Promise<string> {
+  if (item.image) return item.image;
+  const link = (item.link || '').trim();
+  if (!isScrapable(link)) return '';
+  return (await loadFullArticle(link)).image;
 }
 
 /**
@@ -89,7 +118,7 @@ export async function resolveArticleText(item: NewsItem): Promise<ResolvedArticl
   const link = (item.link || '').trim();
   if (!isScrapable(link)) return { text: teaser, via: 'feed' };
 
-  const full = await loadFullBody(link);
+  const full = (await loadFullArticle(link)).body;
   if (full.length >= MIN_USEFUL_BODY && full.length > teaser.length) {
     return { text: full, via: 'article' };
   }

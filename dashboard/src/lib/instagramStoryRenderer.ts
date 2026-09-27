@@ -2,7 +2,7 @@ import type { NewsItem, NewsTopic } from './newsAgentTypes';
 import { proxiedImageUrl } from './newsFeedClient';
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
-import { BRAND_GREEN, CHARCOAL, getLogo, loadFont, drawImageCover, wrapRtl, resolveNewsBackground } from './newsImageComposer';
+import { BRAND_GREEN, CHARCOAL, getLogo, loadFont, drawImageCover, wrapRtl, resolveNewsBackground, loadOriginalImage } from './newsImageComposer';
 import { resolveSlidePhotoUrl, loadPhoto, hashSeed } from './pexelsBackground';
 import { resolveArticleText } from './articleText';
 import {
@@ -107,10 +107,9 @@ async function resolveBgForSource(src: SlideSource, format: SlideFormat): Promis
 
 async function resolveBgForSourceInner(src: SlideSource, format: SlideFormat): Promise<HTMLImageElement | null> {
   if (src.imageUrl) {
-    const viaProxy = await loadPhoto(proxiedImageUrl(src.imageUrl));
-    if (viaProxy) return viaProxy;
-    const direct = await loadPhoto(src.imageUrl);
-    if (direct) return direct;
+    // The source's own image, by every route that can reach it — and when it exists but cannot be
+    // loaded, the branded background rather than a stock stand-in (see resolveNewsBackground).
+    return loadOriginalImage(src.imageUrl);
   }
   try {
     const orientation = format === '1:1' ? 'square' : 'portrait';

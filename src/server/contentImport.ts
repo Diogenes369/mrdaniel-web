@@ -16,8 +16,8 @@
  * Never throws.
  */
 
-import { upscaleImageUrl } from './newsFeed.js';
-import { extractArticleFromHtml, extractLeadImage } from './articleExtract.js';
+import { upscaleImageUrl, resolveGoogleNewsUrl } from './newsFeed.js';
+import { absoluteUrl, extractArticleFromHtml, extractLeadImage } from './articleExtract.js';
 
 /**
  * Below this, a body is treated as a metadata shell (an OG description and nothing else) rather
@@ -365,46 +365,99 @@ function pickBest(candidates: Candidate[]): Candidate | undefined {
   );
 }
 
-export async function importUrlContent(rawUrl: string): Promise<ImportedContent> {
+/**
+ * Jina Reader in HTML mode: the page as a real headless browser rendered it, with its <head>.
+ *
+ * The markdown mode alone was the gap behind "no image, nav-menu body" on WAF-protected origins.
+ * Measured 2026-09-27 on jerusalem.muni.il (Akamai): every datacenter request — Vercel, curl, the
+ * public image relays — gets 403, so production only ever reached the markdown fallback, which has
+ * no <meta> tags (image: '') and inlines the site's whole navigation ahead of the article. HTML mode
+ * returns the same rendered DOM a direct fetch would have, so it goes through the SAME structured,
+ * container-scoped extractor and OG/Twitter image read as link 1. It also renders client-side
+ * pages — what a Puppeteer fallback would buy, without shipping Chromium in a serverless function.
+ */
+async function getJinaRendered(url: string, timeoutMs: number): Promise<{ html: string; ogImage: string; title: string } | undefined> {
+  const raw = await getText(`https://r.jina.ai/${url}`, timeoutMs, {
+    Accept: 'application/json',
+    'X-Return-Format': 'html',
+    ...(JINA_KEY ? { Authorization: `Bearer ${JINA_KEY}` } : {}),
+  });
+  if (!raw) return undefined;
+  try {
+    const data = (JSON.parse(raw) as { data?: { html?: string; title?: string; metadata?: Record<string, unknown> } }).data;
+    if (!data?.html) return undefined;
+    const md = data.metadata ?? {};
+    const pick = (...keys: string[]) =>
+      keys.map((k) => md[k]).find((v): v is string => typeof v === 'string' && v.trim().length > 0) ?? '';
+    return { html: data.html, ogImage: pick('og:image', 'og:image:secure_url', 'twitter:image', 'twitter:image:src'), title: pick('og:title', 'twitter:title') || data.title || '' };
+  } catch {
+    return undefined;
+  }
+}
+
+/** A news.google.com redirect has no article behind it — follow it to the publisher first. */
+async function resolveSourceUrl(url: string): Promise<string> {
+  if (!/^https?:\/\/news\.google\.com\/(?:rss\/)?articles\//i.test(url)) return url;
+  return (await resolveGoogleNewsUrl(url, 5000)) ?? url;
+}
+
+/** `skipDirect` simulates an origin that blocks datacenter IPs — used by the live regression. */
+export async function importUrlContent(rawUrl: string, opts: { skipDirect?: boolean } = {}): Promise<ImportedContent> {
   let url = rawUrl.trim();
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  url = await resolveSourceUrl(url);
   const host = hostOf(url);
   const base: ImportedContent = { ok: false, url, title: '', body: '', image: '', source: host, via: 'none', strategy: 'none' };
 
   const candidates: Candidate[] = [];
   const best = (): Candidate | undefined => pickBest(candidates);
 
-  // ── link 1: direct fetch + structured, zero-noise DOM extraction ───────────────────────────
-  const direct = await getText(url, 8000, BROWSER_HEADERS);
-  if (direct) {
-    base.title = decodeEntities(
-      meta(direct, 'og:title', 'twitter:title') || (direct.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? '').trim()
-    );
-    const rawImage =
-      meta(direct, 'og:image:secure_url', 'og:image', 'article:image', 'twitter:image') || extractLeadImage(direct);
-    base.image = rawImage ? upscaleImageUrl(rawImage) : rawImage;
-
-    const structured = extractArticleFromHtml(direct);
+  /** Title, lead image and the structured body out of one rendered page, whoever fetched it. */
+  const readPage = (html: string, via: ImportedContent['via']) => {
+    if (!base.title) {
+      base.title = decodeEntities(
+        meta(html, 'og:title', 'twitter:title') || (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? '').trim()
+      );
+    }
+    if (!base.image) {
+      const rawImage = extractLeadImage(html, url);
+      base.image = rawImage ? upscaleImageUrl(rawImage) : '';
+    }
+    const structured = extractArticleFromHtml(html);
     if (structured.text) {
       const cleaned = cleanExtractedBody(structured.text.slice(0, 20000), base.title).slice(0, 12000);
-      if (cleaned) candidates.push({ body: cleaned, via: 'direct', strategy: structured.strategy });
+      if (cleaned) candidates.push({ body: cleaned, via, strategy: structured.strategy });
     }
+  };
 
-    // The OG description is the publisher's own lede. It is only worth keeping when the structured
-    // pass found nothing — otherwise it just duplicates the article's first paragraph.
-    if (!candidates.length) {
-      const ogDesc = meta(direct, 'og:description', 'twitter:description', 'description');
-      if (ogDesc) candidates.push({ body: cleanExtractedBody(ogDesc, base.title), via: 'direct', strategy: 'none' });
+  // ── link 1: direct fetch + structured, zero-noise DOM extraction ───────────────────────────
+  const direct = opts.skipDirect ? undefined : await getText(url, 8000, BROWSER_HEADERS);
+  if (direct) readPage(direct, 'direct');
+
+  // ── link 2: Jina browser-rendered HTML — origins that block us, or render client-side ──────
+  // Also runs when the direct page had text but no usable image: a JS-injected hero is common.
+  let rendered: string | undefined;
+  if ((best()?.body.length ?? 0) < GOOD_BODY_CHARS || !base.image) {
+    const jina = await getJinaRendered(url, 12000);
+    if (jina) {
+      rendered = jina.html;
+      if (!base.title && jina.title) base.title = decodeEntities(jina.title);
+      if (!base.image && jina.ogImage) base.image = upscaleImageUrl(absoluteUrl(jina.ogImage, url) || jina.ogImage);
+      readPage(jina.html, 'jina');
     }
   }
 
-  // ── link 2: Jina Reader, when the direct pass came back thin or the origin blocked us ──────
-  if ((best()?.body.length ?? 0) < GOOD_BODY_CHARS) {
-    const viaJina = await getText(
-      `https://r.jina.ai/${url}`,
-      9000,
-      JINA_KEY ? { Authorization: `Bearer ${JINA_KEY}` } : {}
-    );
+  // The OG description is the publisher's own lede. Only worth keeping when no structured pass
+  // found anything — otherwise it just duplicates the article's first paragraph.
+  const page = direct ?? rendered;
+  if (!candidates.length && page) {
+    const ogDesc = meta(page, 'og:description', 'twitter:description', 'description');
+    if (ogDesc) candidates.push({ body: cleanExtractedBody(ogDesc, base.title), via: direct ? 'direct' : 'jina', strategy: 'none' });
+  }
+
+  // ── link 3: Jina markdown, when no rendered read found the article container ────────────────
+  if ((best()?.body.length ?? 0) < MIN_BODY_CHARS) {
+    const viaJina = await getText(`https://r.jina.ai/${url}`, 9000, JINA_KEY ? { Authorization: `Bearer ${JINA_KEY}` } : {});
     if (viaJina) {
       const parsed = parseJina(viaJina);
       if (!base.title) base.title = parsed.title;
@@ -413,10 +466,10 @@ export async function importUrlContent(rawUrl: string): Promise<ImportedContent>
     }
   }
 
-  // ── link 3: loose scrape of the already-fetched HTML, for markup neither pass recognised ───
-  if (direct && (best()?.body.length ?? 0) < MIN_BODY_CHARS) {
-    const loose = cleanExtractedBody(extractBody(direct).slice(0, 14000), base.title).slice(0, 12000);
-    if (loose) candidates.push({ body: loose, via: 'direct', strategy: 'loose' });
+  // ── link 4: loose scrape of whatever HTML we hold, for markup no pass recognised ───────────
+  if (page && (best()?.body.length ?? 0) < MIN_BODY_CHARS) {
+    const loose = cleanExtractedBody(extractBody(page).slice(0, 14000), base.title).slice(0, 12000);
+    if (loose) candidates.push({ body: loose, via: direct ? 'direct' : 'jina', strategy: 'loose' });
   }
 
   const winner = best();

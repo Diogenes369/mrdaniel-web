@@ -89,7 +89,7 @@ const HERMES_TIMEOUT_MS = Number(process.env.HERMES_TIMEOUT_MS) || 900_000;
 const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN || '';
 /** Comma-separated origins allowed to call the bridge. Defaults to localhost dev + the dashboard. */
 const ALLOWED_ORIGINS = (process.env.BRIDGE_ALLOWED_ORIGINS ||
-  'http://localhost:5174,http://127.0.0.1:5174')
+  'http://localhost:5174,http://127.0.0.1:5174,https://dashboard-snowy-psi-94.vercel.app')
   .split(',').map((o) => o.trim()).filter(Boolean);
 /** Clean Hebrew sans for the overlay. Override with RENDER_FONT=assistant|rubik. */
 const RENDER_FONT = process.env.RENDER_FONT || 'opensans';
@@ -1579,6 +1579,11 @@ app.use((req, res, next) => {
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-bridge-token');
+  // Chrome's Private Network Access: an HTTPS page (the deployed dashboard) reaching 127.0.0.1
+  // must be answered with this on the preflight, or the request never leaves the browser.
+  if (req.get('access-control-request-private-network') === 'true' && origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  }
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 });
@@ -1603,6 +1608,63 @@ app.use('/carousel', (req, res, next) => {
   const supplied = req.get('x-bridge-token') || fromQuery;
   if (supplied !== BRIDGE_TOKEN) return res.status(401).json({ ok: false, error: 'bad or missing x-bridge-token' });
   next();
+});
+
+/**
+ * Residential image relay for origins that block datacenter IPs (added 2026-09-27).
+ *
+ * Some sources sit behind a WAF that refuses every cloud egress — jerusalem.muni.il (Akamai) 403s
+ * Vercel, curl and every public image relay tried (Photon, weserv, corsproxy), yet serves this
+ * machine's residential IP. /api/img-proxy therefore 502s on their photos, and without a CORS copy
+ * the dashboard canvas cannot use the original at all. This route is the dashboard's last hop
+ * before it gives up on the original image.
+ *
+ * Token-gated like /carousel (an open relay on a tunnelled port is an SSRF gift); the token may
+ * ride as `?t=` because an <img crossOrigin> load cannot attach a header. Public http(s) hosts
+ * only, image/* responses only, 15 MB cap.
+ */
+const RELAY_BLOCKED_HOST =
+  /^(localhost|0\.0\.0\.0|\[?::1\]?|127(\.\d{1,3}){3}|10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|169\.254(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|[^.]+)$/i;
+app.get('/relay/img', async (req, res) => {
+  if (!BRIDGE_TOKEN) {
+    // Same rule as /carousel: no token configured means loopback callers only.
+    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)) {
+      return res.status(503).json({ ok: false, error: 'BRIDGE_TOKEN is not set — refusing non-loopback requests.' });
+    }
+  } else if ((req.get('x-bridge-token') || String(req.query.t || '')) !== BRIDGE_TOKEN) {
+    return res.status(401).json({ ok: false, error: 'bad or missing token' });
+  }
+  let target;
+  try {
+    target = new URL(String(req.query.url || ''));
+  } catch {
+    return res.status(400).json({ ok: false, error: 'invalid url' });
+  }
+  if (!/^https?:$/.test(target.protocol) || RELAY_BLOCKED_HOST.test(target.hostname)) {
+    return res.status(403).json({ ok: false, error: 'blocked host' });
+  }
+  try {
+    const upstream = await fetch(target, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(12000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        Accept: 'image/*,*/*;q=0.8',
+        Referer: `${target.origin}/`,
+      },
+    });
+    const type = (upstream.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!upstream.ok || !type.startsWith('image/')) {
+      return res.status(502).json({ ok: false, error: `upstream ${upstream.status} ${type}` });
+    }
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    if (!buf.length || buf.length > 15 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'bad size' });
+    res.setHeader('Content-Type', type);
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.status(200).send(buf);
+  } catch (err) {
+    res.status(502).json({ ok: false, error: String(err?.message || err) });
+  }
 });
 
 app.get('/health', (_req, res) => {

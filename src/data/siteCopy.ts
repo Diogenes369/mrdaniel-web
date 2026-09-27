@@ -36,6 +36,9 @@ export const HERO_CONSOLE_COPY = {
   currentLabel: 'המודלים העדכניים',
   releasesLabel: 'השקות אחרונות',
   empty: 'אין השקות חדשות כרגע. הרשימה מתעדכנת לבד.',
+  expand: 'כל ההשקות',
+  collapse: 'הצג פחות',
+  allNews: 'לכל החדשות',
 };
 
 /**

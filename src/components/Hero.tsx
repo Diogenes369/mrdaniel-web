@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowDown, ChevronLeft, Cpu, Radio } from 'lucide-react';
+import { ArrowDown, ChevronDown, ChevronLeft, Cpu, Radio } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import WebButton from './WebButton';
 import SocialLinks from './SocialLinks';
 import { HERO_COPY, HERO_CONSOLE_COPY } from '../data/siteCopy';
@@ -98,6 +99,8 @@ export default function Hero() {
  *      a fixed height with a 2-line clamp), so nothing below moves when the data lands.
  */
 const RELEASE_ROWS = 3;
+/** Expanded view: every model/tool launch in the feed, newest first, up to this many. */
+const RELEASE_ROWS_EXPANDED = 20;
 /** Row height is fixed so skeleton → content is a swap, not a reflow. */
 const ROW_H = 'h-[84px]';
 
@@ -112,15 +115,21 @@ function ModelConsole() {
   const news = useNewsFeed();
   const { data: catalog } = useModelCatalog();
   const [active, setActive] = useState<NewsItem | null>(null);
+  // Collapsed, the console holds exactly RELEASE_ROWS fixed-height rows so first paint never
+  // shifts. Expanding is the visitor's own action, so the list may grow then — inside its own
+  // scroll box, which keeps the hero's height bounded on a phone.
+  const [expanded, setExpanded] = useState(false);
   const k = HERO_CONSOLE_COPY;
 
-  const releases = useMemo(() => {
+  const allReleases = useMemo(() => {
     const ts = (iso: string) => {
       const t = new Date(iso).getTime();
       return Number.isNaN(t) ? -Infinity : t;
     };
-    return [...(news.data ?? [])].filter(isModelUpdate).sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt)).slice(0, RELEASE_ROWS);
+    return [...(news.data ?? [])].filter(isModelUpdate).sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt)).slice(0, RELEASE_ROWS_EXPANDED);
   }, [news.data]);
+  const releases = expanded ? allReleases : allReleases.slice(0, RELEASE_ROWS);
+  const canExpand = allReleases.length > RELEASE_ROWS;
 
   const frontier = (catalog?.frontier ?? []).slice(0, 4);
 
@@ -167,7 +176,13 @@ function ModelConsole() {
           <Radio className="h-3.5 w-3.5 text-cyan-300" aria-hidden="true" />
           {k.releasesLabel}
         </p>
-        <ol className="space-y-2" aria-busy={news.isLoading}>
+        <ol
+          id="hero-releases"
+          className={`space-y-2 ${expanded ? 'max-h-[min(60dvh,440px)] overflow-y-auto overscroll-contain pe-1 [scrollbar-width:thin] [scrollbar-color:rgba(118,185,0,0.45)_transparent]' : ''}`}
+          aria-busy={news.isLoading}
+          // Lenis would otherwise swallow the wheel and scroll the page instead of this list.
+          {...(expanded ? { 'data-lenis-prevent': '' } : {})}
+        >
           {news.isLoading
             ? Array.from({ length: RELEASE_ROWS }, (_, i) => (
                 <li key={i} className={`${ROW_H} space-y-2 rounded-2xl border border-white/[0.06] bg-black/25 p-3.5`} aria-hidden="true">
@@ -204,6 +219,34 @@ function ModelConsole() {
                   </li>
                 ))}
         </ol>
+
+        <div className="mt-3 flex items-center justify-between gap-3 text-[12px] font-bold">
+          {canExpand ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              aria-controls="hero-releases"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-brand-300 transition-colors hover:bg-white/5 hover:text-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+              {expanded ? k.collapse : (
+                <>
+                  {k.expand} <span className="font-mono text-zinc-500">({allReleases.length})</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <span />
+          )}
+          <Link
+            to="/news"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
+          >
+            {k.allNews}
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
       </div>
 
       <span className="signal-console__scan" aria-hidden="true" />

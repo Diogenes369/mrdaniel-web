@@ -808,6 +808,10 @@ export default function NewsContentAgent() {
                 <span className="text-brand-400">תמונת המקור מהכתבה ✓</span>
               ) : imageSource === 'stock' ? (
                 <span className="text-amber-400/90">תמונת סטוק (לא נמצאה תמונת מקור)</span>
+              ) : imageSource === 'original-blocked' ? (
+                <span className="text-amber-400/90" title="האתר חוסם גישה מהשרת. הפעילו את carousel-bridge המקומי כדי לטעון את התמונה דרך החיבור הביתי">
+                  תמונת המקור חסומה — רקע גרפי (הפעילו את ה-bridge)
+                </span>
               ) : imageSource === 'none' ? (
                 <span className="text-zinc-500">רקע גרפי בלבד</span>
               ) : item.image ? (

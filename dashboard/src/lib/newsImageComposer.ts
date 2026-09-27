@@ -2,6 +2,8 @@ import { ASPECT_SIZE, type ImageAspect, type NewsItem, type NewsTopic } from './
 import { proxiedImageUrl } from './newsFeedClient';
 import { loadPhoto, resolveSlidePhotoUrl, hashSeed, type PhotoOrientation } from './pexelsBackground';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
+import { resolveArticleImage } from './articleText';
+import { bridgeBase, bridgeToken } from './carouselBridge';
 
 /**
  * Client-side branded social image for a news item — one <canvas>, no server render.
@@ -77,7 +79,7 @@ export function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElem
 /** Where the rendered background photo actually came from — surfaced to the UI so the operator
  * sees the truth (a "stock" badge is a prompt to pick a different article), not just whether the
  * feed happened to include an image URL. */
-export type BgSource = 'original' | 'stock' | 'none';
+export type BgSource = 'original' | 'stock' | 'none' | 'original-blocked';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -93,26 +95,47 @@ async function loadPhotoRetry(url: string, attempts = 3): Promise<HTMLImageEleme
 }
 
 /**
- * Resolve the background photo for a news item, ORIGINAL ARTICLE IMAGE FIRST.
+ * Load a source's ORIGINAL image onto an untainted canvas, trying every route that can reach it:
  *
- *   1. `item.image` through the CORS relay (`/api/img-proxy`), retried — this is the exact photo
- *      from the source article (Globes / Ynet / Geektime / TechTime / Israel Defense og:image).
- *   2. `item.image` loaded directly in CORS mode — succeeds on the CDNs that do send
- *      `Access-Control-Allow-Origin` (fails clean, never taints the canvas, if they don't).
- *   3. Only if the item genuinely has NO image, or every attempt above failed: a topic-matched
- *      stock photo from the shared Pexels pool.
- *   4. Nothing loaded at all → caller paints the flat charcoal + gradient.
+ *   1. `/api/img-proxy` (same-origin CORS copy), retried — covers almost every publisher.
+ *   2. The URL directly in CORS mode — CDNs that send `Access-Control-Allow-Origin`.
+ *   3. The local carousel-bridge's `/relay/img` — the operator's own residential connection. Some
+ *      origins (jerusalem.muni.il behind Akamai, measured 2026-09-27) refuse EVERY datacenter
+ *      egress, Vercel and every public image relay included, but serve a home IP. Only reachable
+ *      while the bridge runs; a short timeout keeps a stopped bridge from costing seconds.
+ */
+export async function loadOriginalImage(url: string): Promise<HTMLImageElement | null> {
+  const viaProxy = await loadPhotoRetry(proxiedImageUrl(url), 3);
+  if (viaProxy) return viaProxy;
+  const direct = await loadPhoto(url);
+  if (direct) return direct;
+  const token = bridgeToken();
+  const relay = `${bridgeBase()}/relay/img?url=${encodeURIComponent(url)}${token ? `&t=${encodeURIComponent(token)}` : ''}`;
+  return loadPhoto(relay, 12000);
+}
+
+/**
+ * Resolve the background photo for a news item, ORIGINAL ARTICLE IMAGE FIRST — and ONLY the
+ * original when the source has one.
+ *
+ *   1. The feed's `item.image`, or — when the feed carried none — the article page's own lead image
+ *      (og:image / twitter:image / first in-body photo, via the server importer).
+ *   2. That image through every route in `loadOriginalImage`.
+ *   3. If the source HAS an image but none of the routes could load it: the branded graphic
+ *      background, reported as `original-blocked`. Never a stock photo — a stock picture standing
+ *      in for a real one reads as the article's own photo, which it is not (policy 2026-09-27).
+ *   4. Stock only when the source genuinely has no image at all.
  */
 export async function resolveNewsBackground(
   item: NewsItem,
   aspect: ImageAspect,
 ): Promise<{ img: HTMLImageElement | null; source: BgSource }> {
-  if (item.image) {
-    const viaProxy = await loadPhotoRetry(proxiedImageUrl(item.image), 3);
-    if (viaProxy) return { img: viaProxy, source: 'original' };
-    const direct = await loadPhoto(item.image);
-    if (direct) return { img: direct, source: 'original' };
-    console.warn('[newsImageComposer] original image failed to load, falling back to stock:', item.image);
+  const original = item.image || (await resolveArticleImage(item).catch(() => ''));
+  if (original) {
+    const img = await loadOriginalImage(original);
+    if (img) return { img, source: 'original' };
+    console.warn('[newsImageComposer] source image exists but could not be loaded — using the branded background, not stock:', original);
+    return { img: null, source: 'original-blocked' };
   }
   try {
     const orientation = ORIENTATION_FOR_ASPECT[aspect];

@@ -188,16 +188,22 @@ export function stripAuthorNoise(text: string): string {
  * `r.jina.ai` → `cleanExtractedBody`). Used to rescue slide generation for feed items whose
  * summary is a thin headline fragment. Never throws — returns '' if extraction fails / is blocked.
  */
-export async function fetchFullArticleBody(url: string): Promise<string> {
+/** The article behind a link: cleaned body plus the page's own lead image (og:image / first photo). */
+export async function fetchFullArticle(url: string): Promise<{ body: string; image: string }> {
   try {
     const res = await post('import-url', { url });
-    if (!res.ok) return '';
+    if (!res.ok) return { body: '', image: '' };
     const data = (await res.json()) as { ok?: boolean; blocked?: boolean; imported?: ImportedContent };
-    if (!data.ok || data.blocked || !data.imported?.body) return '';
-    return cleanExtractedBody(data.imported.body, data.imported.title || '');
+    if (!data.ok || data.blocked || !data.imported) return { body: '', image: '' };
+    const body = data.imported.body ? cleanExtractedBody(data.imported.body, data.imported.title || '') : '';
+    return { body, image: data.imported.image || '' };
   } catch {
-    return '';
+    return { body: '', image: '' };
   }
+}
+
+export async function fetchFullArticleBody(url: string): Promise<string> {
+  return (await fetchFullArticle(url)).body;
 }
 
 /** Server-side best-effort import of a pasted URL (LinkedIn post / article / blog). */

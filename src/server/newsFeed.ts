@@ -71,6 +71,13 @@ interface FeedSource {
 // want to attribute a shared story to come first.
 const GNEWS_QUERY = '("בינה מלאכותית" OR "מודל שפה" OR ChatGPT OR Claude OR Gemini OR Grok OR "סוכן AI" OR "סוכני AI") when:7d';
 const GNEWS_URL = `https://news.google.com/rss/search?q=${encodeURIComponent(GNEWS_QUERY)}&hl=iw&gl=IL&ceid=IL:iw`;
+/**
+ * The same Hebrew query restricted to the last 24 hours. Google News returns at most ~100 items per
+ * query ranked by relevance, so the 7-day query surfaces few of today's stories; this one is
+ * nothing BUT today's (67 items < 24h vs 17 in the 7-day query, measured 2026-09-27). Dedup keeps
+ * one copy of any story both queries return.
+ */
+const GNEWS_TODAY_URL = `https://news.google.com/rss/search?q=${encodeURIComponent(GNEWS_QUERY.replace('when:7d', 'when:1d'))}&hl=iw&gl=IL&ceid=IL:iw`;
 
 const gnewsEn = (query: string) =>
   `https://news.google.com/rss/search?q=${encodeURIComponent(`${query} when:7d`)}&hl=en-US&gl=US&ceid=US:en`;
@@ -136,6 +143,7 @@ const SOURCES: FeedSource[] = [
     priority: 6, lang: 'en', forceTopic: 'ai_agents', stripTitleSuffix: true, maxItems: 8, timeoutMs: 9000,
   },
   // ── Google News safety net — Hebrew AI query ──
+  { name: 'Google News · 24h', url: GNEWS_TODAY_URL, priority: 7, stripTitleSuffix: true, maxItems: 60, timeoutMs: 9000, onlyTopics: AI_ONLY },
   { name: 'Google News', url: GNEWS_URL, priority: 7, stripTitleSuffix: true, timeoutMs: 9000, onlyTopics: AI_ONLY },
 ];
 
@@ -968,6 +976,14 @@ async function fetchSource(source: FeedSource): Promise<NewsItem[]> {
     });
   }
 
+  // Newest first BEFORE the cap. Google News search RSS is ordered by relevance, not date, so
+  // capping it in feed order kept a relevance-ranked mix and dropped fresh stories — measured
+  // 2026-09-27: 100 items in the 7-day query, only 17 from the last 24h, most below the cap.
+  const ts = (iso: string) => {
+    const t = new Date(iso).getTime();
+    return Number.isFinite(t) ? t : 0;
+  };
+  items.sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt));
   return items.slice(0, source.maxItems ?? PER_FEED_ITEM_CAP);
 }
 
