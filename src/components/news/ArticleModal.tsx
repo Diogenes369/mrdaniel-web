@@ -116,7 +116,7 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
         <div className="relative h-[24dvh] w-full shrink-0 overflow-hidden sm:h-[30dvh] lg:h-auto lg:min-h-0 lg:flex-1">
           <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
           <Icon className="pointer-events-none absolute -bottom-6 -left-4 h-40 w-40 text-white/[0.06]" aria-hidden="true" />
-          <NewsImage key={item.image || ai?.image || 'none'} src={item.image || ai?.image} topic={item.topic} seed={item.id} />
+          <NewsImage key={item.image || ai?.image || 'none'} src={item.image || ai?.image} topic={item.topic} seed={item.id} eager />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/30 to-transparent" aria-hidden="true" />
         </div>
 

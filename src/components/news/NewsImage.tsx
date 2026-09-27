@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NewsTopic } from '../../services/newsService';
 
 /**
@@ -26,6 +26,8 @@ import type { NewsTopic } from '../../services/newsService';
  * topic, so the three cards in a row never come out identical by accident.
  */
 const MIN_W = 400;
+/** How long a direct (cross-origin) image load may take before the same-origin relay is tried. */
+const DIRECT_LOAD_DEADLINE_MS = 6000;
 const MIN_H = 300;
 
 /** Per-topic plate colours. Deliberately the same hues as the `TOPIC` table's `grad` in
@@ -85,7 +87,10 @@ export default function NewsImage({
   className = '',
   topic = 'general',
   seed = '',
+  eager = false,
 }: {
+  /** Above-the-fold use (the article modal): load now instead of waiting for the lazy heuristic. */
+  eager?: boolean;
   src?: string;
   className?: string;
   /** Drives the fallback plate's colours, so it matches the card's topic chip. */
@@ -103,6 +108,29 @@ export default function NewsImage({
 
   const fallback = useMemo(() => platePng(topic, seed || src || topic), [topic, seed, src]);
 
+  // A direct load that HANGS never fires onError, so the proxy retry above never ran and the slot
+  // sat at opacity-0 — a blank well (vietnam.vn images, measured 2026-09-27: direct hung, the
+  // proxy served them in under a second). Give the direct request a deadline, then switch.
+  //
+  // The clock only starts once the image is on screen: a lazy card below the fold has not started
+  // loading at all, and timing it out would route every off-screen card through the relay.
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el || !src || viaProxy || status !== 'loading' || !/^https?:\/\//i.test(src)) return;
+    let timer: number | undefined;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting) && timer === undefined) {
+        timer = window.setTimeout(() => setViaProxy(true), DIRECT_LOAD_DEADLINE_MS);
+      }
+    });
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [src, viaProxy, status]);
+
   // No source, or the source failed / was too small: paint the branded plate. Never renders nothing,
   // which is what left a blank black well on the homepage.
   if (!src || status === 'error') {
@@ -118,9 +146,10 @@ export default function NewsImage({
 
   return (
     <img
+      ref={imgRef}
       src={shown}
       alt=""
-      loading="lazy"
+      loading={eager ? 'eager' : 'lazy'}
       decoding="async"
       referrerPolicy="no-referrer"
       onLoad={(e) => {

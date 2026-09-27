@@ -445,7 +445,21 @@ function rememberOgImage(link: string, image: string) {
   ogImageCache.set(link, image);
 }
 
-async function enrichImages(items: NewsItem[], limit = 90, overallMs = 9_000): Promise<void> {
+async function seedOgCacheFromSnapshot(): Promise<void> {
+  const snap = await settleWithin(loadSnapshot(), 2500);
+  let seeded = 0;
+  for (const it of snap?.items ?? []) {
+    if (it?.link && hasResolvedImage(it) && !ogImageCache.has(it.link)) {
+      rememberOgImage(it.link, it.image as string);
+      seeded++;
+    }
+  }
+  if (seeded) console.info(`[news] og:image cache seeded with ${seeded} images from the snapshot`);
+}
+
+// 16s (was 9s): the CDN serves the previous feed stale-while-revalidate during a refresh, so the
+// window costs visitors nothing, and a WAF-blocked origin needs a Google-News resolve + a Jina pass.
+async function enrichImages(items: NewsItem[], limit = 200, overallMs = 16_000): Promise<void> {
   let fromCache = 0;
   for (const it of items) {
     const cached = !it.image && ogImageCache.get(it.link);
@@ -696,6 +710,25 @@ export function sanitizeAndKeep(item: NewsItem, _opts: { allowEnglish?: boolean 
     AI_MODEL_PATTERNS.some((re) => re.test(text)) ||
     AI_PATTERNS.some((re) => re.test(text));
   return !(GENERIC_CONSUMER_PATTERNS.some((re) => re.test(text)) && !aiSignal);
+}
+
+/**
+ * The item carries a usable, fully-resolved lead image: an absolute http(s) URL.
+ *
+ * Every served item must (policy 2026-09-27, Daniel): a card or article modal without the source's
+ * own photo fell back to the branded plate, which read as a broken article. Applied in
+ * `getNewsItems` beside `sanitizeAndKeep` rather than inside it, because `sanitizeAndKeep` also
+ * judges items before image enrichment has run.
+ */
+export function hasResolvedImage(item: Pick<NewsItem, 'image'>): boolean {
+  const img = (item.image || '').trim();
+  if (!/^https?:\/\/[^\s/]+\.[^\s/]+\//i.test(img)) return false;
+  try {
+    new URL(img);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** @deprecated alias kept for any external caller expecting this exact name (task-requested). */
@@ -994,7 +1027,12 @@ async function refreshAll(): Promise<NewsItem[]> {
   const priorityByName = new Map(SOURCES.map((s) => [s.name, s.priority]));
   const priorityOf = (name: string) => priorityByName.get(name) ?? 9;
 
-  const results = await Promise.allSettled(SOURCES.map(fetchSource));
+  // Seed the og:image cache from the last snapshot while the feeds download (no added latency).
+  // The in-memory cache alone reset on every cold instance, so each one re-scraped from zero inside
+  // the same short window and ~30 items (measured 2026-09-27) never got an image. The snapshot
+  // holds every image any instance ever recovered, so coverage now accumulates across instances.
+  const seeding = ogImageCache.size ? Promise.resolve() : seedOgCacheFromSnapshot();
+  const [results] = await Promise.all([Promise.allSettled(SOURCES.map(fetchSource)), seeding]);
   const raw: NewsItem[] = [];
   const stats: string[] = [];
 
@@ -1093,8 +1131,11 @@ export async function getNewsItems(
   // for debugging the raw aggregate (which CAN carry untranslated English — never use it for
   // anything user-facing). `allowEnglish` is accepted for API back-compat but no longer changes the
   // result — see `sanitizeAndKeep`.
-  opts: { strict?: boolean; allowEnglish?: boolean } = {}
+  opts: { strict?: boolean; allowEnglish?: boolean; requireImage?: boolean } = {}
 ): Promise<{ items: NewsItem[]; updatedAt: string }> {
+  // `requireImage` is on for every listing. Only a permalink lookup turns it off: a shared
+  // /news/<slug> link must keep resolving even if its item never got an image.
+  const requireImage = opts.requireImage ?? true;
   const strict = opts.strict ?? true;
   const allowEnglish = opts.allowEnglish ?? false;
   const isStale = !cache || Date.now() - cache.fetchedAt > CACHE_TTL_MS;
@@ -1105,12 +1146,12 @@ export async function getNewsItems(
   const all = cache?.items ?? [];
   return {
     // Applied here, on the way out — the cache always holds the full unfiltered set.
-    items: strict ? all.filter((it) => sanitizeAndKeep(it, { allowEnglish })) : all,
+    items: strict ? all.filter((it) => sanitizeAndKeep(it, { allowEnglish }) && (!requireImage || hasResolvedImage(it))) : all,
     updatedAt: cache ? new Date(cache.fetchedAt).toISOString() : new Date().toISOString(),
   };
 }
 
 export async function getNewsItemBySlug(slug: string): Promise<NewsItem | null> {
-  const { items } = await getNewsItems();
+  const { items } = await getNewsItems({ requireImage: false });
   return items.find((item) => item.slug === slug) ?? null;
 }

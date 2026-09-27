@@ -314,6 +314,12 @@ Every news surface — the site's Live Feed **ticker**, the `/news` page, the **
   `<tag>` / `&#8217;` / CDATA tail, length ≥ 12), and an AI/cyber/cloud signal (reusing the feed's
   own `CYBER_/AI_/CLOUD_PATTERNS`), with generic consumer-tech/gadget/gaming dropped unless it also
   carries one of those signals.
+- **Every served item has a real source image** (since 2026-09-27): `getNewsItems()` also drops
+  any item without an absolute http(s) `image` (`hasResolvedImage`), so no card, ticker row or
+  article modal falls back to the branded plate. Images are recovered by `enrichImages` (og:image,
+  Google-News redirect resolved first, Jina fallback for WAF-blocked origins) and persist across
+  cold instances via the Firebase `news_snapshot` seed. Only `getNewsItemBySlug` skips the image
+  gate, so a shared `/news/<slug>` permalink never 404s.
 - **`getNewsItems()` applies it BY DEFAULT.** `/api/news` is the sanitized stream; `?strict=0` is
   a debug-only escape hatch for the raw aggregate. Do not wire `?strict=0` into any UI.
 - `SOURCES` contains **Hebrew feeds only** (Israeli outlets + Hebrew Google-News queries + the
