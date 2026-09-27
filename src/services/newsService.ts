@@ -56,6 +56,21 @@ function writeCache(items: NewsItem[]) {
   }
 }
 
+declare global {
+  interface Window {
+    /** Started by the inline script in index.html before the bundle loads; null on failure. */
+    __newsPrefetch?: Promise<NewsResponse | null>;
+  }
+}
+
+/** The index.html head prefetch, handed out once — a later refetch must hit the network. */
+async function takePrefetched(): Promise<NewsResponse | null> {
+  if (typeof window === 'undefined' || !window.__newsPrefetch) return null;
+  const pending = window.__newsPrefetch;
+  window.__newsPrefetch = undefined;
+  return pending.catch(() => null);
+}
+
 export async function fetchNews(): Promise<NewsItem[]> {
   const cached = readCache();
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
@@ -63,9 +78,12 @@ export async function fetchNews(): Promise<NewsItem[]> {
   }
 
   try {
-    const res = await fetch('/api/news');
-    if (!res.ok) throw new Error(`news endpoint responded ${res.status}`);
-    const data: NewsResponse = await res.json();
+    let data = await takePrefetched();
+    if (!data) {
+      const res = await fetch('/api/news');
+      if (!res.ok) throw new Error(`news endpoint responded ${res.status}`);
+      data = (await res.json()) as NewsResponse;
+    }
     const items = Array.isArray(data.items) ? data.items : [];
     if (items.length > 0) writeCache(items);
     return items;
@@ -76,10 +94,24 @@ export async function fetchNews(): Promise<NewsItem[]> {
   }
 }
 
+/** A cache older than this is not shown even as a placeholder — a day-old feed reads as broken. */
+const INITIAL_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function initialFromCache(): NewsCacheShape | undefined {
+  const cached = readCache();
+  return cached && cached.items.length && Date.now() - cached.fetchedAt < INITIAL_MAX_AGE_MS ? cached : undefined;
+}
+
 export function useNewsFeed() {
   return useQuery({
     queryKey: ['news-feed'],
     queryFn: fetchNews,
+    // A returning visitor gets the last feed on the FIRST render instead of a skeleton. Reading
+    // the cache inside queryFn (as before) still cost a loading frame, because a query always
+    // starts in `pending` until its function resolves. `initialDataUpdatedAt` carries the real age,
+    // so a cache past `staleTime` is shown AND refetched in the background at once.
+    initialData: () => initialFromCache()?.items,
+    initialDataUpdatedAt: () => initialFromCache()?.fetchedAt,
     staleTime: CACHE_TTL_MS,
     gcTime: CACHE_TTL_MS * 2,
     refetchOnWindowFocus: false,

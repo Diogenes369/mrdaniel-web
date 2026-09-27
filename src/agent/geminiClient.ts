@@ -8,6 +8,7 @@ import {
   GROQ_TEXT_MODEL,
   type GeminiLikeRequest,
 } from './groqClient.js';
+import { buildSourceLock, repairResponseInPlace, requestSourceText, withLockInstruction } from './sourceFidelity.js';
 
 // Re-exported so endpoints and the health check can report which engines are live without
 // importing a second module.
@@ -327,6 +328,13 @@ export interface GenerateOptions {
    * flash-lite daily quota that interactive agent calls depend on. Default `interactive`.
    */
   priority?: 'interactive' | 'background';
+  /**
+   * Default true. Locks versioned model names ("Claude Opus 5.5") to what the user content states,
+   * in the prompt and again on the answer — see sourceFidelity.ts. Opt out only where the answer
+   * is NOT an adaptation of the input (free chat, where the model may legitimately name a release
+   * the user did not).
+   */
+  sourceLock?: boolean;
 }
 
 /**
@@ -475,6 +483,9 @@ export async function generateContentWithRetry(params: GenContentReq, options: G
   // dead weight that would otherwise pin the call to Gemini. Strip first, then route.
   if (options.textOnly) params = stripInlineData(params);
   const textOnly = options.textOnly === true || isTextOnlyRequest(params as GeminiLikeRequest);
+  // Speech has no text answer to repair, and its prompt IS the text to be spoken.
+  const lock = options.sourceLock === false || params.config?.speechConfig ? null : buildSourceLock(requestSourceText(params.contents));
+  if (lock) params = { ...params, config: { ...params.config, systemInstruction: withLockInstruction(params.config?.systemInstruction, lock) as never } };
   const legs = planLegs(String(params.model), textOnly, options.priority ?? 'interactive');
 
   if (!legs.length) {
@@ -510,7 +521,7 @@ export async function generateContentWithRetry(params: GenContentReq, options: G
               reasoningEffort: leg.model === GROQ_SMALL_MODEL ? 'low' : undefined,
             });
       if (skipped.length || lastError) console.info(`[ai-router] served by ${legKey(leg)}${skipped.length ? ` (benched: ${skipped.join(', ')})` : ''}`);
-      return res;
+      return repairResponseInPlace(res, lock, legKey(leg));
     } catch (err) {
       lastError = err;
       if (err instanceof GeminiPacedOutError) continue;

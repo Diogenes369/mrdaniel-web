@@ -9,6 +9,7 @@ import {
   detectGeminiRateLimit,
 } from '../agent/geminiClient.js';
 import type { NewsItem } from './newsFeed.js';
+import { buildSourceLock, repairModelMentions, withLockInstruction } from '../agent/sourceFidelity.js';
 
 /**
  * Auto-translates non-Hebrew feed items (AWS/Azure/GCP/OpenAI/Dark Reading/BleepingComputer/…) into
@@ -105,18 +106,24 @@ async function translateChunk(targets: TranslateTarget[]): Promise<Map<string, T
 
   const prompt = `תרגם לעברית את הפריטים הבאים:\n${JSON.stringify({ items: payload })}`;
 
+  // The model-name lock is applied per ITEM here, not per batch: the router's batch-wide repair
+  // would let one headline's "Claude Opus 5.5" rewrite a different headline's legitimately older
+  // "Claude Sonnet 5". The prompt still carries the batch's names; the repair below is item-scoped.
+  const batchLock = buildSourceLock(payload.map((p) => `${p.title}\n${p.summary}`).join('\n'));
+  const itemLocks = new Map(payload.map((p) => [p.id, buildSourceLock(`${p.title}\n${p.summary}`)]));
+
   const response = await generateContentWithRetry({
     model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: batchLock ? (withLockInstruction(SYSTEM_INSTRUCTION, batchLock) as string) : SYSTEM_INSTRUCTION,
       temperature: 0.3,
       topP: 0.9,
       responseMimeType: 'application/json',
     },
     // Runs on every feed refresh with nobody waiting on it: start on Groq's small model so it never
     // drains the flash-lite daily quota the dashboard agents depend on (see planLegs).
-  }, { priority: 'background' });
+  }, { priority: 'background', sourceLock: false });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow<{ items?: Array<{ id?: unknown; title?: unknown; summary?: unknown }> }>(
@@ -134,8 +141,9 @@ async function translateChunk(targets: TranslateTarget[]): Promise<Map<string, T
 
   for (const entry of Array.isArray(parsed.items) ? parsed.items : []) {
     const id = String(entry.id ?? '').trim();
-    const title = String(entry.title ?? '').replace(/\s+/g, ' ').trim();
-    const summary = String(entry.summary ?? '').replace(/\s+/g, ' ').trim();
+    const itemLock = itemLocks.get(id) ?? null;
+    const title = repairModelMentions(String(entry.title ?? '').replace(/\s+/g, ' ').trim(), itemLock).text;
+    const summary = repairModelMentions(String(entry.summary ?? '').replace(/\s+/g, ' ').trim(), itemLock).text;
     if (!sample && title) sample = { id, title: title.slice(0, 60) };
     if (!id || !knownIds.has(id)) { idMismatch++; continue; }
     if (title.length < 8 || summary.length < 15) { tooShort++; continue; }

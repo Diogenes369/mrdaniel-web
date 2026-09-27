@@ -19,8 +19,16 @@ import type { NewsItem } from './newsAgentTypes';
  * Never throws: any failure returns the teaser, so the caller's own fallback still applies.
  */
 
-/** A teaser at least this long is a real summary and worth synthesising from as-is. */
-const TEASER_IS_ENOUGH = 900;
+/**
+ * A teaser at least this long is a real summary and worth synthesising from as-is.
+ *
+ * Was 900 — which is exactly the cap newsTranslate.ts puts on a translated summary, so every
+ * English-sourced item skipped the article fetch and was synthesised from a machine-translated
+ * digest of it. That digest is where a new model name first gets "corrected" to one the translator
+ * knows, and the deck then faithfully repeated the drift. The article itself is the source of
+ * truth; only a teaser long enough to be most of an article skips the fetch now.
+ */
+const TEASER_IS_ENOUGH = 2500;
 
 /** Below this the fetched body is not an improvement worth preferring over the teaser. */
 const MIN_USEFUL_BODY = 200;

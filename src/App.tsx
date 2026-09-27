@@ -31,17 +31,54 @@ const Scene3D = lazy(() => import('./three/Scene3D'));
 // changes fire this often) reuses the same load rather than re-importing.
 import { loadTracker } from './lib/loadTracker';
 import HomePage from './pages/HomePage';
-import AboutPage from './pages/AboutPage';
-import AIPage from './pages/AIPage';
-import JarvisPage from './pages/JarvisPage';
-import MagazinesPage from './pages/MagazinesPage';
-import NewsPage from './pages/NewsPage';
-import NewsArticlePage from './pages/NewsArticlePage';
-import PrivacyPage from './pages/PrivacyPage';
-import TermsPage from './pages/TermsPage';
-import AccessibilityPage from './pages/AccessibilityPage';
-import GuideDownloadPage from './pages/GuideDownloadPage';
-import NotFoundPage from './pages/NotFoundPage';
+
+// Every route except the homepage is its own chunk (2026-09-27). They were all static imports, so
+// the entry chunk — which has to download and parse before the hero, its signal console or anything
+// else paints — carried eleven pages the visitor had not asked for. The homepage stays static: it is
+// the LCP route. The others are warmed on idle (see usePrefetchRoutes) so a click still lands on a
+// chunk that is already in memory.
+const ROUTE_CHUNKS = {
+  about: () => import('./pages/AboutPage'),
+  ai: () => import('./pages/AIPage'),
+  jarvis: () => import('./pages/JarvisPage'),
+  magazines: () => import('./pages/MagazinesPage'),
+  news: () => import('./pages/NewsPage'),
+  newsArticle: () => import('./pages/NewsArticlePage'),
+  privacy: () => import('./pages/PrivacyPage'),
+  terms: () => import('./pages/TermsPage'),
+  accessibility: () => import('./pages/AccessibilityPage'),
+  guideDownload: () => import('./pages/GuideDownloadPage'),
+  notFound: () => import('./pages/NotFoundPage'),
+};
+const AboutPage = lazy(ROUTE_CHUNKS.about);
+const AIPage = lazy(ROUTE_CHUNKS.ai);
+const JarvisPage = lazy(ROUTE_CHUNKS.jarvis);
+const MagazinesPage = lazy(ROUTE_CHUNKS.magazines);
+const NewsPage = lazy(ROUTE_CHUNKS.news);
+const NewsArticlePage = lazy(ROUTE_CHUNKS.newsArticle);
+const PrivacyPage = lazy(ROUTE_CHUNKS.privacy);
+const TermsPage = lazy(ROUTE_CHUNKS.terms);
+const AccessibilityPage = lazy(ROUTE_CHUNKS.accessibility);
+const GuideDownloadPage = lazy(ROUTE_CHUNKS.guideDownload);
+const NotFoundPage = lazy(ROUTE_CHUNKS.notFound);
+
+/** Holds the viewport while a route chunk loads, so the footer does not jump up for a frame. */
+const RouteFallback = () => <div className="min-h-[100dvh]" aria-busy="true" />;
+
+/** Warm every route chunk once the page is idle — after first paint, never competing with it. */
+function usePrefetchRoutes(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    const run = () => Object.values(ROUTE_CHUNKS).forEach((load) => void load().catch(() => {}));
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    if (w.requestIdleCallback) {
+      w.requestIdleCallback(run, { timeout: 6000 });
+      return;
+    }
+    const t = window.setTimeout(run, 3000);
+    return () => window.clearTimeout(t);
+  }, [enabled]);
+}
 import ErrorBoundary, { PageErrorFallback } from './components/ErrorBoundary';
 
 function RouteScrollManager() {
@@ -67,6 +104,8 @@ function RouteScrollManager() {
 export default function App() {
   useLenis();
   const location = useLocation();
+  // Not on the bare guide-download pages, which exist to load as little as possible on mobile data.
+  usePrefetchRoutes(!/^\/(?:download|g)(?:\/|$)/.test(location.pathname));
   // Warm the precomputed article analyses while idle, so opening any headline is instant. Not on
   // the bare guide-download pages, which exist to load as little as possible over mobile data.
   useInsightsPrefetch(!/^\/(?:download|g)(?:\/|$)/.test(location.pathname));
@@ -103,11 +142,13 @@ export default function App() {
     return (
       <div className="relative min-h-screen w-full bg-carbon-950 text-zinc-100 font-sans" dir="rtl">
         <RouteScrollManager />
-        <Routes location={location}>
-          <Route path="/download" element={<GuideDownloadPage />} />
-          <Route path="/download/:guideId" element={<GuideDownloadPage />} />
-          <Route path="/g/:guideId" element={<GuideDownloadPage />} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes location={location}>
+            <Route path="/download" element={<GuideDownloadPage />} />
+            <Route path="/download/:guideId" element={<GuideDownloadPage />} />
+            <Route path="/g/:guideId" element={<GuideDownloadPage />} />
+          </Routes>
+        </Suspense>
       </div>
     );
   }
@@ -132,6 +173,7 @@ export default function App() {
       <Header />
       <main key={location.pathname} className="relative z-[1] w-full max-w-full overflow-x-clip">
         <ErrorBoundary name="route" resetKey={location.pathname} fallback={(reset) => <PageErrorFallback onRetry={reset} />}>
+        <Suspense fallback={<RouteFallback />}>
         <Routes location={location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
@@ -150,6 +192,7 @@ export default function App() {
           <Route path="/accessibility" element={<AccessibilityPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </Suspense>
         </ErrorBoundary>
       </main>
       <div className="relative z-[1]">

@@ -2,6 +2,7 @@ import { genAI, isGroqConfigured, requireText, stripCodeFence, parseJsonOrThrow 
 import { AUDIENCE_RULES, scrubAiPhrases } from '../agent/expertVoice.js';
 import { estimateTokens, groqGenerate, normalizeModelUnicode } from '../agent/groqClient.js';
 import { importUrlContent } from './contentImport.js';
+import { buildSourceLock, repairModelMentions, sourceLockInstruction, type SourceLock } from '../agent/sourceFidelity.js';
 import { resolveGoogleNewsUrl } from './newsFeed.js';
 
 /**
@@ -239,13 +240,13 @@ function compactArticle(text: string): string {
     .join('\n\n');
 }
 
-async function callGemini(engine: Engine, prompt: string, timeoutMs: number): Promise<string> {
+async function callGemini(engine: Engine, prompt: string, timeoutMs: number, lock: SourceLock | null): Promise<string> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
   const res = await genAI.models.generateContent({
     model: engine.model,
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: systemFor(lock),
       // Gemma thinks first; its thought budget must not come out of the answer's room.
       maxOutputTokens: engine.slowMs ? OUTPUT_TOKENS * 3 : OUTPUT_TOKENS,
       temperature: 0.5,
@@ -260,14 +261,31 @@ async function callGemini(engine: Engine, prompt: string, timeoutMs: number): Pr
   return answer || requireText(res);
 }
 
+/**
+ * This module calls both providers directly (it needs per-engine timeouts and Gemma's thought
+ * filtering), so it bypasses generateContentWithRetry — and with it the model-name lock. The lock is
+ * applied here instead: same rule in the system prompt, same repair on the answer.
+ */
 async function callEngine(engine: Engine, prompt: string, timeoutMs: number): Promise<string> {
+  const lock = buildSourceLock(prompt);
+  const raw = await callEngineRaw(engine, prompt, timeoutMs, lock);
+  const { text, fixes } = repairModelMentions(raw, lock);
+  if (fixes.length) console.warn(`[source-fidelity] news-insights: rewrote ${fixes.map((f) => `"${f.from}" → "${f.to}"`).join(', ')}`);
+  return text;
+}
+
+const systemFor = (lock: SourceLock | null) => (lock ? `${SYSTEM_INSTRUCTION}
+
+${sourceLockInstruction(lock)}` : SYSTEM_INSTRUCTION);
+
+async function callEngineRaw(engine: Engine, prompt: string, timeoutMs: number, lock: SourceLock | null): Promise<string> {
   if (engine.provider === 'gemini') {
     try {
-      return await callGemini(engine, prompt, timeoutMs);
+      return await callGemini(engine, prompt, timeoutMs, lock);
     } catch (err) {
       if (engine.slowMs || !/503|UNAVAILABLE|high demand/i.test(String((err as Error)?.message))) throw err;
       await sleep(1_500);
-      return callGemini(engine, prompt, timeoutMs);
+      return callGemini(engine, prompt, timeoutMs, lock);
     }
   }
   if (!isGroqConfigured()) throw new Error('GROQ_API_KEY not configured');
@@ -276,7 +294,7 @@ async function callEngine(engine: Engine, prompt: string, timeoutMs: number): Pr
       model: engine.model,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
+        systemInstruction: systemFor(lock),
         maxOutputTokens: OUTPUT_TOKENS,
         temperature: 0.5,
         responseMimeType: 'application/json',

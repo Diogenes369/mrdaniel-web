@@ -14,7 +14,8 @@
  * builder + `threadFromDeck`, so the operator still gets a thread.
  */
 import { grokChat, parseGrokJson, xaiModel, XaiHttpError, XaiNotConfiguredError, type GrokChatOptions } from '../xaiClient.js';
-import { groqGenerate, isGroqConfigured, GROQ_TEXT_MODEL } from '../../agent/groqClient.js';
+import { isGroqConfigured, GROQ_TEXT_MODEL } from '../../agent/groqClient.js';
+import { generateContentWithRetry, isEngineConfigured, requireText, GEMINI_TEXT_MODEL } from '../../agent/geminiClient.js';
 import {
   X_ALGORITHM_PROMPT_RULES,
   X_POST_LIMIT,
@@ -27,6 +28,7 @@ import {
 import { EXPERT_VOICE_RULES, AUDIENCE_RULES, scrubAiPhrases } from '../../agent/expertVoice.js';
 import { sanitizeInput, sanitizeOutput } from '../../agent/AgentSecurityGuard.js';
 import { sanitizeHebrewText } from '../../agent/hebrewTextSanitizer.js';
+import { buildSourceLock, repairModelMentions, sourceLockInstruction } from '../../agent/sourceFidelity.js';
 import { cleanCarouselList, cleanCarouselText, mapCarouselLayout, type CarouselStudioSlide } from '../../agent/SocialAgentEngine.js';
 
 export interface GrokCarouselInput {
@@ -144,20 +146,38 @@ export function isXaiBillingFailure(err: unknown): boolean {
 }
 
 async function draftWithFallback(opts: GrokChatOptions): Promise<{ raw: string; model: string }> {
+  // Neither leg goes through generateContentWithRetry, so the model-name lock is applied here.
+  const lock = buildSourceLock(opts.user);
+  const draft = await draftOnce(lock ? { ...opts, system: `${opts.system}\n\n${sourceLockInstruction(lock)}` } : opts);
+  const { text, fixes } = repairModelMentions(draft.raw, lock);
+  if (fixes.length) console.warn(`[source-fidelity] grok-carousel: rewrote ${fixes.map((f) => `"${f.from}" → "${f.to}"`).join(', ')}`);
+  return { ...draft, raw: text };
+}
+
+async function draftOnce(opts: GrokChatOptions): Promise<{ raw: string; model: string }> {
   try {
     return { raw: await grokChat(opts), model: xaiModel() };
   } catch (err) {
-    if (!isXaiBillingFailure(err) || !isGroqConfigured()) throw err;
-    console.warn(`[grok] ${(err as Error).message.slice(0, 160)} — falling back to Groq (${GROQ_TEXT_MODEL})`);
-    const res = await groqGenerate({
-      contents: opts.user,
-      config: {
-        systemInstruction: opts.system,
-        temperature: opts.temperature,
-        ...(opts.json ? { responseMimeType: 'application/json' } : {}),
+    if (!isXaiBillingFailure(err) || (!isGroqConfigured() && !isEngineConfigured())) throw err;
+    console.warn(`[grok] ${(err as Error).message.slice(0, 160)} — falling back to the free text router`);
+    // Through the shared router, not groqGenerate directly: a direct Groq call had no fallback of
+    // its own, so once Groq's DAILY token budget was spent this action 500'd while every other
+    // content action quietly moved to Gemini (reproduced 2026-09-27). The lock is already in
+    // opts.system and the repair runs in draftWithFallback, so the router's copy is switched off.
+    const res = await generateContentWithRetry(
+      {
+        model: GEMINI_TEXT_MODEL,
+        contents: opts.user,
+        config: {
+          systemInstruction: opts.system,
+          temperature: opts.temperature,
+          ...(opts.json ? { responseMimeType: 'application/json' } : {}),
+        },
       },
-    });
-    return { raw: res.text, model: `groq:${GROQ_TEXT_MODEL}` };
+      { textOnly: true, sourceLock: false }
+    );
+    const groq = (res as { provider?: string; modelUsed?: string }).provider === 'groq';
+    return { raw: requireText(res), model: groq ? `groq:${(res as { modelUsed?: string }).modelUsed ?? GROQ_TEXT_MODEL}` : 'gemini' };
   }
 }
 

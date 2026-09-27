@@ -13,6 +13,21 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<script>
+  // Start the /api/news request NOW, in parallel with the JS bundle, instead of after React mounts —
+  // the hero signal console, the ticker and today's terms all wait on it. newsService.ts consumes
+  // this promise exactly once. Skipped when the browser cache is still fresh (same key + TTL as
+  // newsService.ts — keep the two in sync), because then nothing would read the response.
+  (function () {
+    try {
+      var c = JSON.parse(localStorage.getItem('dbb-news-feed-cache-v5') || 'null');
+      if (c && typeof c.fetchedAt === 'number' && Date.now() - c.fetchedAt < 600000) return;
+    } catch (e) {}
+    try {
+      window.__newsPrefetch = fetch('/api/news').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+    } catch (e) {}
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@100..900&family=Rubik:wght@300..900&family=Orbitron:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />

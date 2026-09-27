@@ -48,7 +48,8 @@ export default async function handler(req: any, res: any) {
         temperature: 0.7,
         topP: 0.95,
       },
-    });
+      // Free chat, not an adaptation: the visitor may ask about a release they did not name.
+    }, { sourceLock: false });
 
     const reply = response.text?.trim() || 'תודה על פנייתך. אשמח לסייע בהמשך.';
     res.status(200).json({ reply });
