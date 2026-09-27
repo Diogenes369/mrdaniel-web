@@ -234,6 +234,19 @@ function extractFromDom($: cheerio.CheerioAPI): { text: string; selector: string
 }
 
 /** JSON-LD `articleBody`, when the publisher ships one. Zero noise by construction. */
+/**
+ * Many CMSs build JSON-LD `articleBody` by concatenating the paragraphs' text with NO separator
+ * (Stocktwits, measured 2026-09-27: "…on Wednesday.The fresh directive…"). Downstream that reads
+ * as one run-on block and the sentence splitter cannot see the boundary. A sentence end glued to
+ * the next sentence's capital (or Hebrew) letter is a lost paragraph break — restore it. The
+ * preceding character must be lowercase/digit/closing punctuation so "U.S." or "e.g.X" survive.
+ */
+export function unglueParagraphs(text: string): string {
+  return text
+    .replace(/([a-z\d֐-׿)"'”’%])([.!?])(?=[A-Z֐-׿])/g, '$1$2\n\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
 function extractJsonLdBody($: cheerio.CheerioAPI): string {
   const visit = (value: unknown): string => {
     if (!value) return '';
@@ -247,7 +260,7 @@ function extractJsonLdBody($: cheerio.CheerioAPI): string {
     if (typeof value !== 'object') return '';
     const obj = value as Record<string, unknown>;
     if (typeof obj.articleBody === 'string' && obj.articleBody.trim().length > 200) {
-      return obj.articleBody.trim();
+      return unglueParagraphs(obj.articleBody.trim());
     }
     if (obj['@graph']) return visit(obj['@graph']);
     return '';

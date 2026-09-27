@@ -320,6 +320,12 @@ Every news surface — the site's Live Feed **ticker**, the `/news` page, the **
   Google-News redirect resolved first, Jina fallback for WAF-blocked origins) and persist across
   cold instances via the Firebase `news_snapshot` seed. Only `getNewsItemBySlug` skips the image
   gate, so a shared `/news/<slug>` permalink never 404s.
+- **Every served item also passes the text quality gate** (`src/server/newsQuality.ts`, same
+  date): its stored analysis was written from the FULL article, has ≥3 distinct bullets and ≥200
+  chars of body, and repeats neither the headline nor the bullets. Unanalysed items wait off-feed
+  until the precompute agent reaches them; an analysis below the gate is retried (bounded), not
+  kept. A headline-only teaser is replaced by the analysis bullets. The precompute agent and
+  `getInsightsMap` read the ungated list (`requireQuality: false`).
 - **`getNewsItems()` applies it BY DEFAULT.** `/api/news` is the sanitized stream; `?strict=0` is
   a debug-only escape hatch for the raw aggregate. Do not wire `?strict=0` into any UI.
 - `SOURCES` contains **Hebrew feeds only** (Israeli outlets + Hebrew Google-News queries + the

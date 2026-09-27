@@ -157,7 +157,12 @@ t('analysis · returns the two modal sections, no analysis block', ['executiveSu
   t('precompute · the batch endpoint requires the admin secret', /action === 'precompute'[\s\S]{0,200}x-admin-secret/.test(api));
   t('precompute · a rate limit stops the batch instead of burning the day', /stoppedBy = 'rate-limit'/.test(pre));
   t('precompute · only an article-caused failure counts against the article (503/outage does not)', /if \(!isArticleFault\(err\)\)/.test(pre) && !/function isRateLimit/.test(pre));
-  t('precompute · the modal reads the prefetched map, no per-article request', !/news\/analyze/.test(svc) && /action=insights/.test(svc) && !/fetch\(/.test(modal));
+  // 2026-09-27: the modal may do ONE read-only lookup when the bulk map misses (feed and map are
+  // cached separately and can drift). The invariant that matters is unchanged and tested here:
+  // nothing on the click path can start a generation — the lookup endpoint only reads storage.
+  const analyzeHandler = api.slice(api.indexOf('async function handleAnalyze'), api.indexOf('function safeParse'));
+  t('precompute · the modal reads the prefetched map first', /action=insights/.test(svc) && /fromMap \?\?/.test(svc) && !/fetch\(/.test(modal));
+  t('precompute · the fallback lookup is read-only (no generation on click)', /getStoredInsight/.test(analyzeHandler) && !/generateArticleInsights/.test(analyzeHandler));
   t('precompute · the map is warmed while idle', /requestIdleCallback/.test(svc));
 }
 t('analysis · first engine is a free flash-lite, not the 20/day 3.6-flash', /ENGINES: Engine\[\] = \[\s*\{[^}]*'gemini-3\.1-flash-lite'/.test(insights) && !/'gemini-3\.6-flash'/.test(insights));

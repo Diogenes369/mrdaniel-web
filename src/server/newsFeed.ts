@@ -1,6 +1,7 @@
 import Parser from 'rss-parser';
 import { createHash } from 'node:crypto';
 import { translateForeignItems } from './newsTranslate.js';
+import { insightKey, passesTextQuality } from './newsQuality.js';
 
 /**
  * AI-only since 2026-09-21: the feed carries artificial-intelligence news exclusively. `general` is
@@ -1125,17 +1126,49 @@ async function saveSnapshot(snapshot: { items: NewsItem[]; fetchedAt: number }):
   await writeNewsSnapshot(snapshot);
 }
 
+/**
+ * Stored article analyses (Firebase `article_insights`), for the text quality gate. Memoised for two
+ * minutes; the precompute agent writes a few per run, so that lag only delays an item's debut.
+ *
+ * `readArticleInsights` answers `{}` both for "none stored" and for a failed read, and the store is
+ * never legitimately empty once the agent has run — so an empty answer is treated as a failed read:
+ * the last good map is kept, and with none at all the gate stands aside (logged) rather than
+ * serving an empty site. A Firebase blip must never blank every news surface.
+ */
+let storedInsights: { at: number; map: Record<string, { i?: unknown }> } | null = null;
+const STORED_INSIGHTS_TTL_MS = 2 * 60 * 1000;
+
+async function loadStoredInsights(): Promise<Record<string, { i?: unknown }> | null> {
+  if (storedInsights && Date.now() - storedInsights.at < STORED_INSIGHTS_TTL_MS) return storedInsights.map;
+  const { readArticleInsights } = await import('../agent/firebaseServer.js');
+  const map = (await settleWithin(readArticleInsights(), 4000)) as Record<string, { i?: unknown }> | undefined;
+  if (map && Object.keys(map).length) {
+    storedInsights = { at: Date.now(), map };
+    return map;
+  }
+  if (storedInsights) return storedInsights.map;
+  console.warn('[news] article_insights unavailable — text quality gate skipped for this request');
+  return null;
+}
+
 export async function getNewsItems(
   // `strict` is ON by default — the site news page, the Live Feed ticker and the dashboard all get
   // the sanitized, always-Hebrew stream. Pass `{ strict: false }` (via `/api/news?strict=0`) only
   // for debugging the raw aggregate (which CAN carry untranslated English — never use it for
   // anything user-facing). `allowEnglish` is accepted for API back-compat but no longer changes the
   // result — see `sanitizeAndKeep`.
-  opts: { strict?: boolean; allowEnglish?: boolean; requireImage?: boolean } = {}
+  //
+  // Two quality gates, both on by default for every listing (policy 2026-09-27):
+  //   `requireImage`   — a real, fully-resolved source image (`hasResolvedImage`).
+  //   `requireQuality` — a stored analysis written from the FULL article, with >=3 distinct bullets
+  //                      and >=200 chars of body that repeat neither the bullets nor the headline
+  //                      (newsQuality.ts). An item the agent has not analysed yet waits off-feed.
+  // Only two callers turn them off: the permalink lookup (a shared /news/<slug> link must keep
+  // resolving) and the precompute agent (it must see the items it has yet to analyse).
+  opts: { strict?: boolean; allowEnglish?: boolean; requireImage?: boolean; requireQuality?: boolean } = {}
 ): Promise<{ items: NewsItem[]; updatedAt: string }> {
-  // `requireImage` is on for every listing. Only a permalink lookup turns it off: a shared
-  // /news/<slug> link must keep resolving even if its item never got an image.
   const requireImage = opts.requireImage ?? true;
+  const requireQuality = opts.requireQuality ?? true;
   const strict = opts.strict ?? true;
   const allowEnglish = opts.allowEnglish ?? false;
   const isStale = !cache || Date.now() - cache.fetchedAt > CACHE_TTL_MS;
@@ -1144,14 +1177,45 @@ export async function getNewsItems(
     await inFlight;
   }
   const all = cache?.items ?? [];
-  return {
-    // Applied here, on the way out — the cache always holds the full unfiltered set.
-    items: strict ? all.filter((it) => sanitizeAndKeep(it, { allowEnglish }) && (!requireImage || hasResolvedImage(it))) : all,
-    updatedAt: cache ? new Date(cache.fetchedAt).toISOString() : new Date().toISOString(),
-  };
+  const updatedAt = cache ? new Date(cache.fetchedAt).toISOString() : new Date().toISOString();
+  if (!strict) return { items: all, updatedAt };
+
+  // Applied here, on the way out — the cache always holds the full unfiltered set.
+  let items = all.filter((it) => sanitizeAndKeep(it, { allowEnglish }) && (!requireImage || hasResolvedImage(it)));
+  const stored = await loadStoredInsights();
+  if (stored) {
+    if (requireQuality) {
+      items = items.filter((it) => passesTextQuality(stored[insightKey(it.link)]?.i as never, it.title));
+    }
+    items = items.map((it) => withAnalysedTeaser(it, stored[insightKey(it.link)]?.i));
+  }
+  return { items, updatedAt };
+}
+
+/**
+ * A feed item whose teaser is only its headline (83 of 138 items on 2026-09-27 — every English
+ * Google-News entry: the RSS carries a title and nothing else) printed the headline twice on every
+ * card, and as the "summary" on its permalink page. When the stored analysis exists, its bullets —
+ * written from the full article — replace that non-teaser. A real publisher teaser is left alone.
+ * Returns a copy; the cache keeps the raw feed.
+ */
+function withAnalysedTeaser(item: NewsItem, analysis: unknown): NewsItem {
+  const ownTeaser = (item.excerpt || item.summary || '').trim();
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  if (ownTeaser.length >= 60 && norm(ownTeaser) !== norm(item.title)) return item;
+  const bullets = (Array.isArray((analysis as { executiveSummary?: unknown })?.executiveSummary)
+    ? ((analysis as { executiveSummary: unknown[] }).executiveSummary)
+    : []
+  )
+    .map((b) => String(b ?? '').replace(/^[\s\-–—•*·>]+/, '').replace(/\s+/g, ' ').trim())
+    .filter((b) => b.length >= 20)
+    .slice(0, 4);
+  if (!bullets.length) return item;
+  const summary = bullets.join(' ');
+  return { ...item, summary, excerpt: truncate(summary, EXCERPT_MAX) };
 }
 
 export async function getNewsItemBySlug(slug: string): Promise<NewsItem | null> {
-  const { items } = await getNewsItems({ requireImage: false });
+  const { items } = await getNewsItems({ requireImage: false, requireQuality: false });
   return items.find((item) => item.slug === slug) ?? null;
 }

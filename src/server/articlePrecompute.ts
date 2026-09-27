@@ -22,8 +22,8 @@
  * ~500/day each). A batch stops at its first rate-limit so a busy hour cannot burn the day, and an
  * article that keeps failing is retried a bounded number of times, not forever.
  */
-import { createHash } from 'node:crypto';
 import { getNewsItems, type NewsItem } from './newsFeed.js';
+import { insightKey, insightQualityIssues } from './newsQuality.js';
 import { generateArticleInsights, isInsightsConfigured, type ArticleInsights } from './newsInsights.js';
 import { readArticleInsights, writeArticleInsight } from '../agent/firebaseServer.js';
 
@@ -51,10 +51,9 @@ const RETRY_AFTER_MS = 3 * 60 * 60 * 1000;
 /** Stored analyses for articles that left the feed are dropped after this. */
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Stable per-article key: the link, not the title (titles are rewritten by translation). */
-export function insightKey(link: string): string {
-  return createHash('sha1').update(link).digest('hex').slice(0, 16);
-}
+// The per-article key lives in newsQuality.ts, beside the gate that reads it; re-exported so
+// existing importers keep working.
+export { insightKey };
 
 /**
  * Only a failure that is the ARTICLE's fault counts against it: the model answered but the answer
@@ -89,14 +88,18 @@ export async function runPrecompute(opts: { maxItems?: number; budgetMs?: number
   const budgetMs = opts.budgetMs ?? 70_000;
   if (!isInsightsConfigured()) return { ok: false, done: 0, failed: 0, pending: 0, stoppedBy: 'not-configured', ms: 0 };
 
-  const [{ items }, stored] = await Promise.all([getNewsItems(), readStored()]);
+  // The UNGATED list: the text quality gate hides exactly the items this agent has yet to analyse.
+  const [{ items }, stored] = await Promise.all([getNewsItems({ requireQuality: false }), readStored()]);
   const now = Date.now();
   const byTime = [...items].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
   const todo = byTime.filter((item) => {
     const s = stored[insightKey(item.link)];
     if (!s) return true;
-    if (s.i) return false;
-    return (s.fails ?? 0) < MAX_FAILS && now - (s.failedAt ?? 0) > RETRY_AFTER_MS;
+    // A stored analysis that fails the quality gate (usually: the article could not be fetched, so
+    // it was written from the teaser) is retried on the same bounded schedule as an outright
+    // failure, instead of being kept forever and hiding the story from the feed for good.
+    if (s.i && !insightQualityIssues(s.i, item.title).length) return false;
+    return (s.fails ?? 0) < MAX_FAILS && now - (s.failedAt ?? s.at ?? 0) > RETRY_AFTER_MS;
   });
 
   let done = 0;
@@ -120,6 +123,16 @@ export async function runPrecompute(opts: { maxItems?: number; budgetMs?: number
         link: item.link,
       });
       const { cached: _cached, ...value } = insights;
+      const issues = insightQualityIssues(value, item.title);
+      if (issues.length) {
+        // Kept (the permalink page can still use it) but counted as a failed attempt, so the item
+        // stays off the feed and is retried later — the publisher may answer next time.
+        const prev = stored[key];
+        await writeArticleInsight(key, { link: item.link, at: Date.now(), i: value, fails: (prev?.fails ?? 0) + 1, failedAt: Date.now() } satisfies StoredInsight);
+        failed++;
+        console.warn(`[precompute] ${item.id} below the quality gate: ${issues.join(', ')}`);
+        continue;
+      }
       await writeArticleInsight(key, { link: item.link, at: Date.now(), i: value } satisfies StoredInsight);
       done++;
     } catch (err) {
@@ -158,7 +171,8 @@ const MEMO_MS = 2 * 60 * 1000;
  * the frontend has). Read-only — this never generates.
  */
 export async function getInsightsMap(): Promise<{ map: Record<string, ModalInsights>; coverage: { analysed: number; total: number } }> {
-  const [{ items }, stored] = await Promise.all([getNewsItems(), memo && Date.now() - memo.at < MEMO_MS ? Promise.resolve(null) : readStored()]);
+  // Ungated, so a permalink page (which may show an item that is off the listing) still finds its analysis.
+  const [{ items }, stored] = await Promise.all([getNewsItems({ requireQuality: false }), memo && Date.now() - memo.at < MEMO_MS ? Promise.resolve(null) : readStored()]);
   let map: Record<string, ModalInsights>;
   if (stored === null && memo) {
     map = memo.map;

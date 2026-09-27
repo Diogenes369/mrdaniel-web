@@ -90,8 +90,48 @@ export function useInsightsPrefetch(enabled = true): void {
   }, [client, enabled]);
 }
 
-/** The stored analysis for one article, straight from the prefetched map — no request of its own. */
+async function fetchStoredInsight(link: string): Promise<ArticleInsights | null> {
+  try {
+    const res = await fetch(`/api/news/analyze?link=${encodeURIComponent(link)}`, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { available?: boolean; insights?: unknown };
+    return data.available ? normalize(data.insights) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The stored analysis for one article: from the prefetched map when it is there (no request), and
+ * otherwise ONE read-only lookup of that article's stored analysis.
+ *
+ * The lookup closes a gap the text quality gate exposed: the feed and the bulk map are cached
+ * separately (CDN 10 min vs 5 min), so a freshly analysed story can reach the feed before it reaches
+ * the map a browser already holds — and the modal then fell back to the teaser, which for a
+ * headline-only feed item is one sentence shown as both the summary and the article. The lookup
+ * never generates anything (api/news.ts handleAnalyze is read-only).
+ *
+ * `pending` is true while that lookup runs, so the modal can show a placeholder instead of
+ * flashing the teaser fallback first.
+ */
 export function useArticleInsights(item: NewsItem | null): ArticleInsights | undefined {
-  const { data } = useQuery({ ...QUERY_OPTIONS, enabled: Boolean(item) });
-  return item ? data?.[item.id] : undefined;
+  return useArticleInsightsState(item).insights;
+}
+
+export function useArticleInsightsState(item: NewsItem | null): { insights: ArticleInsights | undefined; pending: boolean } {
+  const map = useQuery({ ...QUERY_OPTIONS, enabled: Boolean(item) });
+  const fromMap = item ? map.data?.[item.id] : undefined;
+  const needsLookup = Boolean(item?.link) && !fromMap && !map.isPending;
+  const single = useQuery({
+    queryKey: ['news-insight-single', item?.link ?? ''],
+    queryFn: () => fetchStoredInsight(item!.link),
+    enabled: needsLookup,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    retry: 0,
+    refetchOnWindowFocus: false,
+  });
+  const insights = fromMap ?? single.data ?? undefined;
+  const pending = !insights && Boolean(item) && (map.isPending || (needsLookup && single.isPending));
+  return { insights, pending };
 }

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, ExternalLink, Clock, BookOpen, ListChecks, Sparkles, BrainCircuit, Newspaper, FileText, type LucideIcon } from 'lucide-react';
 import { formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } from '../../services/newsService';
 import { executiveSummary, deepDive, sourceDomain } from '../../lib/newsAnalysis';
-import { useArticleInsights } from '../../services/newsInsightsService';
+import { useArticleInsightsState } from '../../services/newsInsightsService';
 import NewsImage from './NewsImage';
 import RtlText from './RtlText';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
@@ -86,11 +86,11 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
   const Icon = t.icon;
   const domain = sourceDomain(item.link);
   // Precomputed in the background; undefined only if the agent has not reached this story yet.
-  const ai = useArticleInsights(item);
+  const { insights: ai, pending } = useArticleInsightsState(item);
   const bullets = ai?.executiveSummary.length ? ai.executiveSummary : executiveSummary(item);
   const paras = ai?.extendedArticle.length ? ai.extendedArticle : deepDive(item);
   const mins = readingTimeMin(ai ? ai.extendedArticle.join(' ') : item.summary || item.excerpt);
-  const note = !ai ? 'נערך מתוך תקציר המקור' : ai.fullText ? 'נערך מתוך הטקסט המלא של הכתבה' : 'הכתבה המלאה לא הייתה זמינה — נערך מתוך תקציר המקור';
+  const note = pending ? 'טוען את הניתוח המלא…' : !ai ? 'נערך מתוך תקציר המקור' : ai.fullText ? 'נערך מתוך הטקסט המלא של הכתבה' : 'הכתבה המלאה לא הייתה זמינה — נערך מתוך תקציר המקור';
 
   return (
     <motion.article
@@ -168,7 +168,14 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
         <section className="mb-[2.5dvh]">
           <SectionTitle index="01" icon={ListChecks}>תקציר</SectionTitle>
           <ul className="space-y-[1.1dvh] rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 sm:p-5">
-            {bullets.map((b, i) => (
+            {pending
+              ? SKELETON_ROWS.map((w, i) => (
+                  <li key={i} aria-hidden="true" className="flex gap-3">
+                    <span className="mt-[0.6em] h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500/40" />
+                    <span className={`block h-4 animate-pulse rounded bg-white/[0.08] ${w}`} />
+                  </li>
+                ))
+              : bullets.map((b, i) => (
               <li key={i} className="flex gap-3 leading-relaxed text-zinc-100 [font-size:clamp(0.9rem,0.72rem+0.62dvh,1.08rem)]">
                 <span className="mt-[0.6em] h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" aria-hidden="true" />
                 <span className="min-w-0 flex-1"><RtlText>{b}</RtlText></span>
@@ -180,7 +187,9 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
         <section className="lg:flex-1">
           <SectionTitle index="02" icon={Newspaper}>הכתבה</SectionTitle>
           <div className="space-y-[1.4dvh] border-r-2 border-white/10 pr-4">
-            {paras.map((p, i) => (
+            {pending
+              ? SKELETON_ROWS.map((w, i) => <span key={i} aria-hidden="true" className={`block h-4 animate-pulse rounded bg-white/[0.06] ${w}`} />)
+              : paras.map((p, i) => (
               <p key={i} className="leading-[1.8] text-zinc-300 [font-size:clamp(0.92rem,0.74rem+0.62dvh,1.1rem)]">
                 <RtlText>{p}</RtlText>
               </p>
@@ -206,6 +215,9 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
     </motion.article>
   );
 }
+
+/** Placeholder widths while the stored analysis is being looked up (never the teaser twice). */
+const SKELETON_ROWS = ['w-11/12', 'w-4/5', 'w-2/3'];
 
 function SectionTitle({ index, icon: Icon, children }: { index: string; icon: LucideIcon; children: ReactNode }) {
   return (

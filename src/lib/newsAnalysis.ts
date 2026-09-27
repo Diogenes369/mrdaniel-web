@@ -96,6 +96,18 @@ function heDate(iso: string): string {
 }
 
 /** 3–5 executive-summary bullets, drawn from the article's own text. */
+/** Same text once punctuation, bidi marks, case and spacing are ignored. */
+function sameText(a: string, b: string): boolean {
+  const norm = (s: string) =>
+    (s || '')
+      .toLowerCase()
+      .replace(/[\u200e\u200f\u2066-\u2069]/g, '')
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim();
+  const x = norm(a);
+  return Boolean(x) && x === norm(b);
+}
+
 export function executiveSummary(item: NewsItem): string[] {
   const src = (item.summary || item.excerpt || '').trim();
   const ss = toSentences(src).map(stripLeadingBullet);
@@ -103,7 +115,9 @@ export function executiveSummary(item: NewsItem): string[] {
 
   const out: string[] = [];
   if (item.title) out.push(item.title.replace(/[.\s]+$/, '') + '.');
-  if (src && !out.includes(src)) out.push(src.length > 12 ? src : `${src}.`);
+  // Compared without punctuation: a feed whose summary IS the headline (every English Google-News
+  // entry) used to add it a second time, because "title." !== "title".
+  if (src && !sameText(src, item.title)) out.push(src.length > 12 ? src : `${src}.`);
   out.push(`הכתבה פורסמה ב-${item.source}${heDate(item.publishedAt) ? ` · ${heDate(item.publishedAt)}` : ''}.`);
   return out.filter(Boolean).map(stripLeadingBullet).filter(Boolean);
 }
@@ -115,6 +129,11 @@ export function deepDive(item: NewsItem): string[] {
     return [
       'הפיד סיפק לכתבה זו כותרת ותקציר קצר בלבד. הניתוח כאן מבוסס על המידע הזמין; לסיקור המלא עברו למקור המקורי בכפתור למטה.',
     ];
+  }
+  // A "summary" that is only the headline has no article in it. Repeating it as the body is the
+  // one-sentence-everywhere modal (2026-09-27); say plainly that the full story is at the source.
+  if (sameText(src, item.title)) {
+    return ['הפיד סיפק לכתבה זו כותרת בלבד. הסיקור המלא זמין באתר המקור בכפתור למטה.'];
   }
   const ss = toSentences(src).map(stripLeadingBullet);
   if (ss.length <= 2) return [stripLeadingBullet(src)];
