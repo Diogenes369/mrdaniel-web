@@ -1,6 +1,7 @@
 import { detectSlop, dropCeremonySentences, repairContrastHeadline, type SlopHit } from '../agent/antiSlop.js';
 import { itemKey } from '../agent/listExtract.js';
 import {
+  factCheckCarouselClaims,
   synthesizeMissingListEntries,
   type CarouselSlideDesign,
   type CarouselStudioResult,
@@ -23,6 +24,9 @@ import {
  *   3. Context alignment — every source list item covered (FIXED with one small repair call for the
  *      missing ones), and every number on a slide present in the source (reported: a number the
  *      article never stated is a fabricated fact, and deleting it would leave a broken sentence).
+ *   3c. Fact-check — a model reads every claim beside the source and rewrites anything unsupported,
+ *      inverted, misattributed or strengthened; rewritten claims get one confirmation pass. This is
+ *      the only check that sees MEANING — the others see words and numbers.
  *   4. Anti-slop — antiSlop.ts patterns. Ceremony sentences (signposts, sign-offs, generic
  *      optimism) are REMOVED when the slide keeps other content; the rest are reported.
  *
@@ -32,7 +36,7 @@ import {
 export type CheckStatus = 'pass' | 'warn' | 'fail';
 
 export interface VerificationCheck {
-  id: 'readability' | 'layout-variance' | 'coverage' | 'numbers' | 'anti-slop';
+  id: 'readability' | 'layout-variance' | 'coverage' | 'numbers' | 'anti-slop' | 'fact-check';
   label: string;
   status: CheckStatus;
   detail: string;
@@ -245,6 +249,10 @@ export async function verifyCarouselDeck(
     });
   }
 
+  // ── 3c · fact-check (after coverage, so repaired items are checked too; before anti-slop, so
+  //    rewritten claims are scanned for slop like everything else) ────────────────────────────
+  await factCheckPass(slides, source, checks, fixes);
+
   // ── 4 · anti-slop ───────────────────────────────────────────────────────────────────────────
   let dropped = 0;
   for (const s of slides) {
@@ -351,9 +359,116 @@ export async function verifyCarouselDeck(
     detail: layoutIssues.length ? layoutIssues.join(' · ') : `${kinds.size} סוגי פריסה, מיקום וניגודיות מתחלפים`,
   });
 
+  // ── fact-check lives in its own helper below; order the report the way an operator reads it ──
+  const order: VerificationCheck['id'][] = ['fact-check', 'coverage', 'numbers', 'anti-slop', 'readability', 'layout-variance'];
+  checks.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+
   const score = Math.max(0, 100 - checks.reduce((sum, c) => sum + (c.status === 'fail' ? 25 : c.status === 'warn' ? 8 : 0), 0));
   return {
     slides,
     verification: { passed: !checks.some((c) => c.status === 'fail'), score, checks, fixes, coverage },
   };
+}
+
+// ─── fact-check pass ────────────────────────────────────────────────────────────────────────
+
+interface ClaimUnit {
+  id: string;
+  get: () => string;
+  set: (v: string) => void;
+  /** Item entries carry list coverage — they are rewritten, never dropped. */
+  required: boolean;
+}
+
+function claimUnits(slides: CarouselStudioSlide[]): ClaimUnit[] {
+  const units: ClaimUnit[] = [];
+  slides.forEach((s, i) => {
+    if (s.role === 'cta') return; // brand copy, not the article's claims
+    const n = i + 1;
+    const field = (key: 'headline' | 'subhead' | 'body' | 'quote') => {
+      if (words(s[key]) >= 3) units.push({ id: `s${n}.${key}`, get: () => s[key], set: (v) => (s[key] = v), required: false });
+    };
+    field('headline');
+    field('subhead');
+    field('body');
+    field('quote');
+    s.bullets.forEach((_, j) => units.push({ id: `s${n}.bullet${j + 1}`, get: () => s.bullets[j], set: (v) => (s.bullets[j] = v), required: false }));
+    (s.items ?? []).forEach((it) => units.push({ id: `s${n}.item${it.n}`, get: () => it.text, set: (v) => (it.text = v), required: true }));
+  });
+  return units;
+}
+
+async function factCheckPass(
+  slides: CarouselStudioSlide[],
+  source: { title: string; body: string },
+  checks: VerificationCheck[],
+  fixes: string[]
+): Promise<void> {
+  const units = claimUnits(slides);
+  const byId = new Map(units.map((u) => [u.id, u]));
+  const issues: string[] = [];
+  let corrected = 0;
+  let dropped = 0;
+  let unresolved = 0;
+  let unchecked = 0;
+  const evidence = [source.title, source.body].join(' — ');
+  try {
+    const first = await factCheckCarouselClaims({ source: evidence, units: units.map((u) => ({ id: u.id, text: u.get() })) });
+    const answered = new Set(first.map((v) => v.id));
+    unchecked = units.filter((u) => !answered.has(u.id)).length;
+    const changed: ClaimUnit[] = [];
+    for (const v of first) {
+      if (v.verdict !== 'fix') continue;
+      const u = byId.get(v.id);
+      if (!u) continue;
+      issues.push(`${v.id}: ${v.issue || 'לא נאמן למקור'}`);
+      if (v.fix) {
+        u.set(v.fix);
+        changed.push(u);
+        corrected++;
+      } else if (!u.required) {
+        u.set('');
+        dropped++;
+      } else {
+        unresolved++;
+      }
+    }
+    // Confirmation: a rewrite is itself model output, so it is checked once more on its own.
+    if (changed.length) {
+      const second = await factCheckCarouselClaims({ source: evidence, units: changed.map((u) => ({ id: u.id, text: u.get() })) });
+      for (const v of second) {
+        if (v.verdict !== 'fix') continue;
+        const u = byId.get(v.id);
+        if (!u) continue;
+        if (v.fix) u.set(v.fix);
+        else if (!u.required) {
+          u.set('');
+          dropped++;
+        } else unresolved++;
+      }
+    }
+  } catch (err) {
+    console.warn('[carousel-verifier] fact-check failed:', (err as Error)?.message);
+    checks.push({ id: 'fact-check', label: 'בדיקת עובדות מול המקור', status: 'warn', detail: 'בדיקת העובדות לא רצה (שגיאת מודל) — יש לקרוא את הטענות מול הכתבה לפני פרסום' });
+    return;
+  }
+
+  // A bullet emptied by the check leaves a hole; a value slide emptied entirely has nothing to render.
+  for (const s of slides) s.bullets = s.bullets.filter(Boolean);
+  for (let i = slides.length - 1; i >= 0; i--) {
+    const s = slides[i];
+    if (s.role === 'value' && !s.headline && !s.body && !s.quote && !s.stat && !s.bullets.length && !(s.items?.length) && !s.code) slides.splice(i, 1);
+  }
+
+  if (corrected || dropped) fixes.push(`בדיקת עובדות: תוקנו ${corrected} טענות${dropped ? `, הוסרו ${dropped}` : ''} — ${issues.slice(0, 3).join(' · ')}`);
+  checks.push({
+    id: 'fact-check',
+    label: 'בדיקת עובדות מול המקור',
+    status: unresolved ? 'fail' : unchecked ? 'warn' : 'pass',
+    detail: unresolved
+      ? `${unresolved} טענות לא נאמנות למקור ולא ניתנו לתיקון`
+      : unchecked
+        ? `${unchecked}/${units.length} טענות לא נבדקו`
+        : `${units.length} טענות נבדקו מול הכתבה${corrected || dropped ? ` · ${corrected} תוקנו${dropped ? `, ${dropped} הוסרו` : ''}` : ' · כולן נאמנות למקור'}`,
+  });
 }

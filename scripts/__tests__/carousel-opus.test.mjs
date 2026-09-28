@@ -76,6 +76,8 @@ t('slop · negative parallelism (לא רק … אלא גם)', kinds('הוא לא
 t('slop · Hebrew headline formula (לא X, אלא Y)', kinds("לא צ'אט, אלא מנוע החלטות", { heading: true }).includes('negative-parallelism'));
 t('slop · signposting', kinds('בואו נצלול לפרטים.').includes('signposting'));
 t('slop · weasel attribution', kinds('מומחים אומרים שזה יעבוד.').includes('weasel'));
+t('slop · an attributed estimate is not weasel', !kinds('לפי הערכות החברה, הוא מהיר פי 193.6.').includes('weasel'));
+t('slop · an unattributed estimate still is', kinds('לפי הערכות, זה יחסוך חצי מהעלות.').includes('weasel'));
 t('slop · generic conclusion', kinds('העתיד נראה מבטיח.').includes('generic-conclusion'));
 t('slop · em-dash cluster', kinds('א — ב — ג.').includes('em-dash-cluster'));
 t('slop · a single em dash is fine (house style)', !kinds('Jev — מודל החלטות.').includes('em-dash-cluster'));
@@ -135,6 +137,15 @@ t('endpoint · carousel-studio runs the verifier before responding', /verifyCaro
 t('endpoint · item copy goes through sanitizeOutput', /s\.items \?\? \[\]\)\.map\(\(i\) => `\$\{i\.name\}/.test(api));
 t('engine · entities must appear in the source', /lowerSource\.includes\(e\.toLowerCase\(\)\)/.test(engine));
 t('engine · anti-slop rules reach every deck prompt', (engine.match(/\$\{ANTI_SLOP_RULES\}/g) ?? []).length >= 7, String((engine.match(/\$\{ANTI_SLOP_RULES\}/g) ?? []).length));
+
+// fact-check pass wiring (the model call itself needs a key; the contract is asserted at source level)
+const verifierSrc = readFileSync(new URL('../../src/server/carouselVerifier.ts', import.meta.url), 'utf8');
+t('fact-check · runs after coverage and before anti-slop', verifierSrc.indexOf('await factCheckPass(') > verifierSrc.indexOf('3a · coverage') && verifierSrc.indexOf('await factCheckPass(') < verifierSrc.indexOf('// ── 4 · anti-slop'));
+t('fact-check · list items are rewritten, never dropped', /required: true/.test(verifierSrc) && /else if \(!u\.required\)/.test(verifierSrc));
+t('fact-check · rewrites get a confirmation pass', /const second = await factCheckCarouselClaims/.test(verifierSrc));
+t('fact-check · a failed call reports warn, never pass', /fact-check failed[\s\S]{0,200}status: 'warn'/.test(verifierSrc));
+t('fact-check · runs on the carousel tier', /tier: 'carousel'/.test(fnBody('factCheckCarouselClaims')));
+t('fact-check · CTA copy is not sent as an article claim', /if \(s\.role === 'cta'\) return; \/\/ brand copy/.test(verifierSrc));
 
 // verifier end-to-end on a tiny deck: contrast headline fixed, unknown name flagged, number checked
 {

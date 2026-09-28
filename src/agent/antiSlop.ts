@@ -75,7 +75,8 @@ const PATTERNS: { kind: SlopKind; re: RegExp; sentence?: boolean }[] = [
   { kind: 'signposting', re: /בואו נצלול|הנה מה שצריך לדעת|בפוסט (?:הזה|הבא) (?:נסקור|נעבור)|בקרוסלה הזו נסקור|בלי הקדמות|בלי יותר מדי הקדמות/u, sentence: true },
   { kind: 'fake-candid', re: /(?:^|[.!?]\s*)(?:בכנות|האמת)\?|הנה העניין[:,]/u },
   { kind: 'authority-trope', re: /בבסיס הכ(?:ו)?ל|השאלה האמיתית היא|מה שבאמת משנה|בלב העניין/u },
-  { kind: 'weasel', re: /מומחים (?:אומרים|טוענים|מעריכים)|לפי הערכות|רבים טוענים|יש הטוענים/u },
+  // "לפי הערכות" is weasel only when nobody is named: "לפי הערכות החברה" / "…של TypeSafe" attribute.
+  { kind: 'weasel', re: /מומחים (?:אומרים|טוענים|מעריכים)|לפי הערכות(?!\s+(?:ה?חברה|של\s|\p{Lu}|[A-Za-z]))|רבים טוענים|יש הטוענים/u },
   { kind: 'false-range', re: /מ-?\S+ ועד \S+[,،]? וכל מה שביניהם/u },
   { kind: 'generic-conclusion', re: /העתיד נראה (?:מבטיח|ורוד|מרגש)|ימים מרגשים|צעד בכיוון הנכון|השמיים הם הגבול|רק ההתחלה/u, sentence: true },
   { kind: 'chatbot-closer', re: /מקווה ש(?:זה )?עזר|אשמח לענות|אשמח לעזור|אל תהססו לשאול/u, sentence: true },

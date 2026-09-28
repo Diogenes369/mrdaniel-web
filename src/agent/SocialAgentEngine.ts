@@ -1327,6 +1327,74 @@ export async function synthesizeMissingListEntries(input: {
     .filter((e) => e.n > 0 && e.text.length > 10);
 }
 
+// --- Carousel fact-check — meaning-level precision against the source ----------------------------
+//
+// The verifier's deterministic checks prove coverage, numbers and names. They cannot see a claim
+// whose words are all in the article but whose MEANING is not: a benchmark multiplier applied to all
+// twenty use cases, "approved 0 of 8" rendered as "blocked 0 of 8", "worth turning into skills"
+// upgraded to "successful". Found in production on 2026-09-28, in decks that scored 100. Those need a
+// reader, so this pass is a second model call that reads every claim beside the source and returns a
+// corrected sentence for anything that is not a faithful statement of it.
+
+const FACT_CHECK_SYSTEM_INSTRUCTION = `אתה בודק עובדות קפדן לקרוסלות בעברית שנכתבו מכתבה באנגלית. קיבלת את טקסט המקור ורשימת יחידות טקסט מהקרוסלה, כל אחת עם id.
+לכל יחידה קבע verdict:
+- "ok" — כל טענה ביחידה נאמרת במקור, באותו היקף ובאותה משמעות. ניסוח חופשי בעברית מותר.
+- "fix" — יש בה לפחות אחד מאלה:
+  • טענה שאין לה בסיס במקור (למשל "ללא טעויות אנוש" כשהמקור לא אומר זאת).
+  • היפוך משמעות ("חסם 0 מתוך 8" כשהמקור אומר "approved 0 of 8" — כלומר לא אישר אף אחת).
+  • ייחוס שגוי או הרחבת היקף: נתון שנמדד על דבר אחד מוצג כאילו חל על משהו אחר או על הכול (למשל "20 משימות במהירות פי 193" כשפי 193 הוא תוצאה של הערכה פנימית של החברה, לא של 20 מקרי השימוש).
+  • חיזוק או החלפה של מילת תיאור: "state-changing" ≠ "מסוכן", "worth turning into skills" ≠ "מוצלח", "about" ≠ מספר מדויק, "in its calibration" ≠ "תמיד".
+  • השמטה שהופכת את הטענה ללא נכונה (למשל השמטת "לפי המבחנים של החברה עצמה" מנתון שנוי במחלוקת).
+  • למה אסור "fix": סגנון, קיצור, או מידע שהושמט בלי לשנות את נכונות הטענה.
+כאשר verdict="fix": issue = משפט קצר בעברית מה לא נכון; fix = אותה יחידה משוכתבת בעברית טבעית, באורך דומה ובאותו קול, שאומרת רק מה שהמקור אומר. שמור שמות באנגלית כפי שהם, שמור מספרים מדויקים מהמקור, אל תוסיף מידע חדש. אם אין דרך להציל את היחידה — fix="".
+החזר JSON בלבד: {"verdicts":[{"id":"...","verdict":"ok|fix","issue":"...","fix":"..."}]} — verdict לכל id שקיבלת, בלי לדלג.`;
+
+export interface FactCheckUnit {
+  id: string;
+  text: string;
+}
+
+export interface FactCheckVerdict {
+  id: string;
+  verdict: 'ok' | 'fix';
+  issue: string;
+  fix: string;
+}
+
+/**
+ * One call over all units. Returns a verdict per id the model answered for; an id it skipped is
+ * absent (the caller treats that as unchecked, never as ok). Throws on a transport/parse failure so
+ * the verifier can report the pass as not run rather than as passed.
+ */
+export async function factCheckCarouselClaims(input: { source: string; units: FactCheckUnit[] }): Promise<FactCheckVerdict[]> {
+  if (!input.units.length) return [];
+  const { clean } = sanitizeInput(input.source.slice(0, 14000));
+  const units = input.units.map((u) => ({ id: u.id, text: u.text.replace(/[‎‏⁦-⁩]/g, '') }));
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: `טקסט המקור:\n"""\n${clean}\n"""\n\nיחידות הקרוסלה לבדיקה:\n${JSON.stringify(units, null, 1)}` }],
+      },
+    ],
+    config: { systemInstruction: FACT_CHECK_SYSTEM_INSTRUCTION, temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 6000 },
+  }, { textOnly: true, tier: 'carousel' });
+  const parsed = parseJsonOrThrow(stripCodeFence(requireText(response)), 'factCheckCarouselClaims') as { verdicts?: unknown };
+  const ids = new Set(input.units.map((u) => u.id));
+  return (Array.isArray(parsed?.verdicts) ? parsed.verdicts : [])
+    .map((v) => {
+      const r = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+      return {
+        id: String(r.id ?? ''),
+        verdict: String(r.verdict ?? '').toLowerCase() === 'fix' ? ('fix' as const) : ('ok' as const),
+        issue: sanitizeHebrewText(String(r.issue ?? '').trim()).slice(0, 200),
+        fix: cleanCarouselText(r.fix, 480),
+      };
+    })
+    .filter((v) => ids.has(v.id));
+}
+
 // --- AI Slide Editor — apply a natural-language edit to an existing carousel deck -------------
 
 const SLIDE_EDIT_SYSTEM_INSTRUCTION = `אתה עורך תוכן מקצועי לקרוסלות עברית. קיבלת מערך שקופיות (JSON) והוראת עריכה של המשתמש. החזר את אותו מספר שקופיות, באותו סדר ובאותו kind, כאשר רק מה שההוראה מבקשת השתנה — כל שאר השקופיות זהות מילה במילה.

@@ -153,7 +153,9 @@ it. `qwen/qwen3.8-27b` is faster but rewrites Latin technical terms, which break
 - **Listicles** (`src/agent/listExtract.ts`): "Label: text" / numbered / bulleted runs are found in
   code and handed to the model as a numbered checklist; decks cover every item via the `items` layout.
 - **Verifier** (`src/server/carouselVerifier.ts`) runs inside `carousel-studio` before the response:
-  coverage (one repair call for missing items), anti-slop (ceremony sentences dropped), readability,
+  coverage (one repair call for missing items), a model **fact-check** of every claim against the
+  source (rewrites unsupported / inverted / misattributed / strengthened claims, then re-checks the
+  rewrites; list items are rewritten, never dropped), anti-slop (ceremony sentences dropped), readability,
   numbers-vs-source, design variance (seeded per title). Report ships as `verification`, shown by
   `DeckVerificationPanel`. Slides carry optional `design` {align, zone, tone, scale}; deck carries
   source-checked `entities`, drawn as monogram wordmarks (never fetched logo files — canvas taint +
