@@ -96,7 +96,7 @@
       "maxDuration": 90
     },
     "api/agent-generate.ts": {
-      "maxDuration": 120
+      "maxDuration": 180
     }
   }
 }

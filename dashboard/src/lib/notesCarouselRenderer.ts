@@ -400,6 +400,15 @@ function renderChecklist({ ctx, s, style }: Ctx) {
   bulletList(ctx, items, W - PAD, y, W - PAD * 2, CONTENT_BOTTOM - y, style.accent, '•');
 }
 
+/** `items` in the study-notes look: the numbered entries become the notebook's bullet list, each
+ *  prefixed with its SOURCE index so the list's coverage stays legible in this theme too. */
+function renderItems(c: Ctx) {
+  const entries = c.s.items ?? [];
+  if (!entries.length) return renderChecklist(c);
+  const bullets = entries.map((e) => `${String(e.n).padStart(2, '0')} · ${e.name}: ${e.text}`);
+  renderChecklist({ ...c, s: { ...c.s, bullets, bulletsLeft: [] } });
+}
+
 function renderStat({ ctx, s, style }: Ctx) {
   const stat = he(s.stat || '—');
   const { px } = autoFit(ctx, stat, W - PAD * 2, 230, 110, 1, (c, p) => setBold(c, p, 800));
@@ -613,6 +622,7 @@ const RENDERERS: Record<LayoutKind, (c: Ctx) => void> = {
   comparison: renderComparison,
   prompt: renderPrompt,
   quote: renderQuote,
+  items: renderItems,
   cta: renderCta,
 };
 

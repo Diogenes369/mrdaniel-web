@@ -1,7 +1,7 @@
 import { SITE_ORIGIN } from './useDashboardRefresh';
 import { importUrl, parseRawText, stripAuthorNoise, cleanExtractedBody } from './repurposeApi';
 import type { NewsTopic } from './newsAgentTypes';
-import type { LayoutKind, ResearchBrief, SlideRole, StudioDeck, StudioPreset, StudioSlide, StudioTheme } from './carouselStudioTypes';
+import type { DeckVerification, LayoutKind, ListEntry, ResearchBrief, SlideDesign, SlideRole, StudioDeck, StudioPreset, StudioSlide, StudioTheme } from './carouselStudioTypes';
 import { getAdminSecret } from './adminSecret';
 import { describeAiError, aiRetryDelayMs } from './aiErrors';
 
@@ -18,7 +18,9 @@ import { describeAiError, aiRetryDelayMs } from './aiErrors';
 
 const ENDPOINT = `${SITE_ORIGIN.replace(/\/$/, '')}/api/agent-generate`;
 
-async function post(body: Record<string, unknown>, timeoutMs = 90000): Promise<Response> {
+// 170s: the carousel tier runs Claude Opus 5.5 first (up to ~90s on a 20-item listicle) and the
+// server falls back to the free models inside the same request, under a 180s function ceiling.
+async function post(body: Record<string, unknown>, timeoutMs = 170000): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(getAdminSecret() ? { 'x-admin-secret': getAdminSecret() } : {}),
@@ -195,6 +197,8 @@ export interface ApiSlide {
   code?: string;
   quote?: string;
   readingTime?: string;
+  items?: ListEntry[];
+  design?: SlideDesign;
 }
 
 export function toStudioSlide(s: ApiSlide, index: number): StudioSlide {
@@ -218,6 +222,10 @@ export function toStudioSlide(s: ApiSlide, index: number): StudioSlide {
     readingTime: s.readingTime || '',
     accent: 'green',
     glow: 0.5,
+    ...(Array.isArray(s.items) && s.items.length
+      ? { items: s.items.filter((i) => i && (i.name || i.text)).map((i) => ({ n: Number(i.n) || 0, name: String(i.name ?? ''), text: String(i.text ?? '') })) }
+      : {}),
+    ...(s.design ? { design: s.design } : {}),
   };
 }
 
@@ -325,7 +333,7 @@ export async function synthesizeStudioDeck(
       takeaways: brief.takeaways,
     });
     if (!res.ok) return buildDeckFallback(brief, topic, (await describeAiError(res)).message, theme);
-    const data = (await res.json()) as { ok?: boolean; blocked?: boolean; deck?: ApiSlide[] };
+    const data = (await res.json()) as { ok?: boolean; blocked?: boolean; deck?: ApiSlide[]; entities?: unknown; verification?: DeckVerification };
     if (data.blocked) return buildDeckFallback(brief, topic, 'הפלט נחסם ע"י מסנן התוכן', theme);
     if (!data.ok || !Array.isArray(data.deck) || data.deck.length < 5) {
       return buildDeckFallback(brief, topic, 'מנוע ה-AI לא החזיר קרוסלה שמישה', theme);
@@ -339,7 +347,7 @@ export async function synthesizeStudioDeck(
       if (!cta.headline) cta.headline = 'רוצים ליישם את זה נכון?';
       if (!cta.body) cta.body = 'המדריך המלא, כלים ודוגמאות — ב-mrdaniel.co.il. עקבו לעוד פירוקים של AI.';
     }
-    slides = slides.filter((s) => s.headline || s.body || s.bullets.length || s.quote || s.code || s.stat || s.role === 'cta');
+    slides = slides.filter((s) => s.headline || s.body || s.bullets.length || s.items?.length || s.quote || s.code || s.stat || s.role === 'cta');
     return {
       slides: slides.map((s, i) => ({ ...s, index: i })),
       topic,
@@ -351,6 +359,8 @@ export async function synthesizeStudioDeck(
       synthesized: true,
       theme,
       createdAt: Date.now(),
+      entities: Array.isArray(data.entities) ? data.entities.map((e) => String(e)).filter(Boolean).slice(0, 6) : [],
+      ...(data.verification && Array.isArray(data.verification.checks) ? { verification: data.verification } : {}),
     };
   } catch (e) {
     return buildDeckFallback(brief, topic, (e as Error).message || 'שגיאת רשת מול מנוע ה-AI', theme);

@@ -29,7 +29,7 @@
     "test:bidi": "tsx scripts/__tests__/hebrew-bidi.test.mjs",
     "test:higgsfield": "tsx scripts/__tests__/openhiggsfield-bridge.test.mjs",
     "test:screenshot": "tsx scripts/__tests__/screenshot-to-code.test.mjs",
-    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma && npm run test:bidi && npm run test:higgsfield && npm run test:screenshot && npm run test:x && npm run test:newsimg && npm run test:groq && npm run test:news && npm run test:copy && npm run test:xalgo && npm run test:tone && npm run test:sync && npm run test:terms && npm run test:fidelity && npm run test:quality",
+    "test": "npm run test:pacing && npm run test:voice && npm run test:prompt && npm run test:carousel && npm run test:figma && npm run test:bidi && npm run test:higgsfield && npm run test:screenshot && npm run test:x && npm run test:newsimg && npm run test:groq && npm run test:news && npm run test:copy && npm run test:xalgo && npm run test:tone && npm run test:sync && npm run test:terms && npm run test:fidelity && npm run test:quality && npm run test:opus",
     "test:x": "tsx scripts/__tests__/x-import.test.mjs",
     "test:newsimg": "tsx scripts/__tests__/news-images.test.mjs",
     "test:groq": "tsx scripts/__tests__/groq-router.test.mjs",
@@ -40,9 +40,11 @@
     "test:sync": "tsx scripts/__tests__/site-sync.test.mjs",
     "test:terms": "tsx scripts/__tests__/ai-terms.test.mjs",
     "test:fidelity": "tsx scripts/__tests__/source-fidelity.test.mjs",
-    "test:quality": "tsx scripts/__tests__/news-quality.test.mjs"
+    "test:quality": "tsx scripts/__tests__/news-quality.test.mjs",
+    "test:opus": "tsx scripts/__tests__/carousel-opus.test.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@google/genai": "^2.19.0",
     "@gsap/react": "^2.1.2",
     "@netlify/functions": "^6.0.0",

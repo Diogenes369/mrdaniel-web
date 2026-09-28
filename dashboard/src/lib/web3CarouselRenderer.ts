@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { getLogo, loadFont, wrapRtl, wrapRtlBalanced } from './newsImageComposer';
 import { FONT_HEADLINE } from './designAssets';
 import { sanitizeHebrewText } from './hebrewTextSanitizer';
-import type { AccentKey, LayoutKind, StudioDeck, StudioSlide } from './carouselStudioTypes';
+import type { AccentKey, LayoutKind, SlideDesign, StudioDeck, StudioSlide } from './carouselStudioTypes';
 
 /**
  * Agents 3 & 4 of the WEB3 Carousel Studio.
@@ -47,23 +47,199 @@ const LAYOUT_STYLE: Record<LayoutKind, { accent: AccentKey; glow: number }> = {
   comparison: { accent: 'green', glow: 0.5 },
   prompt: { accent: 'green', glow: 0.55 },
   quote: { accent: 'cyan', glow: 0.7 },
+  items: { accent: 'green', glow: 0.45 },
   cta: { accent: 'green', glow: 1 },
 };
+
+/** Deterministic PRNG from a string — same article, same rhythm; a different article, a different one. */
+function seededRandom(seedText: string): () => number {
+  let h = 2166136261;
+  for (const ch of seedText) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  };
+}
+
+const ZONES: SlideDesign['zone'][] = ['top', 'center', 'bottom'];
+const TONES: SlideDesign['tone'][] = ['plain', 'band', 'split', 'spot'];
+
+/**
+ * Design for a slide that arrived without one (the local fallback deck, a Grok deck, a session
+ * saved by an older build). The server verifier already did this for AI decks; this keeps the
+ * fallback from being the one deck that always looks identical.
+ */
+function seedDesign(s: StudioSlide, rnd: () => number, prev?: SlideDesign): SlideDesign {
+  const rows = s.layout === 'items' || s.layout === 'checklist' || s.layout === 'comparison';
+  let zone: SlideDesign['zone'] = s.role === 'cta' ? 'center' : rows ? (rnd() < 0.5 ? 'top' : 'center') : ZONES[Math.floor(rnd() * 3)];
+  let tone = TONES[Math.floor(rnd() * TONES.length)];
+  if (prev && prev.tone === tone) tone = TONES[(TONES.indexOf(tone) + 1) % TONES.length];
+  if (prev && prev.zone === zone && !rows && s.role !== 'cta') zone = ZONES[(ZONES.indexOf(zone) + 1) % 3];
+  return {
+    align: s.layout === 'quote' || s.layout === 'stat' || s.role === 'cta' ? 'center' : 'right',
+    zone,
+    tone,
+    scale: s.role === 'hook' ? 'xl' : rnd() < 0.35 ? 'm' : 'l',
+  };
+}
 
 /** Pure — returns a new deck with per-slide accent + glow assigned. `value` slides alternate the
  * accent so a long deck keeps visual rhythm. */
 export function directDeck(deck: StudioDeck): StudioDeck {
   let valueSeen = 0;
+  const rnd = seededRandom(deck.title || deck.slides[0]?.headline || 'deck');
+  let prev: SlideDesign | undefined;
   const slides = deck.slides.map((s): StudioSlide => {
     const base = LAYOUT_STYLE[s.layout] ?? LAYOUT_STYLE.value;
     let accent = base.accent;
-    if (s.layout === 'value') {
+    if (s.layout === 'value' || s.layout === 'items') {
       accent = valueSeen % 2 === 0 ? 'green' : 'cyan';
       valueSeen++;
     }
-    return { ...s, accent, glow: base.glow };
+    const design = s.design ?? seedDesign(s, rnd, prev);
+    prev = design;
+    return { ...s, accent, glow: base.glow, design };
   });
   return { ...deck, slides };
+}
+
+// ─── design direction (align / zone / tone / scale) ──────────────────────────────────────
+
+const DEFAULT_DESIGN: SlideDesign = { align: 'right', zone: 'center', tone: 'plain', scale: 'l' };
+const designOf = (s: StudioSlide): SlideDesign => s.design ?? DEFAULT_DESIGN;
+const scaleOf = (s: StudioSlide) => ({ xl: 1.16, l: 1, m: 0.86 })[designOf(s).scale] ?? 1;
+
+/** Where in the free vertical space a block sits: 0 = flush top, 1 = flush bottom. */
+function zoneFactor(s: StudioSlide): number {
+  return { top: 0.04, center: 0.45, bottom: 0.92 }[designOf(s).zone] ?? 0.45;
+}
+
+/** The band of the canvas the text block occupies, for the tone treatment behind it. */
+function zoneBand(s: StudioSlide): [number, number] {
+  switch (designOf(s).zone) {
+    case 'top':
+      return [CONTENT_TOP - 30, CONTENT_TOP + 560];
+    case 'bottom':
+      return [H * 0.44, CONTENT_BOTTOM + 10];
+    default:
+      return [H * 0.26, H * 0.74];
+  }
+}
+
+/**
+ * The contrast treatment behind the text. All four keep the white ink legible (DESIGN.md: solid
+ * ink, no gradient fills on glyphs) — they vary the GROUND, which is what makes consecutive slides
+ * read as designed rather than stamped from one template.
+ */
+function paintTone(ctx: CanvasRenderingContext2D, s: StudioSlide) {
+  const tone = designOf(s).tone;
+  if (tone === 'plain' || s.layout === 'cta') return;
+  const accent = accentHex(s.accent);
+  const [y0, y1] = zoneBand(s);
+  ctx.save();
+  if (tone === 'band') {
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.fillRect(0, y0, W, y1 - y0);
+    ctx.fillStyle = hexToRgba(accent, 0.06);
+    ctx.fillRect(0, y0, W, y1 - y0);
+    ctx.fillStyle = hexToRgba(accent, 0.45);
+    ctx.fillRect(0, y0, W, 2);
+    ctx.fillRect(0, y1 - 2, W, 2);
+  } else if (tone === 'split') {
+    // The dark half sits opposite the RTL text edge, so the reading edge stays on the lit side.
+    const splitX = W * 0.46;
+    const g = ctx.createLinearGradient(0, 0, splitX, 0);
+    g.addColorStop(0, 'rgba(0,0,0,0.55)');
+    g.addColorStop(1, 'rgba(0,0,0,0.30)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, splitX, H);
+    // The accent edge sits on the canvas's outer edge, never across the text panels.
+    ctx.fillStyle = hexToRgba(accent, 0.55);
+    ctx.fillRect(0, y0, 5, y1 - y0);
+  } else if (tone === 'spot') {
+    const cy = (y0 + y1) / 2;
+    const cx = designOf(s).align === 'center' ? W / 2 : W * 0.7;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.62);
+    g.addColorStop(0, hexToRgba(accent, 0.2));
+    g.addColorStop(0.5, hexToRgba(accent, 0.05));
+    g.addColorStop(1, hexToRgba(accent, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+  ctx.restore();
+}
+
+// ─── entity wordmarks ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Wordmark lockups for the companies/products the article names (TypeSafe AI, Jev, Claude Code…).
+ *
+ * Drawn, not fetched: a real logo file would have to come from a third-party host, which taints the
+ * canvas and breaks `toDataURL` (the same reason designAssets draws its tool marks as vectors), and
+ * putting a company's actual trademark on a branded slide is a rights question, not a code one. A
+ * monogram tile + the name set in the mono face reads as "this slide is about X" at feed size.
+ * The names are source-checked on the server — only entities the article itself names get here.
+ */
+function drawWordmark(ctx: CanvasRenderingContext2D, name: string, rightX: number, y: number, accent: string, h = 46): number {
+  const label = name.trim();
+  ctx.save();
+  setMono(ctx, Math.round(h * 0.46), 700);
+  const textW = ctx.measureText(label).width;
+  const w = h + 18 + textW + 22;
+  const x = rightX - w;
+  roundRectPath(ctx, x, y, w, h, 12);
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // monogram tile — the logo stand-in
+  roundRectPath(ctx, x + 6, y + 6, h - 12, h - 12, 8);
+  ctx.fillStyle = accent;
+  ctx.fill();
+  ctx.fillStyle = '#05070A';
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  setDisplay(ctx, Math.round(h * 0.5), 900);
+  ctx.fillText((label.match(/[A-Za-z0-9֐-׿]/)?.[0] ?? '•').toUpperCase(), x + h / 2, y + h / 2 + 1);
+  setMono(ctx, Math.round(h * 0.46), 700);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillText(label, x + h + 12, y + h / 2 + 1);
+  ctx.restore();
+  return x;
+}
+
+/** Entities this slide actually talks about (case-insensitive substring over its copy). */
+function slideEntities(s: StudioSlide, entities: string[]): string[] {
+  const text = [s.headline, s.subhead, s.body, s.quote, ...s.bullets, ...(s.items ?? []).map((i) => `${i.name} ${i.text}`)].join(' ').toLowerCase();
+  return entities.filter((e) => text.includes(e.toLowerCase()));
+}
+
+function drawEntityLockups(ctx: CanvasRenderingContext2D, s: StudioSlide, entities: string[]) {
+  if (!entities.length || s.layout === 'cta') return;
+  const accent = accentHex(s.accent);
+  if (s.role === 'hook') {
+    // The cover carries the article's cast: up to four marks in a row above the bottom rail.
+    let right = W - PAD;
+    for (const e of entities.slice(0, 4)) {
+      const x = drawWordmark(ctx, e, right, CONTENT_BOTTOM - 60, accent, 48);
+      right = x - 14;
+      if (right < PAD + 160) break;
+    }
+    return;
+  }
+  // Inner slides: one mark, top-left of the header band, only when the slide names that entity.
+  const hit = slideEntities(s, entities)[0];
+  if (!hit) return;
+  ctx.save();
+  setMono(ctx, 17, 700);
+  const w = 40 + 18 + ctx.measureText(hit).width + 22;
+  ctx.restore();
+  drawWordmark(ctx, hit, PAD + w, 106, accent, 40);
 }
 
 // ─── shared canvas chrome ─────────────────────────────────────────────────────────────────
@@ -402,14 +578,19 @@ function autoFitLines(
   return { lines, px };
 }
 
-function renderHero(ctx: CanvasRenderingContext2D, s: StudioSlide) {
+function renderHero(ctx: CanvasRenderingContext2D, s: StudioSlide, reserveBottom = 0) {
   const b = contentBox();
   const accent = accentHex(s.accent);
+  const centered = designOf(s).align === 'center';
   const headText = sanitizeHebrewText(s.headline);
-  const { lines, px } = autoFitLines(ctx, headText, b.w, 96, 52, 5, (c, p) => setHeadline(c, p, 800), true);
+  const { lines, px } = autoFitLines(ctx, headText, b.w, Math.round(96 * scaleOf(s)), 52, 5, (c, p) => setHeadline(c, p, 800), true);
   const lh = px * 1.2;
-  const blockH = lines.length * lh;
-  let y = b.y + Math.max(40, (b.h - blockH) * 0.42) + px;
+  // The whole block — headline, subhead, reading-time pill — so a bottom zone cannot push it off.
+  setBody(ctx, 34, 400);
+  const subLines = s.subhead ? Math.min(4, wrapRtl(ctx, sanitizeHebrewText(s.subhead), b.w).length) : 0;
+  const blockH = lines.length * lh + (subLines ? 26 + subLines * 46 : 0) + (s.readingTime ? 80 : 0) + 30;
+  const free = Math.max(0, b.h - reserveBottom - blockH);
+  let y = b.y + Math.max(40, free * zoneFactor(s)) + px;
 
   // accent tick above the headline
   ctx.save();
@@ -418,12 +599,15 @@ function renderHero(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   ctx.shadowColor = accent;
   ctx.shadowBlur = 16;
   ctx.beginPath();
-  ctx.moveTo(b.x + b.w, y - px - 26);
-  ctx.lineTo(b.x + b.w - 150, y - px - 26);
+  const tickRight = centered ? W / 2 + 75 : b.x + b.w;
+  ctx.moveTo(tickRight, y - px - 26);
+  ctx.lineTo(tickRight - 150, y - px - 26);
   ctx.stroke();
   ctx.restore();
 
-  y = drawHeadlineLines(ctx, lines, b.x + b.w, y, lh, accent, false);
+  // The block measurement above left the body face set; drawHeadlineLines draws in whatever is current.
+  setHeadline(ctx, px, 800);
+  y = drawHeadlineLines(ctx, lines, b.x + b.w, y, lh, accent, centered);
 
   // sub-headline
   if (s.subhead) {
@@ -431,9 +615,9 @@ function renderHero(ctx: CanvasRenderingContext2D, s: StudioSlide) {
     setBody(ctx, 34, 400);
     ctx.fillStyle = 'rgba(226,232,240,0.82)';
     ctx.direction = 'rtl';
-    ctx.textAlign = 'right';
+    ctx.textAlign = centered ? 'center' : 'right';
     for (const line of wrapRtl(ctx, sanitizeHebrewText(s.subhead), b.w).slice(0, 4)) {
-      ctx.fillText(line, b.x + b.w, y);
+      ctx.fillText(line, centered ? W / 2 : b.x + b.w, y);
       y += 46;
     }
   }
@@ -444,7 +628,7 @@ function renderHero(ctx: CanvasRenderingContext2D, s: StudioSlide) {
     setMono(ctx, 20, 600);
     const label = sanitizeHebrewText(s.readingTime);
     const tw = ctx.measureText(label).width + 40;
-    const px2 = b.x + b.w - tw;
+    const px2 = centered ? W / 2 - tw / 2 : b.x + b.w - tw;
     roundRectPath(ctx, px2, y, tw, 44, 22);
     ctx.fillStyle = hexToRgba(accent, 0.12);
     ctx.fill();
@@ -463,39 +647,144 @@ function renderHero(ctx: CanvasRenderingContext2D, s: StudioSlide) {
 function renderValue(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   const b = contentBox();
   const accent = accentHex(s.accent);
-  let y = b.y + 26;
+  const centered = designOf(s).align === 'center';
+  const inW = b.w - 92;
+  const bodyText = sanitizeHebrewText(s.body || (s.bullets || []).join('. '));
 
-  if (s.headline) {
-    const { lines, px } = autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, 58, 40, 3, (c, p) => setHeadline(c, p, 800), true);
-    y = drawHeadlineLines(ctx, lines, b.x + b.w, y + px, px * 1.16, accent, false);
+  // Measure first, place second: the zone decides where the headline+panel block sits.
+  const head = s.headline
+    ? autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, Math.round(58 * scaleOf(s)), 40, 3, (c, p) => setHeadline(c, p, 800), true)
+    : null;
+  const headH = head ? head.lines.length * head.px * 1.16 + 62 + 26 : 26;
+  const body = autoFitLines(ctx, bodyText, inW, 40, 26, 12, (c, p) => setBody(c, p, 400));
+  const lh = body.px * 1.5;
+  const maxPanel = b.h - headH;
+  const panelH = Math.min(maxPanel, Math.max(260, body.lines.length * lh + 110));
+  let y = b.y + (maxPanel - panelH) * zoneFactor(s);
+
+  if (head) {
+    setHeadline(ctx, head.px, 800);
+    y = drawHeadlineLines(ctx, head.lines, b.x + b.w, y + 26 + head.px, head.px * 1.16, accent, centered);
     // accent rule
     ctx.save();
     ctx.fillStyle = accent;
     ctx.shadowColor = accent;
     ctx.shadowBlur = 12;
-    roundRectPath(ctx, b.x + b.w - 132, y + 14, 132, 5, 2.5);
+    roundRectPath(ctx, centered ? W / 2 - 66 : b.x + b.w - 132, y + 14, 132, 5, 2.5);
     ctx.fill();
     ctx.restore();
     y += 62;
+  } else {
+    y += 26;
   }
 
   const panelY = y;
-  const panelH = b.y + b.h - panelY;
   glassPanel(ctx, b.x, panelY, b.w, panelH, 30, accent);
 
-  const inX = b.x + 46;
-  const inW = b.w - 92;
-  const bodyText = sanitizeHebrewText(s.body || (s.bullets || []).join('. '));
-  const { lines, px } = autoFitLines(ctx, bodyText, inW, 40, 26, 12, (c, p) => setBody(c, p, 400));
-  setBody(ctx, px, 400);
+  setBody(ctx, body.px, 400);
   ctx.fillStyle = 'rgba(255,255,255,0.94)';
   ctx.direction = 'rtl';
-  ctx.textAlign = 'right';
-  const lh = px * 1.5;
-  let ty = panelY + Math.max(46, (panelH - lines.length * lh) / 2) + px;
-  for (const line of lines) {
-    ctx.fillText(line, b.x + b.w - 46, ty);
+  ctx.textAlign = centered ? 'center' : 'right';
+  let ty = panelY + Math.max(46, (panelH - body.lines.length * lh) / 2) + body.px;
+  for (const line of body.lines) {
+    ctx.fillText(line, centered ? W / 2 : b.x + b.w - 46, ty);
     ty += lh;
+  }
+}
+
+/**
+ * `items` — one to three numbered entries from a source list. The number is the item's position
+ * in the SOURCE ("07"), not on the slide, so a reader can tell the deck covers the whole list.
+ * Names are Latin product/technique names and are set LTR in the mono face; the explanation is
+ * Hebrew body copy.
+ */
+function renderItems(ctx: CanvasRenderingContext2D, s: StudioSlide) {
+  const b = contentBox();
+  const accent = accentHex(s.accent);
+  const entries = (s.items ?? []).slice(0, 3);
+  if (!entries.length) return renderValue(ctx, s);
+
+  const head = s.headline
+    ? autoFitLines(ctx, sanitizeHebrewText(s.headline), b.w, Math.round(54 * scaleOf(s)), 38, 2, (c, p) => setHeadline(c, p, 800), true)
+    : null;
+  const headH = head ? head.lines.length * head.px * 1.16 + 40 : 0;
+
+  // Card geometry: number column on the right (RTL start), copy to its left.
+  const numW = 118;
+  const copyW = b.w - numW - 60;
+  const cardGap = 26;
+  const room = b.h - headH - 30;
+  // Size ladder: the largest type at which every card fits. Two short entries at a fixed 32px left
+  // half the slide empty; the copy should fill the frame it was given.
+  const measureAt = (bodyPx: number) =>
+    entries.map((e) => {
+      const namePx = Math.round(bodyPx * 1.02);
+      const text = autoFitLines(ctx, sanitizeHebrewText(e.text), copyW, bodyPx, 22, entries.length > 2 ? 4 : 5, (c, p) => setBody(c, p, 400));
+      setMono(ctx, namePx, 700);
+      const nameLines = wrapLtr(ctx, e.name, copyW).slice(0, 2);
+      const pad = Math.round(bodyPx * 1.25);
+      const h = pad + nameLines.length * namePx * 1.3 + 14 + text.lines.length * text.px * 1.45 + pad * 0.8;
+      return { e, text, nameLines, namePx, pad, h };
+    });
+  const total = (ms: ReturnType<typeof measureAt>) => ms.reduce((sum, m) => sum + m.h, 0) + cardGap * (ms.length - 1);
+  let measured = measureAt(26);
+  for (const px of entries.length > 2 ? [34, 31, 28] : entries.length === 2 ? [42, 38, 34, 30] : [48, 42, 36]) {
+    const m = measureAt(px);
+    if (total(m) <= room * 0.9) {
+      measured = m;
+      break;
+    }
+  }
+  const cardsH = total(measured);
+  const free = Math.max(0, b.h - headH - cardsH - 20);
+  let y = b.y + 20 + free * Math.min(zoneFactor(s), 0.5);
+
+  if (head) {
+    setHeadline(ctx, head.px, 800);
+    y = drawHeadlineLines(ctx, head.lines, b.x + b.w, y + head.px, head.px * 1.16, accent, false);
+    y += 40 - head.px * 0.16;
+  }
+
+  for (const m of measured) {
+    glassPanel(ctx, b.x, y, b.w, m.h, 24, accent);
+    // source index
+    ctx.save();
+    setDisplay(ctx, 64, 900);
+    ctx.direction = 'ltr';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = accent;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 18;
+    ctx.fillText(String(m.e.n).padStart(2, '0'), b.x + b.w - numW / 2 - 10, y + m.pad + 44);
+    ctx.restore();
+    // vertical hairline between number and copy
+    ctx.fillStyle = hexToRgba(accent, 0.35);
+    ctx.fillRect(b.x + b.w - numW - 12, y + 26, 2, m.h - 52);
+
+    const copyRight = b.x + b.w - numW - 36;
+    let ty = y + m.pad + m.namePx * 0.9;
+    ctx.save();
+    setMono(ctx, m.namePx, 700);
+    ctx.fillStyle = '#FFFFFF';
+    // Latin names read LTR but hug the RTL edge: right-aligned, LTR direction.
+    ctx.direction = 'ltr';
+    ctx.textAlign = 'right';
+    for (const line of m.nameLines) {
+      ctx.fillText(line, copyRight, ty);
+      ty += m.namePx * 1.3;
+    }
+    ctx.restore();
+    ty += 14 + m.text.px * 0.1;
+    setBody(ctx, m.text.px, 400);
+    ctx.fillStyle = 'rgba(226,232,240,0.9)';
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'right';
+    for (const line of m.text.lines) {
+      ctx.fillText(line, copyRight, ty);
+      ty += m.text.px * 1.45;
+    }
+    y += m.h + cardGap;
   }
 }
 
@@ -731,9 +1020,9 @@ function renderQuote(ctx: CanvasRenderingContext2D, s: StudioSlide) {
   ctx.fillText('”', W / 2, b.y + 150);
   ctx.restore();
 
-  const { lines, px } = autoFitLines(ctx, quote, b.w * 0.92, 60, 34, 6, (c, p) => setHeadline(c, p, 700), true);
+  const { lines, px } = autoFitLines(ctx, quote, b.w * 0.92, Math.round(60 * scaleOf(s)), 34, 6, (c, p) => setHeadline(c, p, 700), true);
   const lh = px * 1.32;
-  let y = b.y + b.h * 0.34;
+  let y = b.y + b.h * ({ top: 0.26, center: 0.34, bottom: 0.46 }[designOf(s).zone] ?? 0.34);
   y = drawHeadlineLines(ctx, lines, W / 2, y, lh, accent, true);
 
   if (s.body) {
@@ -817,6 +1106,7 @@ const LAYOUT_RENDERERS: Record<LayoutKind, (ctx: CanvasRenderingContext2D, s: St
   comparison: renderComparison,
   prompt: renderPrompt,
   quote: renderQuote,
+  items: renderItems,
   cta: renderCta,
 };
 
@@ -836,7 +1126,7 @@ async function ensureFonts() {
   ]);
 }
 
-export async function renderStudioSlide(slide: StudioSlide, total: number): Promise<string> {
+export async function renderStudioSlide(slide: StudioSlide, total: number, entities: string[] = []): Promise<string> {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -848,12 +1138,15 @@ export async function renderStudioSlide(slide: StudioSlide, total: number): Prom
   paintObsidian(ctx);
   drawCarbonGrid(ctx);
   drawAmbientGlow(ctx, slide);
+  paintTone(ctx, slide);
   await ensureFonts();
 
   drawTopBar(ctx, slide, total);
+  drawEntityLockups(ctx, slide, entities);
 
   try {
-    (LAYOUT_RENDERERS[slide.layout] ?? renderValue)(ctx, slide);
+    if (slide.layout === 'hero') renderHero(ctx, slide, entities.length ? 80 : 0);
+    else (LAYOUT_RENDERERS[slide.layout] ?? renderValue)(ctx, slide);
   } catch (err) {
     console.warn('[carousel-studio] layout render failed, using value fallback:', (err as Error)?.message);
     renderValue(ctx, slide);
@@ -872,7 +1165,7 @@ export async function renderStudioDeck(
   const total = deck.slides.length;
   const out: string[] = [];
   for (let i = 0; i < total; i++) {
-    out.push(await renderStudioSlide(deck.slides[i], total));
+    out.push(await renderStudioSlide(deck.slides[i], total, deck.entities ?? []));
     onProgress?.(i + 1, total);
   }
   return out;

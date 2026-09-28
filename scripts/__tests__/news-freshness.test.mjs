@@ -183,13 +183,14 @@ t('textOnly · an emptied turn is dropped, not sent blank', /contents: cleaned\.
 const TEXT_GENERATORS = ['generateSocialContent','synthesizeStorySlides','synthesizeStoryCarousel','synthesizeCarouselDeck','editSlideDeck','synthesizeNewsPost','synthesizeReelScript','synthesizeTechTipDeck','synthesizeThreadDeck'];
 for (const fn of TEXT_GENERATORS) {
   const body = engine.slice(engine.indexOf(`export async function ${fn}`), engine.indexOf(`export async function ${fn}`) + 4000);
-  t(`textOnly · ${fn} is tagged`, /\{ textOnly: true \}/.test(body), 'missing');
+  // `tier: 'carousel'` rides alongside on the deck generators (see carousel-opus.test.mjs).
+  t(`textOnly · ${fn} is tagged`, /\{ textOnly: true(?:, tier: 'carousel')? \}/.test(body), 'missing');
 }
 // The multimodal ones must NOT be — tagging them would strip the very image they exist to read.
 for (const fn of ['extractImageCarouselContent','classifyImageCarouselPreset','extractInstagramPromptLibrary','synthesizeSpeech','transcribeAudio']) {
   const start = engine.indexOf(`export async function ${fn}`);
   const body = engine.slice(start, engine.indexOf('export ', start + 10));
-  t(`textOnly · ${fn} is NOT tagged (it needs its media)`, !/\{ textOnly: true \}/.test(body), 'wrongly tagged');
+  t(`textOnly · ${fn} is NOT tagged (it needs its media)`, !/textOnly: true/.test(body), 'wrongly tagged');
 }
 
 // ─── background work must not starve interactive work ──────────────────────────────────────────

@@ -9,10 +9,11 @@ import {
   type GeminiLikeRequest,
 } from './groqClient.js';
 import { buildSourceLock, repairResponseInPlace, requestSourceText, withLockInstruction } from './sourceFidelity.js';
+import { claudeGenerate, isClaudeConfigured, claudeConfigReason, CLAUDE_CAROUSEL_MODEL } from './claudeClient.js';
 
 // Re-exported so endpoints and the health check can report which engines are live without
 // importing a second module.
-export { isGroqConfigured, groqConfigReason, GROQ_TEXT_MODEL };
+export { isGroqConfigured, groqConfigReason, GROQ_TEXT_MODEL, isClaudeConfigured, claudeConfigReason, CLAUDE_CAROUSEL_MODEL };
 
 /**
  * The one Gemini client, and the one retry policy, for every model call in the codebase.
@@ -335,6 +336,13 @@ export interface GenerateOptions {
    * the user did not).
    */
   sourceLock?: boolean;
+  /**
+   * `carousel` puts Claude Opus 5.5 at the head of the waterfall (claudeClient.ts), with the free
+   * legs behind it as the fallback. ONLY the designed-deck generators pass it — posts, captions,
+   * news summaries and translation must stay on the free models, so this is opt-in per call site
+   * and there is no global switch that could widen it. Requires a text-only request.
+   */
+  tier?: 'carousel';
 }
 
 /**
@@ -391,10 +399,14 @@ function isGeneralFlashModel(model: string): boolean {
   return /^gemini-(?:[\d.]+-)?flash(?:-lite)?(?:-latest|-preview)?$/.test(model);
 }
 
-type Leg = { provider: 'gemini' | 'groq'; model: string };
+type Leg = { provider: 'gemini' | 'groq' | 'claude'; model: string };
 
-function planLegs(requested: string, textOnly: boolean, priority: 'interactive' | 'background'): Leg[] {
+function planLegs(requested: string, textOnly: boolean, priority: 'interactive' | 'background', tier?: 'carousel'): Leg[] {
   if (!isGeneralFlashModel(requested)) return [{ provider: 'gemini', model: requested }];
+  // The paid carousel leg goes first; everything the free waterfall would have done follows it.
+  if (tier === 'carousel' && textOnly && isClaudeConfigured()) {
+    return [{ provider: 'claude', model: CLAUDE_CAROUSEL_MODEL }, ...planLegs(requested, textOnly, priority)];
+  }
   const gemini: Leg[] = genAI ? GEMINI_FREE_CHAIN.map((model) => ({ provider: 'gemini' as const, model })) : [];
   if (!textOnly || !isGroqConfigured()) return gemini;
   const bigGroq: Leg = { provider: 'groq', model: GROQ_TEXT_MODEL };
@@ -435,6 +447,11 @@ function benchLeg(leg: Leg, err: unknown): void {
     if (rate) until = rate.kind === 'rate' ? Date.now() + 60_000 : nextUtcMidnight();
     else if (status === 404 || /\b404\b|NOT_FOUND|no longer available/i.test(msg)) until = nextUtcMidnight();
     else if (TRANSIENT_UPSTREAM.test(msg)) until = Date.now() + 20_000;
+  } else if (leg.provider === 'claude') {
+    // Credits/auth problems do not clear inside a day; a 429 or overload clears in a minute. A
+    // timeout benches nothing — the next deck may well be shorter.
+    if (status === 401 || status === 403 || /credit balance|billing|permission/i.test(msg)) until = nextUtcMidnight();
+    else if (status === 429 || status === 529 || /overloaded|rate.?limit/i.test(msg)) until = Date.now() + 60_000;
   } else if (/DAILY|per day|TPD/i.test(msg)) {
     until = nextUtcMidnight();
   } else if (/429|rate.?limit/i.test(msg)) {
@@ -486,7 +503,7 @@ export async function generateContentWithRetry(params: GenContentReq, options: G
   // Speech has no text answer to repair, and its prompt IS the text to be spoken.
   const lock = options.sourceLock === false || params.config?.speechConfig ? null : buildSourceLock(requestSourceText(params.contents));
   if (lock) params = { ...params, config: { ...params.config, systemInstruction: withLockInstruction(params.config?.systemInstruction, lock) as never } };
-  const legs = planLegs(String(params.model), textOnly, options.priority ?? 'interactive');
+  const legs = planLegs(String(params.model), textOnly, options.priority ?? 'interactive', options.tier);
 
   if (!legs.length) {
     throw new Error(
@@ -514,7 +531,9 @@ export async function generateContentWithRetry(params: GenContentReq, options: G
       const res =
         leg.provider === 'gemini'
           ? await runGeminiLeg(params, leg.model, options)
-          : await groqGenerate(params as GeminiLikeRequest, {
+          : leg.provider === 'claude'
+            ? await claudeGenerate(params as GeminiLikeRequest, options)
+            : await groqGenerate(params as GeminiLikeRequest, {
               ...options,
               model: leg.model,
               // gpt-oss-20b spends its room on hidden reasoning at the default effort.

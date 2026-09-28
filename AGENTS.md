@@ -138,6 +138,27 @@ worked. The free tier has its own **tokens-per-minute** limit, so Groq is not an
 `llama-3.3-70b-versatile` is **retired** and absent from `GET /openai/v1/models` — do not restore
 it. `qwen/qwen3.8-27b` is faster but rewrites Latin technical terms, which breaks source fidelity.
 
+### Claude Opus 5.5 — carousels only (since 2026-09-28)
+
+- `src/agent/claudeClient.ts` is a third router leg, planned ONLY when a call passes
+  `tier: 'carousel'` to `generateContentWithRetry` (text-only, and `ANTHROPIC_API_KEY` set). It runs
+  first; the free Gemini/Groq waterfall follows it as the fallback. Deck generators opt in
+  (story slides, story carousel, carousel studio, slide edit, tech tips, thread decks); posts, news,
+  captions, email, translation and chat never do — `npm run test:opus` asserts both sides.
+  Env: `ANTHROPIC_API_KEY` (optional), `CLAUDE_CAROUSEL_MODEL` (default `claude-opus-5-5`),
+  `CLAUDE_CAROUSEL_EFFORT` (default `medium`), `CLAUDE_TIMEOUT_MS` (90s), `CLAUDE_CAROUSELS=off`.
+- **Anti-slop** (`src/agent/antiSlop.ts`, from github.com/miqdadbadjuber/anti-slop): `ANTI_SLOP_RULES`
+  in every deck prompt + `detectSlop`. Deviation: upstream bans "—"; here a single em dash is house
+  style and only a cluster (>1 per slide) is flagged.
+- **Listicles** (`src/agent/listExtract.ts`): "Label: text" / numbered / bulleted runs are found in
+  code and handed to the model as a numbered checklist; decks cover every item via the `items` layout.
+- **Verifier** (`src/server/carouselVerifier.ts`) runs inside `carousel-studio` before the response:
+  coverage (one repair call for missing items), anti-slop (ceremony sentences dropped), readability,
+  numbers-vs-source, design variance (seeded per title). Report ships as `verification`, shown by
+  `DeckVerificationPanel`. Slides carry optional `design` {align, zone, tone, scale}; deck carries
+  source-checked `entities`, drawn as monogram wordmarks (never fetched logo files — canvas taint +
+  trademark). `api/agent-generate.ts` maxDuration is 180s for the Opus leg + fallback.
+
 ---
 
 ### IG Growth Strategy Engine (organic, white-hat)

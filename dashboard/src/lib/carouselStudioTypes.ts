@@ -20,9 +20,39 @@ export type LayoutKind =
   | 'comparison' // two-column grid (myth vs reality / before vs after)
   | 'prompt' // ready-to-copy prompt / code box (monospace)
   | 'quote' // pull quote
+  | 'items' // 1–3 numbered entries from a source list (listicle decks)
   | 'cta'; // final slide — conversion
 
 export type SlideRole = 'hook' | 'value' | 'cta';
+
+/**
+ * Per-slide art direction. Written by the model on the carousel tier (Claude Opus 5.5), made to
+ * vary by the server's verifier, and filled from a title-derived seed by `directDeck` for decks that
+ * arrive without it (the local fallback, older sessions). Mirrors `CarouselSlideDesign` in
+ * src/agent/SocialAgentEngine.ts.
+ */
+export interface SlideDesign {
+  align: 'right' | 'center';
+  zone: 'top' | 'center' | 'bottom';
+  tone: 'plain' | 'band' | 'split' | 'spot';
+  scale: 'xl' | 'l' | 'm';
+}
+
+/** One numbered entry on an `items` slide. `n` is the item's position in the SOURCE list. */
+export interface ListEntry {
+  n: number;
+  name: string;
+  text: string;
+}
+
+/** The server verifier's report — see src/server/carouselVerifier.ts. */
+export interface DeckVerification {
+  passed: boolean;
+  score: number;
+  checks: { id: string; label: string; status: 'pass' | 'warn' | 'fail'; detail: string }[];
+  fixes: string[];
+  coverage: { expected: number; covered: number; missing: { n: number; name: string }[]; promised: number | null } | null;
+}
 export type AccentKey = 'green' | 'cyan';
 
 /**
@@ -56,6 +86,9 @@ export interface StudioSlide {
   accent: AccentKey;
   /** 0..1 ambient neon glow intensity behind the key element */
   glow: number;
+  /** `items` layout only. Optional so sessions persisted by an older build deserialise. */
+  items?: ListEntry[];
+  design?: SlideDesign;
 }
 
 export interface StudioDeck {
@@ -72,6 +105,10 @@ export interface StudioDeck {
   fallbackReason?: string;
   /** visual system the slides are rendered in */
   theme: StudioTheme;
+  /** Company/product names from the source, drawn as wordmark lockups. Source-checked server-side. */
+  entities?: string[];
+  /** The pre-render verification report; absent on the local fallback deck. */
+  verification?: DeckVerification;
   createdAt: number;
 }
 

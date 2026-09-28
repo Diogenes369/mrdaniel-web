@@ -569,7 +569,9 @@ function assembleSynthesized(src: SlideSource, synthSlides: SynthSlide[], hookOp
   const contentTexts = contentSynth.map((s) => stripMetaPhrases((s.narrativeText || '').trim())).filter(Boolean);
   const alreadyDense =
     contentTexts.length >= 2 &&
-    contentTexts.length <= 3 &&
+    // Up to the renderer's ceiling: a listicle source comes back as 4–6 paragraphs that each name
+    // their items, and re-pooling them would scatter the items across arbitrary chunks.
+    contentTexts.length <= MAX_CONTENT_SLIDES &&
     contentTexts.every((t) => wordCount(t) >= MIN_DENSE_WORDS);
 
   let content: StorySlide[];

@@ -887,21 +887,28 @@ ${typeof notes === 'string' ? notes : ''}`);
         rejectThinInput(res, 'brief (>= 40 chars) required', 'הבריף קצר מדי לבניית קרוסלה (נדרשים לפחות 40 תווים)');
         return;
       }
-      const deck = await synthesizeCarouselDeck({
+      const synth = await synthesizeCarouselDeck({
         title: String(title ?? ''),
         source: String(source ?? ''),
         topic: String(topic ?? 'general'),
         brief,
         takeaways: Array.isArray(takeaways) ? takeaways.map((t: unknown) => String(t)) : [],
       });
+      // The verification agent runs BEFORE render: coverage repair, anti-slop, design variance.
+      // Dynamically imported so the other actions sharing this function never load it.
+      const { verifyCarouselDeck } = await import('../src/server/carouselVerifier.js');
+      const { slides: deck, verification } = await verifyCarouselDeck(synth, { title: String(title ?? ''), body: brief });
       const security = sanitizeOutput(
-        deck.map((s) => `${s.headline}\n${s.subhead}\n${s.body}\n${s.quote}\n${s.bullets.join('\n')}\n${s.bulletsLeft.join('\n')}`).join('\n\n')
+        deck
+          .map((s) => `${s.headline}\n${s.subhead}\n${s.body}\n${s.quote}\n${s.bullets.join('\n')}\n${s.bulletsLeft.join('\n')}\n${(s.items ?? []).map((i) => `${i.name}\n${i.text}`).join('\n')}`)
+          .join('\n\n')
       );
       if (!security.passed) {
         res.status(200).json({ ok: true, blocked: true, security });
         return;
       }
-      res.status(200).json({ ok: true, deck });
+      // `entities` / `verification` / `listItems` are additive — an older dashboard reads `deck` only.
+      res.status(200).json({ ok: true, deck, entities: synth.entities, verification, listItems: synth.listItems.map(({ n, name }) => ({ n, name })) });
       return;
     }
 

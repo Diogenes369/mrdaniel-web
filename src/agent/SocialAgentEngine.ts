@@ -27,6 +27,8 @@ import { ANALYST_VOICE_RULES, AUDIENCE_RULES, CONCISE_FACTUAL_RULES, CONTEXTUAL_
 import { contextualHashtags, enforceAnalystTone } from './analystTone.js';
 import { enforceDeck, storyCarouselInstruction, type CarouselContentKind, type StoryCarouselDeck } from './storyCarousel.js';
 import { planDeck, type SlidePlan } from './figmaTemplates.js';
+import { ANTI_SLOP_RULES } from './antiSlop.js';
+import { detectListItems, type DetectedList } from './listExtract.js';
 import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoScript, ReelScript, ReelScriptScene, TipSlideKind, TechTipSlide, TechTipDeck, HookOption, HookPattern, NodeIcon, WorkflowNode, PromptCard, ImageOverlayBox } from './types.js';
 
 
@@ -808,8 +810,19 @@ export async function synthesizeStorySlides(input: {
   articleText: string;
 }): Promise<SynthesizedStoryDeck> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
-  const { clean } = sanitizeInput(input.articleText.slice(0, 8000));
+  const { clean } = sanitizeInput(input.articleText.slice(0, 12000));
   if (clean.trim().length < 40) throw new Error('article text too thin to summarise');
+  // A listicle does not fit "2–4 paragraphs that summarise": the model keeps the items it likes and
+  // drops the rest. Allow up to six content slides and name every item — the story renderer's own
+  // ceiling (MAX_CONTENT_SLIDES) is six, so this asks for nothing it cannot draw.
+  const list = detectListItems(clean, input.title);
+  const storyListNote =
+    list.items.length >= 5
+      ? `
+
+חריגה מכלל מספר השקופיות — המקור הוא רשימה של ${list.items.length} פריטים: הפק 4 עד 6 שקופיות תוכן, וכל אחד מהפריטים חייב להופיע בשמו (כפי שנכתב במקור) בתוך אחת הפסקאות, בסדר המקור, עם הפרט הספציפי שלו. פסקה יכולה להגיע עד 75 מילים. אסור לסכם את הרשימה במשפט כללי.
+הפריטים: ${list.items.map((i) => `${i.n}. ${i.name}`).join(' · ')}`
+      : '';
 
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,
@@ -823,8 +836,10 @@ export async function synthesizeStorySlides(input: {
         ],
       },
     ],
-    config: { systemInstruction: STORY_SYNTH_SYSTEM_INSTRUCTION, temperature: 0.4, topP: 0.9, responseMimeType: 'application/json' },
-  }, { textOnly: true });
+    config: { systemInstruction: `${STORY_SYNTH_SYSTEM_INSTRUCTION}
+
+${ANTI_SLOP_RULES}${storyListNote}`, temperature: 0.4, topP: 0.9, responseMimeType: 'application/json' },
+  }, { textOnly: true, tier: 'carousel' });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow(raw, 'synthesizeStorySlides') as unknown;
@@ -874,7 +889,35 @@ export type CarouselLayout =
   | 'comparison'
   | 'prompt'
   | 'quote'
+  | 'items'
   | 'cta';
+
+/**
+ * Per-slide art direction, written by the model (Claude Opus 5.5 on the carousel tier) and enforced
+ * for variance by the verifier. All optional: a deck without it renders exactly as before, and the
+ * dashboard's Creative Director fills whatever is missing from a seed derived from the title, so two
+ * articles never come out with the same rhythm.
+ *   align — headline alignment (right = RTL default, center = a "statement" slide)
+ *   zone  — where the text block sits vertically; varying it is what breaks the template look
+ *   tone  — the contrast treatment behind the text (plain / band / split / spot)
+ *   scale — headline size tier; one xl slide in five is a pacing beat, every slide xl is shouting
+ */
+export interface CarouselSlideDesign {
+  align: 'right' | 'center';
+  zone: 'top' | 'center' | 'bottom';
+  tone: 'plain' | 'band' | 'split' | 'spot';
+  scale: 'xl' | 'l' | 'm';
+}
+
+/** One numbered entry on an `items` slide: a source list item, adapted to Hebrew. */
+export interface CarouselListEntry {
+  /** 1-based index of the item in the SOURCE list — how the verifier proves coverage. */
+  n: number;
+  /** The item's name; Latin product/technique names stay in Latin. */
+  name: string;
+  /** One or two Hebrew sentences on what the item does. */
+  text: string;
+}
 
 export interface CarouselStudioSlide {
   role: 'hook' | 'value' | 'cta';
@@ -890,6 +933,9 @@ export interface CarouselStudioSlide {
   code: string;
   quote: string;
   readingTime: string;
+  /** `items` layout only — optional so the Grok agent's slides stay valid unchanged. */
+  items?: CarouselListEntry[];
+  design?: CarouselSlideDesign;
 }
 
 const CAROUSEL_STUDIO_SYSTEM_INSTRUCTION = `אתה "אדריכל ה-Hook והקופירייטינג" של סטודיו קרוסלות פרימיום עבור דניאל בן ברוך. קיבלת תקציר מחקר (כותרת, טקסט מקור, ותובנות שחולצו). הפק תסריט קרוסלת אינסטגרם שלם בעברית — 10 עד 14 שקופיות — במבנה ויראלי הדוק.
@@ -902,6 +948,8 @@ ${HOOK_RETENTION_RULES}
 
 ${SAVE_SHARE_RULES}
 
+${ANTI_SLOP_RULES}
+
 מבנה הקרוסלה:
 1. שקופית פתיחה (role:"hook", layout:"hero") — כותרת שעוצרת גלילה ב-1-2 שניות לפי מנוע ה-Hook שלמעלה (עד 10 מילים, באחת התבניות) + subhead שפותח את הלולאה ומייצר פער סקרנות + readingTime (למשל "3 דק׳ קריאה"). body ="" , bullets=[].
    שקופית הערך הראשונה אחרי ה-hero משלמת את ההבטחה מיד. לפחות אחת משקופיות הערך היא נכס לשמירה — "checklist", או "prompt" כשיש בתקציר חומר מתאים.
@@ -912,6 +960,7 @@ ${SAVE_SHARE_RULES}
    • "comparison" — headline + columnLabels (זוג תוויות, למשל ["מיתוס","מציאות"] או ["לפני","אחרי"]) + bulletsLeft (עמודה ימנית) + bullets (עמודה שמאלית), 2–4 פריטים בכל עמודה.
    • "prompt" — headline + code: פרומפט מוכן-להעתקה או קטע קוד קצר (עד 6 שורות) שהקורא יכול להשתמש בו מיד. אם אין בתקציר חומר מתאים לפרומפט — אל תשתמש ב-layout הזה.
    • "quote" — quote: משפט מפתח חד וזכיר מהתוכן (עד 20 מילים) + body: שורת חיזוק קצרה.
+   • "items" — לפריטים ממוספרים מתוך רשימה במקור: headline קצר + items: 1 עד 3 פריטים, כל אחד {"n": מספר הפריט במקור, "name": שם הפריט כפי שנכתב במקור (שמות באנגלית נשארים באנגלית), "text": משפט או שניים בעברית — מה הפריט עושה בפועל ואיזה פרט ספציפי מהמקור מוכיח את זה}. השתמש ב-layout הזה רק כשההודעה למטה מצרפת רשימת פריטים.
    גיוון: אל תשתמש באותו layout יותר מ-3 פעמים. שלב לפחות 3 סוגים שונים. הראשונה אחרי ה-hero תהיה "value" או "checklist".
 אחרונה. שקופית סיום (role:"cta", layout:"cta") — headline: קריאה לפעולה אסטרטגית (לא מכירתית אגרסיבית) שמפנה ל-mrdaniel.co.il ולעקוב אחרי הפרופיל. body: משפט תמיכה קצר שמזמין לשמור את הקרוסלה או לשלוח אותה למי שזה רלוונטי עבורו.
 
@@ -922,9 +971,35 @@ ${SAVE_SHARE_RULES}
 4. טקסט נקי: אסור תוויות מסגור, "כותרת:", "הקשר:", הערות עורך.
 5. kicker: תגית קצרה (1–3 מילים) לפס העליון של השקופית — נושא-המשנה של אותה שקופית.
 
-פלט: JSON array בלבד, בלי markdown code fence. כל איבר:
-{"role":"hook|value|cta","layout":"hero|value|checklist|stat|comparison|prompt|quote|cta","kicker":"...","headline":"...","subhead":"...","body":"...","bullets":["..."],"bulletsLeft":["..."],"columnLabels":["...","..."],"stat":"...","code":"...","quote":"...","readingTime":"..."}
+עיצוב — אתה גם הארט-דיירקטור של הקרוסלה. לכל שקופית החזר design:
+   • align: "right" (ברירת מחדל RTL) או "center" (לשקופית הצהרה — hook, quote, stat).
+   • zone: "top" | "center" | "bottom" — איפה יושב גוש הטקסט. גוון לאורך הדק; אסור אותו zone בשלוש שקופיות רצופות.
+   • tone: "plain" | "band" (פס ניגודיות מלא מאחורי הטקסט) | "split" (חצי שקופית כהה יותר) | "spot" (הילה ממוקדת מאחורי האלמנט המרכזי). לא אותו tone בשתי שקופיות רצופות.
+   • scale: "xl" | "l" | "m" — גודל הכותרת. xl שמור ל-hook ולשקופית שיא אחת או שתיים; השאר l או m.
+   העיצוב נבחר לפי התוכן של הכתבה הזו — כתבה על רשימת כלים נראית אחרת מכתבה על מספר אחד מפתיע.
+entities: 1 עד 6 שמות חברות, מוצרים או מודלים שמופיעים בטקסט המקור (בדיוק כפי שנכתבו, באנגלית אם כך במקור). המערכת מציירת אותם כסמלילי-מילה (wordmark) על השער ועל השקופיות שבהן הם מופיעים. אסור להמציא שם שלא מופיע במקור.
+
+פלט: אובייקט JSON בלבד, בלי markdown code fence:
+{"entities":["..."],"slides":[{"role":"hook|value|cta","layout":"hero|value|checklist|stat|comparison|prompt|quote|items|cta","kicker":"...","headline":"...","subhead":"...","body":"...","bullets":["..."],"bulletsLeft":["..."],"columnLabels":["...","..."],"stat":"...","code":"...","quote":"...","readingTime":"...","items":[{"n":1,"name":"...","text":"..."}],"design":{"align":"right|center","zone":"top|center|bottom","tone":"plain|band|split|spot","scale":"xl|l|m"}}]}
 שדות שאינם רלוונטיים ל-layout: החזר "" (מחרוזת ריקה) או [] (מערך ריק).`;
+
+/**
+ * The listicle addendum: the numbered item list found in code, handed to the model as a coverage
+ * checklist with an explicit slide plan. Stated as numbers the model must echo back (`items[].n`),
+ * so coverage is checkable afterwards instead of taken on trust.
+ */
+function listicleInstruction(list: DetectedList, perSlide: number): string {
+  const lines = list.items.map((it) => `${it.n}. ${it.name}${it.text ? ` — ${it.text}` : ''}`).join('\n');
+  const itemSlides = Math.ceil(list.items.length / perSlide);
+  return `המקור הוא כתבת רשימה: ${list.items.length} פריטים${list.promised && list.promised !== list.items.length ? ` (הכותרת מבטיחה ${list.promised})` : ''}. כלל אדום — כיסוי מלא:
+- כל אחד מ-${list.items.length} הפריטים חייב להופיע בקרוסלה, בסדר של המקור, בשקופית layout:"items" עם ה-n שלו. אסור לדלג, לאחד שני פריטים לאחד, או לסכם את הרשימה במשפט.
+- ${itemSlides} שקופיות items, ${perSlide} פריטים בכל אחת (האחרונה יכולה להכיל פחות). headline של כל שקופית items מקבץ את הפריטים שבה לפי מה שמשותף להם בפועל (למשל "שומרי סף לפקודות מסוכנות"), לא "פריטים 4–6".
+- text של כל פריט: מה הוא עושה + הפרט הספציפי מהמקור (שם הכלי, המספר, התוצאה). לא ניסוח כללי שמתאים לכל פריט.
+- בנוסף ל-items: hero, שקופית value אחת שמסבירה מה זה ואיך זה עובד לפני הרשימה, ושקופית value או stat אחת עם המגבלה או הנתון המרכזי שבמקור — ואז cta.
+
+רשימת הפריטים מהמקור:
+${lines}`;
+}
 
 export function mapCarouselLayout(v: unknown, role: string): CarouselLayout {
   const s = String(v || '').toLowerCase();
@@ -935,6 +1010,7 @@ export function mapCarouselLayout(v: unknown, role: string): CarouselLayout {
   if (/compar|versus|vs|מול|מיתוס|לפני/.test(s)) return 'comparison';
   if (/prompt|code|קוד|פרומפט/.test(s)) return 'prompt';
   if (/quote|ציטוט|משפט/.test(s)) return 'quote';
+  if (/^items?$|numbered|פריט/.test(s)) return 'items';
   if (/hero|cover|שער/.test(s)) return 'hero';
   return 'value';
 }
@@ -1017,8 +1093,10 @@ ${clean}
         ],
       },
     ],
-    config: { systemInstruction: storyCarouselInstruction(kind), temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
-  }, { textOnly: true });
+    config: { systemInstruction: `${storyCarouselInstruction(kind)}
+
+${ANTI_SLOP_RULES}`, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
+  }, { textOnly: true, tier: 'carousel' });
 
   const deck = enforceDeck(parseJsonOrThrow(stripCodeFence(requireText(response)), 'synthesizeStoryCarousel'));
   // Planned here rather than at the call site so every caller — endpoint, Hermes, a test — gets the
@@ -1027,17 +1105,73 @@ ${clean}
   return { ...deck, templateId: template.id, contentKind: kind, figmaFont: font, figmaPlan };
 }
 
+export interface CarouselStudioResult {
+  slides: CarouselStudioSlide[];
+  /** Company/product names the model found in the source, for the renderer's wordmark lockups. */
+  entities: string[];
+  /** The list the source was detected to contain — [] for a non-listicle. The verifier reads it. */
+  listItems: { n: number; name: string; text: string }[];
+  /** How many items the title promised (e.g. 20), when it named a count. */
+  promisedItems: number | null;
+}
+
+const DESIGN_ALIGN = ['right', 'center'] as const;
+const DESIGN_ZONE = ['top', 'center', 'bottom'] as const;
+const DESIGN_TONE = ['plain', 'band', 'split', 'spot'] as const;
+const DESIGN_SCALE = ['xl', 'l', 'm'] as const;
+
+function pickOne<T extends string>(v: unknown, allowed: readonly T[]): T | null {
+  const s = String(v ?? '').toLowerCase().trim();
+  return (allowed as readonly string[]).includes(s) ? (s as T) : null;
+}
+
+/** The model's design block, or undefined when it sent nothing usable — never a half-filled one. */
+export function coerceSlideDesign(v: unknown): CarouselSlideDesign | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const r = v as Record<string, unknown>;
+  const align = pickOne(r.align, DESIGN_ALIGN);
+  const zone = pickOne(r.zone, DESIGN_ZONE);
+  const tone = pickOne(r.tone, DESIGN_TONE);
+  const scale = pickOne(r.scale, DESIGN_SCALE);
+  if (!align && !zone && !tone && !scale) return undefined;
+  return { align: align ?? 'right', zone: zone ?? 'center', tone: tone ?? 'plain', scale: scale ?? 'l' };
+}
+
+function coerceListEntries(v: unknown): CarouselListEntry[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((x, i): CarouselListEntry => {
+      const r = (x && typeof x === 'object' ? x : { text: x }) as Record<string, unknown>;
+      return {
+        n: Math.max(1, Math.round(Number(r.n) || i + 1)),
+        name: sanitizeHebrewText(String(r.name ?? '').trim()).slice(0, 70),
+        text: cleanCarouselText(r.text ?? r.body, 260),
+      };
+    })
+    .filter((e) => e.name.length > 1 || e.text.length > 10)
+    .slice(0, 3);
+}
+
 export async function synthesizeCarouselDeck(input: {
   title: string;
   source: string;
   topic: string;
   brief: string;
   takeaways?: string[];
-}): Promise<CarouselStudioSlide[]> {
+}): Promise<CarouselStudioResult> {
   if (!genAI) throw new Error('GEMINI_API_KEY not configured');
-  const { clean } = sanitizeInput(input.brief.slice(0, 9000));
+  // 14k: a 20-item listicle runs 6–10k chars, and cutting it at 9k is exactly how the last items
+  // used to vanish before the model ever saw them.
+  const { clean } = sanitizeInput(input.brief.slice(0, 14000));
   if (clean.trim().length < 40) throw new Error('brief too thin to build a carousel');
   const takeaways = (input.takeaways ?? []).map((t) => String(t).slice(0, 200)).filter(Boolean).slice(0, 8);
+
+  const list = detectListItems(clean, input.title);
+  const isListicle = list.items.length >= 5;
+  // Instagram caps a carousel at 20 slides. Two per slide keeps each entry readable; past 28 items
+  // three per slide is the only way to keep every one of them.
+  const perSlide = list.items.length > 28 ? 3 : 2;
+  const maxValue = isListicle ? Math.min(17, Math.ceil(list.items.length / perSlide) + 3) : 12;
 
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,
@@ -1047,30 +1181,47 @@ export async function synthesizeCarouselDeck(input: {
         parts: [
           {
             text: `כותרת המקור: ${input.title}\nמקור: ${input.source}\nנושא: ${input.topic}\n\n${
-              takeaways.length ? `תובנות מפתח שחולצו:\n- ${takeaways.join('\n- ')}\n\n` : ''
+              isListicle ? `${listicleInstruction(list, perSlide)}\n\n` : takeaways.length ? `תובנות מפתח שחולצו:\n- ${takeaways.join('\n- ')}\n\n` : ''
             }טקסט המקור המלא (הבסיס היחיד לתוכן):\n"""\n${clean}\n"""`,
           },
         ],
       },
     ],
-    config: { systemInstruction: CAROUSEL_STUDIO_SYSTEM_INSTRUCTION, temperature: 0.55, topP: 0.9, responseMimeType: 'application/json' },
-  }, { textOnly: true });
+    // Listicles need the room: twenty entries of two sentences each, plus the design blocks.
+    config: {
+      systemInstruction: CAROUSEL_STUDIO_SYSTEM_INSTRUCTION,
+      temperature: 0.55,
+      topP: 0.9,
+      responseMimeType: 'application/json',
+      maxOutputTokens: isListicle ? 8000 : 4000,
+    },
+  }, { textOnly: true, tier: 'carousel' });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow(raw, 'synthesizeCarouselDeck') as unknown;
   const arr = Array.isArray(parsed) ? parsed : (parsed as { slides?: unknown[] })?.slides;
   if (!Array.isArray(arr)) throw new Error('model did not return a slide array');
+  const rawEntities = Array.isArray(parsed) ? [] : (parsed as { entities?: unknown })?.entities;
+  // An entity survives only if the source actually names it — a wordmark for a company the article
+  // never mentioned is a fabricated fact, just drawn instead of written.
+  const lowerSource = clean.toLowerCase();
+  const entities = (Array.isArray(rawEntities) ? rawEntities : [])
+    .map((e) => String(e ?? '').trim().slice(0, 40))
+    .filter((e) => e.length > 1 && lowerSource.includes(e.toLowerCase()))
+    .filter((e, i, a) => a.findIndex((x) => x.toLowerCase() === e.toLowerCase()) === i)
+    .slice(0, 6);
 
   const slides = arr
     .map((s): CarouselStudioSlide => {
       const rec = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
       const role: CarouselStudioSlide['role'] =
         /cta|סיום|קריא/.test(String(rec.role || '')) ? 'cta' : /hook|שער|פתיח/.test(String(rec.role || '')) ? 'hook' : 'value';
-      const layout = mapCarouselLayout(rec.layout, role);
+      const items = role === 'value' ? coerceListEntries(rec.items) : [];
+      const layout = items.length ? 'items' : mapCarouselLayout(rec.layout, role);
       const cols = Array.isArray(rec.columnLabels) ? rec.columnLabels.map((c) => sanitizeHebrewText(String(c ?? '').trim()).slice(0, 24)) : [];
-      return {
+      const slide: CarouselStudioSlide = {
         role,
-        layout,
+        layout: layout === 'items' && !items.length ? 'value' : layout,
         kicker: cleanCarouselText(rec.kicker, 40) || 'תובנה',
         headline: cleanCarouselText(rec.headline, 120),
         subhead: cleanCarouselText(rec.subhead, 160),
@@ -1083,6 +1234,10 @@ export async function synthesizeCarouselDeck(input: {
         quote: cleanCarouselText(rec.quote, 220),
         readingTime: sanitizeHebrewText(String(rec.readingTime ?? '').trim()).slice(0, 24),
       };
+      if (items.length) slide.items = items;
+      const design = coerceSlideDesign(rec.design);
+      if (design) slide.design = design;
+      return slide;
     })
     .filter((s) => {
       if (s.role === 'hook') return s.headline.length > 3;
@@ -1091,6 +1246,7 @@ export async function synthesizeCarouselDeck(input: {
       return (
         s.body.length > 15 ||
         s.bullets.length > 0 ||
+        (s.items?.length ?? 0) > 0 ||
         s.quote.length > 5 ||
         s.code.length > 5 ||
         (s.stat.length > 0 && s.headline.length > 2) ||
@@ -1118,7 +1274,51 @@ export async function synthesizeCarouselDeck(input: {
     quote: '',
     readingTime: '',
   };
-  return [hook, ...valueSlides.slice(0, 12), cta];
+  return {
+    slides: [hook, ...valueSlides.slice(0, maxValue), cta],
+    entities,
+    listItems: list.items,
+    promisedItems: list.promised,
+  };
+}
+
+/**
+ * Hebrew entries for list items a deck left out — the verifier's one repair pass. Small by design:
+ * only the missing items travel, so it answers in seconds even when it falls through to Groq.
+ */
+export async function synthesizeMissingListEntries(input: {
+  title: string;
+  items: { n: number; name: string; text: string }[];
+}): Promise<CarouselListEntry[]> {
+  if (!input.items.length) return [];
+  const response = await generateContentWithRetry({
+    model: GEMINI_TEXT_MODEL,
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: `כותרת הכתבה: ${input.title}\n\nכתוב לכל אחד מהפריטים הבאים ערך בעברית לשקופית קרוסלה.\n${input.items
+              .map((i) => `${i.n}. ${i.name} — ${i.text}`)
+              .join('\n')}`,
+          },
+        ],
+      },
+    ],
+    config: {
+      systemInstruction: `אתה כותב ערכים לשקופיות "items" בקרוסלת אינסטגרם בעברית.\n${EXPERT_VOICE_RULES}\n\n${ANTI_SLOP_RULES}\n\nלכל פריט: name כפי שנכתב במקור (אנגלית נשארת אנגלית), text = משפט או שניים בעברית: מה הפריט עושה + הפרט הספציפי מהמקור. אסור להמציא עובדה שלא בטקסט הפריט.\nפלט: JSON בלבד: {"items":[{"n":1,"name":"...","text":"..."}]}`,
+      temperature: 0.4,
+      responseMimeType: 'application/json',
+    },
+  }, { textOnly: true, tier: 'carousel' });
+  const parsed = parseJsonOrThrow(stripCodeFence(requireText(response)), 'synthesizeMissingListEntries') as { items?: unknown };
+  const entries = Array.isArray(parsed?.items) ? parsed.items : [];
+  return entries
+    .map((x) => {
+      const r = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+      return { n: Math.round(Number(r.n) || 0), name: sanitizeHebrewText(String(r.name ?? '').trim()).slice(0, 70), text: cleanCarouselText(r.text, 260) };
+    })
+    .filter((e) => e.n > 0 && e.text.length > 10);
 }
 
 // --- AI Slide Editor — apply a natural-language edit to an existing carousel deck -------------
@@ -1158,8 +1358,10 @@ export async function editSlideDeck(input: { instruction: string; slides: SlideE
         parts: [{ text: `הוראת עריכה: ${instruction}\n\nמערך השקופיות הנוכחי:\n${JSON.stringify(deck, null, 1)}` }],
       },
     ],
-    config: { systemInstruction: SLIDE_EDIT_SYSTEM_INSTRUCTION, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
-  }, { textOnly: true });
+    config: { systemInstruction: `${SLIDE_EDIT_SYSTEM_INSTRUCTION}
+
+${ANTI_SLOP_RULES}`, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
+  }, { textOnly: true, tier: 'carousel' });
 
   const raw = stripCodeFence(requireText(response));
   const parsed = parseJsonOrThrow(raw, 'editSlideDeck') as unknown;
@@ -1842,8 +2044,10 @@ export async function synthesizeTechTipDeck(input: { topic: string; notes?: stri
     const response = await generateContentWithRetry({
       model: GEMINI_TEXT_MODEL,
       contents: [{ role: 'user', parts: [{ text: `נושא המדריך:\n"""\n${clean}\n"""${countDirective}${extra}` }] }],
-      config: { systemInstruction: TECH_TIP_SYSTEM_INSTRUCTION, temperature: 0.6, topP: 0.9, responseMimeType: 'application/json' },
-    }, { textOnly: true });
+      config: { systemInstruction: `${TECH_TIP_SYSTEM_INSTRUCTION}
+
+${ANTI_SLOP_RULES}`, temperature: 0.6, topP: 0.9, responseMimeType: 'application/json' },
+    }, { textOnly: true, tier: 'carousel' });
     const raw = stripCodeFence(requireText(response));
     const parsed = parseJsonOrThrow(raw, 'synthesizeTechTipDeck') as Record<string, unknown>;
     return { parsed, slides: parseTipSlides(parsed) };
@@ -2106,12 +2310,14 @@ export async function synthesizeThreadDeck(input: {
       },
     ],
     config: {
-      systemInstruction: THREAD_DECK_SYSTEM_INSTRUCTION,
+      systemInstruction: `${THREAD_DECK_SYSTEM_INSTRUCTION}
+
+${ANTI_SLOP_RULES}`,
       temperature: 0.55,
       topP: 0.9,
       responseMimeType: 'application/json',
     },
-  }, { textOnly: true });
+  }, { textOnly: true, tier: 'carousel' });
 
   return parseAdaptedDeck(stripCodeFence(requireText(response)), {
     label: 'synthesizeThreadDeck',

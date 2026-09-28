@@ -24,6 +24,7 @@ import { STUDIO_PRESETS } from '../lib/carouselStudioTypes';
 import { useCarouselStudio } from '../lib/useCarouselStudio';
 import { exportStudioZip } from '../lib/web3CarouselRenderer';
 import PreviewErrorBoundary from './PreviewErrorBoundary';
+import DeckVerificationPanel from './DeckVerificationPanel';
 import QuickPublishBar from './QuickPublishBar';
 
 const TOPICS: { id: NewsTopic; label: string }[] = [
@@ -394,6 +395,8 @@ export default function CarouselStudio() {
                 ייצא הכל (ZIP · 01→{String(deck.slides.length).padStart(2, '0')})
               </button>
             </div>
+
+            {deck.verification && <DeckVerificationPanel verification={deck.verification} />}
 
             {/* thumbnail rail */}
             <div className="flex items-center gap-1.5 flex-wrap mb-4">
