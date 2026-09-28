@@ -96,6 +96,14 @@ const mid = periodic.slice(1, -1);
 t('design · a two-tone alternation is broken up', new Set(mid.map((s) => s.design.tone)).size >= 3);
 t('design · no tone twice in a row', mid.every((s, i) => i === 0 || s.design.tone !== mid[i - 1].design.tone));
 t('design · rows never sit at the bottom', mid.every((s) => s.design.zone !== 'bottom'));
+const rows = [mk('hero', 'hook')];
+for (let i = 0; i < 12; i++) rows.push(mk('items', 'value', { align: 'right', zone: 'top', tone: i % 3 ? 'plain' : 'spot', scale: 'm' }));
+rows.push(mk('cta', 'cta'));
+for (const seed of ['s1', 's2', 's3', 's4', 's5']) {
+  const r = rows.map((s) => ({ ...s, design: s.design ? { ...s.design } : undefined }));
+  enforceDesignVariance(r, seed);
+  t(`design · a run of row slides never lands at the bottom (${seed})`, r.every((s) => s.layout !== 'items' || s.design.zone !== 'bottom'), r.map((s) => s.design?.zone).join(','));
+}
 const a = [mk('hero', 'hook'), ...Array.from({ length: 8 }, () => mk('value')), mk('cta', 'cta')];
 const b = a.map((s) => ({ ...s }));
 enforceDesignVariance(a, 'Article one');

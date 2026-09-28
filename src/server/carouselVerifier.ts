@@ -109,11 +109,14 @@ export function enforceDesignVariance(slides: CarouselStudioSlide[], seedText: s
         };
     if (s.role === 'cta') d.zone = 'center';
     if (s.layout === 'quote' || s.layout === 'stat') d.align = 'center';
-    // Items and checklists are rows; a bottom-anchored stack of rows reads as a mistake.
-    if ((s.layout === 'items' || s.layout === 'checklist' || s.layout === 'comparison') && d.zone === 'bottom') d.zone = 'top';
     const prev = slides[i - 1]?.design;
     const prev2 = slides[i - 2]?.design;
     if (prev && prev2 && prev.zone === d.zone && prev2.zone === d.zone) d.zone = ZONES[(ZONES.indexOf(d.zone) + 1 + Math.floor(rnd() * 2)) % 3];
+    // Items and checklists are rows; a bottom-anchored stack of rows reads as a mistake. Applied
+    // AFTER the rotation above, which can otherwise land a row slide on 'bottom'.
+    if ((s.layout === 'items' || s.layout === 'checklist' || s.layout === 'comparison') && d.zone === 'bottom') {
+      d.zone = prev?.zone === 'top' && prev2?.zone === 'top' ? 'center' : 'top';
+    }
     if (prev && prev.tone === d.tone) d.tone = TONES[(TONES.indexOf(d.tone) + 1 + Math.floor(rnd() * 3)) % TONES.length];
     if (d.scale === 'xl' && s.role !== 'hook') {
       if (xlCount >= 2) d.scale = 'l';
