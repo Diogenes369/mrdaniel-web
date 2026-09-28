@@ -1177,7 +1177,7 @@ export async function synthesizeCarouselDeck(input: {
   const perSlide = list.items.length > 28 ? 3 : 2;
   const maxValue = isListicle ? Math.min(17, Math.ceil(list.items.length / perSlide) + 3) : 12;
 
-  const response = await generateContentWithRetry({
+  const request = {
     model: GEMINI_TEXT_MODEL,
     contents: [
       {
@@ -1199,10 +1199,24 @@ export async function synthesizeCarouselDeck(input: {
       responseMimeType: 'application/json',
       maxOutputTokens: isListicle ? 8000 : 4000,
     },
-  }, { textOnly: true, tier: 'carousel' });
+  };
 
-  const raw = stripCodeFence(requireText(response));
-  const parsed = parseJsonOrThrow(raw, 'synthesizeCarouselDeck') as unknown;
+  // One retry on malformed JSON. A 20-item listicle is the longest structured answer in the app,
+  // and the free models occasionally break it mid-object (a production Jev run on 2026-09-28 came
+  // back 422 this way). A second sample almost always parses; a safety block or an outage does not
+  // change on retry, so only an unparseable answer is retried.
+  let response!: Awaited<ReturnType<typeof generateContentWithRetry>>;
+  let parsed: unknown;
+  for (let attempt = 1; ; attempt++) {
+    response = await generateContentWithRetry(request, { textOnly: true, tier: 'carousel' });
+    try {
+      parsed = parseJsonOrThrow(stripCodeFence(requireText(response)), 'synthesizeCarouselDeck');
+      break;
+    } catch (err) {
+      if (attempt >= 2 || !(err instanceof ModelOutputError) || err.blockedBySafety) throw err;
+      console.warn('[carousel-studio] unusable deck JSON, sampling once more:', err.message.slice(0, 160));
+    }
+  }
   const arr = Array.isArray(parsed) ? parsed : (parsed as { slides?: unknown[] })?.slides;
   if (!Array.isArray(arr)) throw new Error('model did not return a slide array');
   const rawEntities = Array.isArray(parsed) ? [] : (parsed as { entities?: unknown })?.entities;
@@ -1346,12 +1360,14 @@ const FACT_CHECK_SYSTEM_INSTRUCTION = `אתה בודק עובדות קפדן ל�
   • חיזוק או החלפה של מילת תיאור: "state-changing" ≠ "מסוכן", "worth turning into skills" ≠ "מוצלח", "about" ≠ מספר מדויק, "in its calibration" ≠ "תמיד".
   • השמטה שהופכת את הטענה ללא נכונה (למשל השמטת "לפי המבחנים של החברה עצמה" מנתון שנוי במחלוקת).
   • למה אסור "fix": סגנון, קיצור, או מידע שהושמט בלי לשנות את נכונות הטענה.
-כאשר verdict="fix": issue = משפט קצר בעברית מה לא נכון; fix = אותה יחידה משוכתבת בעברית טבעית, באורך דומה ובאותו קול, שאומרת רק מה שהמקור אומר. שמור שמות באנגלית כפי שהם, שמור מספרים מדויקים מהמקור, אל תוסיף מידע חדש. אם אין דרך להציל את היחידה — fix="".
+כאשר verdict="fix": issue = משפט קצר בעברית מה לא נכון; fix = אותה יחידה משוכתבת בעברית טבעית, באורך דומה ובאותו קול, שאומרת רק מה שהמקור אומר. שמור שמות באנגלית כפי שהם, שמור מספרים מדויקים מהמקור, אל תוסיף מידע חדש. אם אין דרך להציל את היחידה — fix="". חריג: ליחידה עם "required": true (כותרות ופריטי רשימה) אסור fix ריק — כתוב במקומה ניסוח נאמן למקור באותו תפקיד (כותרת נשארת כותרת קצרה, פריט נשאר תיאור של אותו פריט).
 החזר JSON בלבד: {"verdicts":[{"id":"...","verdict":"ok|fix","issue":"...","fix":"..."}]} — verdict לכל id שקיבלת, בלי לדלג.`;
 
 export interface FactCheckUnit {
   id: string;
   text: string;
+  /** Headlines and list items: the checker must rewrite, never empty them. */
+  required?: boolean;
 }
 
 export interface FactCheckVerdict {
@@ -1369,7 +1385,7 @@ export interface FactCheckVerdict {
 export async function factCheckCarouselClaims(input: { source: string; units: FactCheckUnit[] }): Promise<FactCheckVerdict[]> {
   if (!input.units.length) return [];
   const { clean } = sanitizeInput(input.source.slice(0, 14000));
-  const units = input.units.map((u) => ({ id: u.id, text: u.text.replace(/[‎‏⁦-⁩]/g, '') }));
+  const units = input.units.map((u) => ({ id: u.id, ...(u.required ? { required: true } : {}), text: u.text.replace(/[‎‏⁦-⁩]/g, '') }));
   const response = await generateContentWithRetry({
     model: GEMINI_TEXT_MODEL,
     contents: [

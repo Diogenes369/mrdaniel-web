@@ -376,7 +376,7 @@ interface ClaimUnit {
   id: string;
   get: () => string;
   set: (v: string) => void;
-  /** Item entries carry list coverage — they are rewritten, never dropped. */
+  /** Headlines (the slide's reason to exist) and list items (coverage) are rewritten, never dropped. */
   required: boolean;
 }
 
@@ -386,7 +386,7 @@ function claimUnits(slides: CarouselStudioSlide[]): ClaimUnit[] {
     if (s.role === 'cta') return; // brand copy, not the article's claims
     const n = i + 1;
     const field = (key: 'headline' | 'subhead' | 'body' | 'quote') => {
-      if (words(s[key]) >= 3) units.push({ id: `s${n}.${key}`, get: () => s[key], set: (v) => (s[key] = v), required: false });
+      if (words(s[key]) >= 3) units.push({ id: `s${n}.${key}`, get: () => s[key], set: (v) => (s[key] = v), required: key === 'headline' });
     };
     field('headline');
     field('subhead');
@@ -413,7 +413,7 @@ async function factCheckPass(
   let unchecked = 0;
   const evidence = [source.title, source.body].join(' — ');
   try {
-    const first = await factCheckCarouselClaims({ source: evidence, units: units.map((u) => ({ id: u.id, text: u.get() })) });
+    const first = await factCheckCarouselClaims({ source: evidence, units: units.map((u) => ({ id: u.id, text: u.get(), required: u.required })) });
     const answered = new Set(first.map((v) => v.id));
     unchecked = units.filter((u) => !answered.has(u.id)).length;
     const changed: ClaimUnit[] = [];
@@ -435,7 +435,7 @@ async function factCheckPass(
     }
     // Confirmation: a rewrite is itself model output, so it is checked once more on its own.
     if (changed.length) {
-      const second = await factCheckCarouselClaims({ source: evidence, units: changed.map((u) => ({ id: u.id, text: u.get() })) });
+      const second = await factCheckCarouselClaims({ source: evidence, units: changed.map((u) => ({ id: u.id, text: u.get(), required: u.required })) });
       for (const v of second) {
         if (v.verdict !== 'fix') continue;
         const u = byId.get(v.id);

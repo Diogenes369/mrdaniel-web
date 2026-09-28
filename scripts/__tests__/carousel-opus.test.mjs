@@ -142,6 +142,9 @@ t('engine · anti-slop rules reach every deck prompt', (engine.match(/\$\{ANTI_S
 const verifierSrc = readFileSync(new URL('../../src/server/carouselVerifier.ts', import.meta.url), 'utf8');
 t('fact-check · runs after coverage and before anti-slop', verifierSrc.indexOf('await factCheckPass(') > verifierSrc.indexOf('3a · coverage') && verifierSrc.indexOf('await factCheckPass(') < verifierSrc.indexOf('// ── 4 · anti-slop'));
 t('fact-check · list items are rewritten, never dropped', /required: true/.test(verifierSrc) && /else if \(!u\.required\)/.test(verifierSrc));
+t('fact-check · headlines are required too (a cover never loses its headline)', /required: key === 'headline'/.test(verifierSrc));
+t('fact-check · the checker is told which units it may not empty', /required: true/.test(fnBody('factCheckCarouselClaims')) && /אסור fix ריק/.test(engine));
+t('deck · malformed JSON gets exactly one more sample', /attempt >= 2 \|\| !\(err instanceof ModelOutputError\)/.test(fnBody('synthesizeCarouselDeck')));
 t('fact-check · rewrites get a confirmation pass', /const second = await factCheckCarouselClaims/.test(verifierSrc));
 t('fact-check · a failed call reports warn, never pass', /fact-check failed[\s\S]{0,200}status: 'warn'/.test(verifierSrc));
 t('fact-check · runs on the carousel tier', /tier: 'carousel'/.test(fnBody('factCheckCarouselClaims')));
