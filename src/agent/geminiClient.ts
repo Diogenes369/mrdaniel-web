@@ -520,11 +520,16 @@ export async function generateContentWithRetry(params: GenContentReq, options: G
   const shortBench = (leg: Leg) => (benchedUntil.get(legKey(leg)) ?? 0) - Date.now() <= 90_000;
 
   let lastError: unknown = null;
+  // Why each leg ahead of the winner did not serve — returned with the answer so an admin-facing
+  // caller can show "Opus skipped: <reason>" without anyone reading function logs.
+  const trail: string[] = [];
+  if (options.tier === 'carousel' && legs[0]?.provider !== 'claude') trail.push(`claude: ${claudeConfigReason() ?? 'not planned (request is not text-only)'}`);
   const skipped: string[] = [];
   for (const leg of legs) {
     // A single explicitly-named model is always attempted — there is nothing to fall back to.
     if (legs.length > 1 && isLegBenched(leg) && !(allBenched && shortBench(leg))) {
       skipped.push(legKey(leg));
+      trail.push(`${legKey(leg)}: benched until ${new Date(benchedUntil.get(legKey(leg)) ?? 0).toISOString()}`);
       continue;
     }
     try {
@@ -544,12 +549,14 @@ export async function generateContentWithRetry(params: GenContentReq, options: G
       // Which leg answered ("claude:claude-opus-5-5", "gemini:…", "groq:…"). Callers that report
       // their engine read it (the carousel studio does); nobody else has to know it is there.
       (out as { servedBy?: string }).servedBy = legKey(leg);
+      (out as { routeTrail?: string[] }).routeTrail = trail;
       return out;
     } catch (err) {
       lastError = err;
       if (err instanceof GeminiPacedOutError) continue;
       benchLeg(leg, err);
       console.warn(`[ai-router] ${legKey(leg)} failed, trying next leg:`, (err as Error)?.message?.replace(/\s+/g, ' ').slice(0, 200));
+      trail.push(`${legKey(leg)}: ${String((err as Error)?.message ?? err).replace(/\s+/g, ' ').slice(0, 180)}`);
     }
   }
   if (lastError) throw lastError;

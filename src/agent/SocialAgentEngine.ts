@@ -1115,6 +1115,8 @@ export interface CarouselStudioResult {
   promisedItems: number | null;
   /** The router leg that wrote the deck, e.g. "claude:claude-opus-5-5" — proof of which engine ran. */
   engine: string;
+  /** Legs that were skipped or failed before `engine` answered, with the reason. [] when the first leg served. */
+  engineTrail: string[];
 }
 
 const DESIGN_ALIGN = ['right', 'center'] as const;
@@ -1282,6 +1284,7 @@ export async function synthesizeCarouselDeck(input: {
     listItems: list.items,
     promisedItems: list.promised,
     engine: (response as { servedBy?: string }).servedBy ?? 'unknown',
+    engineTrail: (response as { routeTrail?: string[] }).routeTrail ?? [],
   };
 }
 

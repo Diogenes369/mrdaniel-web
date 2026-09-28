@@ -908,7 +908,7 @@ ${typeof notes === 'string' ? notes : ''}`);
         return;
       }
       // `entities` / `verification` / `listItems` are additive — an older dashboard reads `deck` only.
-      res.status(200).json({ ok: true, deck, engine: synth.engine, entities: synth.entities, verification, listItems: synth.listItems.map(({ n, name }) => ({ n, name })) });
+      res.status(200).json({ ok: true, deck, engine: synth.engine, engineTrail: synth.engineTrail, entities: synth.entities, verification, listItems: synth.listItems.map(({ n, name }) => ({ n, name })) });
       return;
     }
 
