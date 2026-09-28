@@ -333,7 +333,7 @@ export async function synthesizeStudioDeck(
       takeaways: brief.takeaways,
     });
     if (!res.ok) return buildDeckFallback(brief, topic, (await describeAiError(res)).message, theme);
-    const data = (await res.json()) as { ok?: boolean; blocked?: boolean; deck?: ApiSlide[]; entities?: unknown; verification?: DeckVerification };
+    const data = (await res.json()) as { ok?: boolean; blocked?: boolean; deck?: ApiSlide[]; entities?: unknown; verification?: DeckVerification; engine?: unknown };
     if (data.blocked) return buildDeckFallback(brief, topic, 'הפלט נחסם ע"י מסנן התוכן', theme);
     if (!data.ok || !Array.isArray(data.deck) || data.deck.length < 5) {
       return buildDeckFallback(brief, topic, 'מנוע ה-AI לא החזיר קרוסלה שמישה', theme);
@@ -359,6 +359,7 @@ export async function synthesizeStudioDeck(
       synthesized: true,
       theme,
       createdAt: Date.now(),
+      ...(typeof data.engine === 'string' && data.engine ? { engine: data.engine } : {}),
       entities: Array.isArray(data.entities) ? data.entities.map((e) => String(e)).filter(Boolean).slice(0, 6) : [],
       ...(data.verification && Array.isArray(data.verification.checks) ? { verification: data.verification } : {}),
     };

@@ -114,6 +114,8 @@ t('design · quote/stat are centred', (() => { const d = [mk('quote'), mk('stat'
 // ─── 5 · verifier + endpoint wiring ────────────────────────────────────────────────────────────
 
 const api = readFileSync(new URL('../../api/agent-generate.ts', import.meta.url), 'utf8');
+t('router · every answer is tagged with the leg that served it', /\.servedBy = legKey\(leg\)/.test(router));
+t('endpoint · carousel-studio reports its engine', /engine: synth\.engine/.test(api));
 t('endpoint · carousel-studio runs the verifier before responding', /verifyCarouselDeck\(synth/.test(api));
 t('endpoint · item copy goes through sanitizeOutput', /s\.items \?\? \[\]\)\.map\(\(i\) => `\$\{i\.name\}/.test(api));
 t('engine · entities must appear in the source', /lowerSource\.includes\(e\.toLowerCase\(\)\)/.test(engine));

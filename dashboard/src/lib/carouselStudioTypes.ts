@@ -107,6 +107,8 @@ export interface StudioDeck {
   theme: StudioTheme;
   /** Company/product names from the source, drawn as wordmark lockups. Source-checked server-side. */
   entities?: string[];
+  /** Router leg that wrote the copy ("claude:claude-opus-5-5", "gemini:…"); absent on the fallback. */
+  engine?: string;
   /** The pre-render verification report; absent on the local fallback deck. */
   verification?: DeckVerification;
   createdAt: number;

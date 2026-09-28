@@ -1113,6 +1113,8 @@ export interface CarouselStudioResult {
   listItems: { n: number; name: string; text: string }[];
   /** How many items the title promised (e.g. 20), when it named a count. */
   promisedItems: number | null;
+  /** The router leg that wrote the deck, e.g. "claude:claude-opus-5-5" — proof of which engine ran. */
+  engine: string;
 }
 
 const DESIGN_ALIGN = ['right', 'center'] as const;
@@ -1279,6 +1281,7 @@ export async function synthesizeCarouselDeck(input: {
     entities,
     listItems: list.items,
     promisedItems: list.promised,
+    engine: (response as { servedBy?: string }).servedBy ?? 'unknown',
   };
 }
 

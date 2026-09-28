@@ -383,7 +383,9 @@ export default function CarouselStudio() {
               <span className="flex items-center gap-2 text-zinc-400 text-xs font-mono uppercase tracking-wider">
                 <LayoutTemplate className="w-3.5 h-3.5" /> {deck.slides.length} שקופיות ·{' '}
                 <span className={deck.synthesized ? 'text-brand-400 normal-case' : 'text-amber-400/80 normal-case'}>
-                  {deck.synthesized ? 'טקסט AI' : `גיבוי מקומי${deck.fallbackReason ? ` — ${deck.fallbackReason}` : ''}`}
+                  {deck.synthesized
+                    ? `טקסט AI${deck.engine ? ` · ${/^claude:/.test(deck.engine) ? 'Claude Opus 5.5' : deck.engine.split(':').pop()}` : ''}`
+                    : `גיבוי מקומי${deck.fallbackReason ? ` — ${deck.fallbackReason}` : ''}`}
                 </span>
               </span>
               <button

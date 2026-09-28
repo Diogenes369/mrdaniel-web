@@ -540,7 +540,11 @@ export async function generateContentWithRetry(params: GenContentReq, options: G
               reasoningEffort: leg.model === GROQ_SMALL_MODEL ? 'low' : undefined,
             });
       if (skipped.length || lastError) console.info(`[ai-router] served by ${legKey(leg)}${skipped.length ? ` (benched: ${skipped.join(', ')})` : ''}`);
-      return repairResponseInPlace(res, lock, legKey(leg));
+      const out = repairResponseInPlace(res, lock, legKey(leg));
+      // Which leg answered ("claude:claude-opus-5-5", "gemini:…", "groq:…"). Callers that report
+      // their engine read it (the carousel studio does); nobody else has to know it is there.
+      (out as { servedBy?: string }).servedBy = legKey(leg);
+      return out;
     } catch (err) {
       lastError = err;
       if (err instanceof GeminiPacedOutError) continue;
