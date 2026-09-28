@@ -9,7 +9,8 @@
 // No network and no key needed. Run: npx tsx scripts/__tests__/carousel-opus.test.mjs
 import { readFileSync } from 'node:fs';
 import { detectListItems } from '../../src/agent/listExtract.ts';
-import { detectSlop, dropCeremonySentences } from '../../src/agent/antiSlop.ts';
+import { detectSlop, dropCeremonySentences, repairContrastHeadline } from '../../src/agent/antiSlop.ts';
+import { verifyCarouselDeck } from '../../src/server/carouselVerifier.ts';
 import { enforceDesignVariance } from '../../src/server/carouselVerifier.ts';
 import { isClaudeConfigured, CLAUDE_CAROUSEL_MODEL } from '../../src/agent/claudeClient.ts';
 
@@ -85,6 +86,11 @@ t('slop · mid-sentence real contrast is not flagged', !kinds('המודל לא �
 t('slop · ceremony sentence dropped, fact kept', dropCeremonySentences('Jev עולה 0.042 דולר. העתיד נראה מבטיח.') === 'Jev עולה 0.042 דולר.');
 t('slop · a slide that is only ceremony is left alone', dropCeremonySentences('העתיד נראה מבטיח.') === 'העתיד נראה מבטיח.');
 
+t('slop · contrast headline repaired to its claim', repairContrastHeadline("לא צ'אט, אלא מנוע החלטות") === 'מנוע החלטות');
+t('slop · a one-word remainder is left alone', repairContrastHeadline("לא צ'אט, אלא מנוע") ==="לא צ'אט, אלא מנוע");
+t('slop · ordinary headline untouched', repairContrastHeadline('מנוע החלטות לסוכנים') === 'מנוע החלטות לסוכנים');
+t('precision · the claim-size rule is in the prompt rules', /דיוק טענה/.test(readFileSync(new URL('../../src/agent/antiSlop.ts', import.meta.url), 'utf8')));
+
 // ─── 4 · design variance ───────────────────────────────────────────────────────────────────────
 
 const mk = (layout, role = 'value', design) => ({ role, layout, kicker: '', headline: 'h', subhead: '', body: 'b', bullets: [], bulletsLeft: [], columnLabels: null, stat: '', code: '', quote: '', readingTime: '', ...(design ? { design } : {}) });
@@ -104,6 +110,15 @@ for (const seed of ['s1', 's2', 's3', 's4', 's5']) {
   enforceDesignVariance(r, seed);
   t(`design · a run of row slides never lands at the bottom (${seed})`, r.every((s) => s.layout !== 'items' || s.design.zone !== 'bottom'), r.map((s) => s.design?.zone).join(','));
 }
+const alt = [mk('hero', 'hook', { align: 'right', zone: 'top', tone: 'plain', scale: 'xl' })];
+for (let i = 0; i < 12; i++) alt.push(mk('items', 'value', { align: 'right', zone: i % 2 ? 'center' : 'top', tone: ['plain', 'band', 'plain', 'split', 'plain', 'spot'][i % 6], scale: 'm' }));
+alt.push(mk('cta', 'cta'));
+enforceDesignVariance(alt, 'dominant');
+{
+  const m = alt.slice(1, -1).map((s) => `${s.design.zone}/${s.design.tone}`);
+  const top = Math.max(...Object.values(m.reduce((o, k) => ((o[k] = (o[k] ?? 0) + 1), o), {})));
+  t('design · no zone+tone combination dominates the deck', top / m.length <= 0.34, m.join(' '));
+}
 const a = [mk('hero', 'hook'), ...Array.from({ length: 8 }, () => mk('value')), mk('cta', 'cta')];
 const b = a.map((s) => ({ ...s }));
 enforceDesignVariance(a, 'Article one');
@@ -120,6 +135,15 @@ t('endpoint · carousel-studio runs the verifier before responding', /verifyCaro
 t('endpoint · item copy goes through sanitizeOutput', /s\.items \?\? \[\]\)\.map\(\(i\) => `\$\{i\.name\}/.test(api));
 t('engine · entities must appear in the source', /lowerSource\.includes\(e\.toLowerCase\(\)\)/.test(engine));
 t('engine · anti-slop rules reach every deck prompt', (engine.match(/\$\{ANTI_SLOP_RULES\}/g) ?? []).length >= 7, String((engine.match(/\$\{ANTI_SLOP_RULES\}/g) ?? []).length));
+
+// verifier end-to-end on a tiny deck: contrast headline fixed, unknown name flagged, number checked
+{
+  const deck = [mk('hero', 'hook'), { ...mk('value'), headline: "לא צ'אט, אלא מנוע החלטות", body: 'Jev עובד עם LangGraph ומחזיר 0.99.' }, mk('value'), mk('value'), mk('value'), mk('cta', 'cta')];
+  const { slides, verification } = await verifyCarouselDeck({ slides: deck, entities: [], listItems: [], promisedItems: null, engine: 'test', engineTrail: [] }, { title: 'Jev', body: 'Jev scored it 0.99 and dropped it.' });
+  t('verifier · contrast headline repaired before render', slides[1].headline === 'מנוע החלטות', slides[1].headline);
+  const nums = verification.checks.find((c) => c.id === 'numbers');
+  t('verifier · a name the source never mentions is flagged', nums?.status === 'warn' && /LangGraph/.test(nums.detail), nums?.detail);
+}
 
 for (const [status, label, detail] of results) console.log(`${status} ${label}${detail ? ` — ${detail}` : ''}`);
 const failed = results.filter((r) => r[0] === 'FAIL').length;

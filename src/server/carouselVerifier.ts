@@ -1,4 +1,4 @@
-import { detectSlop, dropCeremonySentences, type SlopHit } from '../agent/antiSlop.js';
+import { detectSlop, dropCeremonySentences, repairContrastHeadline, type SlopHit } from '../agent/antiSlop.js';
 import { itemKey } from '../agent/listExtract.js';
 import {
   synthesizeMissingListEntries,
@@ -137,8 +137,12 @@ export function enforceDesignVariance(slides: CarouselStudioSlide[], seedText: s
     // Period-2 repetition: the share of slides whose zone+tone equals the slide two back.
     const sig = (s?: CarouselStudioSlide) => `${s?.design?.zone}/${s?.design?.tone}`;
     const repeats = mid.filter((s, i) => i >= 2 && sig(s) === sig(mid[i - 2])).length;
-    const periodic = mid.length > 4 && repeats / (mid.length - 2) > 0.6;
-    if (tones.size < 3 || zones.size < 2 || periodic) {
+    const periodic = mid.length > 4 && repeats / (mid.length - 2) > 0.4;
+    // One zone+tone combination on more than a third of the slides reads as the template it is.
+    const counts = new Map<string, number>();
+    for (const s of mid) counts.set(sig(s), (counts.get(sig(s)) ?? 0) + 1);
+    const dominant = Math.max(0, ...counts.values()) / mid.length > 0.34;
+    if (tones.size < 3 || zones.size < 2 || periodic || dominant) {
       const stride = rnd() < 0.5 ? 1 : 3; // coprime with 4: every tone appears
       const offset = Math.floor(rnd() * TONES.length);
       mid.forEach((s, i) => {
@@ -253,6 +257,15 @@ export async function verifyCarouselDeck(
     }
   }
   if (dropped) fixes.push(`הוסרו ${dropped} משפטי טקס (כרוזים/סיומים גנריים)`);
+  let reframed = 0;
+  for (const s of slides) {
+    const fixed = repairContrastHeadline(s.headline);
+    if (fixed !== s.headline) {
+      s.headline = fixed;
+      reframed++;
+    }
+  }
+  if (reframed) fixes.push(`${reframed} כותרות "לא X, אלא Y" קוצרו לטענה עצמה`);
   const slop: { slide: number; hit: SlopHit }[] = [];
   slides.forEach((s, i) => {
     if (s.role === 'cta') return; // CTA copy is templated in code
@@ -290,11 +303,29 @@ export async function verifyCarouselDeck(
     if (s.role === 'cta') continue;
     for (const t of [...slideTexts(s).map((x) => x.text), s.stat]) for (const num of numbersIn(t)) if (!src.includes(num)) unverified.add(num);
   }
+  // Names: every Latin product/tool/company term on a content slide must occur in the source. A
+  // model adapting an English article rarely invents a number but readily "helps" with a tool name.
+  const srcLow = src.toLowerCase().replace(/[’']/g, "'");
+  const unknownNames = new Set<string>();
+  for (const s of slides) {
+    if (s.role === 'cta') continue; // CTA copy is the brand's, not the article's
+    for (const t of slideTexts(s).map((x) => x.text).concat(s.stat)) {
+      // The class below holds the invisible bidi marks the sanitizer inserts (LRM, RLM, LRI…PDI).
+      for (const raw of String(t).replace(/[‎‏⁦-⁩]/g, '').match(/[A-Za-z][A-Za-z0-9+_/-]*(?:\.[A-Za-z0-9]+)*/g) ?? []) {
+        const w = raw.replace(/[.-]+$/, '');
+        if (w.length < 2 || /^(AI|LLM|API|JSON|mrdaniel\.co\.il)$/i.test(w)) continue;
+        if (!srcLow.includes(w.toLowerCase())) unknownNames.add(w);
+      }
+    }
+  }
   checks.push({
     id: 'numbers',
-    label: 'התאמה להקשר — מספרים מהמקור',
-    status: unverified.size === 0 ? 'pass' : 'fail',
-    detail: unverified.size ? `מספרים שלא מופיעים במקור: ${[...unverified].slice(0, 8).join(', ')}` : 'כל המספרים מופיעים בכתבה',
+    label: 'התאמה להקשר — מספרים ושמות מהמקור',
+    status: unverified.size ? 'fail' : unknownNames.size ? 'warn' : 'pass',
+    detail: [
+      unverified.size ? `מספרים שלא מופיעים במקור: ${[...unverified].slice(0, 8).join(', ')}` : '',
+      unknownNames.size ? `שמות שלא מופיעים במקור: ${[...unknownNames].slice(0, 8).join(', ')}` : '',
+    ].filter(Boolean).join(' · ') || 'כל המספרים והשמות מופיעים בכתבה',
   });
 
   // ── 2 · layout variance (last: it must see the repaired deck) ────────────────────────────

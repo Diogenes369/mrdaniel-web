@@ -34,6 +34,7 @@ export const ANTI_SLOP_RULES = `פילטר anti-slop — כלל אדום. הקר
 - הדגשה במרכאות, אימוג'י בכותרות, וקו מפריד ארוך (—) יותר מפעם אחת בשקופית — אסורים.
 - מילוי: לא "על מנת ש" במקום "כדי", לא "בשל העובדה ש" במקום "כי", ולא יותר מהסתייגות אחת על אותה טענה.
 - אל תעקרו את הקול: משפטים באורכים שונים, פרט ספציפי ולא מעוגל, ודעה אחת ברורה שנשענת על המקור — זה מה שנשמע אנושי.
+- דיוק טענה (מתוך "Honesty & Evidence" של anti-slop): כל טענה נשארת בגודל שלה במקור. מספר השוואתי ("פי 193", "81% מול 84.4%") מופיע יחד עם מה שנמדד ומי מדד, ואסור להחיל אותו על דבר אחר — תוצאה של הערכה פנימית אחת לא הופכת ל"כל 20 המשימות". אסור לחזק או להחליף מילת תיאור: "state-changing" אינו "מסוכן", "worth turning into skills" אינו "מוצלח", "about 7.1 seconds" אינו "בבקשה אחת".
 - לפני שמחזירים: שאלו "מה פה נשמע כמו AI?" ו"האם יש פה עובדה, שם, מספר או תאריך שלא מופיעים במקור?" ותקנו את שני הדברים.`;
 
 export type SlopKind =
@@ -105,6 +106,19 @@ export function detectSlop(text: string, opts: { heading?: boolean } = {}): Slop
     }
   }
   return hits;
+}
+
+/**
+ * The headline form of negative parallelism, repaired: "לא צ'אט, אלא מנוע החלטות" → "מנוע החלטות".
+ * The Y half is the claim; the X half exists only to set up the reveal. Returns the input unchanged
+ * when it does not match, or when the remainder would be too short to stand as a headline.
+ */
+export function repairContrastHeadline(text: string): string {
+  const t = String(text ?? '');
+  const m = t.match(/^\s*(?:זה |הוא |היא )?לא [^,.!?\n]{1,40}[,،]\s*אלא\s+(.+)$/u);
+  if (!m) return t;
+  const rest = m[1].trim();
+  return rest.split(/\s+/).length >= 2 ? rest : t;
 }
 
 /**
