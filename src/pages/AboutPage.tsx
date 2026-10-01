@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Terminal,
   ShieldCheck,
-  Bot,
+  Workflow,
   Cpu,
   Layout,
   Network,
@@ -18,11 +18,11 @@ import SocialLinks from '../components/SocialLinks';
 import { ABOUT_COPY } from '../data/siteCopy';
 import { rtl } from '../lib/rtl';
 
-const PILLAR_ICONS = [Bot, Cpu, Network, Rocket];
+const PILLAR_ICONS = [Workflow, Cpu, Network, Rocket];
 
 const HUB_LINKS = [
   { icon: Terminal, to: '/news', title: 'חדשות ומדריכי AI', description: 'מה חדש ב-AI כל יום, והסבר פשוט על המודלים החדשים' },
-  { icon: Bot, to: '/ai', title: 'סוכני AI', description: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד' },
+  { icon: Workflow, to: '/ai', title: 'סוכני AI', description: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד' },
   { icon: Rocket, to: '/jarvis', title: 'מערכת JARVIS', description: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות' },
   { icon: LayoutGrid, to: '/magazines', title: 'לומדים AI', description: 'מדריכים ומגזינים חדשים על AI, בקרוב' },
 ];
@@ -96,7 +96,7 @@ export default function AboutPage() {
           <p className="text-zinc-400 text-sm md:text-base leading-relaxed mb-6 max-w-lg mx-auto">
             טיפים, עדכוני AI ומה שאני לומד תוך כדי עבודה, ישירות ברשתות או במייל.
           </p>
-          <SocialLinks className="justify-center" iconClassName="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 hover:shadow-[0_0_16px_rgba(0,255,102,0.35)] transition-all outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" glyphClassName="w-5 h-5" />
+          <SocialLinks className="justify-center" iconClassName="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 transition-all outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" glyphClassName="w-5 h-5" />
         </div>
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="glass-panel glass-panel--flagship rounded-2xl p-8 md:p-12 text-center mb-16 max-w-4xl mx-auto">
@@ -113,7 +113,7 @@ export default function AboutPage() {
           </div>
           <Link
             to="/magazines"
-            className="shrink-0 inline-flex items-center gap-2 bg-brand-500 text-black font-bold rounded-full px-6 py-3.5 text-sm md:text-base hover:bg-brand-400 transition-colors shadow-[0_0_20px_rgba(0,255,102,0.2)]"
+            className="shrink-0 inline-flex items-center gap-2 bg-brand-500 text-black font-bold rounded-full px-6 py-3.5 text-sm md:text-base hover:bg-brand-400 transition-colors"
           >
             <ShoppingBag className="w-4 h-4" />
             למעבר לחנות

@@ -1,4 +1,4 @@
-import { Flame, Sparkles, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Flame, Asterisk, ArrowLeft, ExternalLink } from 'lucide-react';
 import { useAIPulse, toolOfTheWeek } from '../../services/aiPulseService';
 
 // Shared header style — both cards use the exact same size / weight / spacing for visual symmetry.
@@ -21,7 +21,7 @@ export default function AIPulseWidget() {
       {/* ---- Tool of the Week (auto-rotates weekly) ---- */}
       <div className="flex min-h-[280px] flex-col rounded-2xl border border-brand-500/30 bg-gradient-to-br from-brand-500/10 to-transparent p-6">
         <h3 className={CARD_HEADING}>
-          <Sparkles className="w-4 h-4 shrink-0 text-brand-400" />
+          <Asterisk className="w-4 h-4 shrink-0 text-brand-400" />
           Tool of the Week
         </h3>
         <p className="font-display text-lg font-black text-brand-300">{tool.name}</p>

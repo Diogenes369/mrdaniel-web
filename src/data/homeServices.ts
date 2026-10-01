@@ -1,4 +1,4 @@
-import { Bot, BrainCircuit, Cpu, Database, MessageSquare, Sparkles, Workflow, type LucideIcon } from 'lucide-react';
+import { Binary, Cpu, Database, MessageSquare, Asterisk, Workflow, type LucideIcon } from 'lucide-react';
 
 /**
  * Data model for the homepage <ServicesSection> bento grid. Editing an entry here is the only
@@ -37,7 +37,7 @@ export interface ServiceEntry {
 export const SERVICES: ServiceEntry[] = [
   {
     id: 'jarvis',
-    icon: Bot,
+    icon: Workflow,
     title: 'JARVIS: עוזר אישי',
     blurb: 'עוזר AI בעברית שמחובר למייל, ליומן ולרשימת הלקוחות שלכם. מבקשים ממנו בהודעה או בקול, והוא עושה.',
     points: [
@@ -54,7 +54,7 @@ export const SERVICES: ServiceEntry[] = [
   },
   {
     id: 'ai-agents',
-    icon: BrainCircuit,
+    icon: Binary,
     title: 'סוכני AI לעבודה חוזרת',
     blurb: 'סוכן אחד לכל משימה: פניות, מכירות או סידורים משרדיים. אתם מאשרים את ההחלטות, הוא עושה את השאר.',
     points: [
@@ -99,7 +99,7 @@ export const SERVICES: ServiceEntry[] = [
   },
   {
     id: 'content-agents',
-    icon: Sparkles,
+    icon: Asterisk,
     title: 'סוכני תוכן',
     blurb: 'סוכן שקורא חדשות מהתחום שלכם, מסכם, ומכין טיוטות לפוסטים. אתם מאשרים לפני שמשהו עולה.',
     points: [

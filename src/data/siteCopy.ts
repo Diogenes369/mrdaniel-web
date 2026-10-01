@@ -17,28 +17,66 @@
  */
 
 export const HERO_COPY = {
-  // One warm promise in the visitor's own words, and one button that takes them to the agents
-  // section. The "news" button was removed 2026-09-23: the ticker above the header already carries
-  // the news, and two CTAs split the first click.
-  h1Lead: 'בואו נהפוך את הבינה המלאכותית',
-  h1Accent: 'לעובד הכי יעיל שלכם',
-  sub: 'אני בונה סוכני AI שעונים ללקוחות, קובעים פגישות ומכינים מסמכים במקומכם. אתם מאשרים, הם עושים את השאר.',
-  ctaPrimary: 'איך זה עובד אצלכם',
+  // Learners first since 2026-10-01 (by decision): the opening meets the visitor's real fear — being
+  // left behind — warmly, and the glyph-built second line promises the one thing this site does
+  // about it ("בה" = הבינה המלאכותית). One button, into the story below.
+  h1Lead: 'הבינה המלאכותית מתקדמת מהר, אבל אתם לא חייבים להישאר מאחור',
+  h1Accent: 'בואו נעשה בה סדר',
+  sub: 'כל שבוע יוצא כלי חדש, וכולם צועקים שהוא הכי טוב. אני מסביר הכול בעברית פשוטה, צעד אחרי צעד, מההתקנה הראשונה ועד שאתם בונים כלים משלכם.',
+  ctaPrimary: 'בואו נתחיל מההתחלה',
+  // Handwritten margin note pointing into the background noise. Comments, never claims.
+  note: 'זה הרעש. נעבור עליו יחד',
+  // What the moving background is made of — true by construction (GlyphField reads /api/news).
+  // `{n}` is replaced with the number of headlines currently in the field.
+  fieldCaption: 'ברקע: {n} כותרות AI אמיתיות מהימים האחרונים ושמות הכלים עצמם',
+  fieldCaptionNoFeed: 'ברקע: שמות אמיתיים של כלים ומודלים של AI',
+  latest: 'הכותרת האחרונה',
 };
 
 /**
- * The hero's console: AI model updates ONLY (2026-09-23 — guides and posts were taken out; the way
- * to the guides is the "לומדים AI" nav link). General news stays in the ticker.
+ * The scroll story under the hero (2026-10-01): it's not you, it's the pace → I filter it for you →
+ * the route from understanding to building like a developer → start with the free guide.
+ * Written for learners, in the same plain voice; no figures, no promised results.
  */
-export const HERO_CONSOLE_COPY = {
-  label: 'MODELS · LIVE',
-  title: 'עדכוני מודלים',
-  currentLabel: 'המודלים העדכניים',
-  releasesLabel: 'השקות אחרונות',
-  empty: 'אין השקות חדשות כרגע. הרשימה מתעדכנת לבד.',
-  expand: 'כל ההשקות',
-  collapse: 'הצג פחות',
-  allNews: 'לכל החדשות',
+export const STORY_COPY = {
+  noise: {
+    title: 'זה לא אתם. זה הקצב',
+    body: 'כל יום יוצא מודל חדש, כלי חדש, ומישהו ברשת מבטיח שהפעם זה משנה הכול. קשה לדעת על מה לסמוך, וקל להרגיש שכבר פספסתם את הרכבת.',
+    logTitle: 'רק מהימים האחרונים',
+    modelsTitle: 'המודלים העדכניים',
+    empty: 'אין השקות חדשות כרגע. הרשימה מתעדכנת לבד.',
+    allNews: 'לכל החדשות',
+    expand: 'עוד השקות',
+    collapse: 'פחות',
+  },
+  order: {
+    title: 'אני עושה את הסינון בשבילכם',
+    body: 'אני מנסה כלים ומודלים חדשים על עבודה אמיתית, מוותר על מה שלא עובד, ומסביר את מה שנשאר בעברית פשוטה. בלי ז׳רגון ובלי הייפ.',
+    pairs: [
+      { term: 'חלון הקשר', plain: 'כמה טקסט המודל מסוגל לזכור בבת אחת' },
+      { term: 'פרומפט', plain: 'הבקשה שאתם כותבים לו, במילים שלכם' },
+      { term: 'סוכן AI', plain: 'AI שלא רק עונה, אלא גם עושה פעולות בשבילכם' },
+      { term: 'מודל קוד פתוח', plain: 'מודל שמותר להוריד ולהריץ על המחשב שלכם' },
+    ],
+  },
+  path: {
+    title: 'מהצעד הראשון ועד לבנות כמו מפתחים',
+    body: 'לא צריך רקע טכני כדי להתחיל. עולים שלב אחרי שלב, ובכל שלב מקבלים את הצעד הבא, לא את כל הספרייה.',
+    note: 'אפשר להתחיל מכל שלב',
+    steps: [
+      { title: 'מבינים מה זה', body: 'מה זה AI, מה זה מודל, ומה הוא באמת יודע לעשות. בלי נוסחאות.' },
+      { title: 'מתחילים להשתמש', body: 'פותחים חשבון, כותבים בקשה ראשונה ולומדים לנסח אותה כך שתקבלו תשובה טובה.' },
+      { title: 'עובדים איתו כל יום', body: 'מיילים, סיכומים, מסמכים ותכנון: AI לעבודה שחוזרת אצלכם.' },
+      { title: 'מתקינים כלים אמיתיים', body: 'יוצאים מחלון הצ׳אט לכלים שעובדים על המחשב שלכם, ומחברים ביניהם.' },
+      { title: 'בונים כמו מפתחים', body: 'כותבים קוד עם AI, בונים סוכנים ומחברים מודלים לאפליקציות משלכם.' },
+    ],
+  },
+  start: {
+    title: 'מתחילים מכאן',
+    body: 'המדריך הראשון כבר מחכה, בחינם. הוא מתחיל מהיסודות ולא מניח שאתם יודעים משהו מראש.',
+    cta: 'להורדת המדריך בחינם',
+    more: 'לכל המדריכים',
+  },
 };
 
 /**
@@ -57,8 +95,8 @@ export const LEARN_AI_COPY = {
 };
 
 /**
- * The "how it works" strip between the three pillars and the savings calculator: what happens if
- * the visitor says yes. Three steps, each a process fact, no promised timelines or results.
+ * The "how it works" strip under the three pillars: what happens if the visitor says yes. Three
+ * steps, each a process fact, no promised timelines or results, and no 01/02/03 numbering.
  */
 export const PROCESS_COPY = {
   lead: 'ככה נבנה',
@@ -66,17 +104,14 @@ export const PROCESS_COPY = {
   sub: 'שלושה שלבים, ואתם מחליטים בכל אחד מהם אם ממשיכים.',
   steps: [
     {
-      kicker: '01',
       title: 'בוחרים משימה אחת',
       body: 'מוצאים עבודה אחת שחוזרת אצלכם כל יום, ומחליטים יחד איך נראה סוכן שעושה אותה טוב.',
     },
     {
-      kicker: '02',
       title: 'בונים ובודקים',
       body: 'הסוכן מתחבר לכלים שכבר יש לכם, כמו וואטסאפ, מייל ויומן, ונבדק על מקרים אמיתיים שלכם.',
     },
     {
-      kicker: '03',
       title: 'מפעילים, אתם בשליטה',
       body: 'הסוכן עובד לבד, ובכל החלטה חשובה הוא עוצר ומחכה לאישור שלכם. מרחיבים רק כשזה עובד.',
     },
@@ -106,7 +141,7 @@ export const CONTACT_COPY = {
 };
 
 export const FOOTER_COPY = {
-  tagline: 'סוכני AI שעושים את העבודה החוזרת, וחדשות AI בעברית פשוטה.',
+  tagline: 'לומדים AI בעברית פשוטה, צעד אחרי צעד: חדשות, מדריכים והסברים בגובה העיניים.',
   status: 'חדשות AI מתעדכנות כל יום',
 };
 

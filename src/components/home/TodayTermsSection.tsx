@@ -48,7 +48,7 @@ export default function TodayTermsSection({ id = 'ai-terms', compact = false }: 
             מילים שמופיעות בחדשות היום
           </h2>
         ) : (
-          <div className="mx-auto mb-12 max-w-3xl text-center">
+          <div className="mb-12 max-w-3xl">
             <PopHeadline lead="מילון AI" accent="מהחדשות של היום" />
             <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
               המונחים שחוזרים בכותרות של היום, כל אחד במשפט פשוט. מתעדכן לבד עם החדשות.

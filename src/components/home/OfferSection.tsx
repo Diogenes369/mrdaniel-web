@@ -13,12 +13,12 @@ import { LINKTREE_URL, X_URL } from '../SocialLinks';
 function BulletCard({ bullet }: { bullet: OfferBullet }) {
   const Icon = bullet.icon;
   return (
-    <div className="glass-panel glass-panel--marketing group/bc h-full flex flex-col rounded-3xl p-7 lg:p-9">
-      <div className="w-12 h-12 lg:w-14 lg:h-14 shrink-0 rounded-2xl bg-black/40 border border-white/12 flex items-center justify-center text-brand-300 mb-5 transition-colors group-hover/bc:border-brand-500/45">
+    <div className="glass-panel glass-panel--marketing group/bc h-full flex flex-col p-7 lg:p-9">
+      <div className="w-11 h-11 shrink-0 border border-dotted border-[var(--color-rule)] flex items-center justify-center text-brand-400 mb-5 transition-colors group-hover/bc:border-brand-400">
         <Icon className="w-6 h-6 lg:w-7 lg:h-7" />
       </div>
-      <h3 className="font-display text-xl font-extrabold text-white mb-2.5 lg:text-2xl">{rtl(bullet.title)}</h3>
-      <p className="text-base text-zinc-300 leading-relaxed lg:text-lg lg:leading-relaxed">{rtl(bullet.body)}</p>
+      <h3 className="poster mb-2.5 text-[1.6rem] leading-tight text-ink-paper">{rtl(bullet.title)}</h3>
+      <p className="font-sans text-base leading-relaxed text-ink-muted lg:text-[17px]">{rtl(bullet.body)}</p>
     </div>
   );
 }
@@ -40,9 +40,9 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
     >
       {/* Header sits ABOVE the depth plane so the pop-out title and the card-grid tilt don't stack. */}
       <div className="container-wide relative z-10">
-        <div className="max-w-4xl mx-auto text-center mb-12 md:mb-16">
+        <div className="max-w-4xl mb-12 md:mb-16">
           <PopHeadline lead={rtl(offer.title)} accent={rtl(offer.accent)} />
-          <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">{rtl(offer.intro)}</p>
+          <p className="story-body">{rtl(offer.intro)}</p>
         </div>
       </div>
 
@@ -64,7 +64,7 @@ export default function OfferSection({ offer }: { offer: HomeOffer }) {
           ))}
         </ScrollLockRail>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="flex flex-col items-start gap-x-6 gap-y-4 sm:flex-row sm:items-center">
           <WebButton variant="primary" onClick={() => navigate(offer.route)} className="cta-sheen !px-8">
             {rtl(offer.ctaLabel)}
             <ArrowLeft className="w-4 h-4" />

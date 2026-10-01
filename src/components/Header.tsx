@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, Shuffle, Search, Sparkles, SquareTerminal } from 'lucide-react';
+import { Menu, X, Shuffle, Search, ListChecks, SquareTerminal } from 'lucide-react';
 import WebButton from './WebButton';
 import SocialLinks from './SocialLinks';
 import Logo from './Logo';
 import { smoothScrollTo, scrollToTopSmooth } from '../hooks/useLenis';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useFieldQuiet } from './field/fieldState';
 
 // TikTok and WhatsApp stay exclusive to the footer and the bottom-of-page social bar — the header
 // toolbar and mobile drawer keep just these three.
@@ -43,7 +44,7 @@ const FOCUS_SAFE_CLASS = 'outline-none focus:outline-none focus-visible:ring-2 f
 // Desktop top toolbar (Shuffle/Search/Social): icon-only, no background circle or border — a
 // soft box-shadow glow on hover (visible even with a transparent fill) is the only affordance.
 const DESKTOP_ICON_CLASS =
-  `w-11 h-11 rounded-full flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:shadow-[0_0_16px_rgba(0,255,102,0.45)] transition-all duration-300 cursor-pointer ${FOCUS_SAFE_CLASS}`;
+  `w-11 h-11 rounded-none flex items-center justify-center text-zinc-300 hover:text-brand-400 transition-all duration-300 cursor-pointer ${FOCUS_SAFE_CLASS}`;
 
 // How long the mobile drawer's own exit fade takes — routing/scroll is deliberately delayed by
 // this long after a nav click (see handleMobileNavClick) so the drawer finishes closing BEFORE
@@ -165,6 +166,8 @@ export default function Header() {
   // save/restore of body.style.overflow permanently locked the page when overlays
   // overlapped.
   useBodyScrollLock(mobileOpen);
+  // The glyph field steps back behind the nav row so its words never run through the links.
+  const quietBar = useFieldQuiet();
 
   return (
     <motion.header
@@ -173,21 +176,22 @@ export default function Header() {
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
       className={`fixed inset-x-0 z-40 pt-safe border-none outline-none transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
         scrolled
-          ? 'bg-black shadow-2xl py-2 lg:bg-transparent lg:shadow-none lg:py-4'
+          ? 'bg-ground border-b border-dotted border-[var(--color-rule)] py-2 lg:bg-transparent lg:border-transparent lg:py-4'
           : 'bg-transparent py-6 md:py-8'
       }`}
       style={{ top: tickerOffset, willChange: 'transform, opacity, background-color' }}
     >
       <div className="container-wide">
         {/* Desktop-only: on scroll this row condenses from a full-width bar into a floating
-            glassmorphism capsule (w-fit + rounded-full + its own bg/border/glow) — the outer
+            glassmorphism capsule (w-fit + rounded-none + its own bg/border/glow) — the outer
             <header> above sheds its own background at the lg breakpoint so the capsule reads as
             a detached floating island rather than a bar-within-a-bar. Below lg, none of the
             capsule classes apply and this is just the existing full-width scrolled bar. */}
         <div
-          className={`flex items-center justify-between gap-3 outline-none lg:border lg:rounded-full transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          ref={quietBar}
+          className={`flex items-center justify-between gap-3 outline-none lg:border lg:rounded-none transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
             scrolled
-              ? 'lg:w-fit lg:mx-auto lg:gap-5 lg:bg-black lg:border-[#76B900]/30 lg:py-2 lg:px-6 lg:shadow-[0_0_20px_rgba(118,185,0,0.15)]'
+              ? 'lg:w-fit lg:mx-auto lg:gap-5 lg:bg-ground lg:border-dotted lg:border-[var(--color-rule)] lg:py-2 lg:px-6'
               : 'lg:border-transparent'
           }`}
           style={{ willChange: 'transform, opacity, background-color' }}
@@ -198,9 +202,8 @@ export default function Header() {
             className={`relative flex items-center shrink-0 group z-50 rounded-lg ${FOCUS_SAFE_CLASS}`}
             style={{ willChange: 'transform, opacity' }}
           >
-            <div className="absolute inset-0 -m-2.5 rounded-full bg-[#76B900]/25 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" aria-hidden="true" />
             <Logo
-              className="relative drop-shadow-[0_0_14px_rgba(118,185,0,0.45)] group-hover:scale-105 transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+              className="relative group-hover:scale-105 transition-transform duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
               iconClassName={scrolled ? 'h-8 lg:h-7' : 'h-9 md:h-10'}
               textClassName={`text-base md:text-lg ${scrolled ? 'hidden lg:inline' : 'hidden sm:inline'}`}
             />
@@ -213,7 +216,7 @@ export default function Header() {
                   key={link.name}
                   type="button"
                   onClick={openContact}
-                  className={`whitespace-nowrap text-sm font-medium text-zinc-300 hover:text-white transition-colors py-2 rounded cursor-pointer ${FOCUS_SAFE_CLASS}`}
+                  className={`nav-link cursor-pointer ${FOCUS_SAFE_CLASS}`}
                 >
                   {link.name}
                 </button>
@@ -222,7 +225,8 @@ export default function Header() {
                   key={link.name}
                   to={link.to!}
                   onClick={(e) => handleNavClick(e, link.to!)}
-                  className={`whitespace-nowrap text-sm font-medium text-zinc-300 hover:text-white transition-colors py-2 rounded ${FOCUS_SAFE_CLASS}`}
+                  aria-current={location.pathname === link.to ? 'page' : undefined}
+                  className={`nav-link ${FOCUS_SAFE_CLASS}`}
                 >
                   {link.name}
                 </Link>
@@ -255,30 +259,14 @@ export default function Header() {
               </motion.button>
               <SocialLinks iconClassName={DESKTOP_ICON_CLASS} channels={[...HEADER_SOCIAL_CHANNELS]} />
             </div>
-
-            {/* Standout CTA: a continuous breathing glow halo (same pattern as the Logo's hover
-                halo above, but always-on and slower) plus a gently animated Sparkles icon, so this
-                reads as the header's one "premium" action at rest — not just on hover, like every
-                other icon/button in this bar. */}
+            {/* The header's one emphasised action. Square, one ink, no glow or sparkle (2026-10-01). */}
             <div className="hidden lg:block relative">
-              <motion.div
-                aria-hidden="true"
-                className="absolute inset-0 -m-1.5 rounded-full bg-[#76B900]/30 blur-lg pointer-events-none"
-                animate={{ opacity: [0.35, 0.8, 0.35], scale: [0.94, 1.06, 0.94] }}
-                transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-              />
               <WebButton
                 variant="ghost"
                 onClick={handleCtaClick}
-                className="!text-[#76B900] hover:text-white !border-[#76B900]/40 hover:!border-[#76B900]/40 hover:bg-[#76B900]/10 !px-4 !py-2 !text-xs !font-semibold !transition-all !duration-300 shadow-[0_0_15px_rgba(118,185,0,0.15)] hover:shadow-[0_0_20px_rgba(118,185,0,0.4)]"
+                className="!min-h-9 !px-4 !text-xs"
               >
-                <motion.span
-                  className="inline-flex"
-                  animate={{ rotate: [0, 15, -10, 0], scale: [1, 1.15, 1] }}
-                  transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <Sparkles size={14} />
-                </motion.span>
+                <ListChecks size={14} aria-hidden="true" />
                 סוכן התאמה אישי
               </WebButton>
             </div>
@@ -287,13 +275,13 @@ export default function Header() {
                 putting `hidden` on the WebButton itself: WebButton hardcodes `inline-flex` in its
                 base class, which fought `hidden` and let the pill leak into the mobile header.
                 Directly LEFT of the personal-agent CTA (RTL: next in DOM); mirrors its pill shape
-                via <WebButton variant="ghost"> with the CLI cyan/turquoise signature (#22d3ee). */}
+                via <WebButton variant="ghost"> in the brand ink (one ink in the header since 2026-10-01). */}
             <div className="hidden lg:block">
               <WebButton
                 variant="ghost"
                 onClick={() => window.dispatchEvent(new CustomEvent('open-cli'))}
                 aria-label="מצב טרמינל · CLI"
-                className="font-mono !text-[#22d3ee] hover:!text-white !border-[#22d3ee]/40 hover:!border-[#22d3ee]/40 hover:bg-[#22d3ee]/10 !px-4 !py-2 !text-xs !font-semibold !transition-all !duration-300 shadow-[0_0_15px_rgba(34,211,238,0.14)] hover:shadow-[0_0_20px_rgba(34,211,238,0.4)]"
+                className="!min-h-9 !px-4 !text-xs"
               >
                 <SquareTerminal size={14} />
                 {'>_ CLI'}
@@ -307,9 +295,9 @@ export default function Header() {
               type="button"
               onClick={openAgent}
               aria-label="פתיחת סוכן אישי"
-              className={`lg:hidden inline-flex items-center gap-1.5 rounded-full border border-[#76B900]/40 bg-[#76B900]/10 px-3 py-1.5 text-xs font-semibold text-[#9FE870] whitespace-nowrap transition-colors hover:bg-[#76B900]/20 active:scale-95 ${FOCUS_SAFE_CLASS}`}
+              className={`lg:hidden inline-flex items-center gap-1.5 rounded-none border border-[#76B900]/40 bg-[#76B900]/10 px-3 py-1.5 text-xs font-semibold text-[#9FE870] whitespace-nowrap transition-colors hover:bg-[#76B900]/20 active:scale-95 ${FOCUS_SAFE_CLASS}`}
             >
-              <Sparkles size={13} />
+              <ListChecks size={13} aria-hidden="true" />
               סוכן אישי
             </button>
 
@@ -334,7 +322,7 @@ export default function Header() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: DRAWER_EXIT_MS / 1000, ease: 'easeInOut' }}
-            className="fixed inset-0 h-dvh w-full max-w-full overflow-x-hidden bg-black lg:hidden z-40 flex flex-col"
+            className="fixed inset-0 h-dvh w-full max-w-full overflow-x-hidden bg-ground lg:hidden z-40 flex flex-col"
           >
             {/* Top: logo + close, pt-safe clears the notch/status bar */}
             <div className="shrink-0 flex items-center justify-between px-6 pt-safe pt-6 pb-4">
@@ -359,9 +347,9 @@ export default function Header() {
                   setMobileOpen(false);
                   window.setTimeout(openAgent, DRAWER_EXIT_MS);
                 }}
-                className={`mb-3 flex items-center justify-center gap-2 rounded-full bg-brand-500 py-3.5 font-display text-lg font-bold text-black shadow-[0_0_24px_rgba(118,185,0,0.25)] ${FOCUS_SAFE_CLASS}`}
+                className={`mb-3 flex items-center justify-center gap-2 rounded-none bg-brand-500 py-3.5 font-sans text-lg font-bold text-ground ${FOCUS_SAFE_CLASS}`}
               >
-                <Sparkles size={18} />
+                <ListChecks size={18} aria-hidden="true" />
                 סוכן אישי · התאמה מיידית
               </button>
               <button
@@ -370,7 +358,7 @@ export default function Header() {
                   setMobileOpen(false);
                   window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-cli')), DRAWER_EXIT_MS);
                 }}
-                className={`mb-4 flex items-center justify-center gap-2 rounded-full border border-[#22d3ee]/40 bg-[#22d3ee]/10 py-3 font-mono text-base font-semibold text-[#7dd3fc] transition-all active:scale-[0.98] hover:border-[#22d3ee]/70 hover:shadow-[0_0_18px_rgba(34,211,238,0.35)] ${FOCUS_SAFE_CLASS}`}
+                className={`mb-4 flex items-center justify-center gap-2 rounded-none border border-brand-400/40 bg-brand-400/10 py-3 font-mono text-base font-semibold text-brand-300 transition-all active:scale-[0.98] hover:border-brand-400/70 ${FOCUS_SAFE_CLASS}`}
               >
                 <SquareTerminal size={17} />
                 {'>_ CLI · מצב טרמינל'}
@@ -384,7 +372,7 @@ export default function Header() {
                       setMobileOpen(false);
                       window.setTimeout(openContact, DRAWER_EXIT_MS);
                     }}
-                    className={`text-right text-xl font-display font-medium text-white border-b border-white/10 py-3 ${FOCUS_SAFE_CLASS}`}
+                    className={`text-right font-sans text-xl font-bold text-ink-paper border-b border-dotted border-[var(--color-rule)] py-3 ${FOCUS_SAFE_CLASS}`}
                   >
                     {link.name}
                   </button>
@@ -393,7 +381,8 @@ export default function Header() {
                     key={link.name}
                     to={link.to!}
                     onClick={(e) => handleMobileNavClick(e, link.to!)}
-                    className={`text-xl font-display font-medium text-white border-b border-white/10 py-3 ${FOCUS_SAFE_CLASS}`}
+                    aria-current={location.pathname === link.to ? 'page' : undefined}
+                    className={`font-sans text-xl font-bold text-ink-paper border-b border-dotted border-[var(--color-rule)] py-3 aria-[current=page]:text-brand-400 ${FOCUS_SAFE_CLASS}`}
                   >
                     {link.name}
                   </Link>
@@ -402,7 +391,7 @@ export default function Header() {
             </nav>
 
             {/* Bottom: social links, anchored with safe-area clearance for the home indicator */}
-            <div className="shrink-0 flex items-center justify-center gap-3 px-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] border-t border-white/10">
+            <div className="shrink-0 flex items-center justify-center gap-3 px-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] border-t border-dotted border-[var(--color-rule)]">
               <SocialLinks channels={[...HEADER_SOCIAL_CHANNELS]} />
             </div>
           </motion.div>

@@ -42,6 +42,7 @@ import {
 import { runAutoPublishCycle, dispatchPublish } from './src/server/autoPublish';
 import { generateEmailCampaign, isCopywriterConfigured } from './src/server/emailCopywriter';
 import leadsHandler from './api/leads';
+import newsHandler from './api/news';
 import { isHiggsfieldAction, handleHiggsfieldAction } from './src/server/openHiggsfieldActions';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -225,6 +226,13 @@ app.get('/api/img-proxy', async (req: Request, res: Response) => {
   } finally {
     clearTimeout(timer);
   }
+});
+
+// Local mirror of vercel.json's `/api/download/:guideId → /api/news.ts?action=download` rewrite, so
+// the guide download page (the homepage story's final button) works in local dev too.
+app.get('/api/download/:guideId', (req: Request, res: Response) => {
+  req.query = { ...req.query, action: 'download', guideId: req.params.guideId };
+  return newsHandler(req, res);
 });
 
 app.get('/api/news/item/:slug', async (req: Request, res: Response) => {

@@ -36,7 +36,7 @@ export function isTouchFirst(): boolean {
 }
 
 /** Few cores or little RAM. hardwareConcurrency is capped by WebKit for anti-fingerprinting, so it
- * is only trusted together with deviceMemory's absence-safe default (see useDeviceTier.ts). */
+ * is only trusted together with deviceMemory's absence-safe default. */
 export function isWeakHardware(): boolean {
   if (typeof navigator === 'undefined') return false;
   const n = navigator as NavigatorHints;
@@ -48,7 +48,7 @@ export function isPerfLite(): boolean {
 }
 
 /** Whether the fixed WebGL background should mount at all. Touch devices with capable hardware
- * keep it (it is the site's identity, and useDeviceTier already trims it there); reduced motion,
+ * keep it (it is the site's identity, and the field already halves its frame rate there); reduced motion,
  * Save-Data and weak hardware get the static CSS glow that sits under it anyway. */
 export function shouldMountScene(): boolean {
   return !isReducedMotion() && !isSaveData() && !isWeakHardware();

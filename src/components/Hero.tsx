@@ -1,256 +1,122 @@
-import React, { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
-import { ArrowDown, ChevronDown, ChevronLeft, Cpu, Radio } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import WebButton from './WebButton';
-import SocialLinks from './SocialLinks';
-import { HERO_COPY, HERO_CONSOLE_COPY } from '../data/siteCopy';
-import { useNewsFeed, formatRelativeTime, type NewsItem } from '../services/newsService';
-import { useModelCatalog } from '../services/modelCatalogService';
+import { useMemo, type MouseEvent } from 'react';
+import { ArrowDown } from 'lucide-react';
+import GlyphButton from './ui/GlyphButton';
+import Depth from './story/Depth';
+import HandNote from './story/HandNote';
+import { HERO_COPY } from '../data/siteCopy';
+import { useNewsFeed, formatRelativeTime } from '../services/newsService';
 import { smoothScrollTo } from '../hooks/useLenis';
 import { rtl } from '../lib/rtl';
+import { selectFieldTitles } from './field/glyphs';
+import { useFieldBeat, useFieldHeadline, useFieldQuiet } from './field/fieldState';
 
-// Static on purpose: the site-wide NewsTicker already imports ArticleModal, so it is in the main
-// chunk either way and a lazy() here would only add a Suspense boundary and lose its exit animation.
-import ArticleModal from './news/ArticleModal';
-
-const HERO_ICON_CLASS =
-  'w-10 h-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 transition-colors';
-
-const EASE = [0.16, 1, 0.3, 1] as const;
-
-/** The homepage section the single hero CTA leads to. */
-const AGENTS_ANCHOR = '#offer-ai-agents';
+/** Where the single hero action leads: the first beat of the story. */
+const STORY_ANCHOR = '#story';
 
 /**
- * Hero (split layout since 2026-09-23). The right-hand column (RTL start) carries one warm promise
- * and exactly ONE button, which scrolls to the AI agents section. The left-hand column is the
- * model-updates console below.
+ * Hero (rewritten 2026-10-01, learners first). The visitor's own feeling as the first line, the
+ * promise as the second — and that second line is not typeset by the browser: the glyph field
+ * builds it out of the same characters as the noise around it, assembling cell by cell on load.
+ * The DOM keeps the real text in place (transparent while the field draws it) so selection,
+ * search and screen readers never notice; on small screens or without WebGL it simply stays solid.
  *
- * First-paint rules (2026-09-23 performance pass): nothing in the first viewport starts at
- * `opacity: 0`. The entrance is a transform-only nudge, so the headline — the page's LCP element —
- * is painted on the first frame instead of after a 1.1 s fade, and the console is never hidden
- * behind a delayed entrance.
+ * First paint: nothing here starts hidden. Every line is readable on the first frame; the field
+ * fades in behind it once the page is idle.
  *
- * Mobile: one column, console under the CTA. No sticky/pin anywhere (webview rule, AGENTS.md).
+ * The open side of the hero (left, in RTL) is deliberately empty of DOM: it is where the noise is
+ * visible and where the pointer lens wanders until the visitor's own hand takes it over.
  */
 export default function Hero() {
   const c = HERO_COPY;
+  const beat = useFieldBeat('hero');
+  const headline = useFieldHeadline();
+  const quietLead = useFieldQuiet();
+  const quietBody = useFieldQuiet();
+  const quietBar = useFieldQuiet();
+  const news = useNewsFeed();
 
-  const goToAgents = (e: React.MouseEvent<HTMLButtonElement | HTMLAnchorElement>) => {
+  const count = useMemo(() => selectFieldTitles((news.data ?? []).map((n) => n.title)).length, [news.data]);
+  const newest = useMemo(() => {
+    const times = (news.data ?? []).map((n) => new Date(n.publishedAt).getTime()).filter((t) => !Number.isNaN(t));
+    return times.length ? new Date(Math.max(...times)).toISOString() : null;
+  }, [news.data]);
+  const caption = count > 0 ? c.fieldCaption.replace('{n}', String(count)) : c.fieldCaptionNoFeed;
+  const accent = rtl(c.h1Accent).split(' ');
+
+  const goToStory = (e: MouseEvent<HTMLElement>) => {
     e.preventDefault();
-    smoothScrollTo(AGENTS_ANCHOR);
+    smoothScrollTo(STORY_ANCHOR, -24);
   };
 
   return (
-    <section id="hero" className="relative min-h-[100dvh] flex items-center pt-28 pb-16 overflow-hidden">
-      <div className="hero-grid" aria-hidden="true" />
-      <div className="container-wide relative z-10">
-        <div className="mx-auto grid max-w-[1400px] items-center gap-12 px-4 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
-          <motion.div
-            initial={{ y: 14 }}
-            animate={{ y: 0 }}
-            transition={{ duration: 0.9, ease: EASE }}
-            className="text-center lg:text-right"
-          >
-            <h1 className="font-display text-fluid-hero font-black text-white mb-7 [text-shadow:0_2px_18px_rgba(0,0,0,0.85),0_6px_44px_rgba(0,0,0,0.75)]">
-              {rtl(c.h1Lead)}
-              <br />
-              <span className="neon-text">{rtl(c.h1Accent)}</span>
+    <section
+      id="hero"
+      ref={beat}
+      // From md up the news ticker sits above the header in normal flow; subtracting it keeps the
+      // caption at the foot of the hero inside the first viewport.
+      className="story-hero relative flex min-h-[100dvh] flex-col md:min-h-[calc(100dvh-2.25rem)]"
+    >
+      <div className="container-wide relative z-10 flex flex-1 items-center pb-14 pt-24 md:pb-6 md:pt-24">
+        <div className="grid w-full grid-cols-1 gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-7">
+            <h1 className="story-h1">
+              <Depth as="span" speed={0.22}>
+                <span ref={quietLead} className="story-h1__lead">
+                  {rtl(c.h1Lead)}
+                </span>
+              </Depth>
+              <Depth as="span" speed={0.1}>
+                {/* Three lines on a phone (bigger letters read better as glyphs), two from sm up. The
+                    trailing spaces keep the accessible text "בואו נעשה בה סדר" intact. */}
+                <span ref={headline} className="glyph-accent">
+                  {accent[0]}{' '}
+                  <br className="sm:hidden" />
+                  {accent[1]}{' '}
+                  <br className="hidden sm:inline" />
+                  {accent[2]}{' '}
+                  <br className="sm:hidden" />
+                  {accent.slice(3).join(' ')}
+                </span>
+              </Depth>
             </h1>
 
-            <p className="text-base md:text-xl text-zinc-300 font-light max-w-2xl mx-auto lg:mx-0 leading-relaxed mb-10 [text-shadow:0_2px_14px_rgba(0,0,0,0.9)]">
-              {rtl(c.sub)}
-            </p>
+            <Depth speed={0.04}>
+              <div ref={quietBody} className="mt-8 max-w-[46ch] md:mt-10">
+                <p className="story-body !text-ink-paper">{rtl(c.sub)}</p>
+                <div className="mt-9">
+                  {/* A real anchor, so it still works if the smooth-scroll layer is off. Never full
+                      width: on a phone it has to stay clear of the floating accessibility button. */}
+                  <GlyphButton href={STORY_ANCHOR} onClick={goToStory}>
+                    {rtl(c.ctaPrimary)}
+                    <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                  </GlyphButton>
+                </div>
+              </div>
+            </Depth>
+          </div>
 
-            <div className="flex justify-center lg:justify-start">
-              {/* A real anchor, so it still works if the smooth-scroll layer is off. */}
-              <WebButton variant="primary" magnetic href={AGENTS_ANCHOR} onClick={goToAgents} className="cta-sheen w-full sm:w-auto !px-9">
-                {rtl(c.ctaPrimary)}
-                <ArrowDown className="w-5 h-5" />
-              </WebButton>
-            </div>
+          <div className="relative hidden lg:col-span-5 lg:block">
+            <Depth speed={0.34} className="absolute end-[8%] top-[18%]">
+              <HandNote arrow="down-left">{c.note}</HandNote>
+            </Depth>
+          </div>
+        </div>
+      </div>
 
-            <SocialLinks
-              className="mt-9 justify-center lg:justify-start"
-              iconClassName={HERO_ICON_CLASS}
-              channels={['instagram', 'threads', 'tiktok', 'x', 'linkedin']}
-            />
-          </motion.div>
-
-          <ModelConsole />
+      {/* What the background is made of — a caption, not a claim: GlyphField reads the same feed. */}
+      <div className="container-wide relative z-10">
+        <div ref={quietBar} className="story-statusbar">
+          <span className="flex items-center gap-2">
+            <span className="story-statusbar__live" aria-hidden="true" />
+            {rtl(caption)}
+          </span>
+          {newest && (
+            <span className="hidden sm:inline">
+              {c.latest}: {formatRelativeTime(newest)}
+            </span>
+          )}
         </div>
       </div>
     </section>
-  );
-}
-
-// ─── Model-updates console ───────────────────────────────────────────────────────────────────
-
-/**
- * Model updates ONLY (2026-09-23). Guides and posts were removed from here by decision — the one
- * way to the guides is the "לומדים AI" nav link.
- *
- * Two layers, chosen so the console is complete on the first frame and never shifts:
- *   1. "Current models" — the newest model per lab from ModelUpdateAgent. The query's
- *      `placeholderData` is the verified seed, so this row has real content before any fetch.
- *   2. "Latest launches" — model/tool release headlines filtered from /api/news. Until the feed
- *      answers, FIXED-HEIGHT skeleton rows hold exactly the space the real rows take (each row is
- *      a fixed height with a 2-line clamp), so nothing below moves when the data lands.
- */
-const RELEASE_ROWS = 3;
-/** Expanded view: every model/tool launch in the feed, newest first, up to this many. */
-const RELEASE_ROWS_EXPANDED = 20;
-/** Row height is fixed so skeleton → content is a swap, not a reflow. */
-const ROW_H = 'h-[84px]';
-
-/** Only NEW models, tools and releases — the feed is already Hebrew + AI-only (sanitizeAndKeep). */
-const LAUNCH = /השיק|משיק|משיקה|השקה|השקת|חשפ|חושפ|גרסה|גרסת|מודל חדש|כלי חדש|קוד פתוח|זמין עכשיו|הכריז|מכריז|\b(?:GPT|Claude|Gemini|Llama|Grok|Muse|Mistral|DeepSeek|Qwen|Copilot|Cursor|Sora|Veo|Midjourney|o\d)\b/i;
-
-function isModelUpdate(item: NewsItem): boolean {
-  return item.topic === 'ai_models' || LAUNCH.test(item.title);
-}
-
-function ModelConsole() {
-  const news = useNewsFeed();
-  const { data: catalog } = useModelCatalog();
-  const [active, setActive] = useState<NewsItem | null>(null);
-  // Collapsed, the console holds exactly RELEASE_ROWS fixed-height rows so first paint never
-  // shifts. Expanding is the visitor's own action, so the list may grow then — inside its own
-  // scroll box, which keeps the hero's height bounded on a phone.
-  const [expanded, setExpanded] = useState(false);
-  const k = HERO_CONSOLE_COPY;
-
-  const allReleases = useMemo(() => {
-    const ts = (iso: string) => {
-      const t = new Date(iso).getTime();
-      return Number.isNaN(t) ? -Infinity : t;
-    };
-    return [...(news.data ?? [])].filter(isModelUpdate).sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt)).slice(0, RELEASE_ROWS_EXPANDED);
-  }, [news.data]);
-  const releases = expanded ? allReleases : allReleases.slice(0, RELEASE_ROWS);
-  const canExpand = allReleases.length > RELEASE_ROWS;
-
-  const frontier = (catalog?.frontier ?? []).slice(0, 4);
-
-  return (
-    <div className="signal-console glass-panel glass-panel--flagship relative overflow-hidden rounded-3xl" dir="rtl">
-      <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-2 w-2" aria-hidden="true">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-70" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-400" />
-          </span>
-          <span className="font-mono text-[11px] font-bold tracking-[0.2em] text-brand-300" dir="ltr">
-            {k.label}
-          </span>
-        </div>
-        <div className="flex gap-1.5" aria-hidden="true">
-          <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-          <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-          <span className="h-2.5 w-2.5 rounded-full bg-brand-500/60" />
-        </div>
-      </div>
-
-      <div className="px-5 pb-5 pt-4">
-        <h2 className="mb-3 font-display text-lg font-extrabold text-white">{rtl(k.title)}</h2>
-
-        {/* 1 — Current models: real content on the first frame (seed placeholder). */}
-        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold text-zinc-500">
-          <Cpu className="h-3.5 w-3.5 text-brand-400" aria-hidden="true" />
-          {k.currentLabel}
-        </p>
-        <ul className="mb-5 grid grid-cols-2 gap-2">
-          {frontier.map((m) => (
-            <li key={m.id} className="h-[58px] rounded-xl border border-white/[0.07] bg-black/25 px-3 py-2">
-              <span className="block text-[10px] font-bold text-zinc-500">{m.vendor}</span>
-              <bdi dir="ltr" className="block truncate font-display text-sm font-extrabold text-white">
-                {m.name}
-              </bdi>
-            </li>
-          ))}
-        </ul>
-
-        {/* 2 — Latest launches from the feed. */}
-        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold text-zinc-500">
-          <Radio className="h-3.5 w-3.5 text-cyan-300" aria-hidden="true" />
-          {k.releasesLabel}
-        </p>
-        <ol
-          id="hero-releases"
-          className={`space-y-2 ${expanded ? 'max-h-[min(60dvh,440px)] overflow-y-auto overscroll-contain pe-1 [scrollbar-width:thin] [scrollbar-color:rgba(118,185,0,0.45)_transparent]' : ''}`}
-          aria-busy={news.isLoading}
-          // Lenis would otherwise swallow the wheel and scroll the page instead of this list.
-          {...(expanded ? { 'data-lenis-prevent': '' } : {})}
-        >
-          {news.isLoading
-            ? Array.from({ length: RELEASE_ROWS }, (_, i) => (
-                <li key={i} className={`${ROW_H} space-y-2 rounded-2xl border border-white/[0.06] bg-black/25 p-3.5`} aria-hidden="true">
-                  <span className="block h-2.5 w-24 animate-pulse rounded bg-white/[0.08]" />
-                  <span className="block h-3.5 w-full animate-pulse rounded bg-white/[0.08]" />
-                  <span className="block h-3.5 w-2/3 animate-pulse rounded bg-white/[0.08]" />
-                </li>
-              ))
-            : releases.length === 0
-              ? (
-                  <li className={`${ROW_H} flex items-center rounded-2xl border border-white/[0.06] bg-black/25 p-3.5 text-sm text-zinc-400`}>
-                    {rtl(k.empty)}
-                  </li>
-                )
-              : releases.map((item) => (
-                  <li key={item.id} className={ROW_H}>
-                    <button
-                      type="button"
-                      onClick={() => setActive(item)}
-                      className="group flex h-full w-full items-start gap-3 rounded-2xl border border-white/[0.06] bg-black/25 p-3.5 text-right transition-colors hover:border-brand-500/40 hover:bg-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="mb-1 flex items-center gap-x-2 text-[11px] text-zinc-500">
-                          <span className="truncate font-bold text-zinc-300">{item.source}</span>
-                          <span aria-hidden="true">·</span>
-                          <span className="shrink-0">{formatRelativeTime(item.publishedAt)}</span>
-                        </span>
-                        <bdi dir="rtl" className="line-clamp-2 block text-[14px] font-semibold leading-snug text-zinc-100 group-hover:text-white">
-                          {item.title}
-                        </bdi>
-                      </span>
-                      <ChevronLeft className="mt-5 h-4 w-4 shrink-0 text-zinc-600 transition-transform group-hover:-translate-x-0.5 group-hover:text-brand-400" aria-hidden="true" />
-                    </button>
-                  </li>
-                ))}
-        </ol>
-
-        <div className="mt-3 flex items-center justify-between gap-3 text-[12px] font-bold">
-          {canExpand ? (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-expanded={expanded}
-              aria-controls="hero-releases"
-              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-brand-300 transition-colors hover:bg-white/5 hover:text-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
-            >
-              <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
-              {expanded ? k.collapse : (
-                <>
-                  {k.expand} <span className="font-mono text-zinc-500">({allReleases.length})</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <span />
-          )}
-          <Link
-            to="/news"
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
-          >
-            {k.allNews}
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </div>
-      </div>
-
-      <span className="signal-console__scan" aria-hidden="true" />
-      <ArticleModal item={active} onClose={() => setActive(null)} />
-    </div>
   );
 }

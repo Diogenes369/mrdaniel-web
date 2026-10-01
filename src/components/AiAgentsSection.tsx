@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Rocket, ArrowLeft, PhoneCall, Cpu, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Asterisk, Rocket, ArrowLeft, PhoneCall, Cpu, CheckCircle2, RefreshCw } from 'lucide-react';
 import WebButton from './WebButton';
 import TiltCard from './TiltCard';
 import { AI_AGENTS, type AiAgent, type AgentAudience } from '../data/aiAgents';
@@ -83,7 +83,7 @@ function AgentWizardTrigger() {
   return (
     <div className="glass-panel glass-panel--info max-w-2xl mx-auto rounded-[1.75rem] p-6 sm:p-8 mb-14 text-center">
       <div className="flex items-center gap-2.5 mb-2 justify-center">
-        <Sparkles className="w-5 h-5 text-brand-400" />
+        <Asterisk className="w-5 h-5 text-brand-400" />
         <h3 className="font-display font-black text-2xl text-white">לא בטוחים איזה מתאים לכם</h3>
       </div>
       <p className="text-zinc-400 text-sm mb-6 max-w-xl mx-auto">
@@ -94,7 +94,7 @@ function AgentWizardTrigger() {
         onClick={() => window.dispatchEvent(new CustomEvent('open-agent-qualifier'))}
         className="!px-8 mx-auto"
       >
-        <Sparkles size={16} />
+        <Asterisk size={16} />
         עזרו לי לבחור
       </WebButton>
     </div>

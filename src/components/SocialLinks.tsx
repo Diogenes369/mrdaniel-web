@@ -70,7 +70,7 @@ export function SpotifyIcon({ className }: { className?: string }) {
 }
 
 const DEFAULT_ICON_CLASS =
-  'w-11 h-11 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 hover:shadow-[0_0_16px_rgba(0,255,102,0.35)] transition-all';
+  'w-11 h-11 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 transition-all';
 
 // No native browser focus ring on any variant, ever (that default ring reads as a stray white
 // outline against this dark theme) — replaced with a branded green ring, and only via

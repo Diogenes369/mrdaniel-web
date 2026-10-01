@@ -5,7 +5,7 @@ import {
   Check,
   ArrowLeft,
   ArrowRight,
-  Bot,
+  Workflow,
   Code2,
   BookOpen,
   MessageCircle,
@@ -35,7 +35,7 @@ const trackField = (field: string, action: 'focus' | 'blur' | 'submit') =>
 const WHATSAPP_NUMBER = '972506473039';
 
 const SERVICES = [
-  { id: 'ai', label: 'סוכן AI שיעבוד בשבילי', icon: Bot },
+  { id: 'ai', label: 'סוכן AI שיעבוד בשבילי', icon: Workflow },
   { id: 'dev', label: 'לחבר בין הכלים שלי', icon: Code2 },
   { id: 'content', label: 'מדריכים וחוברות', icon: BookOpen },
   { id: 'other', label: 'משהו אחר', icon: MessageCircle },
@@ -251,7 +251,7 @@ export default function LeadForm() {
 
               <div className="relative -mt-7 md:-mt-8 px-6 md:px-8 pb-4">
               <div className="flex items-center gap-2.5 mb-1 pl-14">
-                <span className="w-2 h-2 rounded-full bg-brand-400 shadow-[0_0_8px_rgba(0,255,102,0.8)] shrink-0" aria-hidden="true" />
+                <span className="w-2 h-2 rounded-full bg-brand-400 shrink-0" aria-hidden="true" />
                 {isProductFlow ? (
                   <h3 className="font-display font-black text-xl md:text-2xl text-white leading-snug">
                     אפיון וחיבור: <span className="text-brand-500">{product!.name}</span>
@@ -284,7 +284,7 @@ export default function LeadForm() {
                           initial={false}
                           animate={{ scaleX: idx <= step ? 1 : 0 }}
                           transition={{ duration: 0.4, ease: 'easeOut' }}
-                          className="h-full w-full origin-right bg-brand-500 shadow-[0_0_8px_rgba(0,255,102,0.6)]"
+                          className="h-full w-full origin-right bg-brand-500"
                         />
                       </div>
                       <span className={`text-xs mt-1.5 block ${idx <= step ? 'text-zinc-300' : 'text-zinc-500'}`}>
@@ -311,7 +311,7 @@ export default function LeadForm() {
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 260, damping: 15, delay: 0.1 }}
-                    className="w-16 h-16 rounded-full bg-brand-500/15 border border-brand-500/40 flex items-center justify-center mb-5 shadow-[0_0_30px_rgba(0,255,102,0.25)]"
+                    className="w-16 h-16 rounded-full bg-brand-500/15 border border-brand-500/40 flex items-center justify-center mb-5"
                   >
                     <Check className="w-8 h-8 text-brand-400" />
                   </motion.div>
@@ -346,7 +346,7 @@ export default function LeadForm() {
                                   onClick={() => setForm({ ...form, goal: g.id })}
                                   className={`flex items-center gap-3 p-3.5 rounded-2xl border text-right transition-all ${
                                     form.goal === g.id
-                                      ? 'border-brand-400/60 bg-brand-500/10 shadow-[0_0_20px_rgba(0,255,102,0.15)]'
+                                      ? 'border-brand-400/60 bg-brand-500/10'
                                       : 'border-white/10 bg-white/[0.02] hover:border-white/25'
                                   }`}
                                 >
@@ -480,7 +480,7 @@ export default function LeadForm() {
                               onClick={() => setForm({ ...form, service: s.id })}
                               className={`flex items-center gap-3 p-4 rounded-2xl border text-right transition-all ${
                                 form.service === s.id
-                                  ? 'border-brand-400/60 bg-brand-500/10 shadow-[0_0_20px_rgba(0,255,102,0.15)]'
+                                  ? 'border-brand-400/60 bg-brand-500/10'
                                   : 'border-white/10 bg-white/[0.02] hover:border-white/25'
                               }`}
                             >

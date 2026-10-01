@@ -235,7 +235,7 @@ export default function AccessibilityWidget() {
         aria-controls="a11y-panel"
         aria-label={isOpen ? t.closeLabel : t.openLabel}
         title={isOpen ? t.closeLabel : t.openLabel}
-        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-[calc(1.5rem+env(safe-area-inset-left))] z-40 w-11 h-11 md:w-12 md:h-12 rounded-full bg-[#0D0E12] border border-white/25 hover:border-white/50 flex items-center justify-center cursor-pointer transition-all duration-300"
+        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-[calc(1.5rem+env(safe-area-inset-left))] z-40 w-11 h-11 md:w-12 md:h-12 rounded-none bg-[#0D0E12] border border-white/25 hover:border-white/50 flex items-center justify-center cursor-pointer transition-all duration-300"
       >
         {isOpen ? (
           <X className="w-5 h-5 text-white" strokeWidth={2} />

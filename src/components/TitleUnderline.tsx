@@ -1,39 +1,32 @@
 import { useRef } from 'react';
-import { useInView } from 'motion/react';
-import { prefersReducedMotion } from '../lib/gsap';
+import { motion, useInView, useReducedMotion } from 'motion/react';
 
 interface TitleUnderlineProps {
-  /** Extra classes on the outer wrapper — pass `w-full` so the bar can fill the title's width. */
+  /** Extra classes on the outer wrapper. */
   className?: string;
-  /** Resting width before scroll-in and when not hovered. */
+  /** Kept for call-site compatibility (the old rule's resting width); unused. */
   base?: string;
 }
 
 /**
- * Animated glowing rule under a section title. Place it inside a `group` wrapper alongside the
- * heading:
- *   - it expands from a short stub to a medium bar the first time it scrolls into view,
- *   - and fills to the full title width while the pointer is over the group (`group-hover:w-full`).
- * Neon green → cyan → transparent, with a soft bloom. `prefers-reduced-motion` renders it at the
- * revealed width with no transition.
+ * The mark under a section title (rewritten 2026-10-01 for the glyph world): a typing caret and a
+ * dotted rule that draws itself out from it, on a spring, the first time it scrolls into view. It
+ * replaced a glowing green→cyan gradient bar. Reduced motion shows it drawn.
  */
-export default function TitleUnderline({ className = '', base = 'w-10' }: TitleUnderlineProps) {
+export default function TitleUnderline({ className = '' }: TitleUnderlineProps) {
   const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, amount: 0.5 });
-  const reduced = prefersReducedMotion();
-  const revealed = reduced || inView;
+  const inView = useInView(ref, { once: true, amount: 0.6 });
+  const reduce = useReducedMotion();
+  const drawn = reduce || inView;
 
   return (
-    <span ref={ref} aria-hidden="true" className={`mt-3 block h-px ${className}`}>
-      <span
-        className={[
-          // Thin, refined — the site's own brand-green accent (no blue, no blocky bar).
-          'block h-px rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-transparent',
-          'shadow-[0_0_8px_rgba(118,185,0,0.45)]',
-          reduced ? '' : 'transition-[width] duration-500 ease-out will-change-[width]',
-          'group-hover:w-full group-focus-within:w-full',
-          revealed ? 'w-16 sm:w-24' : base,
-        ].join(' ')}
+    <span ref={ref} aria-hidden="true" className={`mt-4 flex items-center gap-2 ${className}`}>
+      <span className="story-statusbar__live" />
+      <motion.span
+        className="block h-px w-24 origin-right border-t border-dotted border-[var(--color-rule)]"
+        initial={false}
+        animate={{ scaleX: drawn ? 1 : 0.15 }}
+        transition={{ type: 'spring', stiffness: 120, damping: 18 }}
       />
     </span>
   );

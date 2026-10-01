@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Bell, ArrowLeft, Lock, Sparkles } from 'lucide-react';
+import { Bell, ArrowLeft, Lock, Asterisk } from 'lucide-react';
 import WebButton from '../components/WebButton';
 import SocialLinks from '../components/SocialLinks';
 import GuideCover from '../components/guides/GuideCover';
@@ -63,7 +63,7 @@ export default function MagazinesPage() {
             transition={{ duration: 0.8, ease: EASE }}
             className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-500/40 bg-brand-500/10 px-4 py-1.5 text-sm font-bold text-brand-300"
           >
-            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            <Asterisk className="h-4 w-4" aria-hidden="true" />
             {c.kicker}
           </motion.p>
 

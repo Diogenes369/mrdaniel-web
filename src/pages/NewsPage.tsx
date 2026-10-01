@@ -6,9 +6,9 @@ import {
   RefreshCw,
   ChevronRight,
   ChevronLeft,
-  Sparkles,
-  BrainCircuit,
-  Bot,
+  Asterisk,
+  Binary,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react';
 import { PageHero } from '../components/content/ContentPrimitives';
@@ -23,9 +23,9 @@ import { useNewsFeed, type NewsItem, type NewsTopic } from '../services/newsServ
 // ── categories (Command Center filter rail) ───────────────────────────────────────────────────
 const CATEGORIES: { id: NewsTopic | 'all'; he: string; en: string; icon?: LucideIcon }[] = [
   { id: 'all', he: 'הכל', en: 'ALL' },
-  { id: 'ai', he: 'בינה מלאכותית', en: 'AI', icon: Sparkles },
-  { id: 'ai_models', he: 'מודלי AI וחידושים', en: 'AI Models & LLMs', icon: BrainCircuit },
-  { id: 'ai_agents', he: 'סוכני AI', en: 'AI Agents', icon: Bot },
+  { id: 'ai', he: 'בינה מלאכותית', en: 'AI', icon: Asterisk },
+  { id: 'ai_models', he: 'מודלי AI וחידושים', en: 'AI Models & LLMs', icon: Binary },
+  { id: 'ai_agents', he: 'סוכני AI', en: 'AI Agents', icon: Workflow },
 ];
 
 const PAGE_SIZE = 18;
@@ -55,21 +55,20 @@ function TelemetryTicker({ items, updatedAt }: { items: NewsItem[]; updatedAt: n
   const synced = updatedAt > 0 ? new Date(updatedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '—';
 
   return (
-    <div dir="rtl" className="mb-6 overflow-hidden rounded-2xl border border-[#22d3ee]/20 bg-[#04070b]/85 font-mono">
+    <div dir="rtl" className="mb-6 overflow-hidden border border-dotted border-[var(--color-rule)] bg-ground font-mono">
       <div className="flex items-stretch">
-        <div className="flex shrink-0 items-center gap-2 border-l border-white/10 bg-[#22d3ee]/[0.06] px-3 py-2.5 text-[11px] font-bold text-[#67e8f9] sm:px-4">
-          <span className="relative flex h-2 w-2">
-            {!reduce && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22d3ee] opacity-70" />}
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#22d3ee]" />
-          </span>
-          LIVE FEED
+        <div className="flex shrink-0 items-center gap-2 border-l border-dotted border-[var(--color-rule)] px-3 py-2.5 font-sans text-[12px] font-bold text-brand-400 sm:px-4">
+          <span className="story-statusbar__live" aria-hidden="true" />
+          מתעדכן עכשיו
         </div>
-        <div className="hidden shrink-0 items-center gap-3 border-l border-white/10 px-4 py-2.5 text-[11px] text-zinc-500 md:flex">
+        <div className="hidden shrink-0 items-center gap-3 border-l border-dotted border-[var(--color-rule)] px-4 py-2.5 font-sans text-[12px] text-ink-faint md:flex">
           <span>
-            NODES ACTIVE: <span className="text-zinc-300">{nodes || '—'}</span>
+            <span className="font-type text-ink-muted">{nodes || '—'}</span> מקורות
           </span>
           <span aria-hidden="true">·</span>
-          <span>SYNC {synced}</span>
+          <span>
+            עודכן ב-<span className="font-type">{synced}</span>
+          </span>
         </div>
         <div className="relative min-w-0 flex-1 px-3 py-2.5 sm:px-4">
           <AnimatePresence mode="wait">

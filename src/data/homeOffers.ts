@@ -1,11 +1,10 @@
 import {
-  Bot,
   Cpu,
   Newspaper,
   TrendingUp,
   MessageCircle,
   Workflow,
-  Sparkles,
+  Asterisk,
   Scale,
   FlaskConical,
   Route,
@@ -52,7 +51,7 @@ export interface HomeOffer {
 export const HOME_OFFERS: HomeOffer[] = [
   {
     id: 'offer-ai-agents',
-    icon: Bot,
+    icon: Workflow,
     eyebrow: 'סוכני AI',
     title: 'סוכני AI',
     accent: 'שעושים את העבודה בשבילכם',
@@ -61,7 +60,7 @@ export const HOME_OFFERS: HomeOffer[] = [
       { icon: TrendingUp, title: 'סינון פניות', body: 'קורא את ההודעות ומעביר אליכם רק את מה שבאמת דורש אתכם.' },
       { icon: MessageCircle, title: 'מענה מיידי', body: 'עונה על השאלות שחוזרות כל יום, גם כשאתם לא ליד הטלפון.' },
       { icon: Workflow, title: 'מסמכים לבד', body: 'הצעות מחיר והזמנות שמוכנות לאישור, בלי העתק-הדבק.' },
-      { icon: Sparkles, title: 'עוזר אישי', body: 'JARVIS: עוזר בעברית שמסדר לכם מייל, יומן ומשימות.' },
+      { icon: Asterisk, title: 'עוזר אישי', body: 'JARVIS: עוזר בעברית שמסדר לכם מייל, יומן ומשימות.' },
     ],
     route: '/ai',
     ctaLabel: 'איך זה עובד',

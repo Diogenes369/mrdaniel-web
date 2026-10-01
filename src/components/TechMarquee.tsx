@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Sparkles, BrainCircuit, Eye, MessageSquare, Zap, Cpu, Plug, Database, Braces, Atom, X, type LucideIcon } from 'lucide-react';
+import { Asterisk, Binary, Eye, MessageSquare, Zap, Cpu, Plug, Database, Braces, Atom, X, type LucideIcon } from 'lucide-react';
 import { prefersReducedMotion } from '../lib/gsap';
 import PopHeadline from './home/PopHeadline';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
@@ -35,8 +35,8 @@ interface Tech {
 const STACK: Tech[] = [
   // Plain-language pass 2026-09-23: each tooltip says what the tool does FOR the reader, in words a
   // non-technical client follows. The names stay — they are what people search for.
-  { name: 'Grok', icon: Sparkles, detail: 'ה-AI של X. מכיר את מה שקורה ברשת עכשיו, ואני משתמש בו לכתיבת פוסטים.' },
-  { name: 'Claude', icon: BrainCircuit, detail: 'חזק בכתיבה ארוכה ובעבודה צעד אחר צעד. טוב לסוכנים שעושים כמה פעולות ברצף.' },
+  { name: 'Grok', icon: Asterisk, detail: 'ה-AI של X. מכיר את מה שקורה ברשת עכשיו, ואני משתמש בו לכתיבת פוסטים.' },
+  { name: 'Claude', icon: Binary, detail: 'חזק בכתיבה ארוכה ובעבודה צעד אחר צעד. טוב לסוכנים שעושים כמה פעולות ברצף.' },
   { name: 'Gemini', icon: Eye, detail: 'ה-AI של Google. מבין גם תמונות, וידאו והקלטות, ולכן טוב לתמלול ולקריאת מסמכים סרוקים.' },
   { name: 'GPT', icon: MessageSquare, detail: 'המודלים של OpenAI, היוצרים של ChatGPT. יש גם גרסה פתוחה שאני מריץ לטקסט מהיר.' },
   { name: 'Groq', icon: Zap, detail: 'שירות שמריץ מודלי AI מהר מאוד. רוב הטקסט באתר הזה נכתב דרכו.' },
@@ -66,9 +66,9 @@ const CHIP_CLASS =
   'tech-pill group inline-flex items-center gap-2.5 rounded-full border border-white/10 backdrop-blur-md ' +
   'px-5 py-2.5 md:px-6 md:py-3 font-mono text-[0.8rem] md:text-[0.9rem] font-medium tracking-wide ' +
   'whitespace-nowrap text-zinc-300 transition-all duration-300 ' +
-  'hover:border-[#00FF66]/50 hover:text-[#00FF66] hover:shadow-[0_0_15px_rgba(0,255,102,0.2)] ' +
+  'hover:border-[#00FF66]/50 hover:text-[#00FF66] ' +
   'focus-visible:outline-none focus-visible:border-[#00FF66]/50 ' +
-  'focus-visible:text-[#00FF66] focus-visible:shadow-[0_0_15px_rgba(0,255,102,0.2)]';
+  'focus-visible:text-[#00FF66]';
 
 export default function TechMarquee() {
   const reduced = prefersReducedMotion();
@@ -181,7 +181,7 @@ export default function TechMarquee() {
 
   return (
     <section className="relative py-20 md:py-28 overflow-x-clip cv-auto">
-      <div className="container-wide relative z-10 mb-10 text-center md:mb-14">
+      <div className="container-wide relative z-10 mb-10 md:mb-14">
         <PopHeadline lead="הכלים" accent="שאני עובד איתם" className="mb-3 md:mb-4" />
         <p className="text-sm md:text-base text-zinc-400">לחצו על כלי כדי לראות מה הוא עושה, במילים פשוטות.</p>
       </div>

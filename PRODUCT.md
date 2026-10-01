@@ -8,27 +8,27 @@ web
 
 ## Users
 
-**Primary — prospective clients (public site, `mrdaniel.co.il`).** Small-business owners, freelancers and private individuals in Israel who are not technical and are considering hiring Daniel Ben Baruch to build them an AI agent. Their job on the site: understand in plain Hebrew what an agent could do for them, trust that the person behind it is real and competent, and take one step toward talking to him. No enterprises, no corporate buyers.
+**Primary — people learning AI (public site + social), since 2026-10-01 by decision.** Beginners, enthusiasts and career-changers in Israel who want to learn AI but feel overwhelmed by the pace — a new model or tool every week, everyone online claiming it is the best — and do not know whom to trust or where to start. Their job on the site: recognise their own overwhelm, trust that one real person will walk them through it in plain Hebrew, and take the first step (the free beginner guide). They are also the audience of the generated social content (Instagram / X / Threads carousels and reels).
 
-**Secondary — people learning AI (public site + social).** Beginners, enthusiasts and career-changers who come for AI news, model explanations and free guides. They are also the audience of the generated social content (Instagram / X / Threads carousels and reels). This audience is served, but it does not outrank the client path on the site.
+**Secondary — prospective clients (public site).** Small-business owners, freelancers and private individuals who are not technical and are considering hiring Daniel Ben Baruch to build them an AI agent. Served further down the homepage and on `/ai`; it no longer leads the homepage. No enterprises, no corporate buyers.
 
 **Operator — Daniel himself (admin dashboard).** A single, authenticated operator running a live-ops tool: turning news, Threads/X/Instagram posts and URLs into Hebrew carousels, reels, subtitled videos and emails, checking analytics and leads. Daily, repetitive, speed-sensitive work, done on desktop against the production API.
 
 ## Product Purpose
 
-The public site exists to win agent-building work: it presents Daniel as the person who builds AI agents that do real, repetitive work (answer customers, book meetings, prepare documents) while the client approves. The news feed, model lab and guides demonstrate current, hands-on knowledge and bring in reach. Success = a non-technical visitor understands the offer on first read and makes contact.
+The public site exists to put order into the AI mess for people learning it: Daniel tries the new tools and models on real work, drops what does not hold up, and explains what is left in plain Hebrew, step by step — from the first install to building like a developer. The news feed, model lab and guides are that work made visible. Success = a first-time visitor recognises the problem, trusts the person, and starts (downloads the beginner guide or walks the path). Agent-building for clients remains a real, secondary offer.
 
 The dashboard exists so one person can produce a steady stream of accurate, on-brand Hebrew content without the content ever fully stopping (every generator falls back to a deterministic local builder).
 
 ## Positioning
 
-A named individual, not an agency: the visitor talks to Daniel directly. He builds agents that run every day, tries every new model on real tasks and explains it in plain Hebrew. Three pillars, always in this order: (1) building AI agents, (2) the model lab — new models tried and explained, (3) the AI news + practical guides hub.
+A named individual, not an agency or a course platform: one person who cuts through the noise and walks you through it. He tries every new model on real tasks, explains it in plain Hebrew, and builds agents that run every day. The homepage story, in order: it's not you, it's the pace → I filter it for you → the path from understanding to building like a developer → start with the free guide. The three pillars (building AI agents, the model lab, the AI news + guides hub) continue below the story.
 
 ## Operating Context
 
 - Hebrew-first, RTL, Israeli audience; embedded Latin terms (model and tool names, URLs) must stay correctly ordered inside RTL lines.
 - Much traffic arrives on mobile from Instagram / Facebook / X in-app webviews.
-- Hero has one call to action (to the agents offer); news lives in the ticker, not a competing button.
+- Hero has one call to action (into the scroll story, which ends on the free beginner guide); news lives in the ticker and the story's launch log, not a competing button.
 - Social output is 1080×1350 carousels and 1080×1920 videos, exported from the dashboard and posted manually.
 - Dashboard: desktop, logged-in operator, always against production data.
 
@@ -44,7 +44,7 @@ A named individual, not an agency: the visitor talks to Daniel directly. He buil
 ## Brand Commitments
 
 - Name: Daniel Ben Baruch (דניאל בן ברוך); domain `mrdaniel.co.il` is the only brand on generated output. Handles: @mrdaniel_ai (X), @mrdaniel.ai (Instagram / Linktree).
-- **Site voice (clients):** an experienced IT person talking to a client across the table — warm, direct, plain Israeli Hebrew; no buzzwords, no acronyms needing a glossary (LLM, RAG, MCP, "agentic"), no rhetorical questions. "AI" and "סוכן AI" are the only assumed terms. Copy lives in `src/data/siteCopy.ts` and siblings.
+- **Site voice:** a knowledgeable friend talking eye to eye — warm, direct, plain Israeli Hebrew; no buzzwords, no acronyms needing a glossary (LLM, RAG, MCP, "agentic") unless the copy is explaining that very term, no rhetorical questions, nothing that sounds machine-written. "AI" and "סוכן AI" are the only assumed terms. Copy lives in `src/data/siteCopy.ts` and siblings.
 - **Generated-content voice (learners):** senior Israeli practitioner explaining to someone entering the field, glossing terms on first use; banned AI-cliché phrases enforced in code (`src/agent/expertVoice.ts`). The two voices differ on purpose; do not align one to the other without asking.
 - Never machine-translated; never engagement bait; no links or comment triggers painted onto slides.
 - Existing assets: `public/logo.png`, `public/favicon.svg`, `public/og-image.png`.
@@ -58,7 +58,7 @@ A named individual, not an agency: the visitor talks to Daniel directly. He buil
 
 ## Product Principles
 
-1. **One clear next step.** Every public surface leads a non-technical visitor toward talking to Daniel; secondary paths (news, guides) never compete with it.
+1. **One clear next step.** Every public surface leads the visitor to one next step — on the homepage, starting to learn (the beginner guide); on `/ai`, talking to Daniel about an agent. Secondary paths never compete with it.
 2. **Plain before clever.** If a first-time visitor needs a glossary, the copy is wrong.
 3. **Only true things.** No invented numbers, clients or promises — on the site or in generated content.
 4. **A person, not a platform.** Trust comes from Daniel being real, reachable and hands-on.

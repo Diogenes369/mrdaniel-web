@@ -37,7 +37,7 @@ export default function VideoEmbed({ youtubeId, title, channel }: VideoEmbedProp
           />
           <div className="absolute inset-0 bg-black/50 group-hover:bg-black/35 transition-colors" />
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-brand-500/90 flex items-center justify-center shadow-[0_0_30px_rgba(0,255,102,0.4)] group-hover:scale-110 transition-transform">
+            <div className="w-16 h-16 rounded-full bg-brand-500/90 flex items-center justify-center group-hover:scale-110 transition-transform">
               <Play className="w-6 h-6 text-black fill-black translate-x-0.5" />
             </div>
           </div>

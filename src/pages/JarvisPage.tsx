@@ -4,7 +4,7 @@ import {
   Mic,
   Briefcase,
   Home,
-  BrainCircuit,
+  Binary,
   Database,
   Radio,
   AudioLines,
@@ -158,14 +158,14 @@ function ReqCard({ opt }: { opt: (typeof DEPLOYMENT_OPTIONS)[number] }) {
     <div
       className={`flex h-full flex-col rounded-2xl border p-6 md:p-8 transition-colors ${
         opt.featured
-          ? 'border-brand-500/40 bg-brand-500/[0.04] shadow-[0_0_40px_-12px_rgba(118,185,0,0.28)]'
+          ? 'border-brand-500/40 bg-brand-500/[0.04]'
           : 'border-white/10 bg-carbon-900/60 hover:border-brand-500/30'
       }`}
     >
       <div
         className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl border bg-black/40 ${
           opt.featured
-            ? 'border-brand-500/40 text-brand-300 shadow-[0_0_20px_rgba(118,185,0,0.25)]'
+            ? 'border-brand-500/40 text-brand-300'
             : 'border-white/10 text-brand-400'
         }`}
       >
@@ -306,14 +306,14 @@ export default function JarvisPage() {
           {/* ---- What's inside, in plain words (replaced the "technical architecture" block and its
                  acronym glossary on 2026-09-23) ---- */}
           <SectionHeading
-            icon={BrainCircuit}
+            icon={Binary}
             title="מה יש בפנים, בפשטות"
             description="ארבעה חלקים שעובדים יחד. לא צריך להבין אותם כדי להשתמש, אבל טוב לדעת מה קורה מאחורי הקלעים."
           />
           <ServiceGrid
             items={[
               {
-                icon: BrainCircuit,
+                icon: Binary,
                 title: 'המוח',
                 description: 'מודלי ה-AI המובילים, כמו Claude, Gemini, GPT ו-Grok. לכל משימה נבחר המודל שעושה אותה הכי טוב.',
               },

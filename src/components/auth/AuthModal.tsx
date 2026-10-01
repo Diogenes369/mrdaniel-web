@@ -149,7 +149,7 @@ export default function AuthModal({ open, guideSlug, guideTitle, onClose, onAuth
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 30, scale: 0.98 }}
             transition={{ duration: 0.45, ease: EASE }}
-            className="relative max-h-[100dvh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-carbon-900/95 p-6 pb-8 shadow-[0_0_80px_-20px_rgba(118,185,0,0.45)] sm:max-w-md sm:rounded-3xl sm:p-8"
+            className="relative max-h-[100dvh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-carbon-900/95 p-6 pb-8 sm:max-w-md sm:rounded-3xl sm:p-8"
           >
             {/* Top hairline + bloom: the same light language as the guide page's conversion block. */}
             <span
@@ -249,7 +249,7 @@ export default function AuthModal({ open, guideSlug, guideTitle, onClose, onAuth
                   <button
                     type="submit"
                     disabled={busy !== null}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-3.5 text-[15px] font-extrabold text-carbon-950 transition-all hover:bg-brand-400 hover:shadow-[0_0_28px_-4px_rgba(118,185,0,0.6)] active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-3.5 text-[15px] font-extrabold text-carbon-950 transition-all hover:bg-brand-400 active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
                   >
                     {busy === 'email' && <Loader2 className="h-4 w-4 animate-spin" />}
                     {mode === 'signup' ? 'הרשמה והורדה' : 'התחברות והורדה'}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
-  Sparkles,
+  Asterisk,
   ArrowRight,
   RotateCcw,
   Check,
@@ -120,7 +120,7 @@ function OptionGrid<T extends string>({
           transition={{ type: 'spring', stiffness: 400, damping: 22 }}
           className={`flex items-center gap-3 p-4 rounded-2xl border text-right transition-colors min-h-11 cursor-pointer ${
             value === opt.id
-              ? 'border-brand-400/60 bg-brand-500/10 shadow-[0_0_20px_rgba(0,255,102,0.15)]'
+              ? 'border-brand-400/60 bg-brand-500/10'
               : 'border-white/10 bg-white/[0.02] hover:border-white/25'
           }`}
         >
@@ -150,7 +150,7 @@ function Stepper({ labels, step }: { labels: string[]; step: number }) {
       <motion.div
         // Same span as the track (inset-x-6), grown with scaleX from the RTL start edge: transform
         // runs on the compositor, where the old animated `width` re-laid-out the row every frame.
-        className="absolute top-3.5 inset-x-6 h-0.5 origin-right bg-brand-500 rounded-full shadow-[0_0_8px_rgba(0,255,102,0.6)]"
+        className="absolute top-3.5 inset-x-6 h-0.5 origin-right bg-brand-500 rounded-full"
         initial={false}
         animate={{ scaleX: progressPct / 100 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
@@ -166,7 +166,7 @@ function Stepper({ labels, step }: { labels: string[]; step: number }) {
                 idx < step
                   ? 'bg-brand-500 border-brand-500 text-black'
                   : idx === step
-                    ? 'bg-brand-500/20 border-brand-400 text-brand-300 shadow-[0_0_10px_rgba(0,255,102,0.5)]'
+                    ? 'bg-brand-500/20 border-brand-400 text-brand-300'
                     : 'bg-white/5 border-white/15 text-zinc-500'
               }`}
             >
@@ -295,7 +295,7 @@ export default function AgentQualificationModal() {
 
                 <div className="relative -mt-7 md:-mt-8 px-6 md:px-8 pb-4">
                   <div className="flex items-center gap-2.5 mb-1 pl-14">
-                    <span className="w-2 h-2 rounded-full bg-brand-400 shadow-[0_0_8px_rgba(0,255,102,0.8)] shrink-0" aria-hidden="true" />
+                    <span className="w-2 h-2 rounded-full bg-brand-400 shrink-0" aria-hidden="true" />
                     <h3 className="font-display font-black text-xl md:text-2xl text-white">
                       בואו נמצא לכם <span className="text-brand-500">את הסוכן המושלם</span>
                     </h3>
@@ -342,7 +342,7 @@ export default function AgentQualificationModal() {
                     <motion.div key="result" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', damping: 22, stiffness: 220 }}>
                       <div className="text-center mb-3">
                         <span className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-brand-400 uppercase tracking-widest">
-                          <Sparkles className="w-3.5 h-3.5" />
+                          <Asterisk className="w-3.5 h-3.5" />
                           מצאנו את ההתאמה בשבילכם
                         </span>
                       </div>
@@ -357,7 +357,7 @@ export default function AgentQualificationModal() {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={() => loadTracker().then((t) => t.trackConversion('Agent Qualification → WhatsApp'))}
-                          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-brand-500 text-black font-bold text-sm hover:bg-brand-400 transition-colors shadow-[0_0_20px_rgba(0,255,102,0.25)]"
+                          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-brand-500 text-black font-bold text-sm hover:bg-brand-400 transition-colors"
                         >
                           <MessageCircle size={17} />
                           בואו נדבר על זה ב-WhatsApp

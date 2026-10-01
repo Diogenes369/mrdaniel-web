@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ExternalLink, Clock, BookOpen, ListChecks, Sparkles, BrainCircuit, Newspaper, FileText, type LucideIcon } from 'lucide-react';
+import { X, ExternalLink, Clock, BookOpen, ListChecks, Asterisk, Binary, Newspaper, FileText, type LucideIcon } from 'lucide-react';
 import { formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } from '../../services/newsService';
 import { executiveSummary, deepDive, sourceDomain } from '../../lib/newsAnalysis';
 import { useArticleInsightsState } from '../../services/newsInsightsService';
@@ -10,9 +10,9 @@ import RtlText from './RtlText';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const TOPIC: Record<NewsTopic, { label: string; icon: LucideIcon; ring: string; grad: string }> = {
-  ai: { label: 'בינה מלאכותית ואוטומציה', icon: Sparkles, ring: 'text-violet-300 border-violet-400/40 bg-violet-500/10', grad: 'from-violet-600/40' },
-  ai_models: { label: 'מודלי AI וחידושים', icon: BrainCircuit, ring: 'text-fuchsia-300 border-fuchsia-400/40 bg-fuchsia-500/10', grad: 'from-fuchsia-600/40' },
-  ai_agents: { label: 'בינה מלאכותית ואוטומציה', icon: Sparkles, ring: 'text-violet-300 border-violet-400/40 bg-violet-500/10', grad: 'from-violet-600/40' },
+  ai: { label: 'בינה מלאכותית ואוטומציה', icon: Asterisk, ring: 'text-brand-300 border-brand-400/40 bg-brand-400/10', grad: 'from-brand-600/30' },
+  ai_models: { label: 'מודלי AI וחידושים', icon: Binary, ring: 'text-brand-300 border-brand-400/40 bg-brand-400/10', grad: 'from-brand-600/30' },
+  ai_agents: { label: 'בינה מלאכותית ואוטומציה', icon: Asterisk, ring: 'text-brand-300 border-brand-400/40 bg-brand-400/10', grad: 'from-brand-600/30' },
   general: { label: 'חדשות שוק וטכנולוגיה', icon: Newspaper, ring: 'text-zinc-300 border-white/20 bg-white/5', grad: 'from-zinc-500/30' },
 };
 

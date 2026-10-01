@@ -243,7 +243,7 @@ export default function GuideDownloadPage() {
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-carbon-950" dir="rtl">
+    <div className="relative min-h-screen overflow-hidden bg-ground" dir="rtl">
       <Seo
         title="הורדת מדריך | דניאל בן ברוך"
         description="מדריך AI מעשי להורדה: סוכנים, מודלי שפה ואוטומציה."
@@ -460,7 +460,7 @@ function GuideArticle({
       </section>
 
       {/* CONVERSION */}
-      <section className="mt-12 rounded-2xl border border-brand-500/25 bg-carbon-900/70 p-5 shadow-[0_0_60px_-20px_rgba(118,185,0,0.45)] backdrop-blur-xl sm:p-6">
+      <section className="mt-12 rounded-2xl border border-brand-500/25 bg-carbon-900/70 p-5 backdrop-blur-xl sm:p-6">
         <span
           aria-hidden
           className="mb-5 block h-px w-full"
@@ -476,7 +476,7 @@ function GuideArticle({
         <button
           type="button"
           onClick={() => onDownload()}
-          className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-brand-500 px-6 py-4 text-base font-extrabold text-carbon-950 transition-all hover:bg-brand-400 hover:shadow-[0_0_28px_-4px_rgba(0,255,102,0.6)] active:scale-[0.99] sm:text-lg"
+          className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-brand-500 px-6 py-4 text-base font-extrabold text-carbon-950 transition-all hover:bg-brand-400 active:scale-[0.99] sm:text-lg"
         >
           <Download className="h-5 w-5" />
           {isStatic ? 'הורד את המדריך (PDF)' : `הורד מדריך מלא (ZIP${meta.hasPdf ? ' / PDF' : ''})`}
@@ -559,11 +559,6 @@ function SpecRow({ label, value, last = false }: { label: string; value: string;
 function StaticCover({ meta, guideId }: { meta: GuideMeta; guideId: string }) {
   return (
     <div className="relative flex justify-center py-2">
-      <span
-        aria-hidden
-        className="pointer-events-none absolute top-1/2 left-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-25 blur-[90px]"
-        style={{ background: 'radial-gradient(circle, #76B900 0%, transparent 70%)' }}
-      />
       <GuideCover
         hero
         slug={guideId}
@@ -674,20 +669,16 @@ function StickyBar({ meta, onDownload }: { meta: GuideMeta; onDownload: (variant
 function CarbonMesh() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0">
-      <div className="absolute inset-0 bg-carbon-950" />
+      {/* The glyph world's calm state in CSS (no WebGL on this deliberately light page): the ground
+          and a sparse lattice of ink dots on the cell grid. No glow. */}
+      <div className="absolute inset-0 bg-ground" />
       <div
-        className="absolute inset-0 opacity-[0.35]"
+        className="absolute inset-0"
         style={{
-          backgroundImage:
-            'linear-gradient(rgba(118,185,0,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(118,185,0,0.07) 1px, transparent 1px)',
-          backgroundSize: '44px 44px',
-          maskImage: 'radial-gradient(ellipse 80% 55% at 50% 0%, #000 40%, transparent 100%)',
-          WebkitMaskImage: 'radial-gradient(ellipse 80% 55% at 50% 0%, #000 40%, transparent 100%)',
+          backgroundImage: 'radial-gradient(rgba(143, 212, 0, 0.16) 0.9px, transparent 1.3px)',
+          backgroundSize: '28px 36px',
+          backgroundPosition: '3px 6px',
         }}
-      />
-      <div
-        className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full opacity-25 blur-[120px]"
-        style={{ background: 'radial-gradient(circle, #76B900 0%, transparent 70%)' }}
       />
     </div>
   );
@@ -696,8 +687,8 @@ function CarbonMesh() {
 function BrandMark() {
   return (
     <div className="mb-8 flex items-center gap-2.5">
-      <span className="h-2 w-2 rounded-full bg-brand-500 shadow-[0_0_12px_#76B900]" />
-      <span className="font-tech text-[11px] tracking-[0.3em] text-zinc-400 uppercase">mrdaniel.co.il</span>
+      <span className="story-statusbar__live" aria-hidden="true" />
+      <span className="font-type text-[11px] tracking-[0.2em] text-ink-faint">mrdaniel.co.il</span>
     </div>
   );
 }
@@ -713,7 +704,7 @@ function LoadingBlock() {
 
 function ProblemBlock({ title, body }: { title: string; body: string }) {
   return (
-    <section className="rounded-2xl border border-amber-400/25 bg-carbon-900/70 p-6 text-center shadow-[0_0_60px_-20px_rgba(251,191,36,0.35)] backdrop-blur-xl sm:p-8">
+    <section className="rounded-2xl border border-amber-400/25 bg-carbon-900/70 p-6 text-center backdrop-blur-xl sm:p-8">
       <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10">
         <AlertTriangle className="h-6 w-6 text-amber-300" />
       </span>

@@ -32,7 +32,7 @@ const TONE_CLASS: Record<Tone, string> = {
   prompt: 'text-[#4ade80]',
   out: 'text-zinc-200',
   dim: 'text-zinc-500',
-  accent: 'text-[#22d3ee]',
+  accent: 'text-[#8FD400]',
   err: 'text-[#f87171]',
 };
 
@@ -291,10 +291,10 @@ export default function TerminalCLI() {
 
   return (
     <>
-      {/* Floating trigger — MOBILE ONLY (`md:hidden`). Stacked directly ABOVE the Accessibility
-          widget's launcher button (a11y at bottom 5.5rem, this at 9.5rem — the same +4rem rhythm
-          as a11y-over-chat), matching its w-11 h-11 circular glass shape; the cyan tint + hover
-          glow is the only accent. On desktop the ONLY CLI trigger is the header pill. */}
+      {/* Floating trigger — HIDDEN since 2026-10-01. It was the mobile-only launcher, but the
+          header drawer already carries "CLI · מצב טרמינל", and on the redesigned homepage this
+          button sat on top of the hero's only call to action. The triggers now are the header
+          button (desktop) and the drawer entry (mobile); the `open-cli` event still works. */}
       {!open && (
         <motion.button
           type="button"
@@ -303,9 +303,9 @@ export default function TerminalCLI() {
           onClick={() => setOpen(true)}
           aria-label="פתיחת מצב טרמינל"
           title="מצב טרמינל · CLI"
-          className="fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-[calc(1.5rem+env(safe-area-inset-left))] z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[#22d3ee]/35 bg-[#0D0E12] transition-all duration-300 hover:border-[#22d3ee]/70 hover:shadow-[0_0_18px_rgba(34,211,238,0.4)] md:hidden"
+          className="fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-[calc(1.5rem+env(safe-area-inset-left))] z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[#8FD400]/35 bg-[#0D0E12] transition-all duration-300 hover:border-[#8FD400]/70 hidden"
         >
-          <SquareTerminal className="h-5 w-5 text-[#22d3ee]" strokeWidth={1.75} />
+          <SquareTerminal className="h-5 w-5 text-[#8FD400]" strokeWidth={1.75} />
         </motion.button>
       )}
 
@@ -331,7 +331,7 @@ export default function TerminalCLI() {
             animate={{ y: 0, scale: 1 }}
             exit={{ y: 24, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="relative flex h-dvh w-full flex-col overflow-hidden border border-[#22d3ee]/25 bg-[#04060a]/95 font-mono text-[13px] leading-relaxed shadow-[0_0_60px_rgba(34,211,238,0.12)] md:h-[min(78dvh,640px)] md:max-w-3xl md:rounded-xl"
+            className="relative flex h-dvh w-full flex-col overflow-hidden border border-[#8FD400]/25 bg-[#04060a]/95 font-mono text-[13px] leading-relaxed md:h-[min(78dvh,640px)] md:max-w-3xl md:rounded-xl"
             style={windowStyle}
             onMouseDown={() => inputRef.current?.focus()}
           >
@@ -349,7 +349,7 @@ export default function TerminalCLI() {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="סגירת המסוף"
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-zinc-400 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-[#22d3ee]/60"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-zinc-400 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-[#8FD400]/60"
               >
                 <X size={20} />
               </button>
@@ -378,7 +378,7 @@ export default function TerminalCLI() {
                   key={c}
                   type="button"
                   onClick={() => quick(c)}
-                  className="shrink-0 rounded-md border border-[#22d3ee]/30 bg-[#22d3ee]/10 px-3 py-1.5 text-[12px] text-[#7dd3fc] transition-colors hover:bg-[#22d3ee]/20 active:scale-95"
+                  className="shrink-0 rounded-md border border-[#8FD400]/30 bg-[#8FD400]/10 px-3 py-1.5 text-[12px] text-[#C8F46E] transition-colors hover:bg-[#8FD400]/20 active:scale-95"
                 >
                   [{c}]
                 </button>

@@ -1,7 +1,9 @@
 import Hero from '../components/Hero';
-import WordRotator from '../components/WordRotator';
+import NoiseBeat from '../components/story/NoiseBeat';
+import OrderBeat from '../components/story/OrderBeat';
+import PathBeat from '../components/story/PathBeat';
+import StartBeat from '../components/story/StartBeat';
 import OfferSection from '../components/home/OfferSection';
-import RoiCalculator from '../components/home/RoiCalculator';
 import ProcessSection from '../components/home/ProcessSection';
 import TodayTermsSection from '../components/home/TodayTermsSection';
 import ServicesSection from '../components/home/ServicesSection';
@@ -10,31 +12,33 @@ import ContactPortal from '../components/ContactPortal';
 import { HOME_OFFERS } from '../data/homeOffers';
 
 /**
- * Homepage (AI-only since 2026-09-21; flow redesigned 2026-09-23): split hero with a live signal
- * console (the three newest real headlines) → rotating headline → the three pillars (autonomous
- * AI agents, the LLM lab, the AI news hub) → today's AI terms from the news (autonomous, free) →
- * "how it gets built" process rail → interactive ROI
- * calculator (lead magnet) → services bento → tech-stack marquee → contact.
- * (The X feed and channels grid were removed 2026-09-22; the hero keeps the social icons. The news
- * section was removed the same day — headlines reach the homepage through the site-wide ticker,
- * whose items open the article modal, and the full feed lives on /news.)
+ * Homepage — learners first since 2026-10-01.
  *
- * Every section wrapper is fully transparent — no divider elements, no per-section backdrop — so
- * the fixed Scene3D particle/mesh layer (`.scene3d-layer`, z-0 in App.tsx) runs unobstructed from
- * top to bottom. The `.glass-panel` cards float directly over it. Section bodies ride a
- * <DepthSection> 3D scroll plane; section titles are <PopHeadline>s that project toward the viewer.
+ * The top of the page is one scroll story told over the glyph field (GlyphField, mounted in
+ * App.tsx): the hero names the mess → NoiseBeat proves the pace with the real launches of the last
+ * few days → OrderBeat (the field sorts itself into a typed page) shows jargon turned into plain
+ * Hebrew → PathBeat climbs from "what is this" to building like a developer → StartBeat hands over
+ * the free beginner guide. Each beat registers itself with the field, which stages the background
+ * from the beat under the reading line.
+ *
+ * Below the story the earlier sections continue, the agent-building offer among them as the
+ * secondary path. The ROI / agent-savings calculator was removed on 2026-10-01 by decision.
+ * TODO(redesign): those sections still wear the pre-2026-10-01 look and move into the glyph world
+ * next.
  */
 export default function HomePage() {
   return (
     <>
       <Hero />
-      <WordRotator />
+      <NoiseBeat />
+      <OrderBeat />
+      <PathBeat />
+      <StartBeat />
       {HOME_OFFERS.map((offer) => (
         <OfferSection key={offer.id} offer={offer} />
       ))}
       <TodayTermsSection />
       <ProcessSection />
-      <RoiCalculator />
       <ServicesSection />
       <TechMarquee />
       <ContactPortal />

@@ -33,10 +33,10 @@ const MIN_H = 300;
 /** Per-topic plate colours. Deliberately the same hues as the `TOPIC` table's `grad` in
  *  NewsCards.tsx, so a fallback plate reads as the same design system as a real photo's overlay. */
 const PLATE: Record<NewsTopic, { from: string; to: string; accent: string }> = {
-  ai: { from: '#1d0f33', to: '#06080c', accent: '#a78bfa' },
-  ai_models: { from: '#2a0d2b', to: '#06080c', accent: '#e879f9' },
-  ai_agents: { from: '#1d0f33', to: '#06080c', accent: '#a78bfa' },
-  general: { from: '#14181f', to: '#06080c', accent: '#76B900' },
+  ai: { from: '#131c08', to: '#0A0B09', accent: '#8FD400' },
+  ai_models: { from: '#18240a', to: '#0A0B09', accent: '#C8F46E' },
+  ai_agents: { from: '#131c08', to: '#0A0B09', accent: '#9FE870' },
+  general: { from: '#121410', to: '#0A0B09', accent: '#76B900' },
 };
 
 /**

@@ -24,7 +24,10 @@ const LEGAL_LINKS = [
 
 const CONTACT_EMAIL = 'daniel@mrdaniel.co.il';
 
-const COLUMN_HEADING_CLASS = 'text-xs font-medium uppercase tracking-[0.15em] text-zinc-500 mb-4';
+// Column headings are people's words (Hebrew), so proportional type — the mono face is kept for
+// machine chrome like the copyright line.
+const COLUMN_HEADING_CLASS = 'mb-4 font-sans text-[13px] font-bold text-ink-faint';
+const LINK_CLASS = 'footer-link';
 
 function CopyableEmail() {
   const [copied, setCopied] = useState(false);
@@ -43,7 +46,7 @@ function CopyableEmail() {
     <div className="flex items-center gap-2">
       <a
         href={`mailto:${CONTACT_EMAIL}`}
-        className="flex items-center gap-2 text-sm font-normal text-zinc-300 hover:text-brand-400 transition-colors"
+        className="footer-link flex items-center gap-2 font-type text-[13px]"
         dir="ltr"
       >
         <Mail className="w-3.5 h-3.5 text-brand-400 shrink-0" />
@@ -54,7 +57,7 @@ function CopyableEmail() {
         onClick={handleCopy}
         aria-label="העתקת כתובת המייל"
         title="העתקת כתובת המייל"
-        className="relative flex items-center gap-1 text-xs font-normal text-zinc-500 hover:text-brand-400 transition-colors"
+        className="relative flex items-center gap-1 font-sans text-xs text-ink-faint transition-colors hover:text-brand-400"
       >
         {copied ? (
           <>
@@ -95,33 +98,28 @@ export default function Footer() {
   };
 
   return (
-    <footer className="relative overflow-hidden border-t border-[#76B900]/20 bg-black py-8">
-      <div className="footer-grid absolute inset-0 pointer-events-none" aria-hidden="true" />
-
+    <footer className="relative z-[1] overflow-hidden border-t border-dotted border-[var(--color-rule)] bg-ground py-12">
       <div className="container-wide relative z-10">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-8 mb-8">
           <div className="col-span-2 md:col-span-1">
-            <Link to="/" onClick={handleLogoClick} className="inline-flex rounded-lg outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
-              <Logo className="mb-3" iconClassName="h-7 md:h-9 drop-shadow-[0_0_8px_rgba(0,255,102,0.35)]" textClassName="text-sm md:text-base" />
+            <Link to="/" onClick={handleLogoClick} className="inline-flex outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C8F46E]">
+              <Logo className="mb-4" iconClassName="h-7 md:h-8" textClassName="text-sm md:text-base" />
             </Link>
-            <p className="text-zinc-400 text-sm font-light leading-relaxed max-w-xs mb-3">
+            <p className="mb-4 max-w-xs font-sans text-[15px] leading-relaxed text-ink-muted">
               {rtl(FOOTER_COPY.tagline)}
             </p>
-            <div className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
-              <span className="relative flex h-1.5 w-1.5 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-400" />
-              </span>
+            <div className="inline-flex items-center gap-2 font-type text-xs text-ink-faint">
+              <span className="story-statusbar__live" aria-hidden="true" />
               {rtl(FOOTER_COPY.status)}
             </div>
           </div>
 
           <div>
             <h3 className={COLUMN_HEADING_CLASS}>ניווט</h3>
-            <ul className="flex flex-col gap-2 text-zinc-400 text-sm font-normal">
+            <ul className="flex flex-col gap-2.5">
               {NAV_LINKS.map((link) => (
                 <li key={link.name}>
-                  <Link to={link.to} onClick={(e) => handleNavClick(e, link.to)} className="hover:text-brand-400 transition-colors">
+                  <Link to={link.to} onClick={(e) => handleNavClick(e, link.to)} className={LINK_CLASS}>
                     {link.name}
                   </Link>
                 </li>
@@ -130,11 +128,11 @@ export default function Footer() {
           </div>
 
           <div>
-            <h3 className={COLUMN_HEADING_CLASS}>משפטי ואבטחה</h3>
-            <ul className="flex flex-col gap-2 text-zinc-400 text-sm font-normal">
+            <h3 className={COLUMN_HEADING_CLASS}>מידע משפטי</h3>
+            <ul className="flex flex-col gap-2.5">
               {LEGAL_LINKS.map((link) => (
                 <li key={link.name}>
-                  <Link to={link.to} className="hover:text-brand-400 transition-colors">
+                  <Link to={link.to} className={LINK_CLASS}>
                     {link.name}
                   </Link>
                 </li>
@@ -151,8 +149,8 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between pt-6 border-t border-white/5 text-zinc-500 text-xs font-normal gap-4 text-center sm:text-right">
-          <div dir="ltr" className="font-mono tracking-wide">
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-dotted border-[var(--color-rule)] pt-6 text-center text-xs text-ink-faint sm:flex-row sm:text-right">
+          <div dir="ltr" className="font-type tracking-wide">
             © {new Date().getFullYear()} MR. DANIEL. ALL RIGHTS RESERVED.
           </div>
         </div>

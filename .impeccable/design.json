@@ -1,78 +1,502 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-26T00:00:00Z",
+  "generatedAt": "2026-10-01T00:00:00Z",
   "title": "Design System: mrdaniel.co.il",
   "extensions": {
     "colorMeta": {
-      "brand-green": { "role": "primary", "displayName": "Workbench Green", "canonical": "#76B900", "tonalRamp": ["#2E4800", "#446A00", "#5C9200", "#76B900", "#8FD400", "#9FE870", "#C4F2A6", "#E8FBDB"] },
-      "signal-glow": { "role": "primary", "displayName": "Live Glow", "canonical": "#00FF66" },
-      "neon-cyan": { "role": "secondary", "displayName": "Neon Cyan", "canonical": "#22D3EE", "tonalRamp": ["#0B4650", "#0E6674", "#0891B2", "#06B6D4", "#22D3EE", "#67E8F9", "#A5F3FC", "#ECFEFF"] },
-      "electric-blue": { "role": "secondary", "displayName": "Electric Blue", "canonical": "#38BDF8" },
-      "terracotta": { "role": "tertiary", "displayName": "Terracotta", "canonical": "#D96B52", "tonalRamp": ["#4A1D13", "#72301F", "#9C442D", "#C0573E", "#D96B52", "#E6927E", "#F0C9BC", "#FAEDE8"] },
-      "cream-paper": { "role": "tertiary", "displayName": "Cream Paper", "canonical": "#FAF6F0" },
-      "carbon-950": { "role": "neutral", "displayName": "Carbon Ground", "canonical": "#08090C", "tonalRamp": ["#08090C", "#121212", "#1E1E24", "#2A2D34", "#3A3D46", "#64748B", "#94A3B8", "#CBD5E1"] },
-      "slide-slate": { "role": "neutral", "displayName": "Slide Slate", "canonical": "#08090E" },
-      "ink-bright": { "role": "neutral", "displayName": "Bright Ink", "canonical": "#F1F5F9" },
-      "ink-body": { "role": "neutral", "displayName": "Body Ink", "canonical": "#E2E8F0" },
-      "ink-muted": { "role": "neutral", "displayName": "Muted Ink", "canonical": "#CBD5E1" },
-      "ink-faint": { "role": "neutral", "displayName": "Faint Ink", "canonical": "#94A3B8" }
+      "brand-green-light": {
+        "role": "primary",
+        "displayName": "Field Green",
+        "canonical": "#8FD400",
+        "tonalRamp": [
+          "#2E4800",
+          "#446A00",
+          "#5C9200",
+          "#76B900",
+          "#8FD400",
+          "#9FE870",
+          "#C8F46E",
+          "#E8FBDB"
+        ]
+      },
+      "brand-green": {
+        "role": "primary",
+        "displayName": "Workbench Green",
+        "canonical": "#76B900",
+        "tonalRamp": [
+          "#2E4800",
+          "#446A00",
+          "#5C9200",
+          "#76B900",
+          "#8FD400",
+          "#9FE870",
+          "#C8F46E",
+          "#E8FBDB"
+        ]
+      },
+      "brand-green-pale": {
+        "role": "primary",
+        "displayName": "Pale Green",
+        "canonical": "#9FE870"
+      },
+      "brand-green-deep": {
+        "role": "primary",
+        "displayName": "Deep Green",
+        "canonical": "#5C9200"
+      },
+      "field-ink-hi": {
+        "role": "primary",
+        "displayName": "Lit Glyph",
+        "canonical": "#C8F46E"
+      },
+      "signal-glow": {
+        "role": "primary",
+        "displayName": "Live Glow (dashboard only)",
+        "canonical": "#00FF66"
+      },
+      "neon-cyan": {
+        "role": "secondary",
+        "displayName": "Neon Cyan (dashboard/slides only)",
+        "canonical": "#22D3EE",
+        "tonalRamp": [
+          "#0B4650",
+          "#0E6674",
+          "#0891B2",
+          "#06B6D4",
+          "#22D3EE",
+          "#67E8F9",
+          "#A5F3FC",
+          "#ECFEFF"
+        ]
+      },
+      "electric-blue": {
+        "role": "secondary",
+        "displayName": "Electric Blue (dashboard/slides only)",
+        "canonical": "#38BDF8"
+      },
+      "terracotta": {
+        "role": "tertiary",
+        "displayName": "Terracotta (study-notes slides)",
+        "canonical": "#D96B52",
+        "tonalRamp": [
+          "#4A1D13",
+          "#72301F",
+          "#9C442D",
+          "#C0573E",
+          "#D96B52",
+          "#E6927E",
+          "#F0C9BC",
+          "#FAEDE8"
+        ]
+      },
+      "cream-paper": {
+        "role": "tertiary",
+        "displayName": "Cream Paper (study-notes slides)",
+        "canonical": "#FAF6F0"
+      },
+      "cream-ink": {
+        "role": "tertiary",
+        "displayName": "Warm Ink (study-notes slides)",
+        "canonical": "#1C1917"
+      },
+      "hand-ink": {
+        "role": "tertiary",
+        "displayName": "Hand Ink",
+        "canonical": "#EFE6CF"
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Warm Carbon",
+        "canonical": "#0A0B09",
+        "tonalRamp": [
+          "#0A0B09",
+          "#1A1D16",
+          "#2E3328",
+          "#4F5745",
+          "#8A957D",
+          "#B2BCA5",
+          "#E6ECDD",
+          "#F6F8F2"
+        ]
+      },
+      "ink-paper": {
+        "role": "neutral",
+        "displayName": "Paper Ink",
+        "canonical": "#E6ECDD",
+        "tonalRamp": [
+          "#0A0B09",
+          "#1A1D16",
+          "#2E3328",
+          "#4F5745",
+          "#8A957D",
+          "#B2BCA5",
+          "#E6ECDD",
+          "#F6F8F2"
+        ]
+      },
+      "ink-paper-muted": {
+        "role": "neutral",
+        "displayName": "Muted Paper Ink",
+        "canonical": "#B2BCA5"
+      },
+      "ink-paper-faint": {
+        "role": "neutral",
+        "displayName": "Faint Paper Ink",
+        "canonical": "#8A957D"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Dotted Rule",
+        "canonical": "rgba(143, 212, 0, 0.3)"
+      },
+      "carbon-950": {
+        "role": "neutral",
+        "displayName": "Carbon Ground (dashboard)",
+        "canonical": "#08090C",
+        "tonalRamp": [
+          "#08090C",
+          "#121212",
+          "#1E1E24",
+          "#2A2D34",
+          "#3A3D46",
+          "#64748B",
+          "#94A3B8",
+          "#CBD5E1"
+        ]
+      },
+      "carbon-900": {
+        "role": "neutral",
+        "displayName": "Carbon 900",
+        "canonical": "#121212"
+      },
+      "carbon-800": {
+        "role": "neutral",
+        "displayName": "Carbon 800",
+        "canonical": "#1E1E24"
+      },
+      "carbon-700": {
+        "role": "neutral",
+        "displayName": "Carbon 700",
+        "canonical": "#2A2D34"
+      },
+      "carbon-600": {
+        "role": "neutral",
+        "displayName": "Carbon 600",
+        "canonical": "#3A3D46"
+      },
+      "slide-slate": {
+        "role": "neutral",
+        "displayName": "Slide Slate",
+        "canonical": "#08090E"
+      },
+      "ink-bright": {
+        "role": "neutral",
+        "displayName": "Bright Ink (dashboard)",
+        "canonical": "#F1F5F9"
+      },
+      "ink-body": {
+        "role": "neutral",
+        "displayName": "Body Ink (dashboard)",
+        "canonical": "#E2E8F0"
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Muted Ink (dashboard)",
+        "canonical": "#CBD5E1"
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Faint Ink (dashboard)",
+        "canonical": "#94A3B8"
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Site hero only." },
-      "headline": { "displayName": "Headline", "purpose": "Site section headings, balanced." },
-      "title": { "displayName": "Title", "purpose": "Card and sub-section titles." },
-      "body": { "displayName": "Body", "purpose": "Paragraphs, text-wrap: pretty." },
-      "label": { "displayName": "Label", "purpose": "Latin mono chrome: handles, counters, status. Never Hebrew prose." },
-      "slide-headline": { "displayName": "Slide Headline (condensed)", "purpose": "Every Hebrew headline on a carousel or video frame; auto-fit, then balanced." },
-      "slide-body": { "displayName": "Slide Body", "purpose": "Slide paragraphs and bullets, widow-controlled." },
-      "slide-note": { "displayName": "Handwritten Note", "purpose": "Margin notes only, ≤ 3 per deck, with a doodle arrow." },
-      "slide-code": { "displayName": "Slide Code", "purpose": "Code and Latin prompts inside terminal frames." }
+      "site-display": {
+        "displayName": "Site Display (glyph-built)",
+        "purpose": "The hero promise line only; built from field glyphs when each letter gets at least 9 glyph rows, solid Field Green otherwise."
+      },
+      "site-lead": {
+        "displayName": "Site Lead",
+        "purpose": "The hero's first line, paper ink."
+      },
+      "site-headline": {
+        "displayName": "Site Headline",
+        "purpose": "Story-beat headings, balanced."
+      },
+      "site-title": {
+        "displayName": "Site Title",
+        "purpose": "Stair steps and card titles."
+      },
+      "site-body": {
+        "displayName": "Site Body",
+        "purpose": "Heebo prose, text-wrap: pretty, max 34rem."
+      },
+      "site-machine": {
+        "displayName": "Machine Voice",
+        "purpose": "Cousine captions, metadata, terms, links. Never Hebrew paragraphs."
+      },
+      "site-button": {
+        "displayName": "Button Label",
+        "purpose": "Cousine 700 inside GlyphButton."
+      },
+      "site-hand": {
+        "displayName": "Site Hand",
+        "purpose": "Margin notes only, at most two per page."
+      },
+      "workbench-display": {
+        "displayName": "Dashboard Display",
+        "purpose": "Dashboard; also the legacy site sections pending migration (not site guidance)."
+      },
+      "workbench-headline": {
+        "displayName": "Dashboard Headline",
+        "purpose": "Dashboard section headings."
+      },
+      "workbench-title": {
+        "displayName": "Dashboard Title",
+        "purpose": "Dashboard card titles."
+      },
+      "workbench-body": {
+        "displayName": "Dashboard Body",
+        "purpose": "Dashboard paragraphs."
+      },
+      "workbench-label": {
+        "displayName": "Dashboard Label",
+        "purpose": "Latin mono chrome. Never Hebrew prose."
+      },
+      "slide-headline": {
+        "displayName": "Slide Headline (condensed)",
+        "purpose": "Every Hebrew headline on a carousel or video frame; auto-fit, then balanced."
+      },
+      "slide-body": {
+        "displayName": "Slide Body",
+        "purpose": "Slide paragraphs and bullets, widow-controlled."
+      },
+      "slide-note": {
+        "displayName": "Slide Handwritten Note",
+        "purpose": "Margin notes only, at most 3 per deck, with a doodle arrow."
+      },
+      "slide-code": {
+        "displayName": "Slide Code",
+        "purpose": "Code and Latin prompts inside terminal frames."
+      }
+    },
+    "glyphField": {
+      "densityRamp": " .:-=+*",
+      "alphabet": "density ramp + Hebrew letters + A-Z a-z 0-9 + ,'\"/%&#@()_",
+      "ink": "#8FD400",
+      "inkHi": "#C8F46E",
+      "ground": "#0A0B09",
+      "cellPx": {
+        "desktop": "7x12 (>=768px)",
+        "mobile": "5x9"
+      },
+      "minGlyphRowsPerLetter": 9,
+      "stageParams": [
+        "chaos",
+        "order",
+        "calm",
+        "lens",
+        "dim"
+      ],
+      "buttonTexture": "14x4 tile of Cousine 700 9px Hebrew letters and density marks at rgba(214,255,140,0.18-0.48), published as --glyph-tex"
     },
     "shadows": [
-      { "name": "overlay-lift", "value": "0 30px 80px rgba(0,0,0,0.9)", "purpose": "Modals and floating overlays." },
-      { "name": "live-glow", "value": "0 0 8px rgba(0,255,102,0.8)", "purpose": "Live indicator dots and active progress." },
-      { "name": "selected-glow", "value": "0 0 20px rgba(0,255,102,0.15)", "purpose": "Selected option cards." }
+      {
+        "name": "overlay-lift",
+        "value": "0 30px 80px rgba(0,0,0,0.9)",
+        "purpose": "Dashboard modals and floating overlays. Not used on the site."
+      },
+      {
+        "name": "live-glow",
+        "value": "0 0 8px rgba(0,255,102,0.8)",
+        "purpose": "Dashboard live indicator dots. Not used on the site."
+      },
+      {
+        "name": "selected-glow",
+        "value": "0 0 20px rgba(0,255,102,0.15)",
+        "purpose": "Dashboard selected option cards."
+      }
     ],
     "motion": [
-      { "name": "button-color", "value": "200ms ease", "purpose": "Button colour/border transitions." },
-      { "name": "slide-intro", "value": "rise 0.02W + fade", "purpose": "Motion Studio: slide body rises and fades in, holds, crossfades out." }
+      {
+        "name": "field-stage-spring",
+        "value": "k 34, zeta 1",
+        "purpose": "Field story parameters (chaos/order/calm/lens/dim) following the scroll."
+      },
+      {
+        "name": "field-lens-spring",
+        "value": "k 90, zeta 0.72",
+        "purpose": "Pointer lens position; slight overshoot."
+      },
+      {
+        "name": "button-press",
+        "value": "spring stiffness 720, damping 30, mass 0.6",
+        "purpose": "GlyphButton press: sink 2px, scale 0.985, field ripple."
+      },
+      {
+        "name": "button-settle",
+        "value": "spring stiffness 380, damping 24, mass 0.7",
+        "purpose": "GlyphButton hover/rest; ticks spring 5px out."
+      },
+      {
+        "name": "line-fill",
+        "value": "spring stiffness 260, damping 28",
+        "purpose": "Line button fill entering from the reading start."
+      },
+      {
+        "name": "stair-caret",
+        "value": "spring stiffness 260, damping 22, mass 0.8",
+        "purpose": "Caret moving to the step on the reading line."
+      },
+      {
+        "name": "hand-arrow-draw",
+        "value": "spring stiffness 40, damping 14",
+        "purpose": "Doodle arrow drawing itself in."
+      },
+      {
+        "name": "caret-blink",
+        "value": "1.05-1.1s steps(1) infinite",
+        "purpose": "Stepped caret blink; off under reduced motion."
+      },
+      {
+        "name": "glyph-type",
+        "value": "1s steps(7) infinite",
+        "purpose": "Primary button texture typing across on hover; off under reduced motion."
+      },
+      {
+        "name": "field-fade-in",
+        "value": "1.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Field layer appearing once the page is idle."
+      },
+      {
+        "name": "slide-intro",
+        "value": "rise 0.02W + fade",
+        "purpose": "Motion Studio: slide body rises and fades in, holds, crossfades out."
+      }
     ],
     "breakpoints": [
-      { "name": "md", "value": "768px" },
-      { "name": "lg", "value": "1024px" }
-    ]
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ],
+    "headlineFace": {
+      "family": "'Rubik Lines', 'Noto Sans Hebrew', Rubik, Heebo, sans-serif",
+      "weight": 400,
+      "appliesTo": "every h1/h2 on the public site (unlayered global rule); .headline-plain opts out",
+      "since": "2026-10-01"
+    },
+    "sceneMotion": {
+      "file": "src/lib/sceneMotion.ts",
+      "media": "(min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)",
+      "headingReveal": {
+        "from": {
+          "yPercent": 118
+        },
+        "duration": 1.15,
+        "ease": "expo.out",
+        "stagger": 0.09,
+        "start": "top 88%"
+      },
+      "sectionEnter": {
+        "from": {
+          "y": 110,
+          "rotateX": 7,
+          "opacity": 0.2
+        },
+        "scrub": 1,
+        "start": "top 100%",
+        "end": "top 42%"
+      },
+      "sectionExit": {
+        "to": {
+          "y": -56,
+          "scale": 0.965,
+          "opacity": 0.32
+        },
+        "scrub": 1,
+        "start": "bottom 58%",
+        "end": "bottom 4%"
+      },
+      "velocitySkew": {
+        "clampDeg": 2.2,
+        "factor": -0.06,
+        "quickTo": 0.55
+      },
+      "fieldParallax": 0.3
+    }
   },
   "components": [
     {
-      "name": "Primary Button",
+      "name": "Glyph Button — Primary",
       "kind": "button",
-      "refersTo": "button-primary",
-      "description": "The single primary action; one per decision.",
-      "html": "<button class=\"ds-btn-primary\">איך זה עובד אצלכם</button>",
-      "css": ".ds-btn-primary { direction: rtl; font-family: Heebo, 'Segoe UI', sans-serif; font-weight: 700; letter-spacing: 0.025em; padding: 12px 24px; border-radius: 9999px; background: #76B900; color: #08090C; border: 1px solid #76B900; cursor: pointer; transition: background-color 200ms, border-color 200ms; } .ds-btn-primary:hover { background: #8FD400; border-color: #8FD400; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(143,212,0,0.6); }"
+      "refersTo": "glyph-button-primary",
+      "description": "The site's one primary action: a sharp green rectangle with corner registration ticks.",
+      "html": "<a class=\"ds-glyph-btn\" href=\"#\"><span class=\"ds-tick ds-tr\"></span><span class=\"ds-tick ds-tl\"></span><span class=\"ds-tick ds-br\"></span><span class=\"ds-tick ds-bl\"></span>בואו נתחיל מההתחלה</a>",
+      "css": ".ds-glyph-btn { position: relative; direction: rtl; display: inline-flex; align-items: center; justify-content: center; min-height: 3.25rem; padding: 0 1.6rem; border-radius: 0; background: #76B900; color: #0A0B09; font: 700 1rem Cousine, 'Courier New', Heebo, monospace; letter-spacing: 0.01em; text-decoration: none; transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1); } .ds-glyph-btn:hover { background: #8FD400; } .ds-glyph-btn:active { transform: translateY(2px) scale(0.985); } .ds-glyph-btn:focus-visible { outline: 2px solid #C8F46E; outline-offset: 5px; } .ds-tick { position: absolute; width: 7px; height: 7px; border: 0 solid #8FD400; transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1); } .ds-tr { top: -5px; right: -5px; border-top-width: 1.5px; border-right-width: 1.5px; } .ds-tl { top: -5px; left: -5px; border-top-width: 1.5px; border-left-width: 1.5px; } .ds-br { bottom: -5px; right: -5px; border-bottom-width: 1.5px; border-right-width: 1.5px; } .ds-bl { bottom: -5px; left: -5px; border-bottom-width: 1.5px; border-left-width: 1.5px; } .ds-glyph-btn:hover .ds-tr { transform: translate(5px, -5px); } .ds-glyph-btn:hover .ds-tl { transform: translate(-5px, -5px); } .ds-glyph-btn:hover .ds-br { transform: translate(5px, 5px); } .ds-glyph-btn:hover .ds-bl { transform: translate(-5px, 5px); }"
     },
     {
-      "name": "Ghost Button",
+      "name": "Glyph Button — Line",
       "kind": "button",
-      "refersTo": "button-ghost",
-      "description": "Secondary action on carbon.",
-      "html": "<button class=\"ds-btn-ghost\">לכל המדריכים</button>",
-      "css": ".ds-btn-ghost { direction: rtl; font-family: Heebo, 'Segoe UI', sans-serif; font-weight: 700; padding: 12px 24px; border-radius: 9999px; background: transparent; color: #F1F5F9; border: 1px solid rgba(255,255,255,0.15); cursor: pointer; transition: border-color 200ms; } .ds-btn-ghost:hover { border-color: rgba(143,212,0,0.5); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(143,212,0,0.6); }"
+      "refersTo": "glyph-button-line",
+      "description": "Secondary site action: green outline; a green fill enters from the right (the reading start) on hover.",
+      "html": "<a class=\"ds-glyph-line\" href=\"#\">להורדת המדריך</a>",
+      "css": ".ds-glyph-line { direction: rtl; display: inline-flex; align-items: center; min-height: 3.25rem; padding: 0 1.6rem; border-radius: 0; color: #8FD400; box-shadow: inset 0 0 0 1px #8FD400; background: linear-gradient(#8FD400, #8FD400) right / 0% 100% no-repeat; font: 700 1rem Cousine, 'Courier New', Heebo, monospace; text-decoration: none; transition: background-size 350ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms; } .ds-glyph-line:hover, .ds-glyph-line:focus-visible { background-size: 100% 100%; color: #0A0B09; } .ds-glyph-line:focus-visible { outline: 2px solid #C8F46E; outline-offset: 5px; }"
+    },
+    {
+      "name": "Story Link",
+      "kind": "custom",
+      "refersTo": "story-link",
+      "description": "Machine-voice link with a dotted underline.",
+      "html": "<a class=\"ds-story-link\" href=\"#\">לכל החדשות ‹</a>",
+      "css": ".ds-story-link { direction: rtl; font: 700 14px Cousine, 'Courier New', Heebo, monospace; color: #8FD400; text-decoration: underline dotted rgba(143,212,0,0.55); text-underline-offset: 6px; } .ds-story-link:hover { color: #C8F46E; text-decoration-style: solid; } .ds-story-link:focus-visible { outline: 2px solid #C8F46E; outline-offset: 3px; }"
+    },
+    {
+      "name": "Glyph Frame",
+      "kind": "card",
+      "refersTo": "glyph-frame",
+      "description": "Site container: dotted hairline, ground at 78%, square corners.",
+      "html": "<div class=\"ds-frame\"><div class=\"ds-frame-head\">ai-learning-guide-2026.pdf</div><div class=\"ds-frame-body\"><h3>המדריך למתחילים</h3><p>מאיפה מתחילים, בעברית פשוטה.</p></div></div>",
+      "css": ".ds-frame { direction: rtl; border: 1px dotted rgba(143,212,0,0.3); background: rgba(10,11,9,0.78); border-radius: 0; color: #B2BCA5; } .ds-frame-head { padding: 12px 20px; border-bottom: 1px dotted rgba(143,212,0,0.3); font: 12px Cousine, monospace; color: #8A957D; } .ds-frame-body { padding: 20px; } .ds-frame-body h3 { margin: 0; font-family: 'Noto Sans Hebrew', Rubik, sans-serif; font-weight: 900; font-stretch: 75%; font-size: 2rem; line-height: 1.15; color: #E6ECDD; } .ds-frame-body p { margin: 12px 0 0; font: 15px/1.75 Heebo, sans-serif; }"
+    },
+    {
+      "name": "Jargon Decoder Row",
+      "kind": "custom",
+      "description": "Term in the machine voice, dotted leader, plain-Hebrew meaning.",
+      "html": "<div class=\"ds-decode\"><span class=\"ds-term\">RAG</span><span class=\"ds-plain\">הבינה קוראת את המסמכים שלכם לפני שהיא עונה</span></div>",
+      "css": ".ds-decode { direction: rtl; display: flex; align-items: baseline; gap: 1rem; padding: 1.2rem 1.25rem; border-bottom: 1px dotted rgba(143,212,0,0.3); } .ds-term { min-width: 13ch; font: 700 1rem Cousine, monospace; color: #8A957D; } .ds-decode:hover .ds-term { color: #8FD400; } .ds-plain { flex: 1; display: flex; gap: 1rem; font: 500 1.1rem/1.6 Heebo, sans-serif; color: #E6ECDD; } .ds-plain::before { content: ''; flex: 1 1 auto; min-width: 2.5rem; border-bottom: 1px dotted rgba(143,212,0,0.3); transform: translateY(-0.3em); }"
+    },
+    {
+      "name": "Site Hand Note",
+      "kind": "custom",
+      "refersTo": "hand-note",
+      "description": "The one human voice over the machine grid, with a doodle arrow.",
+      "html": "<figure class=\"ds-hand\"><figcaption>את הרעש הזה אני מסדר בשבילכם</figcaption><svg viewBox=\"0 0 120 96\"><path d=\"M104 6 C 108 34, 92 58, 62 70 C 46 76, 30 78, 14 84\"/><path d=\"M28 72 L 13 84 L 31 91\"/></svg></figure>",
+      "css": ".ds-hand { direction: rtl; margin: 0; display: inline-flex; flex-direction: column; gap: 0.2rem; color: #EFE6CF; transform: rotate(-2.5deg); } .ds-hand figcaption { font: 600 1.4rem/1.3 'Playpen Sans Hebrew', Heebo, cursive; max-width: 14ch; text-wrap: balance; } .ds-hand svg { width: 7.5rem; height: 6rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }"
     },
     {
       "name": "Dashboard Card",
       "kind": "card",
       "refersTo": "dash-card",
       "description": "The shared container for every dashboard tab.",
-      "html": "<div class=\"ds-dash-card\"><h3>סוכן חדשות</h3><p>12 פריטים ממתינים לאישור</p></div>",
+      "html": "<div class=\"ds-dash-card\"><h3>סוכן חדשות</h3><p>פריטים ממתינים לאישור</p></div>",
       "css": ".ds-dash-card { direction: rtl; padding: 20px; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)), #121212; color: #E2E8F0; font-family: Heebo, sans-serif; } .ds-dash-card h3 { margin: 0 0 6px; font-family: Rubik, Heebo, sans-serif; font-weight: 700; color: #F1F5F9; } .ds-dash-card p { margin: 0; color: #94A3B8; }"
     },
     {
-      "name": "Live Chip",
-      "kind": "chip",
-      "description": "Status pill with a live dot.",
-      "html": "<span class=\"ds-chip\"><i></i>LIVE</span>",
-      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; border: 1px solid rgba(118,185,0,0.4); background: rgba(118,185,0,0.1); color: #9FE870; font: 600 11px 'JetBrains Mono', monospace; letter-spacing: 0.08em; } .ds-chip i { width: 6px; height: 6px; border-radius: 50%; background: #8FD400; box-shadow: 0 0 8px rgba(0,255,102,0.8); }"
+      "name": "Dashboard Primary Button",
+      "kind": "button",
+      "refersTo": "dash-button-primary",
+      "description": "Dashboard only: Workbench Green pill. Never on the site.",
+      "html": "<button class=\"ds-dash-btn\">צור דק</button>",
+      "css": ".ds-dash-btn { direction: rtl; font: 700 1rem Heebo, sans-serif; padding: 12px 24px; border-radius: 9999px; background: #76B900; color: #08090C; border: 0; cursor: pointer; transition: background-color 200ms; } .ds-dash-btn:hover { background: #8FD400; } .ds-dash-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(143,212,0,0.6); }"
     },
     {
       "name": "Slide Headline + Note",
@@ -90,40 +514,102 @@
     }
   ],
   "narrative": {
-    "northStar": "The Annotated Workbench",
-    "overview": "A practitioner's bench at night. The surfaces are dark carbon, cool and quiet; one green signal marks what is live, chosen or important; the real tools sit on the table (a terminal frame, a code block, a vector product mark, a click-path of actual menu labels); and in the margins there is a person's own handwriting pointing at the part that matters. Everything reads as made by one hands-on individual rather than assembled by a platform.",
+    "northStar": "The Sorted Noise",
+    "overview": "The public site is the AI world as a learner actually meets it: a full-bleed wall of real words, and one person typing it into a readable page. Behind every page runs a live WebGL2 field rendered as typewriter characters; its brightest cells are letters taken from the week's real AI headlines and tool names, its tone is made by glyph density (blank → `.` → `:` → `-` → `=` → `+` → `*`), and it is drawn in a single green ink on warm carbon. Over it, the page speaks in two voices: the machine in monospace (the field, captions, labels, jargon terms, buttons) and people in proportional Hebrew (a condensed poster face for headlines, Heebo for prose). As the visitor scrolls, the field calms and sorts; under the pointer it stops and becomes readable words; a click ripples through it. One handwritten note, never more than two per page, speaks over the machine grid.\n\nThe system spans three surfaces. The **public site** (`src/`) is The Sorted Noise; its homepage hero and story beats (`Hero`, `NoiseBeat`, `OrderBeat`, `PathBeat`, `StartBeat`), the shared `GlyphButton`, the cookie notice and the background field are built in it. The **operator dashboard** (`dashboard/`) and the **canvas-rendered carousels and 9:16 videos** (`dashboard/src/lib/*Renderer.ts`, `designAssets.ts`) remain **\"The Annotated Workbench\"**: dark carbon, one green signal, real tools on the table, a person's handwriting in the margin. The two share the green hue, condensed Noto Sans Hebrew headlines, the Playpen hand and the no-invented-facts stance, so they read as one product.\n\n**Known gap.** The rest of the public site has not moved yet: the lower homepage sections (offers, terms, process, services, tech marquee, contact), every other route, and the header/ticker chrome still wear the previous neon/glass/pill look. That look is not current site guidance; it is pending migration into The Sorted Noise. New site work is built in The Sorted Noise.",
     "keyCharacteristics": [
-      "Dark carbon ground, one saturated green (`brand-green`) as the signal; cyan only as a secondary data/tech accent.",
-      "Hebrew-first, RTL everywhere; Latin product names stay Latin and correctly ordered inside RTL lines.",
-      "Slide headlines in bold **condensed** Hebrew, balanced across lines; body in a calm humanist sans.",
-      "Human marks — handwritten notes, doodle arrows, marker swipes, scribbled circles — used sparingly, always pointing at real content.",
-      "Real technical artefacts (terminal frames, highlighted code, vector tool marks) instead of stock imagery."
+      "One green ink on warm carbon (`ground`); tone made by glyph density, not by gradients or glow.",
+      "The background is made of real words — live AI headlines and tool names — never `$`/`@` ASCII art and never generic AI imagery.",
+      "Two type voices: monospace Cousine for the machine, proportional Hebrew (Noto Sans Hebrew condensed 900 + Heebo) for people.",
+      "Sharp geometry: square-cornered buttons with corner registration ticks, dotted hairline frames, no pills.",
+      "Physics-based motion: springs for every meaningful move; the few CSS animations are stepped like a typewriter.",
+      "Hebrew-first, RTL everywhere; Latin product names stay Latin and correctly ordered inside RTL lines."
     ],
     "rules": [
-      { "name": "The One Signal Rule", "body": "Green marks what is live, chosen or important. If everything on a screen is green, nothing is; a slide carries at most one accent-coloured headline line, one marker swipe or one note.", "section": "colors" },
-      { "name": "The Solid Ink Rule", "body": "Text is set in solid colour. No gradient fills across glyphs — emphasis comes from the condensed weight, size and one accent colour.", "section": "colors" },
-      { "name": "The Condensed Voice Rule", "body": "Every Hebrew headline on a slide is set in the condensed headline role (`setHeadline`); Rubik is the fallback, not an alternative. Numerals, slash commands and quote glyphs keep the regular display face.", "section": "typography" },
-      { "name": "The Balanced Headline Rule", "body": "A headline is auto-fitted for size, then re-broken at the same line count with even line lengths (`wrapRtlBalanced`; on the web, `text-wrap: balance`). No headline ends on a stranded stub.", "section": "typography" },
-      { "name": "The No Widow Rule", "body": "A paragraph never ends on a single word alone: `wrapRtl` pulls the previous line's last word down whenever that keeps the line count (web: `text-wrap: pretty`). Every slide renderer wraps through it.", "section": "typography" },
-      { "name": "The One Hand Rule", "body": "The handwriting face appears only in margin notes. Never for a headline, body or button.", "section": "typography" },
-      { "name": "The Glow Means Live Rule", "body": "A green glow says \"active, selected or live\". It is never decoration on a static element.", "section": "elevation" }
+      {
+        "name": "The One Ink Rule",
+        "body": "The site has one hue. Green is ink and fill; there is no secondary site accent, no cyan, no neon glow. Emphasis comes from density, weight and size.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Signal Rule",
+        "body": "On the dashboard and slides, green marks what is live, chosen or important. A slide carries at most one accent-coloured headline line, one marker swipe or one note.",
+        "section": "colors"
+      },
+      {
+        "name": "The Solid Ink Rule",
+        "body": "Text is set in solid colour. No gradient fills across glyphs, on any surface.",
+        "section": "colors"
+      },
+      {
+        "name": "The Real Words Rule",
+        "body": "Every glyph that reads as a word in the field comes from a real headline or a real tool name. Nothing in the background is an invented slogan, and the caption under the hero says what the background is made of.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Voices Rule",
+        "body": "The machine speaks monospace; people speak proportional Hebrew. Hebrew paragraphs are never set in Cousine: a monospace cell gives י ו ן a full-width slot and the words fall apart. Cousine carries the machine's short lines only: captions, metadata, terms, links and button labels.",
+        "section": "typography"
+      },
+      {
+        "name": "The Condensed Voice Rule",
+        "body": "Every Hebrew headline, on the site and on every slide, is set in condensed Noto Sans Hebrew (`font-stretch: 75%`; on canvas, `setHeadline` with the stretch in the `font` shorthand). Rubik is the fallback, not an alternative.",
+        "section": "typography"
+      },
+      {
+        "name": "The Balanced Headline Rule",
+        "body": "A headline is auto-fitted for size, then re-broken at the same line count with even line lengths (`wrapRtlBalanced`; on the web, `text-wrap: balance`). No headline ends on a stranded stub.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Widow Rule",
+        "body": "A paragraph never ends on a single word alone: `wrapRtl` on canvas, `text-wrap: pretty` on the web.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Hand Rule",
+        "body": "The handwriting face appears only in margin notes. Never for a headline, body or button. On the site, at most two notes per page.",
+        "section": "typography"
+      },
+      {
+        "name": "The Density Not Glow Rule",
+        "body": "On the site, brightness is made by more and brighter glyphs, never by blur, glow or bloom.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Glow Means Live Rule",
+        "body": "On the dashboard, a green glow says \"active, selected or live\". It is never decoration on a static element.",
+        "section": "elevation"
+      }
     ],
     "dos": [
+      "**Do** build new site surfaces on the glyph field, in one green ink on `ground`, with dotted-rule frames and square corners.",
+      "**Do** set site headlines in condensed Noto Sans Hebrew 900 and site prose in Heebo; keep Cousine for captions, labels, terms, links and buttons.",
+      "**Do** use `GlyphButton` for every site action, and only one primary per decision.",
+      "**Do** move things on springs (motion/react, or the field's own spring step); keep CSS animation stepped (`steps()`), like a caret or typing.",
+      "**Do** show order through layout (indents, position, a caret), not numbers.",
+      "**Do** let the field go quiet behind any text it would cross (`useFieldQuiet`).",
       "**Do** set every Hebrew slide headline with `setHeadline` (condensed 800/900) and re-break it with `wrapRtlBalanced` after auto-fit.",
-      "**Do** wrap every Hebrew paragraph through `wrapRtl` so widow control applies, and run Hebrew through `sanitizeHebrewText` before measuring.",
-      "**Do** make the closing line of a multi-line headline the accent colour, unless a marker swipe already sits under it.",
-      "**Do** warm every new face/weight in `ensureDeckFonts()` before the first slide is drawn.",
-      "**Do** reserve layout space for a note before laying out the content.",
+      "**Do** wrap every Hebrew paragraph through `wrapRtl` on canvas, and run Hebrew through `sanitizeHebrewText` before measuring.",
+      "**Do** make the closing line of a multi-line slide headline the accent colour, unless a marker swipe already sits under it.",
+      "**Do** warm every new face/weight in `ensureDeckFonts()` (slides) or `index.html`'s font link (site) before it is first drawn.",
+      "**Do** reserve layout space for a slide note before laying out the content.",
       "**Do** keep Latin product names, menu labels and handles Latin (LTR runs inside RTL lines)."
     ],
     "donts": [
+      "**Don't** use pill or rounded buttons on the site; site controls are square-cornered (0px).",
+      "**Don't** use generic AI imagery on the site: no brains, node graphs, circuit glows or sparkles.",
+      "**Don't** number sections or steps 01/02/03, or wrap them in brackets.",
+      "**Don't** add invented metrics or status chrome (\"SIGNAL 87%\", fake uptime, fake counts); show a real count or nothing.",
+      "**Don't** add a second site accent (cyan, blue, neon) or glow decoration to the site.",
+      "**Don't** set Hebrew paragraphs in a monospace face (Cousine, JetBrains Mono, Orbitron).",
+      "**Don't** draw ASCII art from `$`/`@` symbols; the field's letters are real words.",
       "**Don't** fill text with a gradient.",
-      "**Don't** set Hebrew prose in JetBrains Mono or Orbitron; those faces have no Hebrew.",
-      "**Don't** use the handwriting face outside margin notes, or put a note on more than three slides.",
+      "**Don't** use the handwriting face outside margin notes, put more than two notes on a site page, or put a note on more than three slides.",
       "**Don't** paint a URL, \"link in bio\" or \"comment X\" onto a slide; the link lives in the caption.",
       "**Don't** put a stock photo behind a prompt, code or workflow slide.",
       "**Don't** add a light theme to the site or dashboard; they are dark-only by decision.",
-      "**Don't** invent numbers, clients or results in any visual, including a handwritten note."
+      "**Don't** invent numbers, clients or results in any visual, including a handwritten note.",
+      "**Don't** treat the legacy neon/glass/pill sections as site guidance; they are pending migration."
     ]
   }
 }

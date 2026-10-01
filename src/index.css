@@ -15,6 +15,25 @@
   /* JetBrains Mono has no Hebrew glyphs: Latin/digits render monospaced, Hebrew falls to Heebo. */
   --font-mono: 'JetBrains Mono', 'Heebo', ui-monospace, 'Segoe UI', monospace;
 
+  /* The glyph world (homepage redesign, 2026-10-01). Two voices: Cousine (the one Google mono
+     with real Hebrew glyphs) is the MACHINE's — field, captions, labels, jargon terms, buttons;
+     never Hebrew prose, which falls apart in a monospace cell. People's words are Noto Sans Hebrew
+     condensed 900 for display (the face the field rebuilds out of glyphs, same as the carousel
+     headlines) and Heebo for prose. Playpen Sans Hebrew is the single human hand, notes only. */
+  --font-type: 'Cousine', 'Courier New', 'Heebo', monospace;
+  /* Every main headline (h1/h2), site-wide: terminal-style scanline letters, Hebrew and Latin. */
+  --font-headline: 'Rubik Lines', 'Noto Sans Hebrew', 'Rubik', 'Heebo', sans-serif;
+  --font-poster: 'Noto Sans Hebrew', 'Rubik', 'Heebo', sans-serif;
+  --font-hand: 'Playpen Sans Hebrew', 'Heebo', cursive;
+
+  /* Warm carbon ground and a green-tinted ink ramp: secondary text is tinted from the hue, never
+     grey. Contrast on --color-ground: paper 16:1, muted 10:1, faint 6.3:1. */
+  --color-ground: #0A0B09;
+  --color-ink-paper: #E6ECDD;
+  --color-ink-muted: #B2BCA5;
+  --color-ink-faint: #8A957D;
+  --color-rule: rgba(143, 212, 0, 0.3);
+
   /* NVIDIA solid-green brand ramp — one hue, only opacity/shade varies */
   --color-brand-300: #9FE870;
   --color-brand-400: #8FD400;
@@ -24,8 +43,20 @@
 
   /* Supplementary "living" accent tones — used for secondary highlights/glows (tech-accent icons,
      data callouts) alongside the brand green, not as a replacement for it. */
-  --color-electric-blue: #38BDF8;
-  --color-neon-cyan: #22D3EE;
+  /* Retired 2026-10-01: the site speaks one green ink. Kept as aliases so old utilities resolve. */
+  --color-electric-blue: #9FE870;
+  --color-neon-cyan: #8FD400;
+
+  /* Sharp, architectural geometry everywhere (2026-10-01): every rounded-* utility resolves to 0.
+     `rounded-full` has no token and is mapped in SITE-WIDE HARMONY at the end of this file. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
 
   /* Deep solid cyber-dark surface ramp — this site is dark-mode only, permanently. A light-theme
      variant was tried and rolled back: converting every hardcoded text/card color across 25+
@@ -121,7 +152,9 @@ p {
 }
 
 html {
-  background-color: #08090C;
+  background-color: #0A0B09;
+  scrollbar-color: rgba(143, 212, 0, 0.45) #0A0B09;
+  caret-color: #8FD400;
   -webkit-text-size-adjust: 100%;
   /* Crisp glyph rendering on Retina/OLED panels — thinner, less "fuzzy" antialiasing than each
      platform's default subpixel-hinted rendering, which reads noticeably better on today's
@@ -164,14 +197,14 @@ body {
   overflow-x: clip;
   width: 100%;
   max-width: 100%;
-  background-color: #08090C;
+  background-color: #0A0B09;
   overscroll-behavior-y: none;
   /* Ambient corner glow — a fixed, low-opacity radial wash (brand green + electric blue) behind
      every page, rather than a flat, uniformly-crushed near-black. Purely decorative and
      pointer-events:none; doesn't affect layout or any component's own background. Given
      `background-attachment: fixed` is unreliable on iOS Safari during momentum scroll, this uses a
      genuinely fixed-position pseudo-element instead (GPU-composited, same technique as
-     `.scene3d-layer`) so the glow stays anchored to the viewport, not the document, on every
+     `.glyph-field-layer`) so the glow stays anchored to the viewport, not the document, on every
      platform. */
   position: relative;
 }
@@ -181,10 +214,12 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse 60% 40% at 15% 0%, rgba(118, 185, 0, 0.14), transparent 60%),
-    radial-gradient(ellipse 55% 38% at 100% 15%, rgba(56, 189, 248, 0.08), transparent 60%),
-    radial-gradient(ellipse 50% 35% at 0% 100%, rgba(0, 255, 102, 0.07), transparent 60%);
+  /* Since 2026-10-01: the glyph field's calm state, drawn in CSS — a sparse lattice of ink dots on
+     the cell grid. It is what shows before the field fades in, and the whole background wherever
+     the field never mounts (reduced motion, Save-Data, weak hardware, no WebGL2). */
+  background-image: radial-gradient(rgba(143, 212, 0, 0.16) 0.9px, transparent 1.3px);
+  background-size: 28px 36px;
+  background-position: 3px 6px;
   transform: translateZ(0);
   will-change: transform;
 }
@@ -194,20 +229,20 @@ body::before {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #08090C;
+  background: #0A0B09;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2A2D34;
-  border-radius: 8px;
+  background: rgba(143, 212, 0, 0.35);
+  border-radius: 0;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3A3D46;
+  background: rgba(143, 212, 0, 0.6);
 }
 
 /* Custom Text Selection */
 ::selection {
-  background: #76B900;
-  color: #08090C;
+  background: #8FD400;
+  color: #0A0B09;
 }
 
 /* Carbon fiber mesh — used on cards/containers per the brand spec */
@@ -385,49 +420,6 @@ body::before {
   padding-right: env(safe-area-inset-right);
 }
 
-/* Fixed full-viewport 3D scene backdrop — sits behind all page content. `inset: 0` on a `fixed`
-   element already resolves to the exact viewport box (unlike `100vw`, it never over-counts the
-   scrollbar gutter and can't introduce a horizontal overflow scrollbar), so width/height are
-   pinned explicitly here only as a defensive no-op, not as the actual sizing mechanism. Never
-   nest this inside a `.container`/`max-width` wrapper — it must stay a direct, unconstrained child. */
-.scene3d-layer {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  margin: 0;
-  z-index: 0;
-  pointer-events: none;
-  contain: strict;
-  /* iOS Safari-specific: a `position: fixed` WebGL canvas with no explicit compositing hint is a
-     known trigger for Safari to defer repainting it during momentum scroll (it reads as the whole
-     3D background "freezing" mid-scroll, then catching up once the scroll gesture settles).
-     Forcing this layer onto its own GPU compositing layer keeps it actively composited through
-     the scroll gesture instead of being treated as static background content. `transform` +
-     `will-change: transform` are the load-bearing pair here. `backface-visibility: hidden` is a
-     known-safe secondary compositing hint for older WebKit. `perspective` and
-     `will-change: contents` are included per explicit request as further hints — realistically
-     inert for a WebGL canvas specifically (its pixel updates happen via GPU draw calls, not the
-     DOM paint/3D-transform pipeline these target), but harmless to leave in. */
-  transform: translateZ(0);
-  will-change: transform, contents;
-  backface-visibility: hidden;
-  perspective: 1000px;
-}
-.scene3d-layer canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-  /* The canvas is purely decorative background — it must never capture a touch meant for page
-     scroll. `pointer-events: none` is restated here (rather than only inherited from
-     `.scene3d-layer`) because a WebGL canvas is a replaced element and some engines hit-test it
-     independently, and `touch-action` was previously `none`, which is the hardest possible
-     scroll block if the canvas ever does get hit-tested. */
-  pointer-events: none;
-  touch-action: pan-x pan-y;
-}
-
 /* GPU-accelerated transform hint for frequently-animated interactive elements */
 .gpu {
   will-change: transform;
@@ -437,30 +429,8 @@ body::before {
 /* The experimental "motion=2d" background engine (Canvas2D particle field, R3F starfield, custom
    cursor, scroll-image-sequence) and every `html.motion-v2 …` / `.motion-field-layer` /
    `.starfield-layer` / `.scroll-sequence-layer` / `.motion-cursor` rule that supported it were
-   archived to src/archive/canvas-motion-v2/ — see the README there. The site's standard background
-   is the R3F scene (`.scene3d-layer`, defined above). */
-
-/* ContactPortal's outer dashed ring — a cheap CSS rotation that reads as a live circular CTA
-   accent. 26s: slow enough to feel alive without reading as an obvious loop. */
-@keyframes contact-portal-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.contact-portal-dial {
-  animation: contact-portal-spin 26s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .contact-portal-dial {
-    animation: none;
-  }
-}
-/* The closing line under the CTA is a short 2-line block, so it wants `balance` (even line lengths,
-   no orphan) rather than the site-wide default `p { text-wrap: pretty }`. Higher-specificity,
-   unlayered selector so it beats that base rule (a Tailwind utility, being layered, would not). */
-#contact-portal p {
-  text-wrap: balance;
-}
+   archived to src/archive/canvas-motion-v2/ — see the README there. The site's background is the
+   glyph field (`.glyph-field-layer`, in THE GLYPH WORLD block at the end of this file). */
 
 /* Mobile horizontal-swipe carousel track/item pair — the shared pattern behind every "long
    vertical card list → compact swipe row on phones" conversion. Every flex/scroll declaration here
@@ -871,67 +841,6 @@ html.a11y-large-cursor * {
   }
   .tech-marquee__group:last-child {
     display: none;
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   ROI calculator range slider (RoiCalculator.tsx). `dir: ltr` is forced on the
-   input so min→max is always left→right regardless of the RTL page, which lets
-   the progress fill be a single static `to right` gradient driven by one CSS
-   custom property (`--fill`, a %) set inline from React. Changing `--fill`
-   repaints only this element's background — no layout, no sibling reflow, no
-   React re-render churn — so dragging is glitch-free. The thumb is GPU-cheap
-   (solid circle, no shadow animation).
-   --------------------------------------------------------------------------- */
-.roi-range {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 8px;
-  border-radius: 9999px;
-  background: linear-gradient(
-    to right,
-    var(--color-brand-500) 0%,
-    var(--color-brand-500) var(--fill, 0%),
-    rgba(255, 255, 255, 0.1) var(--fill, 0%),
-    rgba(255, 255, 255, 0.1) 100%
-  );
-  cursor: pointer;
-  outline: none;
-}
-.roi-range:focus-visible {
-  box-shadow: 0 0 0 3px rgba(143, 212, 0, 0.4);
-}
-.roi-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 9999px;
-  background: #fff;
-  border: 3px solid var(--color-brand-500);
-  box-shadow: 0 0 12px rgba(118, 185, 0, 0.5);
-  transition: transform 0.12s ease;
-}
-.roi-range::-webkit-slider-thumb:active {
-  transform: scale(1.15);
-}
-.roi-range::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 9999px;
-  background: #fff;
-  border: 3px solid var(--color-brand-500);
-  box-shadow: 0 0 12px rgba(118, 185, 0, 0.5);
-}
-.roi-range::-moz-range-track {
-  height: 8px;
-  border-radius: 9999px;
-  background: transparent;
-}
-@media (prefers-reduced-motion: reduce) {
-  .roi-range::-webkit-slider-thumb {
-    transition: none;
   }
 }
 
@@ -1582,3 +1491,646 @@ html.perf-lite .gcover-grain {
   background: rgba(255, 255, 255, 0.06);
   box-shadow: 0 0 0 3px rgba(118, 185, 0, 0.15);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   THE GLYPH WORLD — homepage redesign, 2026-10-01 (surface brief: .impeccable/surfaces/).
+   One green ink, tone made by glyph density. The background is the live GlyphField canvas
+   (src/components/field/); everything below is the page that sits on it.
+   Two voices, on purpose: the MACHINE speaks monospace (Cousine — the field, captions, labels,
+   jargon terms, buttons); PEOPLE speak proportional Hebrew (Noto Sans Hebrew condensed for display,
+   Heebo for prose). Hebrew set in a monospace cell gives י ו ן a full-width slot and words fall
+   apart ("הס י נון"), which is the opposite of plain, eye-to-eye Hebrew.
+   Sharp geometry everywhere: no pill, no rounded button. Motion that matters runs on springs in
+   motion/react; the few CSS animations here are stepped (a caret blink, glyphs typing), never eased.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+.glyph-field-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* The LARGE viewport, so the mobile URL bar showing/hiding never resizes the GL surface. */
+  height: 100vh;
+  height: 100lvh;
+  z-index: 0;
+  pointer-events: none;
+  contain: strict;
+  transform: translateZ(0);
+  opacity: 0;
+  transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glyph-field-layer[data-ready] {
+  opacity: 1;
+}
+.glyph-field-layer canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────────────────────── */
+.story-h1 {
+  margin: 0;
+  font-weight: 400;
+}
+.poster {
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+}
+.story-h1__lead {
+  display: block;
+  font-family: var(--font-headline);
+  font-weight: 400;
+  font-size: clamp(1.55rem, 0.95rem + 1.7vw, 2.55rem);
+  line-height: 1.22;
+  letter-spacing: 0;
+  max-width: 22ch;
+  color: var(--color-ink-paper);
+  margin-bottom: 0.3em;
+}
+/* The promise line. Built out of glyphs by the field when it can be read that way (the field sets
+   html[data-glyph-headline]); otherwise it stays this solid green — a finished look, not a fallback. */
+.glyph-accent {
+  display: block;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: min(clamp(6.6rem, 1.6rem + 10vw, 11rem), 17.5vh);
+  line-height: 0.98;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  color: var(--color-brand-400);
+  transition: color 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+html[data-glyph-headline="live"] .glyph-accent {
+  color: transparent;
+}
+.story-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px dotted var(--color-rule);
+  padding-block: 0.85rem 1.15rem;
+  /* Keep both caption items clear of the floating chat / accessibility buttons parked in the
+     bottom-left corner (inline end, in RTL). */
+  padding-inline: 0 6.5rem;
+  font-family: var(--font-type);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+}
+.story-statusbar__live {
+  flex: none;
+  width: 7px;
+  height: 12px;
+  background: var(--color-brand-400);
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+
+/* ── Story type ───────────────────────────────────────────────────────────────────────────── */
+.story-beat {
+  position: relative;
+  z-index: 1;
+  padding-block: clamp(6rem, 15vh, 11rem);
+}
+.story-beat--last {
+  padding-bottom: clamp(7rem, 20vh, 14rem);
+}
+.story-h2 {
+  font-family: var(--font-headline);
+  font-weight: 400;
+  font-size: clamp(2rem, 1rem + 2.6vw, 3.5rem);
+  line-height: 1.14;
+  letter-spacing: 0;
+  color: var(--color-ink-paper);
+  text-wrap: balance;
+}
+.story-h3 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--color-ink-muted);
+}
+.story-body {
+  font-family: var(--font-sans);
+  font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.22rem);
+  line-height: 1.75;
+  color: var(--color-ink-muted);
+  text-wrap: pretty;
+  max-width: 34rem;
+}
+.story-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-type);
+  font-weight: 700;
+  color: var(--color-brand-400);
+  text-decoration: underline dotted rgba(143, 212, 0, 0.55);
+  text-underline-offset: 6px;
+}
+.story-link:hover {
+  color: #c8f46e;
+  text-decoration-style: solid;
+}
+.story-link:focus-visible,
+.log-row:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 3px;
+}
+.story-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(143, 212, 0, 0.45) transparent;
+}
+
+/* A frame on the grid: dotted hairline, the ground behind it a shade more solid than the field. */
+.glyph-frame {
+  border: 1px dotted var(--color-rule);
+  background: rgba(10, 11, 9, 0.78);
+}
+
+/* ── Launch log rows ──────────────────────────────────────────────────────────────────────── */
+.log-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  text-align: right;
+  font-family: var(--font-type);
+  cursor: pointer;
+}
+.log-row:hover {
+  background: rgba(143, 212, 0, 0.06);
+}
+.log-row__caret {
+  flex: none;
+  width: 7px;
+  height: 1.1em;
+  margin-top: 1.45rem;
+  background: var(--color-brand-400);
+  opacity: 0;
+  transform: scaleY(0.15);
+  transform-origin: bottom;
+  transition:
+    opacity 0.15s,
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.log-row:hover .log-row__caret,
+.log-row:focus-visible .log-row__caret {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── Jargon → plain Hebrew ────────────────────────────────────────────────────────────────── */
+.decode-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.2rem 1.25rem;
+  font-family: var(--font-type);
+}
+.decode-row__term {
+  flex: none;
+  min-width: 13ch;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-ink-faint);
+}
+.decode-row:hover .decode-row__term {
+  color: var(--color-brand-400);
+}
+.decode-row__plain {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  flex: 1;
+  gap: 1rem;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.2rem);
+  line-height: 1.6;
+  color: var(--color-ink-paper);
+}
+@media (min-width: 768px) {
+  .decode-row {
+    flex-direction: row;
+    align-items: baseline;
+  }
+  /* The dotted leader, like the dots between an entry and its page number. */
+  .decode-row__plain::before {
+    content: '';
+    flex: 1 1 auto;
+    min-width: 2.5rem;
+    border-bottom: 1px dotted var(--color-rule);
+    transform: translateY(-0.3em);
+  }
+}
+
+/* ── The stairs ───────────────────────────────────────────────────────────────────────────── */
+.stairs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.stair {
+  position: relative;
+  margin-inline-start: calc(var(--step) * 1.1rem);
+  padding-block: 1.5rem 1.6rem;
+  padding-inline: 1.4rem 0;
+  border-inline-start: 1px dotted var(--color-rule);
+  border-bottom: 1px dotted var(--color-rule);
+}
+@media (min-width: 768px) {
+  .stair {
+    margin-inline-start: calc(var(--step) * min(6vw, 5.5rem));
+    padding-inline-start: 1.75rem;
+  }
+}
+.stair__head {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.stair__caret {
+  position: absolute;
+  inset-inline-start: calc(-1.4rem - 4px);
+  width: 8px;
+  height: 1.35em;
+  background: var(--color-brand-400);
+  animation: caret-blink 1.05s steps(1) infinite;
+}
+@media (min-width: 768px) {
+  .stair__caret {
+    inset-inline-start: calc(-1.75rem - 4px);
+  }
+}
+.stair__title {
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.6rem, 1.15rem + 1.3vw, 2.3rem);
+  line-height: 1.1;
+  color: var(--color-ink-muted);
+}
+.stair__body {
+  margin-top: 0.5rem;
+  max-width: 34rem;
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--color-ink-faint);
+}
+.stair[data-active] .stair__title {
+  color: var(--color-ink-paper);
+}
+.stair[data-active] .stair__body {
+  color: var(--color-ink-muted);
+}
+
+/* ── The hand ─────────────────────────────────────────────────────────────────────────────── */
+.hand-note {
+  margin: 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  color: #efe6cf;
+  pointer-events: none;
+}
+.hand-note__text {
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: clamp(1.15rem, 0.9rem + 0.7vw, 1.5rem);
+  line-height: 1.3;
+  max-width: 14ch;
+  text-wrap: balance;
+}
+.hand-note__arrow {
+  width: 7.5rem;
+  height: 6rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Glyph button ─────────────────────────────────────────────────────────────────────────── */
+.glyph-btn {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0 1.6rem;
+  border-radius: 0;
+  font-family: var(--font-type);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.glyph-btn:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 5px;
+}
+.glyph-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.glyph-btn__fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--color-brand-500);
+  background-image: var(--glyph-tex, none);
+  background-size: var(--glyph-tex-size, 98px 44px);
+}
+.glyph-btn__label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.glyph-btn--primary {
+  color: var(--color-ground);
+}
+.glyph-btn--primary:hover .glyph-btn__fill {
+  background-color: var(--color-brand-400);
+  animation: glyph-type 1s steps(7) infinite;
+}
+.glyph-btn--line {
+  color: var(--color-brand-400);
+  box-shadow: inset 0 0 0 1px var(--color-brand-400);
+}
+.glyph-btn--line .glyph-btn__fill {
+  background-color: var(--color-brand-400);
+  clip-path: inset(0 0 0 100%);
+}
+.glyph-btn--line:hover,
+.glyph-btn--line:focus-visible {
+  color: var(--color-ground);
+}
+@keyframes glyph-type {
+  to {
+    background-position: -98px 0;
+  }
+}
+/* Registration marks at the four corners; they spring outward on hover (GlyphButton.tsx). */
+.glyph-btn__tick {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 0 solid var(--color-brand-400);
+  pointer-events: none;
+}
+.glyph-btn__tick--tr {
+  top: -5px;
+  right: -5px;
+  border-top-width: 1.5px;
+  border-right-width: 1.5px;
+}
+.glyph-btn__tick--tl {
+  top: -5px;
+  left: -5px;
+  border-top-width: 1.5px;
+  border-left-width: 1.5px;
+}
+.glyph-btn__tick--br {
+  bottom: -5px;
+  right: -5px;
+  border-bottom-width: 1.5px;
+  border-right-width: 1.5px;
+}
+.glyph-btn__tick--bl {
+  bottom: -5px;
+  left: -5px;
+  border-bottom-width: 1.5px;
+  border-left-width: 1.5px;
+}
+
+/* Loading rows blink in steps like a terminal, not an eased pulse. */
+.skeleton-step {
+  animation: skeleton-step 1.1s steps(1) infinite;
+}
+@keyframes skeleton-step {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+html.motion-reduced .skeleton-step,
+html.motion-reduced .story-statusbar__live,
+html.motion-reduced .stair__caret,
+html.motion-reduced .glyph-btn--primary:hover .glyph-btn__fill {
+  animation: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   SITE-WIDE HARMONY — 2026-10-01. Every legacy primitive mapped into the glyph world in one place,
+   so the pages that were built before the redesign speak the same language without each one being
+   rewritten: dotted hairline frames instead of glass, sharp corners, one green ink, no glow, and
+   one terminal-style headline face. Unlayered on purpose — it must beat Tailwind utilities.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* Headlines. Every main headline on the site (h1, h2) is set in the headline face — Rubik Lines,
+   whose scanline strokes echo the logo's inline linework and the glyph-built hero line, and which
+   carries Hebrew and Latin alike. It beats `font-display` / `font-black` utilities by being
+   unlayered. `.headline-plain` opts a long, informational title (a news article) back into the
+   solid condensed display face, where reading speed matters more than voice. */
+h1,
+h2 {
+  font-family: var(--font-headline);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+h1.headline-plain,
+h2.headline-plain {
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+}
+
+/* Corners. The radius tokens are 0 in @theme; `rounded-full` has no token, so it is mapped here.
+   `.keep-round` is the escape hatch for a true circle that is not a control. */
+.rounded-full:not(.keep-round) {
+  border-radius: 0;
+}
+
+/* Glass → a frame on the grid. */
+.glass-panel {
+  background-color: rgba(10, 11, 9, 0.84);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px dotted var(--color-rule);
+  border-radius: 0;
+}
+.glass-panel::before,
+.glass-panel::after {
+  display: none;
+}
+.glass-panel--marketing,
+.glass-panel--flagship,
+.glass-panel--info {
+  border-color: var(--color-rule);
+  box-shadow: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .glass-panel--marketing:hover,
+  .glass-panel--flagship:hover,
+  .glass-panel--info:hover {
+    border-style: solid;
+    border-color: rgba(143, 212, 0, 0.6);
+    box-shadow: none;
+    background-color: rgba(10, 11, 9, 0.92);
+  }
+}
+
+/* One ink, solid: no gradient fills across glyphs, no bloom. */
+.neon-text {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: var(--color-brand-400);
+  filter: none;
+}
+.text-pop {
+  text-shadow: none;
+}
+
+/* Status chips: a square caret instead of a pinging glow dot. */
+.glass-chip {
+  border-radius: 0;
+  border: 1px dotted var(--color-rule);
+  background: rgba(10, 11, 9, 0.88);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  font-family: var(--font-type);
+}
+.glass-chip__dot {
+  width: 6px;
+  height: 10px;
+  border-radius: 0;
+  background: var(--color-brand-400);
+  box-shadow: none;
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+.glass-chip__dot::after {
+  display: none;
+}
+
+/* Decoration the world does not use. */
+.cta-sheen::after,
+.hero-grid,
+.learn-orb,
+.channel-card::after,
+.signal-console__scan {
+  display: none;
+}
+.channel-card {
+  border-radius: 0;
+  border: 1px dotted var(--color-rule);
+  background: rgba(10, 11, 9, 0.84);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.tech-pill {
+  background-color: rgba(10, 11, 9, 0.88);
+  background-image: none;
+  font-family: var(--font-type);
+}
+
+html.motion-reduced .glass-chip__dot {
+  animation: none;
+}
+
+/* Footer links: people's words in the body face, the signal colour and a dotted underline on hover. */
+.footer-link {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--color-ink-muted);
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 5px;
+  transition: color 0.2s, text-decoration-color 0.2s;
+}
+.footer-link:hover,
+.footer-link:focus-visible {
+  color: var(--color-brand-400);
+  text-decoration-color: rgba(143, 212, 0, 0.55);
+}
+
+/* Header nav: people's words in the body face; the current page carries the signal colour and a
+   caret under it, like the cursor sitting on the line you are on. */
+.nav-link {
+  position: relative;
+  white-space: nowrap;
+  padding-block: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  transition: color 0.2s;
+}
+.nav-link:hover {
+  color: var(--color-ink-paper);
+}
+.nav-link[aria-current='page'] {
+  color: var(--color-brand-400);
+}
+.nav-link[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: 0.15rem;
+  width: 0.5rem;
+  height: 2px;
+  background: var(--color-brand-400);
+}
+
+/* Process rail in the glyph world: a dotted rule instead of a glowing green→cyan bar, square nodes
+   instead of glowing dots. (Its geometry and charge-in animation above are unchanged.) */
+.process-rail::before {
+  background: none;
+  border-inline-start: 1px dotted rgba(143, 212, 0, 0.6);
+  border-top: 1px dotted rgba(143, 212, 0, 0.6);
+  box-shadow: none;
+}
+.process-step__node {
+  border-radius: 0;
+  width: 0.5rem;
+  height: 0.8rem;
+  background: var(--color-brand-400);
+  box-shadow: none;
+}
+
+/* "לומדים AI" floating model chips: square frames on the grid, no blur, no glow. */
+.learn-chip {
+  border-radius: 0;
+  border-style: dotted;
+  border-color: var(--color-rule);
+  background: rgba(10, 11, 9, 0.9);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  font-family: var(--font-type);
+  font-weight: 700;
+  color: var(--color-ink-paper);
+}
+

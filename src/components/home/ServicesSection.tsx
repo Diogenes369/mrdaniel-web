@@ -23,7 +23,7 @@ function FeatureChips({ chips, compact }: { chips: string[]; compact?: boolean }
       {chips.map((c) => (
         <span
           key={c}
-          className={`inline-flex items-center rounded-full border border-brand-500/25 bg-brand-500/[0.07] font-medium text-brand-200 transition-all duration-300 group-hover:border-brand-500/45 group-hover:bg-brand-500/[0.12] group-hover:shadow-[0_0_14px_-4px_rgba(118,185,0,0.5)] ${
+          className={`inline-flex items-center rounded-full border border-brand-500/25 bg-brand-500/[0.07] font-medium text-brand-200 transition-all duration-300 group-hover:border-brand-500/45 group-hover:bg-brand-500/[0.12] ${
             compact ? 'px-2.5 py-1 text-[11px] leading-none' : 'px-3 py-1 text-[11px] lg:text-xs'
           }`}
         >
@@ -243,7 +243,7 @@ export default function ServicesSection() {
   return (
     <section id="services" className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10">
-        <div className="mx-auto mb-12 max-w-4xl text-center md:mb-16">
+        <div className="mb-12 max-w-4xl md:mb-16">
           <PopHeadline lead={rtl(SERVICES_COPY.lead)} accent={rtl(SERVICES_COPY.accent)} />
           <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
             {rtl(SERVICES_COPY.sub)}
@@ -285,7 +285,7 @@ export default function ServicesSection() {
           <CarouselDots count={SERVICES.length} active={active} onDot={scrollToDot} />
         </div>
 
-        <div className="mx-auto mt-12 max-w-2xl text-center md:mt-16">
+        <div className="mt-12 max-w-2xl md:mt-16">
           <p className="mb-5 text-sm text-zinc-400">{rtl(SERVICES_COPY.closing)}</p>
           <WebButton
             variant="primary"

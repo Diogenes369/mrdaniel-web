@@ -6,7 +6,7 @@
 //   - a placeholder that never got filled,
 //   - rtl() output that is not idempotent or leaves a Latin run un-anchored.
 // Run: npx tsx scripts/__tests__/site-copy.test.mjs
-import { HERO_COPY, HERO_CONSOLE_COPY, PROCESS_COPY, ROTATOR_TERMS, SERVICES_COPY, CONTACT_COPY, FOOTER_COPY, ABOUT_COPY } from '../../src/data/siteCopy.ts';
+import { HERO_COPY, STORY_COPY, PROCESS_COPY, ROTATOR_TERMS, SERVICES_COPY, CONTACT_COPY, FOOTER_COPY, ABOUT_COPY } from '../../src/data/siteCopy.ts';
 import { AI_GUIDE_HERO, AI_GUIDE_WHAT, AI_GUIDE_PREP, AI_GUIDE_PROCESS, AI_GUIDE_CTA } from '../../src/data/aiAgentGuide.ts';
 import { HOME_OFFERS } from '../../src/data/homeOffers.ts';
 import { SERVICES } from '../../src/data/homeServices.ts';
@@ -28,7 +28,8 @@ const words = (s) => s.trim().split(/\s+/).filter(Boolean).length;
 const fields = [];
 const add = (label, text, max) => fields.push([label, text, max]);
 
-Object.entries(HERO_COPY).forEach(([k, v]) => add(`hero.${k}`, v, k === 'sub' ? 26 : 7));
+const HERO_BUDGET = { h1Lead: 12, sub: 26, fieldCaption: 12, fieldCaptionNoFeed: 10 };
+Object.entries(HERO_COPY).forEach(([k, v]) => add(`hero.${k}`, v, HERO_BUDGET[k] ?? 7));
 ROTATOR_TERMS.forEach((v, i) => add(`rotator[${i}]`, v, 5));
 Object.entries(SERVICES_COPY).forEach(([k, v]) => add(`services.${k}`, v, ['sub', 'closing'].includes(k) ? 22 : 5));
 add('contact.headline', CONTACT_COPY.headline, 8);
@@ -54,10 +55,24 @@ HOME_OFFERS.forEach((o) => {
     add(`${o.id}.bullets[${i}].body`, b.body, 16);
   });
 });
-// Hero console + process strip + the /ai client guide (2026-09-23 plain-voice rewrite).
-Object.entries(HERO_CONSOLE_COPY).forEach(([k, v]) => {
-  if (typeof v === 'string' && k !== 'label') add(`console.${k}`, v, 14);
+// The homepage scroll story (2026-10-01, learners first) + process strip + the /ai client guide.
+for (const [beat, block] of Object.entries(STORY_COPY)) {
+  for (const [k, v] of Object.entries(block)) {
+    if (typeof v === 'string') add(`story.${beat}.${k}`, v, k === 'body' ? 30 : k === 'note' ? 6 : 10);
+  }
+}
+STORY_COPY.order.pairs.forEach((p, i) => {
+  add(`story.order.pairs[${i}].term`, p.term, 4);
+  add(`story.order.pairs[${i}].plain`, p.plain, 10);
 });
+STORY_COPY.path.steps.forEach((s, i) => {
+  add(`story.path.steps[${i}].title`, s.title, 5);
+  add(`story.path.steps[${i}].body`, s.body, 16);
+});
+// The brief bans sequential section numbering (01 / 02 / 03) anywhere in the copy.
+t('process steps carry no 01/02/03 kickers', PROCESS_COPY.steps.every((s) => !('kicker' in s)), JSON.stringify(PROCESS_COPY.steps.map((s) => s.kicker)));
+// The handwritten notes comment; they never carry a figure.
+for (const note of [HERO_COPY.note, STORY_COPY.path.note]) t(`note "${note}": no figures`, !/\d/.test(note), note);
 add('process.sub', PROCESS_COPY.sub, 14);
 PROCESS_COPY.steps.forEach((s, i) => {
   add(`process.steps[${i}].title`, s.title, 5);
@@ -103,7 +118,7 @@ const BANNED = [
 t('offer order: AI agents, LLM lab, AI news hub', HOME_OFFERS.map((o) => o.id).join() === 'offer-ai-agents,offer-llm-lab,offer-ai-hub', HOME_OFFERS.map((o) => o.id).join());
 t('hub offer links to the news hub', HOME_OFFERS[2]?.route === '/news', HOME_OFFERS[2]?.route);
 t('hub offer second CTA opens every channel (Linktree)', HOME_OFFERS[2]?.secondary === 'linktree', HOME_OFFERS[2]?.secondary);
-// 2026-09-23: the hero has exactly one CTA (to the agents section); the news button is gone.
+// The hero has exactly one CTA (into the scroll story since 2026-10-01); the news button is gone.
 t('hero has a single CTA', !('ctaSecondary' in HERO_COPY), Object.keys(HERO_COPY).join());
 
 // The retired cyber / enterprise offer must not creep back into the marketing copy.

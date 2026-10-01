@@ -5,7 +5,7 @@ import {
   X,
   Send,
   CalendarClock,
-  Sparkles,
+  Asterisk,
   CheckCircle2,
   RefreshCw,
 } from 'lucide-react';
@@ -80,6 +80,20 @@ function renderMessageContent(content: string) {
 
 export default function AIAssistantWidget() {
   const [isOpen, setIsOpen] = useState(false);
+  // Hide-on-scroll-down for the floating launcher (see the launcher markup below).
+  const [tucked, setTucked] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const dy = y - last;
+      if (Math.abs(dy) < 6) return;
+      setTucked(dy > 0 && y > 140);
+      last = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -262,13 +276,21 @@ export default function AIAssistantWidget() {
 
   return (
     <>
-      {/* Floating Launcher Button — compact, minimalist cyber/hacker styling */}
-      <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-[calc(1.5rem+env(safe-area-inset-left))] z-40 flex items-center gap-3">
+      {/* Floating launcher — square since 2026-10-01 (the redesign bans round buttons). It tucks out
+          of the way while the visitor scrolls DOWN (reading), so it never sits on the text being
+          read, and springs back on any scroll up, near the top, or when it takes keyboard focus. */}
+      <motion.div
+        className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-[calc(1.5rem+env(safe-area-inset-left))] z-40 flex items-center gap-3"
+        animate={tucked && !isOpen ? { x: -96, opacity: 0 } : { x: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+        style={{ pointerEvents: tucked && !isOpen ? 'none' : undefined }}
+        onFocusCapture={() => setTucked(false)}
+      >
         <motion.button
-          whileHover={{ scale: 1.08, boxShadow: '0 0 20px rgba(118,185,0,0.4)' }}
+          whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsOpen(!isOpen)}
-          className="relative w-11 h-11 md:w-12 md:h-12 rounded-full bg-[#0D0E12] border border-emerald-500/30 hover:border-emerald-400/60 flex items-center justify-center cursor-pointer transition-all duration-300"
+          className="relative w-11 h-11 md:w-12 md:h-12 rounded-none bg-[#0D0E12] border border-brand-400/35 hover:border-brand-400/70 flex items-center justify-center cursor-pointer transition-colors duration-300"
           aria-label="פתח עוזר AI דיגיטלי"
         >
           {isOpen ? (
@@ -276,14 +298,12 @@ export default function AIAssistantWidget() {
           ) : (
             <>
               <Terminal className="w-5 h-5 text-brand-400" strokeWidth={1.75} />
-              {/* Ambient "listening" pulse — a static dot underneath so it stays visible between
-                  ping cycles, plus an expanding ring on top of it */}
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-brand-400" />
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#76B900] animate-ping" />
+              {/* A static "available" mark; the pinging pulse was removed with the redesign. */}
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-brand-400" />
             </>
           )}
         </motion.button>
-      </div>
+      </motion.div>
 
       {/* Interactive AI Chat Drawer / Modal */}
       <AnimatePresence>
@@ -299,7 +319,7 @@ export default function AIAssistantWidget() {
             {/* Widget Top Header — subtle, sleek, no vibrant blocks */}
             <div className="p-4 md:p-5 bg-[#0D0E12] border-b border-white/10 flex items-center justify-between relative">
               <div className="flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full bg-brand-400 shadow-[0_0_8px_rgba(0,255,102,0.8)] shrink-0" aria-hidden="true" />
+                <span className="w-2 h-2 rounded-full bg-brand-400 shrink-0" aria-hidden="true" />
                 <div>
                   <h3 className="font-tech font-semibold text-sm text-white tracking-wide" dir="ltr">
                     MR. DANIEL // AI ASSISTANT
@@ -350,7 +370,7 @@ export default function AIAssistantWidget() {
                     <form onSubmit={handleLeadSubmit} className="space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-brand-300 flex items-center gap-1.5">
-                          <Sparkles size={14} /> השארת פרטים לשיחת ייעוץ / הצעת מחיר
+                          <Asterisk size={14} /> השארת פרטים לשיחת ייעוץ / הצעת מחיר
                         </span>
                         <button 
                           type="button" 
@@ -400,7 +420,7 @@ export default function AIAssistantWidget() {
                       <button
                         type="submit"
                         disabled={!leadData.name || !EMAIL_RE.test(leadData.email) || !isValidPhone(leadData.phone)}
-                        className="w-full py-2 bg-brand-400 hover:bg-brand-300 text-black font-bold text-xs rounded-lg transition-all shadow-[0_0_15px_rgba(0,255,102,0.3)] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-full py-2 bg-brand-400 hover:bg-brand-300 text-black font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <CheckCircle2 size={14} /> שליחת פרטים ישירות לדניאל
                       </button>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, Home, Newspaper, Bot } from 'lucide-react';
+import { ArrowLeft, Home, Newspaper, Workflow } from 'lucide-react';
 import Seo from '../components/seo/Seo';
 
 /**
@@ -14,7 +14,7 @@ import Seo from '../components/seo/Seo';
 const ROUTES = [
   { to: '/', label: 'עמוד הבית', icon: Home },
   { to: '/news', label: 'חדשות AI', icon: Newspaper },
-  { to: '/ai', label: 'סוכני AI', icon: Bot },
+  { to: '/ai', label: 'סוכני AI', icon: Workflow },
 ];
 
 export default function NotFoundPage() {

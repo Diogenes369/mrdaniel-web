@@ -114,7 +114,7 @@ export function BulletList({ items }: { items: ReactNode[] }) {
     <ul className="space-y-2.5 mt-3">
       {items.map((item, idx) => (
         <li key={idx} className="relative pr-6 text-base md:text-lg text-zinc-300 leading-[1.8]">
-          <span className="absolute right-0 top-[0.7em] w-1.5 h-1.5 rounded-full bg-brand-500 shadow-[0_0_8px_rgba(0,255,102,0.8)]" />
+          <span className="absolute right-0 top-[0.7em] w-1.5 h-1.5 rounded-full bg-brand-500" />
           {item}
         </li>
       ))}

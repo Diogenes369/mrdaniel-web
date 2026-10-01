@@ -4,8 +4,8 @@ import {
   BookOpen,
   ChevronLeft,
   ShieldAlert,
-  Sparkles,
-  BrainCircuit,
+  Asterisk,
+  Binary,
   Cloud,
   Newspaper,
   type LucideIcon,
@@ -16,9 +16,9 @@ import { formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } fro
 
 /** Shared topic styling for every news card + the article modal. */
 export const TOPIC: Record<NewsTopic, { label: string; icon: LucideIcon; ring: string; grad: string }> = {
-  ai: { label: 'בינה מלאכותית', icon: Sparkles, ring: 'text-violet-300 border-violet-400/40 bg-violet-500/10', grad: 'from-violet-600/40' },
-  ai_models: { label: 'מודלי AI וחידושים', icon: BrainCircuit, ring: 'text-fuchsia-300 border-fuchsia-400/40 bg-fuchsia-500/10', grad: 'from-fuchsia-600/40' },
-  ai_agents: { label: 'בינה מלאכותית', icon: Sparkles, ring: 'text-violet-300 border-violet-400/40 bg-violet-500/10', grad: 'from-violet-600/40' },
+  ai: { label: 'בינה מלאכותית', icon: Asterisk, ring: 'text-brand-300 border-brand-400/40 bg-brand-400/10', grad: 'from-brand-600/30' },
+  ai_models: { label: 'מודלי AI וחידושים', icon: Binary, ring: 'text-brand-300 border-brand-400/40 bg-brand-400/10', grad: 'from-brand-600/30' },
+  ai_agents: { label: 'בינה מלאכותית', icon: Asterisk, ring: 'text-brand-300 border-brand-400/40 bg-brand-400/10', grad: 'from-brand-600/30' },
   general: { label: 'טכנולוגיה', icon: Newspaper, ring: 'text-zinc-300 border-white/20 bg-white/5', grad: 'from-zinc-500/30' },
 };
 

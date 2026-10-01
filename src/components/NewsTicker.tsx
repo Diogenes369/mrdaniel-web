@@ -124,16 +124,16 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
       onClick={() => openRow(row)}
       tabIndex={focusable ? undefined : -1}
       dir="rtl"
-      className="group inline-flex min-w-0 items-center gap-2.5 leading-none text-[13px] md:text-sm text-zinc-300 hover:text-brand-300 transition-colors [unicode-bidi:isolate]"
+      className="group inline-flex min-w-0 items-center gap-2.5 leading-none font-sans text-[13px] md:text-sm text-ink-muted hover:text-brand-400 transition-colors [unicode-bidi:isolate]"
     >
-      <span className="text-brand-500 select-none" aria-hidden="true">•</span>
+      <span className="select-none font-type text-brand-400" aria-hidden="true">+</span>
       <bdi dir="rtl" className={`${truncate ? 'truncate' : 'whitespace-nowrap'} [unicode-bidi:isolate]`}>
         {row.title}
       </bdi>
       {row.stamp && (
         <span
           dir="ltr"
-          className="shrink-0 whitespace-nowrap rounded-full border border-brand-500/25 bg-brand-500/10 px-2 py-0.5 text-[10px] md:text-[11px] font-mono text-brand-300/90 group-hover:border-brand-400/40 [unicode-bidi:isolate]"
+          className="shrink-0 whitespace-nowrap border border-dotted border-[var(--color-rule)] px-1.5 py-0.5 text-[10px] md:text-[11px] font-type text-ink-faint group-hover:border-brand-400/60 group-hover:text-brand-400 [unicode-bidi:isolate]"
         >
           {row.stamp}
         </span>
@@ -149,24 +149,21 @@ export default function NewsTicker({ placement = 'top' }: { placement?: 'top' | 
   const animationDuration = `${Math.max(60, marqueeRows.length * 6)}s`;
 
   const wrapperClass = isTop
-    ? 'news-ticker relative z-30 hidden md:block w-full border-b border-white/10 bg-carbon-950/95 backdrop-blur-sm pt-safe overflow-hidden'
-    : 'news-ticker relative md:hidden mb-8 rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden';
+    ? 'news-ticker relative z-30 hidden md:block w-full border-b border-dotted border-[var(--color-rule)] bg-ground pt-safe overflow-hidden'
+    : 'news-ticker relative md:hidden mb-8 border border-dotted border-[var(--color-rule)] bg-ground overflow-hidden';
 
   return (
     <>
     <div id={isTop ? 'news-ticker-bar' : undefined} className={wrapperClass}>
       {/* LIVE tag (RTL start = right) + gradient mask so items dissolve out from behind it */}
-      <div className="absolute right-0 inset-y-0 z-20 flex items-center gap-2 pr-3 sm:pr-4 pl-10 bg-gradient-to-l from-carbon-950 via-carbon-950 to-transparent">
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
-        </span>
-        <span className="text-[10px] sm:text-[11px] font-mono font-bold uppercase tracking-widest text-brand-300">
-          Live
+      <div className="absolute right-0 inset-y-0 z-20 flex items-center gap-2 pr-3 sm:pr-4 pl-10 bg-gradient-to-l from-ground via-ground to-transparent">
+        <span className="story-statusbar__live" aria-hidden="true" />
+        <span className="font-type text-[10px] sm:text-[11px] font-bold tracking-widest text-brand-400" dir="ltr">
+          LIVE
         </span>
       </div>
       {/* left fade */}
-      <div className="pointer-events-none absolute left-0 inset-y-0 z-10 w-10 bg-gradient-to-r from-carbon-950 to-transparent" />
+      <div className="pointer-events-none absolute left-0 inset-y-0 z-10 w-10 bg-gradient-to-r from-ground to-transparent" />
 
       {reduced ? (
         // Static strip for reduced motion. These were plain <span>s, so a visitor with reduced

@@ -11,23 +11,24 @@ import AgentQualificationModal from './components/AgentQualificationModal';
 import CookieBanner from './components/CookieBanner';
 import CommandPalette from './components/CommandPalette';
 import TerminalCLI from './components/TerminalCLI';
-import { useLenis, triggerRouteTransitionPulse } from './hooks/useLenis';
+import { useLenis } from './hooks/useLenis';
 import { useScrollRestoration } from './hooks/useScrollRestoration';
 import { useDeferredMount } from './hooks/useDeferredMount';
 import { ScrollTrigger } from './lib/gsap';
 import RouteSeo from './components/seo/RouteSeo';
 import { shouldMountScene } from './lib/perfMode';
+import { mountSceneMotion } from './lib/sceneMotion';
 import { useInsightsPrefetch } from './services/newsInsightsService';
 
-// The site's standard background: the R3F cosmic scene. Lazy so its Three.js/R3F bundle stays out
-// of the initial payload until the page is idle (see useDeferredMount).
-// NOTE: the experimental Canvas2D particle / scroll-sequence engine was archived to
-// src/archive/canvas-motion-v2/ (see the README there to restore it).
-const Scene3D = lazy(() => import('./three/Scene3D'));
+// The site's background since 2026-10-01: the glyph field — a live scene rendered as typewriter
+// characters, built from the real AI headlines (raw WebGL2, no 3D engine). Lazy and mounted on idle
+// (useDeferredMount) so it never competes with first paint. It replaced the R3F wireframe scene
+// (src/three/, deleted 2026-10-01).
+const GlyphField = lazy(() => import('./components/field/GlyphField'));
 
 // The tracker pulls in the Firebase SDK (~200KB gzipped) — code-split into its own chunk via
 // dynamic import rather than a static one, so it never bloats the main bundle that every visitor
-// downloads, matching how Scene3D is already lazy-loaded above. Cached so every call site (route
+// downloads, matching how GlyphField is already lazy-loaded above. Cached so every call site (route
 // changes fire this often) reuses the same load rather than re-importing.
 import { loadTracker } from './lib/loadTracker';
 import HomePage from './pages/HomePage';
@@ -81,6 +82,17 @@ function usePrefetchRoutes(enabled: boolean) {
 }
 import ErrorBoundary, { PageErrorFallback } from './components/ErrorBoundary';
 
+/** Mounted as the last child inside the route Suspense boundary, so its effect runs only once the
+ * page chunk has rendered — the desktop scene layer then measures the page that is actually there. */
+function SceneMotionMount() {
+  useEffect(() => {
+    const main = document.querySelector('main');
+    if (!main) return;
+    return mountSceneMotion(main as HTMLElement);
+  }, []);
+  return null;
+}
+
 function RouteScrollManager() {
   const { pathname } = useLocation();
 
@@ -90,7 +102,6 @@ function RouteScrollManager() {
   useScrollRestoration();
 
   useEffect(() => {
-    triggerRouteTransitionPulse();
     loadTracker().then((t) => t.trackPageview(pathname));
     // GSAP pins/triggers need a re-measure after the new route's DOM is in — kept separate from
     // the scroll positioning above.
@@ -140,7 +151,7 @@ export default function App() {
   // the SPA rewrite and <Link to="/"> back-navigation keep working.
   if (/^\/(?:download|g)(?:\/|$)/.test(location.pathname)) {
     return (
-      <div className="relative min-h-screen w-full bg-carbon-950 text-zinc-100 font-sans" dir="rtl">
+      <div className="relative min-h-screen w-full bg-ground text-zinc-100 font-sans" dir="rtl">
         <RouteScrollManager />
         <Suspense fallback={<RouteFallback />}>
           <Routes location={location}>
@@ -155,14 +166,14 @@ export default function App() {
 
   return (
     <div
-      className="relative min-h-screen w-full max-w-full overflow-x-clip bg-carbon-950 text-zinc-100 font-sans selection:bg-brand-500 selection:text-black"
+      className="relative min-h-screen w-full max-w-full overflow-x-clip bg-ground text-zinc-100 font-sans selection:bg-brand-400 selection:text-ground"
       dir="rtl"
     >
       <RouteScrollManager />
       <RouteSeo />
-      {/* Decorative: if the chunk fails to load or WebGL throws, the page simply has no scene. */}
-      <ErrorBoundary name="scene3d" fallback={null}>
-        <Suspense fallback={null}>{sceneReady && sceneAllowed && <Scene3D />}</Suspense>
+      {/* Decorative: if the chunk fails to load or WebGL2 is missing, the page keeps its plain ground. */}
+      <ErrorBoundary name="glyph-field" fallback={null}>
+        <Suspense fallback={null}>{sceneReady && sceneAllowed && <GlyphField />}</Suspense>
       </ErrorBoundary>
       <ScrollProgress />
       {/* Live headline ticker: very top of the layout, above the header, in normal document
@@ -192,6 +203,7 @@ export default function App() {
           <Route path="/accessibility" element={<AccessibilityPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        <SceneMotionMount key={location.pathname} />
         </Suspense>
         </ErrorBoundary>
       </main>
