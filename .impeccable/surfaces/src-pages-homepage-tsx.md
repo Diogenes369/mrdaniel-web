@@ -43,8 +43,8 @@ up, three on phones so the letters are big enough to read; solid green where the
 short laptops, landscape phones, no WebGL), 25-word sub, one sharp primary button at the column's
 foot (never full width: it must clear the phone's floating accessibility button). The pointer is a
 lens: around it the noise stops and becomes readable words. A handwritten note points into the
-noise (desktop only — a phone's first viewport has no free margin). A mono caption at the foot of
-the 100dvh hero states what the background is made of. One human hand = one voice: at most two
+noise (desktop only — a phone's first viewport has no free margin). (The caption that stated what the background is made of was removed on 2026-10-02 at the
+user's request.) One human hand = one voice: at most two
 notes on the page (hero, and the path beat on every screen).
 
 FORM: Challenger adopted by the user (medium-native-ascii-live-scene-render), declined in the roll

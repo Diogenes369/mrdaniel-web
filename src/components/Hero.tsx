@@ -1,13 +1,11 @@
-import { useMemo, type MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { ArrowDown } from 'lucide-react';
 import GlyphButton from './ui/GlyphButton';
 import Depth from './story/Depth';
 import HandNote from './story/HandNote';
 import { HERO_COPY } from '../data/siteCopy';
-import { useNewsFeed, formatRelativeTime } from '../services/newsService';
 import { smoothScrollTo } from '../hooks/useLenis';
 import { rtl } from '../lib/rtl';
-import { selectFieldTitles } from './field/glyphs';
 import { useFieldBeat, useFieldHeadline, useFieldQuiet } from './field/fieldState';
 
 /** Where the single hero action leads: the first beat of the story. */
@@ -32,15 +30,6 @@ export default function Hero() {
   const headline = useFieldHeadline();
   const quietLead = useFieldQuiet();
   const quietBody = useFieldQuiet();
-  const quietBar = useFieldQuiet();
-  const news = useNewsFeed();
-
-  const count = useMemo(() => selectFieldTitles((news.data ?? []).map((n) => n.title)).length, [news.data]);
-  const newest = useMemo(() => {
-    const times = (news.data ?? []).map((n) => new Date(n.publishedAt).getTime()).filter((t) => !Number.isNaN(t));
-    return times.length ? new Date(Math.max(...times)).toISOString() : null;
-  }, [news.data]);
-  const caption = count > 0 ? c.fieldCaption.replace('{n}', String(count)) : c.fieldCaptionNoFeed;
   const accent = rtl(c.h1Accent).split(' ');
 
   const goToStory = (e: MouseEvent<HTMLElement>) => {
@@ -53,7 +42,7 @@ export default function Hero() {
       id="hero"
       ref={beat}
       // From md up the news ticker sits above the header in normal flow; subtracting it keeps the
-      // caption at the foot of the hero inside the first viewport.
+      // whole hero inside the first viewport.
       className="story-hero relative flex min-h-[100dvh] flex-col md:min-h-[calc(100dvh-2.25rem)]"
     >
       <div className="container-wide relative z-10 flex flex-1 items-center pb-14 pt-24 md:pb-6 md:pt-24">
@@ -103,20 +92,6 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* What the background is made of — a caption, not a claim: GlyphField reads the same feed. */}
-      <div className="container-wide relative z-10">
-        <div ref={quietBar} className="story-statusbar">
-          <span className="flex items-center gap-2">
-            <span className="story-statusbar__live" aria-hidden="true" />
-            {rtl(caption)}
-          </span>
-          {newest && (
-            <span className="hidden sm:inline">
-              {c.latest}: {formatRelativeTime(newest)}
-            </span>
-          )}
-        </div>
-      </div>
     </section>
   );
 }

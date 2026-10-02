@@ -8,6 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { backdropMotion, panelMotion } from '../lib/modalMotion';
 import { X, SquareTerminal } from 'lucide-react';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
@@ -312,12 +313,8 @@ export default function TerminalCLI() {
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
-          className="fixed inset-0 z-[120] flex items-stretch justify-center md:items-center md:p-6"
-          style={{ backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', background: 'rgba(3,5,8,0.72)' }}
+          {...backdropMotion}
+          className="modal-backdrop fixed inset-0 z-[120] flex items-stretch justify-center md:items-center md:p-6"
           role="dialog"
           aria-modal="true"
           aria-label="מסוף CLI"
@@ -327,22 +324,15 @@ export default function TerminalCLI() {
           }}
         >
           <motion.div
-            initial={{ y: 24, scale: 0.98 }}
-            animate={{ y: 0, scale: 1 }}
-            exit={{ y: 24, scale: 0.98 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="relative flex h-dvh w-full flex-col overflow-hidden border border-[#8FD400]/25 bg-[#04060a]/95 font-mono text-[13px] leading-relaxed md:h-[min(78dvh,640px)] md:max-w-3xl md:rounded-xl"
+            {...panelMotion}
+            className="modal-panel relative flex h-dvh w-full flex-col overflow-hidden font-mono text-[13px] leading-relaxed md:h-[min(78dvh,640px)] md:max-w-3xl"
             style={windowStyle}
             onMouseDown={() => inputRef.current?.focus()}
           >
             {/* title bar + sticky close (>=44px touch target) */}
-            <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#04060a]/95 px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 md:pt-2">
+            <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-2 border-b border-dotted border-[var(--color-rule)] bg-ground px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 md:pt-2">
               <span className="flex items-center gap-2 truncate text-[#4ade80]">
-                <span className="inline-flex gap-1" aria-hidden="true">
-                  <i className="h-2.5 w-2.5 rounded-full bg-[#f87171]" />
-                  <i className="h-2.5 w-2.5 rounded-full bg-[#fbbf24]" />
-                  <i className="h-2.5 w-2.5 rounded-full bg-[#4ade80]" />
-                </span>
+                <span className="story-statusbar__live" aria-hidden="true" />
                 <span className="truncate text-zinc-400">daniel@mrdaniel:~$</span>
               </span>
               <button

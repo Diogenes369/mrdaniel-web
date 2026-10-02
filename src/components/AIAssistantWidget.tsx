@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { backdropMotion, panelMotion } from '../lib/modalMotion';
 import {
   Terminal,
   X,
@@ -309,22 +310,19 @@ export default function AIAssistantWidget() {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.96 }}
-            transition={{ type: "spring", damping: 26, stiffness: 220 }}
-            className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-3 md:left-6 right-3 md:right-auto z-50 md:w-[460px] max-h-[78dvh] h-[640px] flex flex-col bg-[#0b0c10] border border-white/15 rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.9)] overflow-hidden text-right"
+            {...panelMotion}
+            className="modal-panel fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-3 md:left-6 right-3 md:right-auto z-50 md:w-[460px] max-h-[78dvh] h-[640px] flex flex-col overflow-hidden text-right"
             dir="rtl"
           >
             {/* Widget Top Header — subtle, sleek, no vibrant blocks */}
-            <div className="p-4 md:p-5 bg-[#0D0E12] border-b border-white/10 flex items-center justify-between relative">
+            <div className="p-4 md:p-5 bg-ground border-b border-dotted border-[var(--color-rule)] flex items-center justify-between relative">
               <div className="flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full bg-brand-400 shrink-0" aria-hidden="true" />
+                <span className="story-statusbar__live shrink-0" aria-hidden="true" />
                 <div>
-                  <h3 className="font-tech font-semibold text-sm text-white tracking-wide" dir="ltr">
-                    MR. DANIEL // AI ASSISTANT
+                  <h3 className="modal-title text-lg">
+                    העוזר של דניאל
                   </h3>
-                  <p className="text-zinc-500 text-xs mt-0.5">
+                  <p className="font-sans text-ink-faint text-xs mt-0.5">
                     חדשות AI, מודלים, סוכנים וחוברות
                   </p>
                 </div>
@@ -444,8 +442,8 @@ export default function AIAssistantWidget() {
                     <div
                       className={`max-w-[86%] rounded-2xl p-3.5 md:p-4 text-sm leading-relaxed whitespace-pre-line ${
                         isUser
-                          ? 'bg-brand-500 text-black font-medium shadow-[0_4px_20px_rgba(0,255,102,0.25)] rounded-br-none'
-                          : 'bg-white/[0.07] border border-white/10 text-zinc-100 shadow-md rounded-bl-none'
+                          ? 'bg-brand-500 text-ground font-medium'
+                          : 'border border-dotted border-[var(--color-rule)] bg-ground text-ink-paper'
                       }`}
                     >
                       {renderMessageContent(m.content)}

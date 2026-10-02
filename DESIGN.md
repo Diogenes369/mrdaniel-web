@@ -231,7 +231,7 @@ Site: one green ink on warm carbon, with a green-tinted paper ramp for text. Das
 
 **The Solid Ink Rule.** Text is set in solid colour. No gradient fills across glyphs, on any surface.
 
-**The Real Words Rule.** Every glyph that reads as a word in the field comes from a real headline or a real tool name. Nothing in the background is an invented slogan, and the caption under the hero says what the background is made of.
+**The Real Words Rule.** Every glyph that reads as a word in the field comes from a real headline or a real tool name. Nothing in the background is an invented slogan.
 
 ## Typography
 

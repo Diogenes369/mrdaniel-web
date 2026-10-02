@@ -1573,21 +1573,6 @@ html.perf-lite .gcover-grain {
 html[data-glyph-headline="live"] .glyph-accent {
   color: transparent;
 }
-.story-statusbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-top: 1px dotted var(--color-rule);
-  padding-block: 0.85rem 1.15rem;
-  /* Keep both caption items clear of the floating chat / accessibility buttons parked in the
-     bottom-left corner (inline end, in RTL). */
-  padding-inline: 0 6.5rem;
-  font-family: var(--font-type);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-ink-faint);
-}
 .story-statusbar__live {
   flex: none;
   width: 7px;
@@ -2132,5 +2117,57 @@ html.motion-reduced .glass-chip__dot {
   font-family: var(--font-type);
   font-weight: 700;
   color: var(--color-ink-paper);
+}
+
+/* ── Popups: modals, dialogs and slide-overs (2026-10-02) ───────────────────────────────────
+   One shell for every popup. The backdrop is the field's calm lattice over a deep dim (no blur);
+   the panel is the ground with a hairline green rule and a second, offset registration outline —
+   the same corner language as the glyph button. Motion lives in src/lib/modalMotion.ts. */
+.modal-backdrop {
+  background-color: rgba(10, 11, 9, 0.9);
+  background-image: radial-gradient(rgba(143, 212, 0, 0.14) 0.9px, transparent 1.3px);
+  background-size: 28px 36px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.modal-panel {
+  background-color: var(--color-ground);
+  border: 1px solid rgba(143, 212, 0, 0.3);
+  border-radius: 0;
+  outline: 1px solid rgba(143, 212, 0, 0.12);
+  outline-offset: 5px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85);
+}
+/* Popup headlines speak the site's headline face. */
+.modal-title {
+  font-family: var(--font-headline);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.22;
+  color: var(--color-ink-paper);
+}
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px dotted var(--color-rule);
+  border-radius: 0;
+  background: var(--color-ground);
+  color: var(--color-ink-muted);
+  transition:
+    color 0.2s,
+    border-color 0.2s;
+}
+.modal-close:hover,
+.modal-close:focus-visible {
+  color: var(--color-brand-400);
+  border-style: solid;
+  border-color: rgba(143, 212, 0, 0.6);
+}
+.modal-close:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 3px;
 }
 

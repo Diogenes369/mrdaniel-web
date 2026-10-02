@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { panelMotion } from '../lib/modalMotion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, Shuffle, Search, ListChecks, SquareTerminal } from 'lucide-react';
 import WebButton from './WebButton';
@@ -318,10 +319,7 @@ export default function Header() {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: DRAWER_EXIT_MS / 1000, ease: 'easeInOut' }}
+            {...panelMotion}
             className="fixed inset-0 h-dvh w-full max-w-full overflow-x-hidden bg-ground lg:hidden z-40 flex flex-col"
           >
             {/* Top: logo + close, pt-safe clears the notch/status bar */}

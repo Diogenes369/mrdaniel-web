@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { backdropMotion, panelMotion } from '../../lib/modalMotion';
 import { Download, Loader2, Lock, Mail, User as UserIcon, X } from 'lucide-react';
 import {
   authErrorHe, isInAppBrowser, resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail, type User,
@@ -30,7 +31,6 @@ interface Props {
   onAuthed: (user: User) => void;
 }
 
-const EASE = [0.16, 1, 0.3, 1] as const;
 
 export default function AuthModal({ open, guideSlug, guideTitle, onClose, onAuthed }: Props) {
   const [mode, setMode] = useState<Mode>('signup');
@@ -131,11 +131,8 @@ export default function AuthModal({ open, guideSlug, guideTitle, onClose, onAuth
       {open && (
         <motion.div
           key="auth-backdrop"
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-0 backdrop-blur-md sm:items-center sm:p-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
+          className="modal-backdrop fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-6"
+          {...backdropMotion}
           onMouseDown={(e) => {
             if (e.target === e.currentTarget && !busy) onClose();
           }}
@@ -145,39 +142,25 @@ export default function AuthModal({ open, guideSlug, guideTitle, onClose, onAuth
             role="dialog"
             aria-modal="true"
             aria-labelledby="auth-modal-title"
-            initial={{ opacity: 0, y: 40, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.98 }}
-            transition={{ duration: 0.45, ease: EASE }}
-            className="relative max-h-[100dvh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-carbon-900/95 p-6 pb-8 sm:max-w-md sm:rounded-3xl sm:p-8"
+            {...panelMotion}
+            className="modal-panel relative max-h-[100dvh] w-full overflow-y-auto p-6 pb-8 sm:max-w-md sm:p-8"
           >
-            {/* Top hairline + bloom: the same light language as the guide page's conversion block. */}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-x-8 top-0 h-px"
-              style={{ background: 'linear-gradient(90deg, transparent, rgba(118,185,0,0.8), transparent)' }}
-            />
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -top-24 left-1/2 h-48 w-72 -translate-x-1/2 rounded-full opacity-30 blur-[70px]"
-              style={{ background: 'radial-gradient(circle, #76B900 0%, transparent 70%)' }}
-            />
 
             <button
               type="button"
               onClick={onClose}
               disabled={busy !== null}
               aria-label="סגירה"
-              className="absolute top-4 left-4 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
+              className="modal-close absolute top-4 left-4 cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
 
             <div className="relative">
-              <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-500/30 bg-brand-500/10 text-brand-300">
+              <span className="mb-4 flex h-12 w-12 items-center justify-center border border-dotted border-[var(--color-rule)] text-brand-400">
                 <Download className="h-5 w-5" />
               </span>
-              <h2 id="auth-modal-title" className="font-display text-2xl leading-tight font-extrabold text-white">
+              <h2 id="auth-modal-title" className="modal-title text-2xl">
                 {mode === 'signup' ? 'עוד רגע והמדריך אצלכם' : 'ברוכים השבים'}
               </h2>
               <p className="mt-2 text-[14px] leading-relaxed text-zinc-400">

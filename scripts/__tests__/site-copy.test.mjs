@@ -28,7 +28,7 @@ const words = (s) => s.trim().split(/\s+/).filter(Boolean).length;
 const fields = [];
 const add = (label, text, max) => fields.push([label, text, max]);
 
-const HERO_BUDGET = { h1Lead: 12, sub: 26, fieldCaption: 12, fieldCaptionNoFeed: 10 };
+const HERO_BUDGET = { h1Lead: 12, sub: 26 };
 Object.entries(HERO_COPY).forEach(([k, v]) => add(`hero.${k}`, v, HERO_BUDGET[k] ?? 7));
 ROTATOR_TERMS.forEach((v, i) => add(`rotator[${i}]`, v, 5));
 Object.entries(SERVICES_COPY).forEach(([k, v]) => add(`services.${k}`, v, ['sub', 'closing'].includes(k) ? 22 : 5));

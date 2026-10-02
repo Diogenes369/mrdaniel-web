@@ -26,11 +26,6 @@ export const HERO_COPY = {
   ctaPrimary: 'בואו נתחיל מההתחלה',
   // Handwritten margin note pointing into the background noise. Comments, never claims.
   note: 'זה הרעש. נעבור עליו יחד',
-  // What the moving background is made of — true by construction (GlyphField reads /api/news).
-  // `{n}` is replaced with the number of headlines currently in the field.
-  fieldCaption: 'ברקע: {n} כותרות AI אמיתיות מהימים האחרונים ושמות הכלים עצמם',
-  fieldCaptionNoFeed: 'ברקע: שמות אמיתיים של כלים ומודלים של AI',
-  latest: 'הכותרת האחרונה',
 };
 
 /**

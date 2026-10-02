@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { backdropMotion, panelMotion } from '../lib/modalMotion';
 import {
   X,
   Asterisk,
@@ -261,33 +262,20 @@ export default function AgentQualificationModal() {
 
   return (
     <div className="fixed inset-0 z-[100] flex justify-center items-end md:items-center px-4 md:px-0 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-0">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
-        onClick={close}
-        className="absolute inset-0 bg-black/90"
-      />
+      <motion.div initial={backdropMotion.initial} animate={backdropMotion.animate} onClick={close} className="modal-backdrop absolute inset-0" />
 
-      {/* Signature breathing glow around the card — a plain div with a CSS `animate-pulse`. */}
       <div className="relative w-full max-w-lg">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -inset-1 rounded-[2rem] bg-brand-500/20 blur-2xl animate-pulse"
-        />
-
         <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-          className="relative w-full max-h-[85dvh] md:max-h-[90dvh] flex flex-col bg-[#0b0c10] border border-brand-500/30 shadow-[0_30px_80px_rgba(0,0,0,0.9)] rounded-3xl overflow-hidden"
+          initial={panelMotion.initial}
+          animate={panelMotion.animate}
+          className="modal-panel relative w-full max-h-[85dvh] md:max-h-[90dvh] flex flex-col overflow-hidden"
         >
-              <div className="relative bg-[#0D0E12] border-b border-white/10">
+              <div className="relative bg-ground border-b border-dotted border-[var(--color-rule)]">
                 <ModalHeaderBanner pulse />
 
                 <button
                   onClick={close}
-                  className="absolute top-4 left-4 w-11 h-11 flex items-center justify-center bg-black/40 backdrop-blur-sm text-zinc-300 hover:text-white rounded-full hover:bg-black/60 transition-colors"
+                  className="modal-close absolute top-4 left-4"
                   aria-label="סגירה"
                 >
                   <X size={18} />
@@ -295,12 +283,12 @@ export default function AgentQualificationModal() {
 
                 <div className="relative -mt-7 md:-mt-8 px-6 md:px-8 pb-4">
                   <div className="flex items-center gap-2.5 mb-1 pl-14">
-                    <span className="w-2 h-2 rounded-full bg-brand-400 shrink-0" aria-hidden="true" />
-                    <h3 className="font-display font-black text-xl md:text-2xl text-white">
-                      בואו נמצא לכם <span className="text-brand-500">את הסוכן המושלם</span>
+                    <span className="story-statusbar__live shrink-0" aria-hidden="true" />
+                    <h3 className="modal-title text-xl md:text-2xl">
+                      בואו נמצא לכם <span className="text-brand-400">את הסוכן המושלם</span>
                     </h3>
                   </div>
-                  <p className="text-sm text-zinc-500 mt-1">כמה שאלות קצרות — ותוך פחות מדקה תדעו בדיוק מה הכי מתאים לכם, עם מעבר ישיר לשיחה עם דניאל ב-WhatsApp.</p>
+                  <p className="font-sans text-sm text-ink-muted mt-1">כמה שאלות קצרות — ותוך פחות מדקה תדעו בדיוק מה הכי מתאים לכם, עם מעבר ישיר לשיחה עם דניאל ב-WhatsApp.</p>
 
                   {!result && <Stepper labels={QUESTION_LABELS} step={step} />}
                 </div>
@@ -346,9 +334,9 @@ export default function AgentQualificationModal() {
                           מצאנו את ההתאמה בשבילכם
                         </span>
                       </div>
-                      <div className="bg-black/40 border border-brand-500/30 rounded-2xl p-6 text-center">
+                      <div className="glyph-frame p-6 text-center">
                         <result.icon className={`w-10 h-10 mx-auto mb-3 ${result.accent === 'text-black' ? 'text-brand-400' : result.accent}`} />
-                        <h4 className="font-display text-xl md:text-2xl font-black text-white mb-2">{result.name}</h4>
+                        <h4 className="modal-title text-xl md:text-2xl mb-2">{result.name}</h4>
                         <p className="text-zinc-400 text-sm leading-relaxed mb-4">{result.tagline}</p>
                         <div className="text-3xl font-black text-brand-400 mb-6">₪{result.price.toLocaleString('he-IL')}</div>
 

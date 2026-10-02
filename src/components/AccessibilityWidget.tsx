@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { backdropMotion, panelMotion } from '../lib/modalMotion';
 import {
   Accessibility,
   X,
@@ -252,22 +253,19 @@ export default function AccessibilityWidget() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="a11y-panel-title"
-            initial={{ opacity: 0, y: 30, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.96 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+            {...panelMotion}
             dir={isRtl ? 'rtl' : 'ltr'}
-            className="fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] left-3 md:left-6 right-3 md:right-auto z-[70] md:w-[400px] max-h-[80dvh] flex flex-col bg-[#0b0c10] border border-white/15 rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.9)] overflow-hidden"
+            className="modal-panel fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] left-3 md:left-6 right-3 md:right-auto z-[70] md:w-[400px] max-h-[80dvh] flex flex-col overflow-hidden"
           >
             {/* Header + language switcher */}
-            <div className="p-4 md:p-5 bg-[#0D0E12] border-b border-white/10 shrink-0">
+            <div className="p-4 md:p-5 bg-ground border-b border-dotted border-[var(--color-rule)] shrink-0">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                    <Accessibility className="w-4 h-4 text-white" />
+                  <span className="w-9 h-9 border border-dotted border-[var(--color-rule)] flex items-center justify-center shrink-0">
+                    <Accessibility className="w-4 h-4 text-brand-400" />
                   </span>
                   <div>
-                    <h2 id="a11y-panel-title" className="font-display font-semibold text-sm text-white">
+                    <h2 id="a11y-panel-title" className="modal-title text-lg">
                       {t.title}
                     </h2>
                     <p className="text-zinc-500 text-xs mt-0.5">{t.subtitle}</p>

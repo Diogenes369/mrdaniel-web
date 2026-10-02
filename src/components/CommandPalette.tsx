@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { backdropMotion, panelMotion } from '../lib/modalMotion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { searchEntries, type SearchEntry } from '../lib/searchIndex';
@@ -81,23 +82,14 @@ export default function CommandPalette() {
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[110] flex items-start justify-center pt-[14vh] px-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsOpen(false)}
-            className="absolute inset-0 bg-black/90"
-          />
+          <motion.div {...backdropMotion} onClick={() => setIsOpen(false)} className="modal-backdrop absolute inset-0" />
 
           <motion.div
-            initial={{ opacity: 0, y: -16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -16, scale: 0.97 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 260 }}
-            className="relative w-full max-w-lg bg-[#0D0E12] border border-white/15 shadow-[0_30px_80px_rgba(0,0,0,0.9)] rounded-2xl overflow-hidden"
+            {...panelMotion}
+            className="modal-panel relative w-full max-w-lg overflow-hidden"
             dir="rtl"
           >
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/10">
+            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-dotted border-[var(--color-rule)]">
               <Search className="w-4 h-4 text-zinc-500 shrink-0" />
               <input
                 autoFocus

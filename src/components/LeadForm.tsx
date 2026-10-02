@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { backdropMotion, panelMotion } from '../lib/modalMotion';
 import {
   X,
   Check,
@@ -221,29 +222,20 @@ export default function LeadForm() {
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex justify-center items-end md:items-center px-4 md:px-0 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-0">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={close}
-            className="absolute inset-0 bg-black/90"
-          />
+          <motion.div {...backdropMotion} onClick={close} className="modal-backdrop absolute inset-0" />
 
           <motion.div
-            initial={{ opacity: 0, y: 60, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 60, scale: 0.96 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-            className="relative w-full max-w-lg max-h-[85dvh] md:max-h-[90dvh] flex flex-col bg-[#0b0c10] border border-white/15 shadow-[0_30px_80px_rgba(0,0,0,0.9)] rounded-3xl overflow-hidden"
+            {...panelMotion}
+            className="modal-panel relative w-full max-w-lg max-h-[85dvh] md:max-h-[90dvh] flex flex-col overflow-hidden"
           >
             {/* Header — branded logo banner (see ModalHeaderBanner) shared by every modal on the
                 site, overlapped by the text block below via negative margin. */}
-            <div className="relative bg-[#0D0E12] border-b border-white/10">
+            <div className="relative bg-ground border-b border-dotted border-[var(--color-rule)]">
               <ModalHeaderBanner />
 
               <button
                 onClick={close}
-                className="absolute top-4 left-4 w-11 h-11 flex items-center justify-center bg-black/40 backdrop-blur-sm text-zinc-300 hover:text-white rounded-full hover:bg-black/60 transition-colors"
+                className="modal-close absolute top-4 left-4"
                 aria-label="סגירה"
               >
                 <X size={18} />
@@ -251,14 +243,14 @@ export default function LeadForm() {
 
               <div className="relative -mt-7 md:-mt-8 px-6 md:px-8 pb-4">
               <div className="flex items-center gap-2.5 mb-1 pl-14">
-                <span className="w-2 h-2 rounded-full bg-brand-400 shrink-0" aria-hidden="true" />
+                <span className="story-statusbar__live shrink-0" aria-hidden="true" />
                 {isProductFlow ? (
-                  <h3 className="font-display font-black text-xl md:text-2xl text-white leading-snug">
-                    אפיון וחיבור: <span className="text-brand-500">{product!.name}</span>
+                  <h3 className="modal-title text-xl md:text-2xl">
+                    אפיון וחיבור: <span className="text-brand-400">{product!.name}</span>
                   </h3>
                 ) : (
-                  <h3 className="font-display font-black text-2xl md:text-3xl text-white">
-                    בואו <span className="text-brand-500">נתחיל.</span>
+                  <h3 className="modal-title text-2xl md:text-3xl">
+                    בואו <span className="text-brand-400">נתחיל.</span>
                   </h3>
                 )}
               </div>
@@ -315,7 +307,7 @@ export default function LeadForm() {
                   >
                     <Check className="w-8 h-8 text-brand-400" />
                   </motion.div>
-                  <h4 className="font-display text-2xl font-bold text-white mb-2">קיבלתי. מדבר איתך בקרוב.</h4>
+                  <h4 className="modal-title text-2xl mb-2">קיבלתי. מדבר איתך בקרוב.</h4>
                   <p className="text-zinc-300 text-base leading-relaxed max-w-xs">
                     תודה {form.name.split(' ')[0]} — הפרטים אצלי. אחזור אליך למייל שהשארת, בדרך כלל תוך יום עסקים.
                   </p>

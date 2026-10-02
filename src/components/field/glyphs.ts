@@ -4,8 +4,7 @@
  * The background is a live scene rendered as typewriter characters: tone is made by glyph density
  * (blank → . → : → - → =) and the brightest cells are LETTERS — Hebrew and Latin, taken from real
  * AI headlines and real tool names. That is a product decision, not decoration: the noise the
- * visitor sees behind the hero is literally the week's AI noise, and the caption under the hero
- * says so. Nothing here is a made-up slogan.
+ * visitor sees behind the hero is literally the week's AI noise. Nothing here is a made-up slogan.
  *
  * Index 0 is a space and indices 1–6 are the density ramp; the renderer relies on both.
  */
@@ -32,8 +31,7 @@ export const WORDS_H = WORDS_TEXT_ROWS + 1;
 
 /**
  * Real names and terms only — every one of them is a tool, a model or a word a beginner meets in
- * the first week. No invented hype lines: the caption under the hero promises the background is
- * real, so it has to be.
+ * the first week. No invented hype lines: the background is real, so it has to stay real.
  */
 export const SEED_TERMS: readonly string[] = [
   'ChatGPT', 'Claude', 'Gemini', 'Grok', 'Llama', 'DeepSeek', 'Qwen', 'Mistral', 'Copilot', 'Cursor',

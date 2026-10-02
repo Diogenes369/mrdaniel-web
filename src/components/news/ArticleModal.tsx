@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { backdropMotion, panelMotion } from '../../lib/modalMotion';
 import { X, ExternalLink, Clock, BookOpen, ListChecks, Asterisk, Binary, Newspaper, FileText, type LucideIcon } from 'lucide-react';
 import { formatRelativeTime, readingTimeMin, type NewsItem, type NewsTopic } from '../../services/newsService';
 import { executiveSummary, deepDive, sourceDomain } from '../../lib/newsAnalysis';
@@ -53,11 +54,8 @@ export default function ArticleModal({ item, onClose }: { item: NewsItem | null;
     <AnimatePresence>
       {item && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.16 }}
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-md sm:p-[2.5dvh_2.5vw]"
+          {...backdropMotion}
+          className="modal-backdrop fixed inset-0 z-[9999] flex items-center justify-center sm:p-[2.5dvh_2.5vw]"
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
@@ -94,37 +92,34 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
 
   return (
     <motion.article
-      initial={{ y: 18, opacity: 0, scale: 0.99 }}
-      animate={{ y: 0, opacity: 1, scale: 1 }}
-      exit={{ y: 12, opacity: 0, scale: 0.99 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      {...panelMotion}
       dir="rtl"
-      className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0B0F17] text-right shadow-2xl sm:h-[95dvh] sm:w-[95vw] sm:max-w-[1640px] sm:rounded-3xl sm:border sm:border-white/10 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
+      className="modal-panel relative flex h-[100dvh] w-full flex-col overflow-hidden text-right sm:h-[95dvh] sm:w-[95vw] sm:max-w-[1640px] lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
     >
       <button
         ref={closeRef}
         type="button"
         onClick={onClose}
         aria-label="סגירה"
-        className="absolute left-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white transition-colors hover:bg-black/90 sm:left-4 sm:top-4"
+        className="modal-close absolute left-3 top-3 z-20 sm:left-4 sm:top-4"
       >
         <X className="h-5 w-5" />
       </button>
 
       {/* ── Media + identity column ─────────────────────────────────────────────────────── */}
-      <header className="relative flex shrink-0 flex-col lg:min-h-0 lg:border-l lg:border-white/10">
+      <header className="relative flex shrink-0 flex-col lg:min-h-0 lg:border-l lg:border-dotted lg:border-[var(--color-rule)]">
         <div className="relative h-[24dvh] w-full shrink-0 overflow-hidden sm:h-[30dvh] lg:h-auto lg:min-h-0 lg:flex-1">
           <div className={`absolute inset-0 bg-gradient-to-bl ${t.grad} via-transparent to-transparent`} aria-hidden="true" />
           <Icon className="pointer-events-none absolute -bottom-6 -left-4 h-40 w-40 text-white/[0.06]" aria-hidden="true" />
           <NewsImage key={item.image || ai?.image || 'none'} src={item.image || ai?.image} topic={item.topic} seed={item.id} eager />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/30 to-transparent" aria-hidden="true" />
+          <div className="absolute inset-0 bg-gradient-to-t from-ground via-ground/30 to-transparent" aria-hidden="true" />
         </div>
 
         <div className="relative -mt-10 px-5 pb-4 sm:px-7 lg:mt-0 lg:px-8 lg:pb-7 lg:pt-5">
-          <span className={`mb-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${t.ring}`}>
+          <span className={`mb-3 inline-flex items-center gap-1.5 border border-dotted px-2.5 py-1 font-sans text-[11px] font-bold ${t.ring}`}>
             <Icon className="h-3.5 w-3.5" /> {t.label}
           </span>
-          <h2 className="break-words font-display font-black leading-tight text-white [font-size:clamp(1.15rem,1rem+1.1dvh,2rem)] [text-shadow:0_2px_18px_rgba(0,0,0,0.85)]">
+          <h2 className="modal-title break-words [font-size:clamp(1.3rem,1rem+1.4dvh,2.2rem)] [text-shadow:0_2px_18px_rgba(0,0,0,0.85)]">
             <RtlText>{item.title}</RtlText>
           </h2>
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-zinc-400">
@@ -221,9 +216,8 @@ const SKELETON_ROWS = ['w-11/12', 'w-4/5', 'w-2/3'];
 
 function SectionTitle({ index, icon: Icon, children }: { index: string; icon: LucideIcon; children: ReactNode }) {
   return (
-    <h3 className="mb-[1.2dvh] flex items-center gap-2 font-display text-sm font-black uppercase tracking-wider text-brand-400">
-      <span className="font-mono text-[11px] font-bold text-zinc-600" dir="ltr">{index}</span>
-      <Icon className="h-4 w-4" /> {children}
+    <h3 className="modal-title mb-[1.2dvh] flex items-center gap-2 text-lg !text-brand-400" data-index={index}>
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" /> {children}
     </h3>
   );
 }
