@@ -13,11 +13,13 @@ import {
 } from '../src/agent/firebaseServer.js';
 import { sendOne, sendCampaign, welcomeEmailHtml, wrapBrandedEmail, isEmailConfigured } from '../src/server/emailEngine.js';
 import { findStaticGuide, findCampaignGuide } from '../src/server/leadMagnets.js';
+import { notifyLead } from '../src/server/leadNotify.js';
 
 // Vercel Serverless Function — the site's lead endpoint AND the email engine (folded in here
 // rather than a new `/api/send-email` because Vercel Hobby caps a deployment at 12 functions).
 //
-//   • POST (no `action`)                 → a site lead: store it in `leads`, then email the owner.
+//   • POST (no `action`)                 → a site lead: store it in `leads`, email the owner and ping
+//                                          their phone (src/server/leadNotify.ts, env-configured).
 //   • POST { action: 'qualification' }    → the agent quiz result: store it in `leads`, no email.
 //   • POST { action: 'manychat-lead' }    → ManyChat External Request: save a Comment-to-DM lead.
 //   • POST { action: 'guide-signup' }     → a visitor signed in to download a free guide.
@@ -273,14 +275,23 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  // Instant phone ping (Telegram / Twilio / Green API / webhook — src/server/leadNotify.ts), started
+  // first so it runs in parallel with the store and the SMTP send rather than after them. It never
+  // rejects and is bounded by its own budget; every response below awaits it, because Vercel may
+  // freeze the function as soon as the response is sent. A channel that delivered counts as the lead
+  // reaching the owner, so the visitor is not told to retry when only the database and SMTP failed.
+  const ts = Date.now();
+  const notifying = notifyLead({ name, email, phone, message: notes, project, sourceSection, ts });
+  const delivered = async () => (await notifying).some((r) => r.ok);
+
   // Stored before the email is tried, and whatever happens to it, so a lead still reaches the
   // dashboard when SMTP has a bad day. The browser used to write this copy itself.
-  const leadId = await pushSiteLead({ ...lead, ts: Date.now() });
+  const leadId = await pushSiteLead({ ...lead, ts });
 
   const transporter = getLeadTransporter();
   if (!transporter) {
-    if (leadId) {
-      console.error('[api/leads] SMTP not configured — lead stored but not emailed:', leadId);
+    if (leadId || (await delivered())) {
+      console.error('[api/leads] SMTP not configured — lead not emailed:', leadId ?? 'not stored, notified');
       res.status(200).json({ ok: true, emailed: false });
     } else {
       console.error('[api/leads] SMTP not configured and the lead was not stored:', { name, email, phone, project, sourceSection });
@@ -318,12 +329,13 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!leadId) console.error('[api/leads] lead emailed but not stored in Firebase:', sourceSection);
+    await notifying;
     res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[api/leads] failed to send lead email:', err);
-    // A stored lead is not lost — the owner sees it in the dashboard — so the visitor is not told
-    // to try again.
-    if (leadId) res.status(200).json({ ok: true, emailed: false });
+    // A stored or notified lead is not lost — the owner has it — so the visitor is not told to try
+    // again.
+    if (leadId || (await delivered())) res.status(200).json({ ok: true, emailed: false });
     else res.status(500).json({ ok: false, error: 'send failed' });
   }
 }
