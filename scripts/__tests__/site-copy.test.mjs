@@ -6,7 +6,7 @@
 //   - a placeholder that never got filled,
 //   - rtl() output that is not idempotent or leaves a Latin run un-anchored.
 // Run: npx tsx scripts/__tests__/site-copy.test.mjs
-import { HERO_COPY, STORY_COPY, PROCESS_COPY, ROTATOR_TERMS, SERVICES_COPY, CONTACT_COPY, FOOTER_COPY, ABOUT_COPY } from '../../src/data/siteCopy.ts';
+import { HERO_COPY, STORY_COPY, PROCESS_COPY, ROTATOR_TERMS, SERVICES_COPY, CONTACT_COPY, CONTACT_FORM_COPY, FOOTER_COPY, ABOUT_COPY } from '../../src/data/siteCopy.ts';
 import { AI_GUIDE_HERO, AI_GUIDE_WHAT, AI_GUIDE_PREP, AI_GUIDE_PROCESS, AI_GUIDE_CTA } from '../../src/data/aiAgentGuide.ts';
 import { HOME_OFFERS } from '../../src/data/homeOffers.ts';
 import { SERVICES } from '../../src/data/homeServices.ts';
@@ -34,6 +34,10 @@ ROTATOR_TERMS.forEach((v, i) => add(`rotator[${i}]`, v, 5));
 Object.entries(SERVICES_COPY).forEach(([k, v]) => add(`services.${k}`, v, ['sub', 'closing'].includes(k) ? 22 : 5));
 add('contact.headline', CONTACT_COPY.headline, 8);
 add('contact.sub', CONTACT_COPY.sub, 32);
+// The inline contact form (2026-10-03). `messageLabel` is the one field prompt that asks the visitor
+// a direct question — the operator's own wording, and a form prompt, not a rhetorical question — so
+// it gets every check except the question-mark ban (see the loop below).
+Object.entries(CONTACT_FORM_COPY).forEach(([k, v]) => add(`contactForm.${k}`, v, k === 'messagePlaceholder' ? 14 : 10));
 add('footer.tagline', FOOTER_COPY.tagline, 16);
 add('footer.status', FOOTER_COPY.status, 6);
 add('about.title', ABOUT_COPY.title, 8);
@@ -130,7 +134,7 @@ for (const [label, text, max] of fields) {
   if (typeof text === 'string') t(`${label}: AI-only (no cyber / enterprise)`, !RETIRED.test(text), text);
   t(`${label}: filled`, typeof text === 'string' && text.trim().length > 0 && !text.includes('__'), JSON.stringify(text));
   if (typeof text !== 'string') continue;
-  t(`${label}: no question mark`, !/[?؟]/.test(text), text);
+  if (label !== 'contactForm.messageLabel') t(`${label}: no question mark`, !/[?؟]/.test(text), text);
   t(`${label}: no exclamation mark`, !text.includes('!'), text);
   t(`${label}: no model look-alike hyphens / NBSP / zero-width`, !LOOKALIKE.test(text), JSON.stringify(text));
   const hit = BANNED.find((b) => text.includes(b));

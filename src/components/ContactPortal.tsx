@@ -1,33 +1,29 @@
-import { ArrowLeft } from 'lucide-react';
-import GlyphButton from './ui/GlyphButton';
+import ContactInlineForm from './ContactInlineForm';
 import { CONTACT_COPY } from '../data/siteCopy';
 import { rtl } from '../lib/rtl';
 import { useFieldQuiet } from './field/fieldState';
 
 /**
- * Site outro (rewritten 2026-10-01 for the glyph world): the closing headline in the headline face,
- * the plain promise under it, and one sharp button that opens the lead form. It replaced a round
- * dial-shaped button inside a rotating dashed ring — the redesign has no round controls.
+ * Site outro (rewritten 2026-10-01 for the glyph world): the closing headline in the headline face
+ * and the plain promise under it. Since 2026-10-03 the lead form sits open beside them (under them
+ * on phones) instead of behind a "בואו נדבר" button — a visitor who reached the end of the story has
+ * already decided; one more click to see a form was a step for nothing. The header's contact button
+ * still opens the modal (LeadForm.tsx) from anywhere else on the site.
  */
 export default function ContactPortal() {
-  const quiet = useFieldQuiet();
-  const handleClick = () => {
-    window.dispatchEvent(
-      new CustomEvent('open-lead-modal', { detail: { subject: 'יצירת קשר', sourceSection: 'Contact Portal' } })
-    );
-  };
+  const quietText = useFieldQuiet();
+  const quietForm = useFieldQuiet();
 
   return (
     <section id="contact-portal" className="relative py-32 md:py-48">
       <div className="container-wide">
-        <div ref={quiet} className="max-w-3xl">
-          <h2 className="story-h2">{rtl(CONTACT_COPY.headline)}</h2>
-          <p className="story-body mt-6">{rtl(CONTACT_COPY.sub)}</p>
-          <div className="mt-10">
-            <GlyphButton onClick={handleClick} aria-label="פתיחת טופס יצירת קשר">
-              בואו נדבר
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            </GlyphButton>
+        <div className="grid grid-cols-1 items-start gap-12 lg:grid-cols-12 lg:gap-14">
+          <div ref={quietText} className="lg:col-span-5 lg:pt-10">
+            <h2 className="story-h2">{rtl(CONTACT_COPY.headline)}</h2>
+            <p className="story-body mt-6">{rtl(CONTACT_COPY.sub)}</p>
+          </div>
+          <div ref={quietForm} className="min-w-0 lg:col-span-7">
+            <ContactInlineForm />
           </div>
         </div>
       </div>

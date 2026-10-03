@@ -158,6 +158,28 @@ export const CONTACT_COPY = {
   sub: 'אני עונה בעצמי, לא מוקד ולא בוט. ספרו לי מה חוזר אצלכם כל יום, ואגיד לכם בכנות אם סוכן יכול לקחת את זה.',
 };
 
+/**
+ * The inline contact form under CONTACT_COPY (2026-10-03 — it replaced the button that opened the
+ * lead modal). One field takes a phone OR an email; /api/leads accepts either.
+ */
+export const CONTACT_FORM_COPY = {
+  bar: 'הודעה ישירה אליי',
+  nameLabel: 'שם מלא',
+  namePlaceholder: 'איך לפנות אליכם',
+  contactLabel: 'טלפון / אימייל',
+  messageLabel: 'מה תרצו לחבר או לייעל?',
+  messagePlaceholder: 'למשל: מענה ללקוחות בוואטסאפ, סיכום מיילים, חיבור בין היומן לטפסים',
+  submit: 'שליחה',
+  submitting: 'שולח',
+  privacy: 'מדיניות הפרטיות',
+  nameError: 'כתבו שם, כדי שאדע איך לפנות אליכם',
+  contactError: 'צריך טלפון או אימייל תקין כדי שאוכל לחזור אליכם',
+  sendError: 'השליחה לא עברה. נסו שוב, או כתבו לי ישירות',
+  successTitle: 'קיבלתי, תודה',
+  successBody: 'הפרטים אצלי ואני עונה בעצמי, בדרך כלל תוך יום עסקים.',
+  again: 'לשלוח הודעה נוספת',
+};
+
 export const FOOTER_COPY = {
   tagline: 'לומדים AI בעברית פשוטה, צעד אחרי צעד: חדשות, מדריכים והסברים בגובה העיניים.',
   status: 'חדשות AI מתעדכנות כל יום',

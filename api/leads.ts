@@ -45,6 +45,8 @@ function isAdminAuthorized(req: any): boolean {
 }
 
 const isEmail = (s: unknown): s is string => typeof s === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
+/** 9–15 digits: an Israeli number with its leading 0 (landline or mobile) or an international one. */
+const isPhone = (s: unknown): s is string => typeof s === 'string' && /^\d{9,15}$/.test(s.replace(/\D/g, ''));
 
 /** A site-form field as a trimmed, capped string; '' when absent or not a string. */
 function formText(v: unknown, max: number): string {
@@ -260,9 +262,14 @@ export default async function handler(req: any, res: any) {
 
   // ---- Site lead: store it for the dashboard, then email the owner --------------------------
   const lead = siteLeadFields(body);
+  // A way to reply is required, not specifically an email (2026-10-03): the homepage contact form
+  // takes "phone OR email" in one field, and a visitor who leaves only a phone is still a lead. An
+  // unusable email is stored as '' — the same as a ManyChat lead without one — so campaigns, which
+  // drop empty recipients, never mail it.
+  if (!isEmail(lead.email)) lead.email = '';
   const { name, email, phone, project, notes, sourceSection, selectedProduct, productCategory, price, userCompanySize } = lead;
-  if (!name || !isEmail(email)) {
-    res.status(400).json({ ok: false, error: 'missing name/email' });
+  if (!name || (!email && !isPhone(phone))) {
+    res.status(400).json({ ok: false, error: 'missing name/contact' });
     return;
   }
 
@@ -291,9 +298,9 @@ export default async function handler(req: any, res: any) {
     await transporter.sendMail({
       from: `"אתר דניאל בן ברוך" <${process.env.SMTP_USER}>`,
       to: LEAD_EMAIL_TO,
-      replyTo: email,
+      replyTo: email || undefined,
       subject: `${subjectPrefix}: ${name}`,
-      text: `שם: ${name}\nאימייל: ${email}\nטלפון: ${phone || '-'}\nמקור הפנייה: ${sourceSection || '-'}\nפרויקט: ${project || '-'}${productLines}\nהערות:\n${notes || '-'}`,
+      text: `שם: ${name}\nאימייל: ${email || '-'}\nטלפון: ${phone || '-'}\nמקור הפנייה: ${sourceSection || '-'}\nפרויקט: ${project || '-'}${productLines}\nהערות:\n${notes || '-'}`,
     });
 
     // Auto-welcome the lead too, if enabled.

@@ -1777,6 +1777,112 @@ html[data-glyph-headline="live"] .glyph-accent {
   border: 1px solid rgba(143, 212, 0, 0.55);
 }
 
+/* ── Inline contact form (2026-10-03) ─────────────────────────────────────────────────────── */
+/* Terminal-ish without costume: dotted hairline fields on a ground darker than the frame, a solid
+   green rule and a reading-start accent bar on focus. 16px input text everywhere — under that,
+   iOS zooms the page on focus. */
+.contact-form__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.1rem;
+  border-bottom: 1px dotted var(--color-rule);
+  font-family: var(--font-type);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+}
+.term-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-family: var(--font-type);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+  transition: color 0.15s;
+}
+.term-row:focus-within .term-label {
+  color: var(--color-brand-400);
+}
+.term-field {
+  display: block;
+  width: 100%;
+  padding: 0.8rem 0.95rem;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-ink-paper);
+  caret-color: var(--color-brand-400);
+  background: rgba(4, 5, 4, 0.88);
+  border: 1px dotted var(--color-rule);
+  border-radius: 0;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    box-shadow 0.15s;
+}
+textarea.term-field {
+  min-height: 7.5rem;
+  resize: vertical;
+}
+.term-field::placeholder {
+  color: var(--color-ink-faint);
+  opacity: 1;
+}
+.term-field:hover {
+  border-color: rgba(143, 212, 0, 0.55);
+}
+.term-field:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--color-brand-500);
+  background: rgba(118, 185, 0, 0.05);
+  /* The accent bar sits on the right: the edge a Hebrew line starts from. */
+  box-shadow: inset -3px 0 0 var(--color-brand-500);
+}
+.term-field[aria-invalid='true'] {
+  border-style: solid;
+  border-color: #f87171;
+}
+.term-field:-webkit-autofill,
+.term-field:-webkit-autofill:hover,
+.term-field:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-ink-paper);
+  box-shadow: inset 0 0 0 100px #0d100b;
+  transition: background-color 9999s;
+}
+.term-error {
+  margin-top: 0.45rem;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #fca5a5;
+}
+.contact-form__sent-title {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: clamp(1.4rem, 1.2rem + 0.8vw, 1.85rem);
+  color: var(--color-ink-paper);
+  outline: none;
+}
+.contact-form__sent-title::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 0.8em;
+  margin-inline-end: 0.6rem;
+  background: var(--color-brand-400);
+}
+.contact-form__caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  background: currentColor;
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+html.motion-reduced .contact-form__caret {
+  animation: none;
+}
+
 /* ── Jargon → plain Hebrew ────────────────────────────────────────────────────────────────── */
 .decode-row {
   display: flex;
