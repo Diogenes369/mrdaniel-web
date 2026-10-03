@@ -1,20 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import type { ModelVendor } from '../data/aiAgents';
+import { SEED_FRONTIER, SEED_MODELS, SEED_SYNCED_AT, type ModelEntry } from '../data/modelSeed';
 
 /**
  * The live model catalog written by ModelUpdateAgent (src/server/agents/modelUpdateAgent.ts),
- * served at `/api/news?action=models`. Mirrors that module's `ModelEntry` / `ModelCatalog`.
- *
- * `SEED_FRONTIER` duplicates the server seed so the site shows correct names even before the
- * endpoint answers (first paint, offline, an old deployment without the action). Verified
- * 2026-09-23 against OpenRouter's index and each lab's announcement.
+ * served at `/api/news?action=models`. Mirrors that module's `ModelCatalog`; the entry type and the
+ * seed are shared with it (src/data/modelSeed.ts), so the site shows correct names even before the
+ * endpoint answers (first paint, offline, an old deployment without the action).
  */
-export interface ModelEntry {
-  id: string;
-  name: string;
-  vendor: string;
-  releasedAt: string;
-}
+export type { ModelCap, ModelEntry } from '../data/modelSeed';
+export { SEED_FRONTIER };
 
 export interface ModelCatalog {
   frontier: ModelEntry[];
@@ -23,14 +18,7 @@ export interface ModelCatalog {
   source: 'openrouter' | 'snapshot' | 'seed';
 }
 
-export const SEED_FRONTIER: ModelEntry[] = [
-  { id: 'openai/gpt-6-luna', name: 'GPT-6 Luna', vendor: 'OpenAI', releasedAt: '2026-09-22' },
-  { id: 'anthropic/claude-opus-5.5', name: 'Claude Opus 5.5', vendor: 'Anthropic', releasedAt: '2026-09-22' },
-  { id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash', vendor: 'Google', releasedAt: '2026-09-02' },
-  { id: 'x-ai/grok-4.7', name: 'Grok 4.7', vendor: 'xAI', releasedAt: '2026-09-21' },
-];
-
-const SEED: ModelCatalog = { frontier: SEED_FRONTIER, models: SEED_FRONTIER, syncedAt: Date.parse('2026-09-23T00:00:00Z'), source: 'seed' };
+const SEED: ModelCatalog = { frontier: SEED_FRONTIER, models: SEED_MODELS, syncedAt: SEED_SYNCED_AT, source: 'seed' };
 
 async function fetchCatalog(): Promise<ModelCatalog> {
   try {

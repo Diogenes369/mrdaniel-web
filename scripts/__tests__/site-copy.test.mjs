@@ -61,6 +61,8 @@ for (const [beat, block] of Object.entries(STORY_COPY)) {
     if (typeof v === 'string') add(`story.${beat}.${k}`, v, k === 'body' ? 30 : k === 'note' ? 6 : 10);
   }
 }
+// The model board's capability tags (2026-10-03): short labels on a narrow card.
+Object.entries(STORY_COPY.noise.caps).forEach(([k, v]) => add(`story.noise.caps.${k}`, v, 3));
 STORY_COPY.order.pairs.forEach((p, i) => {
   add(`story.order.pairs[${i}].term`, p.term, 4);
   add(`story.order.pairs[${i}].plain`, p.plain, 10);

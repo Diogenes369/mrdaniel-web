@@ -22,17 +22,9 @@
  * no snapshot the verified seed below — the list is never empty and never invented.
  */
 import { readSyncSnapshot, writeSyncSnapshot } from '../../agent/firebaseServer.js';
+import { SEED_FRONTIER, SEED_MODELS, SEED_SYNCED_AT, type ModelCap, type ModelEntry } from '../../data/modelSeed.js';
 
-export interface ModelEntry {
-  /** OpenRouter id, e.g. `openai/gpt-6-luna`. */
-  id: string;
-  /** Display name without the vendor prefix, e.g. `GPT-6 Luna`. */
-  name: string;
-  vendor: string;
-  /** ISO date (YYYY-MM-DD) the model became available. */
-  releasedAt: string;
-  contextLength?: number;
-}
+export type { ModelCap, ModelEntry };
 
 export interface ModelCatalog {
   /** The newest model of each frontier lab — what the site names as "current". */
@@ -55,6 +47,10 @@ const VENDORS: Array<{ prefix: string; label: string; frontier: boolean }> = [
   { prefix: 'deepseek', label: 'DeepSeek', frontier: false },
   { prefix: 'mistralai', label: 'Mistral', frontier: false },
   { prefix: 'qwen', label: 'Qwen', frontier: false },
+  // Added 2026-10-03 for the homepage model board: both ship open-weight frontier-class models
+  // monthly and are what a learner meets next after the big four.
+  { prefix: 'moonshotai', label: 'Moonshot AI', frontier: false },
+  { prefix: 'z-ai', label: 'Z.ai', frontier: false },
 ];
 
 /** Variants that are the same model on a different billing/serving path, or not a chat model. */
@@ -67,27 +63,13 @@ const EXCLUDE_NAME = new RegExp(`\\(batch\\)|^OpenAI: .+ Pro$|${VARIANT.source}`
 const PER_VENDOR = 3;
 
 /**
- * Verified 2026-09-23 against OpenRouter and each lab's announcement. Served only when there has
- * never been a successful sync — the first run replaces it.
+ * Served only when there has never been a successful sync — the first run replaces it. Lives in
+ * src/data/modelSeed.ts because the site paints the same list before the endpoint answers.
  */
 export const SEED_CATALOG: ModelCatalog = {
-  frontier: [
-    { id: 'openai/gpt-6-luna', name: 'GPT-6 Luna', vendor: 'OpenAI', releasedAt: '2026-09-22' },
-    { id: 'anthropic/claude-opus-5.5', name: 'Claude Opus 5.5', vendor: 'Anthropic', releasedAt: '2026-09-22' },
-    { id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash', vendor: 'Google', releasedAt: '2026-09-02' },
-    { id: 'x-ai/grok-4.7', name: 'Grok 4.7', vendor: 'xAI', releasedAt: '2026-09-21' },
-  ],
-  models: [
-    { id: 'openai/gpt-6-luna', name: 'GPT-6 Luna', vendor: 'OpenAI', releasedAt: '2026-09-22' },
-    { id: 'openai/gpt-6-sol', name: 'GPT-6 Sol', vendor: 'OpenAI', releasedAt: '2026-09-22' },
-    { id: 'openai/gpt-6-astra', name: 'GPT-6 Astra', vendor: 'OpenAI', releasedAt: '2026-09-04' },
-    { id: 'anthropic/claude-opus-5.5', name: 'Claude Opus 5.5', vendor: 'Anthropic', releasedAt: '2026-09-22' },
-    { id: 'anthropic/claude-fable-5.1', name: 'Claude Fable 5.1', vendor: 'Anthropic', releasedAt: '2026-09-01' },
-    { id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash', vendor: 'Google', releasedAt: '2026-09-02' },
-    { id: 'x-ai/grok-4.7', name: 'Grok 4.7', vendor: 'xAI', releasedAt: '2026-09-21' },
-    { id: 'meta/muse-spark-1.3', name: 'Muse Spark 1.3', vendor: 'Meta', releasedAt: '2026-09-02' },
-  ],
-  syncedAt: Date.parse('2026-09-23T00:00:00Z'),
+  frontier: SEED_FRONTIER,
+  models: SEED_MODELS,
+  syncedAt: SEED_SYNCED_AT,
   source: 'seed',
 };
 
@@ -101,6 +83,37 @@ interface RawModel {
   name?: unknown;
   created?: unknown;
   context_length?: unknown;
+  architecture?: { input_modalities?: unknown };
+  supported_parameters?: unknown;
+  hugging_face_id?: unknown;
+}
+
+/** The labs' own speed/price tier words, matched as whole id segments (`flash-lite`, `glm-5.3-flashx`). */
+const FAST_TIER = /(?:^|-)(?:flash|flashx|lite|mini|nano|haiku|small|air|turbo)(?=-|$)/i;
+const CODE_MODEL = /cod(?:e|er)|devstral|codestral/i;
+
+/**
+ * Pure: what a model is good at, from the index's structured metadata only. Each cap has exactly one
+ * signal, so a card's tags are checkable against OpenRouter rather than a reading of marketing copy
+ * (every description there says "agentic coding", which makes descriptions useless as a signal):
+ *   code      — the lab ships it as a coding model (the id says so: `kimi-k2.7-code`, `devstral`)
+ *   fast      — the lab's speed/price tier (`flash`, `lite`, `mini`, `small`…)
+ *   reasoning — the endpoint accepts a `reasoning` parameter (a thinking mode)
+ *   video     — video is an accepted input modality
+ *   open      — the index links downloadable weights (`hugging_face_id`)
+ * Ordered primary-first: what the model is FOR (code, fast, reasoning) before what it also has.
+ */
+export function deriveCaps(r: RawModel): ModelCap[] {
+  const slug = (typeof r.id === 'string' ? r.id : '').split('/')[1] ?? '';
+  const params = Array.isArray(r.supported_parameters) ? r.supported_parameters : [];
+  const inputs = Array.isArray(r.architecture?.input_modalities) ? r.architecture.input_modalities : [];
+  const caps: ModelCap[] = [];
+  if (CODE_MODEL.test(slug)) caps.push('code');
+  if (FAST_TIER.test(slug)) caps.push('fast');
+  if (params.includes('reasoning')) caps.push('reasoning');
+  if (inputs.includes('video')) caps.push('video');
+  if (typeof r.hugging_face_id === 'string' && r.hugging_face_id.trim()) caps.push('open');
+  return caps;
 }
 
 /** Pure: raw OpenRouter rows → catalog. Exported for the regression test. */
@@ -120,6 +133,7 @@ export function curateModels(rows: RawModel[], now = Date.now()): ModelCatalog {
       vendor: vendor.label,
       releasedAt: new Date(created * 1000).toISOString().slice(0, 10),
       contextLength: Number(r.context_length) || undefined,
+      caps: deriveCaps(r),
     };
     const list = byVendor.get(vendor.label) ?? [];
     list.push(entry);

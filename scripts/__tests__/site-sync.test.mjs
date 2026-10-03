@@ -3,7 +3,7 @@
 // wiring that makes them run without a human (cron, local worker, API actions, no new function).
 // Run: npx tsx scripts/__tests__/site-sync.test.mjs
 import fs from 'node:fs';
-import { curateModels, SEED_CATALOG } from '../../src/server/agents/modelUpdateAgent.ts';
+import { curateModels, deriveCaps, SEED_CATALOG } from '../../src/server/agents/modelUpdateAgent.ts';
 import { parseLinktree } from '../../src/server/agents/socialSyncAgent.ts';
 import { SEED_FRONTIER } from '../../src/services/modelCatalogService.ts';
 import { AI_AGENTS } from '../../src/data/aiAgents.ts';
@@ -44,8 +44,28 @@ t('models · Meta tracked but not in the frontier row', cat.models.some((m) => m
 t('models · release date kept', cat.models.find((m) => m.id === 'x-ai/grok-4.7')?.releasedAt === '2026-09-21');
 t('models · empty index → empty catalog (caller keeps the snapshot)', curateModels([]).frontier.length === 0);
 
-// Client seed and server seed must name the same frontier models.
+// Capabilities (2026-10-03, homepage model board): one structured index signal per tag, never prose.
+const caps = (o) => deriveCaps(o).join(',');
+t('caps · reasoning = the endpoint takes a `reasoning` parameter', caps({ id: 'x-ai/grok-4.7', supported_parameters: ['tools', 'reasoning'] }) === 'reasoning');
+t('caps · fast = the lab tier word as an id segment', caps({ id: 'google/gemini-3.5-flash-lite' }) === 'fast' && caps({ id: 'z-ai/glm-5.3-flashx' }) === 'fast');
+t('caps · a tier word inside another word is not a tier ("muse-spark", "flashpoint")', caps({ id: 'meta/muse-spark-1.3' }) === '' && caps({ id: 'acme/flashpoint-2' }) === '');
+t('caps · code = a coding model by id', caps({ id: 'moonshotai/kimi-k2.7-code' }) === 'code' && caps({ id: 'mistralai/devstral-2512' }) === 'code');
+t('caps · video = video is an accepted input', caps({ id: 'meta/muse-spark-1.3', architecture: { input_modalities: ['text', 'image', 'video'] } }) === 'video');
+t('caps · image input alone is not "video"', caps({ id: 'openai/gpt-6.1-sol', architecture: { input_modalities: ['text', 'image', 'file'] } }) === '');
+t('caps · open = the index links downloadable weights', caps({ id: 'deepseek/deepseek-v4.1-flash', hugging_face_id: 'deepseek-ai/DeepSeek-V4.1-Flash' }) === 'fast,open');
+t('caps · an empty hugging_face_id is not open weights', caps({ id: 'openai/gpt-6.1-sol', hugging_face_id: '' }) === '');
+t('caps · primary focus first (code, fast, reasoning) before what it also has', caps({ id: 'z-ai/glm-5.3-flash', supported_parameters: ['reasoning'], architecture: { input_modalities: ['video'] }, hugging_face_id: 'zai-org/GLM-5.3-Flash' }) === 'fast,reasoning,video,open');
+t('caps · malformed rows never throw', caps({}) === '' && caps({ id: 42, supported_parameters: 'reasoning', architecture: null }) === '');
+t('caps · curateModels attaches them', curateModels([{ id: 'google/gemini-3.8-flash', name: 'Google: Gemini 3.8 Flash', created: ts('2026-09-02'), supported_parameters: ['reasoning'] }]).models[0]?.caps?.join(',') === 'fast,reasoning');
+t('models · newer labs tracked (Moonshot AI, Z.ai)', curateModels([
+  { id: 'moonshotai/kimi-k3', name: 'MoonshotAI: Kimi K3', created: ts('2026-07-16') },
+  { id: 'z-ai/glm-5.3-prime', name: 'Z.ai: GLM 5.3 Prime', created: ts('2026-09-23') },
+]).models.map((m) => m.vendor).join() === 'Moonshot AI,Z.ai');
+
+// One seed, shared by the server agent and the site (src/data/modelSeed.ts).
 t('seed · client and server frontier agree', JSON.stringify(SEED_FRONTIER.map((m) => m.name)) === JSON.stringify(SEED_CATALOG.frontier.map((m) => m.name)));
+t('seed · frontier = the newest model of each frontier lab', SEED_CATALOG.frontier.every((f) => !SEED_CATALOG.models.some((m) => m.vendor === f.vendor && m.releasedAt > f.releasedAt)));
+t('seed · every entry carries its capabilities', SEED_CATALOG.models.every((m) => Array.isArray(m.caps)));
 
 // ── SocialSyncAgent.parseLinktree ───────────────────────────────────────────────────────────
 const tree = (links) => `<html><script id="x" type="application/json">${JSON.stringify({ props: { pageProps: { account: { links } } } })}</script></html>`;

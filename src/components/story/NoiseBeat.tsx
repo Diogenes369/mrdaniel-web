@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ChevronDown, ChevronLeft } from 'lucide-react';
 import Depth from './Depth';
+import ModelBoard from './ModelBoard';
 import ArticleModal from '../news/ArticleModal';
 import { STORY_COPY } from '../../data/siteCopy';
 import { useNewsFeed, formatRelativeTime, type NewsItem } from '../../services/newsService';
@@ -22,7 +23,8 @@ const ROW_H = 'min-h-[76px]';
 
 /**
  * First beat of the story: name the overwhelm, then prove it with the real thing — the model and
- * tool launches of the last few days, straight from the news feed, and the newest model per lab.
+ * tool launches of the last few days, straight from the news feed, and the live model board
+ * (ModelBoard: every current model of ten labs, filterable by lab and capability).
  * (This is the model-updates console that used to sit in the hero, moved to where it is evidence.)
  */
 export default function NoiseBeat() {
@@ -43,7 +45,6 @@ export default function NoiseBeat() {
     return [...(news.data ?? [])].filter(isLaunch).sort((a, b) => ts(b.publishedAt) - ts(a.publishedAt)).slice(0, ROWS_EXPANDED);
   }, [news.data]);
   const rows = expanded ? launches : launches.slice(0, ROWS);
-  const frontier = (catalog?.frontier ?? []).slice(0, 4);
 
   return (
     <section id="story" ref={beat} className="story-beat">
@@ -58,19 +59,7 @@ export default function NoiseBeat() {
 
           <Depth speed={0.16} className="lg:col-span-7 lg:pt-28">
             <div ref={quietLog} className="space-y-8">
-              <div>
-                <h3 className="story-h3">{rtl(c.modelsTitle)}</h3>
-                <ul className="mt-3 grid grid-cols-2 gap-px bg-[var(--color-rule)] sm:grid-cols-4">
-                  {frontier.map((m) => (
-                    <li key={m.id} className="bg-ground px-3.5 py-3">
-                      <span className="block text-[11px] text-ink-faint">{m.vendor}</span>
-                      <bdi dir="ltr" className="block break-words font-type text-[14px] font-bold leading-snug text-ink-paper">
-                        {m.name}
-                      </bdi>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <ModelBoard catalog={catalog} />
 
               <div className="glyph-frame">
                 <div className="flex items-center justify-between gap-3 border-b border-dotted border-[var(--color-rule)] px-4 py-3">
