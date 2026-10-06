@@ -292,7 +292,7 @@ export default function JarvisPage() {
             title="מה הוא יודע לעשות"
             description="שלושה דברים עיקריים: לדבר איתכם, לסדר לכם את העבודה, ולשלוט במכשירים בבית ובמשרד."
           />
-          <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-16 md:mb-24">
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-16 md:mb-24" data-live="stagger">
             {CAPABILITIES.map((group) => (
               <CapCard key={group.title} group={group} />
             ))}
@@ -341,7 +341,7 @@ export default function JarvisPage() {
             title="מה זה נותן לכם"
             description="בשורה התחתונה: יותר זמן לדברים שרק אתם יכולים לעשות."
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-16 md:mb-24">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-16 md:mb-24" data-live="stagger">
             {CUSTOMER_BENEFITS.map((benefit) => (
               <div
                 key={benefit}
@@ -372,7 +372,7 @@ export default function JarvisPage() {
             title="איפה הוא רץ"
             description="שתי אפשרויות. רוב האנשים מתחילים בענן."
           />
-          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16 md:mb-24">
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-16 md:mb-24" data-live="stagger">
             {DEPLOYMENT_OPTIONS.map((opt) => (
               <ReqCard key={opt.title} opt={opt} />
             ))}

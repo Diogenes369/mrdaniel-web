@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import GlyphButton from './ui/GlyphButton';
+import SiteBot from './bots/SiteBot';
 import { useFieldQuiet } from './field/fieldState';
 
 // Key and values unchanged: the tracker and returning visitors read them.
@@ -48,17 +49,26 @@ export default function CookieBanner() {
           role="dialog"
           aria-live="polite"
           aria-label="הודעה על עוגיות"
-          className="glyph-frame fixed inset-x-4 bottom-4 z-50 !bg-ground p-5 font-type sm:inset-x-auto sm:bottom-28 sm:left-6 sm:w-[24rem]"
+          className="glyph-frame fixed inset-x-3 bottom-3 z-50 !bg-ground px-4 py-3.5 font-type sm:inset-x-auto sm:bottom-28 sm:left-6 sm:w-[24rem] sm:p-5"
         >
-          <p className="poster text-[1.35rem] text-ink-paper">עוגיות, בקצרה</p>
-          <p className="mt-2 font-sans text-[15px] leading-relaxed text-ink-muted">
-            האתר משתמש בעוגיות כדי להבין אילו עמודים עוזרים ולתקן תקלות. אפשר גם לסרב.{' '}
-            <Link to="/privacy" className="story-link text-[13px]">
-              מדיניות הפרטיות
-            </Link>
-          </p>
-          <div className="mt-5 flex items-center gap-5">
-            <GlyphButton onClick={() => close('accepted')} className="!min-h-11 !px-6 !text-[14px]">
+          {/* Slim on a phone (2026-10-06): it used to cover a third of the screen on first visit. A
+              bot from the crew holds it, so even the cookie notice belongs to the site. */}
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex-none sm:hidden">
+              <SiteBot shape="circle" tone="ink" mood="happy" size={40} hop="tap" />
+            </span>
+            <div className="min-w-0">
+              <p className="poster text-[1.15rem] text-ink-paper sm:text-[1.35rem]">עוגיות, בקצרה</p>
+              <p className="mt-1 font-sans text-[14px] leading-normal text-ink-muted sm:mt-2 sm:text-[15px] sm:leading-relaxed">
+                האתר משתמש בעוגיות כדי להבין אילו עמודים עוזרים ולתקן תקלות. אפשר גם לסרב.{' '}
+                <Link to="/privacy" className="story-link text-[13px]">
+                  מדיניות הפרטיות
+                </Link>
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-5 sm:mt-5">
+            <GlyphButton onClick={() => close('accepted')} className="!min-h-10 !px-5 !text-[14px] sm:!min-h-11 sm:!px-6">
               אישור
             </GlyphButton>
             <button type="button" onClick={() => close('rejected')} className="story-link text-[14px]">

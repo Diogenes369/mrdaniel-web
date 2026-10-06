@@ -191,7 +191,7 @@ The public site is the AI world as a learner actually meets it: a full-bleed wal
 
 The system spans three surfaces. The **public site** (`src/`) is The Sorted Noise; its homepage hero and story beats (`Hero`, `NoiseBeat`, `OrderBeat`, `PathBeat`, `StartBeat`), the shared `GlyphButton`, the cookie notice and the background field are built in it. The **operator dashboard** (`dashboard/`) and the **canvas-rendered carousels and 9:16 videos** (`dashboard/src/lib/*Renderer.ts`, `designAssets.ts`) remain **"The Annotated Workbench"**: dark carbon, one green signal, real tools on the table, a person's handwriting in the margin. The two share the green hue, condensed Noto Sans Hebrew headlines, the Playpen hand and the no-invented-facts stance, so they read as one product.
 
-**Known gap.** The rest of the public site has not moved yet: the lower homepage sections (offers, terms, process, services, tech marquee, contact), every other route, and the header/ticker chrome still wear the previous neon/glass/pill look. That look is not current site guidance; it is pending migration into The Sorted Noise. New site work is built in The Sorted Noise.
+**Known gap.** Since 2026-10-06 the lower homepage sections (the three pillars, today's AI words, the process line, the services catalogue), the inner-page primitives (`ContentPrimitives`: page hero, section heading, frames, CTA), the cookie notice, the footer and the 404 page are in The Sorted Noise too. Still pending: the header/ticker chrome, the JARVIS page's own hero and cards, the AI page's agent cards and the magazines hero. Their old neon/glass/pill look is not current site guidance; the harmony layer (below) keeps them in step until they move.
 
 **Key Characteristics:**
 - One green ink on warm carbon (`ground`); tone made by glyph density, not by gradients or glow.
@@ -312,6 +312,12 @@ Cousine 700 in Field Green, dotted underline 6px below; hover goes to Lit Glyph 
 ### Frames (site: glyph-frame)
 Dotted rule, `ground` at 78%, square corners, no padding of its own; rows inside are split by dotted dividers. Used for the headline log, the jargon decoder, the guide file card and the cookie notice.
 
+### The crew (signature, since 2026-10-06)
+The Grok Bot deck's characters live on the site too (`src/components/bots/SiteBot.tsx`, outlines in `botShapes.ts`, ported from `public/grok-deck/js/bots.js`): a geometric head (circle, triangle, square, diamond, flower, star, heart...) in one of the five greens, two slanted dark eyes with a glint, the letter skin, and a `.:-=-:.` shadow. One bot hosts each section or page, standing in the open side of the grid; `BotCrew` lines up five of them (the Grok section, the /grok hero, the footer).
+- **Alive, cheaply:** a slow breath on the HTML wrapper (composited, paused off screen); blinks from one shared timer, only for the 150 ms of a blink; the eyes follow a mouse pointer (one shared listener writing two CSS variables per visible bot), and on touch they look the way the page scrolls; a hop with squash and stretch when the bot first comes into view and when tapped.
+- **Moods** are eye shapes only: idle, happy (closed arcs), focus, sleepy, surprised, sad. No mouths, no speech bubbles, no sound on the site (sound belongs to the deck).
+- **Never** more than one bot per section (a crew row counts as one), never in front of text, and under reduced motion they stand still with their eyes open.
+
 ### Glyph field (signature)
 A two-pass WebGL2 renderer: a per-cell scene pass, then a per-pixel glyph pass from an atlas of Hebrew, Latin, digits and a little punctuation. Ink `brand-green-light`, highlights `field-ink-hi`, ground `ground`. The story drives five sprung parameters (chaos, order, calm, lens, dim); the pointer is a lens that calms the noise into readable words; clicks ripple. It fades in over 1.2s once the page is idle and is never needed to read anything.
 
@@ -341,7 +347,8 @@ Site: an RTL header row over the field (which goes quiet behind it), with the ne
 - **Desktop scene layer** (`src/lib/sceneMotion.ts`, GSAP + ScrollTrigger + SplitText, mounted per route): section h2s rise line by line out of a mask (`expo.out`, 1.15s, stagger 0.09, once); each top-level section's content tilts up out of depth on entry (y 110 → 0, rotateX 7° → 0, opacity 0.2 → 1, `scrub: 1`), and the outgoing section recedes (y −56, scale 0.965, opacity 0.32, `scrub: 1`); scroll velocity bends sections (`skewY`, clamped ±2.2°, `quickTo` 0.55s) and they spring back at rest. Desktop with a fine pointer and no reduced-motion preference only; nothing pins.
 - **Field** reacts to scroll: the noise lives on a 0.3× parallax layer and fast scrolling shoves each row of words sideways by its own amount.
 - **Element physics** stay in motion/react springs: button press/hover, depth layers (`Depth`), the stair caret, the title rule drawing out.
-- **Mobile / webviews:** native scroll, `Depth` parallax only; no scrubbed or pinned scenes.
+- **Live layer, every device** (`src/lib/liveLayer.ts`, 2026-10-06): elements opt in with `data-live` (`rise`, `wipe` and `frame` revealed right to left through a moving mask edge, `stagger` for lists, `decode` for short machine labels); on phones every section h2 rises too. IntersectionObserver and CSS transitions only, set up before paint, nothing pinned or scrubbed, so it is safe in Instagram/Facebook webviews. Never put a clip-path on an observed element: Chrome reports a fully clipped element as not intersecting, so it would never arrive.
+- **Mobile / webviews:** native scroll, `Depth` parallax and the live layer; no scrubbed or pinned scenes.
 
 ## Site-wide harmony layer
 

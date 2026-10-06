@@ -14,7 +14,10 @@
  * scripts/reel-audio.mjs scores the video from it: the same sounds at the same frames, under music
  * that keeps time with the slides.
  *
- *   node scripts/render-grok-reel.mjs [out.mp4] [--seconds N]
+ *   node scripts/render-grok-reel.mjs [out.mp4] [--seconds N] [--from <slide key>]
+ *
+ * --seconds stops early and --from starts at a later slide: both are for checking one part of the
+ * reel quickly; a real render uses neither.
  *
  * Default output: reels/out/grok-bot-reel.mp4 (+ grok-bot-reel-cover.jpg, grok-bot-reel.cues.json).
  * Needs Chrome or Edge and ffmpeg on PATH; fonts load from Google Fonts, so it needs a network
@@ -30,9 +33,10 @@ import { cuePath, scoreVideo } from './reel-audio.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
-const secIdx = args.indexOf('--seconds');
-const LIMIT = secIdx >= 0 ? Number(args[secIdx + 1]) : 0;
-const OUT = path.resolve(args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--seconds') || path.join(ROOT, 'reels/out/grok-bot-reel.mp4'));
+const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
+const LIMIT = Number(opt('--seconds') || 0);
+const FROM = opt('--from');
+const OUT = path.resolve(args.find((a, i) => !a.startsWith('--') && !['--seconds', '--from'].includes(args[i - 1])) || path.join(ROOT, 'reels/out/grok-bot-reel.mp4'));
 const COVER = OUT.replace(/\.mp4$/i, '') + '-cover.jpg';
 const SILENT = path.join(tmpdir(), `grok-reel-picture-${process.pid}.mp4`);
 const FPS = 30;
@@ -87,13 +91,13 @@ try {
   await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
   await send('Page.addScriptToEvaluateOnNewDocument', { source: VIRTUAL_CLOCK });
-  await send('Page.navigate', { url: pathToFileURL(path.join(ROOT, 'public/grok-deck/index.html')).href + '?reel' });
+  await send('Page.navigate', { url: pathToFileURL(path.join(ROOT, 'public/grok-deck/index.html')).href + '?reel' + (FROM ? '&from=' + encodeURIComponent(FROM) : '') });
 
   // Fonts arrive on the real clock; the deck starts once they have (or after its own timeout).
   let started = false;
   for (let i = 0; i < 60 && !started; i++) {
     await sleep(500);
-    started = await evaluate('!!(window.Deck && window.Deck.state.i === 0)');
+    started = await evaluate('!!(window.Deck && window.Deck.state.i >= 0)');
     if (!started && i === 20) await evaluate('window.__vt && window.__vt.advance(1700)');
   }
   if (!started) throw new Error('deck never started (fonts or scripts failed to load)');
@@ -105,6 +109,7 @@ try {
 
   const t0 = Date.now();
   const v0 = await evaluate('window.__vt.now');
+  const keyCount = await evaluate('document.querySelectorAll(".slide").length');
   let frame = 0;
   for (;;) {
     await evaluate(`window.__vt.advance(${1000 / FPS})`);
@@ -112,12 +117,12 @@ try {
     const buf = Buffer.from(shot.result.data, 'base64');
     if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once('drain', r));
     frame++;
-    if (frame === Math.round(FPS * 6.2)) writeFileSync(COVER, buf); // the cover slide at rest, before it hands over
+    if (!FROM && frame === Math.round(FPS * 4.4)) writeFileSync(COVER, buf); // the cover slide at rest, before it hands over
     if (frame % FPS === 0) {
       const st = await evaluate('JSON.stringify({ i: Deck.state.i, done: !!(window.__reel && window.__reel.done) })');
       const { i, done } = JSON.parse(st);
       const secs = frame / FPS;
-      process.stdout.write(`\r${secs}s rendered · slide ${i + 1}/16 · ${(frame / ((Date.now() - t0) / 1000)).toFixed(1)} fps   `);
+      process.stdout.write(`\r${secs}s rendered · slide ${i + 1}/${keyCount} ·${(frame / ((Date.now() - t0) / 1000)).toFixed(1)} fps   `);
       if (done || (LIMIT && secs >= LIMIT) || secs > 290) break;
     }
   }
@@ -131,7 +136,8 @@ try {
     .filter((c) => c.t < duration);
   ff.stdin.end();
   await ffDone;
-  const sheet = { fps: FPS, duration, slideCount, cues };
+  const bpm = await evaluate('window.__reel.bpm');
+  const sheet = { fps: FPS, duration, slideCount, bpm, cues };
   writeFileSync(cuePath(OUT), JSON.stringify(sheet, null, 1));
   const sound = await scoreVideo(SILENT, sheet, OUT, { chrome });
   rmSync(SILENT, { force: true });

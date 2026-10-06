@@ -2655,3 +2655,832 @@ html.motion-reduced .glass-chip__dot {
 .hand-note--lit {
   color: #c8f46e;
 }
+
+/* ── The crew on the site (SiteBot, 2026-10-06) ───────────────────────────────────────────────
+   The Grok Bot deck's characters. The breath is a composited transform on an HTML wrapper; the
+   eyes (gaze, blink, mood) are SVG transforms that change only when something happens. Off screen
+   the breath pauses. */
+.site-bot {
+  --open: 1;
+  --tilt: 12;
+  --eye: 1;
+  --happy: 0;
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--bot-size);
+  height: calc(var(--bot-size) * 1.12);
+  vertical-align: bottom;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.site-bot[data-tap] {
+  cursor: pointer;
+}
+.site-bot__hop,
+.site-bot__bob {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--bot-size);
+  transform-origin: 50% 100%;
+}
+.site-bot__bob {
+  animation: bot-bob 3.8s var(--bob-delay, 0s) ease-in-out infinite;
+  animation-play-state: paused;
+}
+.site-bot[data-on] .site-bot__bob {
+  animation-play-state: running;
+}
+.site-bot__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.site-bot__head {
+  fill: var(--bot-tone);
+}
+.site-bot__cap {
+  fill: #0a0b09;
+}
+.site-bot__glint {
+  fill: rgba(230, 236, 221, 0.55);
+}
+.site-bot__arc {
+  fill: none;
+  stroke: #0a0b09;
+  stroke-width: 9;
+  stroke-linecap: round;
+  opacity: var(--happy);
+}
+.site-bot__lid {
+  opacity: calc(1 - var(--happy));
+  transition: transform 0.07s ease-in;
+}
+.site-bot[data-blink] .site-bot__lid {
+  transform: scaleY(0.08);
+}
+.site-bot__eye {
+  transform: rotate(calc(var(--tilt) * 1deg)) scale(var(--eye), calc(var(--eye) * var(--open)));
+  transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.site-bot__gaze {
+  transform: translate(calc(var(--gx, 0) * 8px), calc(var(--gy, 0) * 7px));
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.site-bot[data-mood='happy'] {
+  --happy: 1;
+}
+.site-bot[data-mood='focus'] {
+  --open: 0.56;
+  --tilt: 6;
+}
+.site-bot[data-mood='sleepy'] {
+  --open: 0.2;
+  --tilt: 8;
+}
+.site-bot[data-mood='surprised'] {
+  --open: 1.1;
+  --tilt: 0;
+  --eye: 1.14;
+}
+.site-bot[data-mood='sad'] {
+  --open: 0.8;
+}
+.site-bot[data-mood='sad'] .site-bot__eye {
+  --tilt: calc(-17 * var(--side));
+}
+.site-bot__shadow {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  text-align: center;
+  font-family: var(--font-type);
+  font-weight: 700;
+  font-size: calc(var(--bot-size) * 0.11);
+  letter-spacing: 0.12em;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-brand-400);
+  opacity: 0.42;
+  pointer-events: none;
+}
+@keyframes bot-bob {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  50% {
+    transform: translateY(-3.5%) scale(0.99, 1.012);
+  }
+}
+.bot-crew {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: clamp(0.4rem, 1.4vw, 0.9rem);
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-bot__bob {
+    animation: none;
+  }
+  .site-bot__gaze,
+  .site-bot__eye,
+  .site-bot__lid {
+    transition: none;
+  }
+}
+html.motion-reduced .site-bot__bob {
+  animation: none;
+}
+
+/* ── The live layer (src/lib/liveLayer.ts, 2026-10-06) ─────────────────────────────────────────
+   Opt-in arrivals on every device. Hidden states exist only under html.live-on, which the layer
+   sets when it runs; `is-live` is added once, when the element scrolls into view. */
+html.live-on [data-live] {
+  transition:
+    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+    clip-path 0.95s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--live-delay, 0) * 1ms);
+}
+html.live-on [data-live='rise']:not(.is-live) {
+  opacity: 0;
+  transform: translateY(28px);
+}
+/* wipe and frame reveal right to left through a moving mask edge, not a clip-path: a fully clipped
+   element reads as not intersecting to IntersectionObserver in Chrome, so it would never arrive. */
+html.live-on [data-live='wipe'],
+html.live-on [data-live='frame'] {
+  -webkit-mask-image: linear-gradient(to left, #000 44%, transparent 56%);
+  mask-image: linear-gradient(to left, #000 44%, transparent 56%);
+  -webkit-mask-size: 260% 100%;
+  mask-size: 260% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 0% 0;
+  mask-position: 0% 0;
+  transition:
+    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    -webkit-mask-position 1.1s cubic-bezier(0.16, 1, 0.3, 1),
+    mask-position 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--live-delay, 0) * 1ms);
+}
+html.live-on [data-live='wipe'].is-live,
+html.live-on [data-live='frame'].is-live {
+  -webkit-mask-position: 100% 0;
+  mask-position: 100% 0;
+}
+html.live-on [data-live].is-done {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+html.live-on [data-live='frame']:not(.is-live) {
+  opacity: 0.35;
+}
+html.live-on [data-live='decode']:not(.is-live) {
+  opacity: 0;
+}
+html.live-on [data-live='stagger'] > * {
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--live-delay, 0) * 1ms + var(--i, 0) * 75ms);
+}
+html.live-on [data-live='stagger']:not(.is-live) > * {
+  opacity: 0;
+  transform: translateY(22px);
+}
+@media (prefers-reduced-motion: reduce) {
+  html.live-on [data-live],
+  html.live-on [data-live] > * {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+  }
+}
+
+/* ── The pillars (OfferSection, glyph world since 2026-10-06) ──────────────────────────────── */
+@media (max-width: 767px) {
+  .offer-beat__bot {
+    --bot-size: 92px !important;
+  }
+}
+/* agents: the agent's own window, tasks ticking off */
+.offer-window {
+  max-width: 62rem;
+}
+.offer-window__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px dotted var(--color-rule);
+  direction: ltr;
+}
+.offer-window__bar > i {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgba(143, 212, 0, 0.6);
+  border-radius: 50%;
+}
+.offer-window__title {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  direction: rtl;
+  font-family: var(--font-type);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.offer-tasks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0.5rem 0;
+  list-style: none;
+}
+@media (min-width: 768px) {
+  .offer-tasks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.offer-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+}
+.offer-task__check {
+  position: relative;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 0.3rem;
+  border: 1.5px solid rgba(143, 212, 0, 0.6);
+}
+.offer-task__check::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  background: var(--color-brand-400);
+  transform: scale(0);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition-delay: calc(var(--i, 0) * 280ms + 650ms);
+}
+html:not(.live-on) .offer-task__check::after,
+.is-live > .offer-task .offer-task__check::after {
+  transform: scale(1);
+}
+.offer-task__title {
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.35rem, 1.1rem + 0.7vw, 1.75rem);
+  line-height: 1.15;
+  color: var(--color-ink-paper);
+}
+.offer-task__body {
+  margin-top: 0.3rem;
+  font-size: 1.02rem;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+  text-wrap: pretty;
+}
+/* lab: a test bench, one frame per kind of test */
+.offer-bench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 768px) {
+  .offer-bench {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+@media (min-width: 1280px) {
+  .offer-bench {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.offer-bench__cell {
+  position: relative;
+  padding: 1.4rem 1.3rem 1.5rem;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+.offer-bench__cell::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -1px;
+  top: 1.45rem;
+  width: 3px;
+  height: 1.4rem;
+  background: var(--color-brand-400);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.offer-bench__cell:hover {
+  border-color: rgba(143, 212, 0, 0.6);
+  background: rgba(143, 212, 0, 0.04);
+}
+.offer-bench__cell:hover::before {
+  transform: scaleY(1);
+}
+.offer-bench__title {
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.35rem, 1.1rem + 0.7vw, 1.7rem);
+  line-height: 1.15;
+  color: var(--color-ink-paper);
+}
+.offer-bench__body {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+}
+/* hub: a running log */
+.offer-log {
+  max-width: 62rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.offer-log__row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.3rem;
+  padding: 1.1rem 1.4rem 1.15rem 1.25rem;
+  transition: background-color 0.2s;
+}
+@media (min-width: 768px) {
+  .offer-log__row {
+    grid-template-columns: 13rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 1.5rem;
+  }
+}
+.offer-log__row:hover {
+  background: rgba(143, 212, 0, 0.05);
+}
+.offer-log__caret {
+  position: absolute;
+  inset-inline-start: 0.45rem;
+  top: 1.35rem;
+  width: 6px;
+  height: 1.05em;
+  background: var(--color-brand-400);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.offer-log__row:hover .offer-log__caret {
+  opacity: 1;
+  animation: caret-blink 1.05s steps(1) infinite;
+}
+.offer-log__title {
+  font-family: var(--font-type);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-brand-400);
+}
+.offer-log__body {
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: var(--color-ink-paper);
+}
+
+/* ── What I build (ServicesSection, glyph world since 2026-10-06) ─────────────────────────── */
+.service-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-block-end: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 768px) {
+  .service-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+@media (min-width: 1280px) {
+  .service-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .service-grid--lead {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.service-item {
+  min-width: 0;
+}
+.service-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1.35rem 1.35rem 1.2rem;
+  color: inherit;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
+}
+.service-card:hover,
+.service-card:focus-visible {
+  border-color: rgba(143, 212, 0, 0.6);
+  background: rgba(143, 212, 0, 0.04);
+}
+.service-card:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 3px;
+}
+.service-card__tags {
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--color-brand-400);
+}
+.service-card__title {
+  margin-top: 0.55rem;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.4rem, 1.1rem + 0.8vw, 1.8rem);
+  line-height: 1.12;
+  color: var(--color-ink-paper);
+}
+.service-item--lead .service-card__title {
+  font-size: clamp(1.6rem, 1.2rem + 1.1vw, 2.25rem);
+}
+.service-card__blurb {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+  text-wrap: pretty;
+}
+.service-card__points {
+  display: none;
+  margin: 0.95rem 0 0;
+  padding: 0.95rem 0 0;
+  border-top: 1px dotted var(--color-rule);
+  list-style: none;
+}
+@media (min-width: 768px) {
+  .service-card__points {
+    display: grid;
+    gap: 0.4rem;
+  }
+}
+.service-card__points li {
+  position: relative;
+  padding-inline-start: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--color-ink-paper);
+}
+.service-card__points li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.62em;
+  width: 6px;
+  height: 6px;
+  background: var(--color-brand-400);
+}
+.service-card__metric {
+  margin-top: 0.95rem;
+  font-family: var(--font-type);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+}
+.service-card__metric b {
+  display: block;
+  font-size: 14px;
+  color: var(--color-brand-400);
+}
+.service-card__go {
+  margin-top: auto;
+  padding-top: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-type);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--color-brand-400);
+  opacity: 0;
+  transform: translateX(6px);
+  transition:
+    opacity 0.2s,
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.service-card:hover .service-card__go,
+.service-card:focus-visible .service-card__go {
+  opacity: 1;
+  transform: none;
+}
+@media (hover: none) {
+  .service-card__go {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── How an agent gets built (ProcessSection, 2026-10-06): three stops on one line ─────────── */
+.process-line {
+  position: relative;
+}
+.process-stops {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.process-stop {
+  position: relative;
+  padding: 0 2.6rem 2.2rem 0;
+  padding-inline: 2.4rem 0;
+  border-inline-start: 1px dotted var(--color-rule);
+}
+.process-stop:last-child {
+  padding-bottom: 0;
+}
+.process-stop__node {
+  position: absolute;
+  top: 0.35rem;
+  inset-inline-start: -9px;
+  width: 17px;
+  height: 17px;
+  border: 1.5px solid rgba(143, 212, 0, 0.6);
+  background: var(--color-ground);
+}
+.process-stop__node::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  background: var(--color-brand-400);
+  transform: scale(0);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition-delay: calc(var(--i, 0) * 750ms + 500ms);
+}
+html:not(.live-on) .process-stop__node::after,
+.is-live > .process-stop .process-stop__node::after {
+  transform: scale(1);
+}
+.process-stop__title {
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.5rem, 1.15rem + 1vw, 2.1rem);
+  line-height: 1.1;
+  color: var(--color-ink-paper);
+}
+.process-stop__body {
+  margin-top: 0.55rem;
+  max-width: 26rem;
+  font-size: 1.03rem;
+  line-height: 1.7;
+  color: var(--color-ink-muted);
+  text-wrap: pretty;
+}
+.process-walker {
+  display: none;
+}
+@media (min-width: 768px) {
+  .process-line {
+    padding-top: 84px;
+  }
+  .process-stops {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2.5rem;
+  }
+  /* The line itself, through every node. */
+  .process-stops::before {
+    content: '';
+    position: absolute;
+    top: 0.88rem;
+    inset-inline: 0 -1rem;
+    border-top: 1px dotted rgba(143, 212, 0, 0.55);
+  }
+  .process-stop {
+    padding: 2.6rem 0 0;
+    border: 0;
+  }
+  .process-stop__node {
+    top: 0.35rem;
+    inset-inline-start: 0;
+  }
+  /* The walker: stands over the first stop, walks to the last once they have lit. */
+  .process-walker {
+    display: block;
+    position: absolute;
+    top: calc(84px + 0.88rem - 62px * 1.12 + 6px);
+    inset-inline-start: -22px;
+    transition: inset-inline-start 2.2s cubic-bezier(0.45, 0, 0.25, 1) 0.9s;
+  }
+  html:not(.live-on) .process-walker,
+  .process-stops.is-live + .process-walker {
+    inset-inline-start: calc((100% + 2.5rem) * 2 / 3 - 22px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .process-walker {
+    transition: none;
+  }
+}
+
+/* ── Today's AI words (TodayTermsSection, glyph world since 2026-10-06) ──────────────────────── */
+.terms-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-block-end: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 640px) {
+  .terms-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .terms-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+  .terms-grid--compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.term-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.2rem 1.25rem 1.1rem;
+  transition: border-color 0.2s;
+}
+.term-card:hover {
+  border-color: rgba(143, 212, 0, 0.6);
+}
+.term-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.term-card__term {
+  font-family: var(--font-type);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-brand-400);
+}
+.term-card__count {
+  flex: none;
+  font-family: var(--font-type);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.term-card__text {
+  margin-top: 0.55rem;
+  flex-grow: 1;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-paper);
+  text-wrap: pretty;
+}
+.term-card__story {
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px dotted var(--color-rule);
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  text-align: right;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+  transition: color 0.15s;
+}
+.term-card__story:hover {
+  color: var(--color-ink-paper);
+}
+.term-card__story svg {
+  color: var(--color-brand-400);
+}
+.term-card__story:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 3px;
+}
+.term-card__where {
+  font-family: var(--font-type);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--color-ink-muted);
+}
+
+/* ── Inner pages (ContentPrimitives, glyph world since 2026-10-06) ─────────────────────────── */
+.page-hero__title {
+  font-family: var(--font-headline);
+  font-weight: 400;
+  font-size: clamp(2.3rem, 1.2rem + 3.4vw, 4.4rem);
+  line-height: 1.1;
+  color: var(--color-ink-paper);
+  text-wrap: balance;
+}
+.page-hero__sub {
+  margin-top: 1.25rem;
+  max-width: 48rem;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: clamp(1.1rem, 0.95rem + 0.6vw, 1.45rem);
+  line-height: 1.6;
+  color: var(--color-brand-400);
+  text-wrap: pretty;
+}
+.frame-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  height: 100%;
+  padding: 1.25rem 1.3rem 1.3rem;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
+}
+.frame-cell:hover {
+  border-color: rgba(143, 212, 0, 0.6);
+  background: rgba(143, 212, 0, 0.04);
+}
+.frame-cell--stack {
+  flex-direction: column;
+  gap: 0;
+}
+.frame-cell--big {
+  padding: 1.6rem 1.6rem 1.7rem;
+}
+.frame-cell__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  color: var(--color-brand-400);
+  border: 1px dotted var(--color-rule);
+  transition: border-color 0.2s;
+}
+.frame-cell:hover .frame-cell__icon {
+  border-color: rgba(143, 212, 0, 0.7);
+}
+.frame-cell--big .frame-cell__icon {
+  width: 3.2rem;
+  height: 3.2rem;
+}
+.frame-cell__title {
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.3rem, 1.1rem + 0.6vw, 1.6rem);
+  line-height: 1.15;
+  color: var(--color-ink-paper);
+}
+.frame-cell--big .frame-cell__title {
+  font-size: clamp(1.55rem, 1.2rem + 1vw, 2.1rem);
+}
+.frame-cell__text {
+  margin-top: 0.45rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+  text-wrap: pretty;
+}
+
+/* Arrivals move on a spring (DESIGN.md: springs for every meaningful move): a damped spring sampled
+   into a CSS linear() curve, about 4% of overshoot. Browsers without linear() keep the expo curve
+   declared first. Opacity and the mask edge stay on the plain curve: a mask that overshoots would
+   uncover the far edge for a frame. */
+html.live-on [data-live='rise'],
+html.live-on [data-live='decode'] {
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1), linear(0, 0.0839 4.2%, 0.2657 8.3%, 0.4706 12.5%, 0.6565 16.7%, 0.8045 20.8%, 0.9106 25%, 0.9789 29.2%, 1.0174 33.3%, 1.0347 37.5%, 1.0384 41.7%, 1.0345 45.8%, 1.0272 50%, 1.0194 54.2%, 1.0124 58.3%, 1.0069 62.5%, 1.003 66.7%, 1.0006 70.8%, 0.9992 75%, 0.9986 79.2%, 0.9985 83.3%, 0.999 91.7%, 1), cubic-bezier(0.16, 1, 0.3, 1);
+}
+html.live-on [data-live='stagger'] > * {
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1), linear(0, 0.0839 4.2%, 0.2657 8.3%, 0.4706 12.5%, 0.6565 16.7%, 0.8045 20.8%, 0.9106 25%, 0.9789 29.2%, 1.0174 33.3%, 1.0347 37.5%, 1.0384 41.7%, 1.0345 45.8%, 1.0272 50%, 1.0194 54.2%, 1.0124 58.3%, 1.0069 62.5%, 1.003 66.7%, 1.0006 70.8%, 0.9992 75%, 0.9986 79.2%, 0.9985 83.3%, 0.999 91.7%, 1);
+}

@@ -57,7 +57,7 @@ function LiveModels({ catalog }: { catalog: ModelCatalog | undefined }) {
           {live ? `מתעדכן אוטומטית · עודכן ${formatRelativeTime(new Date(catalog!.syncedAt).toISOString())}` : 'מתעדכן אוטומטית'}
         </span>
       </div>
-      <ul className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-3 md:grid-cols-4" data-live="stagger">
         {frontier.map((m) => (
           <li key={m.id} className="rounded-xl border border-white/10 bg-black/30 px-4 py-3">
             <span className="block text-[11px] font-bold text-zinc-500">{m.vendor}</span>
@@ -315,7 +315,7 @@ export default function AiAgentsSection() {
 
         <AnimatePresence mode="wait">
           <motion.div key={filter} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3 }}>
-            <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6 md:gap-7 max-w-[1600px] mx-auto">
+            <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6 md:gap-7 max-w-[1600px] mx-auto" data-live="stagger">
               {visibleAgents.map((agent) => (
                 <AgentCard key={agent.id} agent={agent} catalog={catalog} />
               ))}

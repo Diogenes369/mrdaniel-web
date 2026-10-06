@@ -11,16 +11,6 @@
   const viewport = document.getElementById('viewport');
   const overlay = document.getElementById('overlayLayer');
   const liveRegion = document.getElementById('liveRegion');
-  const slideEls = Array.from(stage.querySelectorAll('.slide'));
-  const keys = slideEls.map((s) => s.dataset.key);
-  const DEF = window.SLIDES || {};
-  const Field = window.GlyphField;
-  const Bots = window.Bots;
-  const FX = window.FX;
-  const mq = (q) => (window.matchMedia ? window.matchMedia(q).matches : false);
-  const reduce = mq('(prefers-reduced-motion: reduce)');
-  const touch = mq('(pointer: coarse)');
-  const CALM = { chaos: 0.42, order: 0.18, calm: 0.8, lens: 0.32, dim: 0.34 };
 
   // full: the deck on its own page. embed: inside an iframe on the site (starts when it scrolls
   // into view, sleeps while off screen). reel: a fixed 1080×1920 vertical cut for Instagram that
@@ -31,6 +21,20 @@
   const MODE = params.has('reel') ? 'reel' : inFrame || params.has('embed') ? 'embed' : 'full';
   const sfx = (name, o) => { if (window.GrokSFX) window.GrokSFX.emit(name, o); };
   html.dataset.mode = MODE;
+  // The branded ending belongs to the video; on the site the page around the deck is the brand.
+  if (MODE !== 'reel') stage.querySelectorAll('[data-reel-only]').forEach((n) => n.remove());
+  else stage.querySelectorAll('img[data-src]').forEach((n) => { n.src = n.dataset.src; });
+
+  const slideEls = Array.from(stage.querySelectorAll('.slide'));
+  const keys = slideEls.map((s) => s.dataset.key);
+  const DEF = window.SLIDES || {};
+  const Field = window.GlyphField;
+  const Bots = window.Bots;
+  const FX = window.FX;
+  const mq = (q) => (window.matchMedia ? window.matchMedia(q).matches : false);
+  const reduce = mq('(prefers-reduced-motion: reduce)');
+  const touch = mq('(pointer: coarse)');
+  const CALM = { chaos: 0.42, order: 0.18, calm: 0.8, lens: 0.32, dim: 0.34 };
 
   const state = { i: -1, W: 1920, H: 1080, scale: 1, orient: '', lastNav: 0, swipedAt: 0 };
   let active = null;
@@ -309,8 +313,9 @@
       Field.setMask(def.mask ? el.querySelector(def.mask) : null);
       if (!o.first && !o.instant) Field.kick(dir);
     }
-    if (!o.first && !o.instant && !reduce) FX.Particles.sweep(dir);
+    if (!o.first && !o.instant && !reduce) { FX.Particles.sweep(dir); sweepBand(dir); }
     if (!o.first && !o.instant) sfx('swap', { dir: dir });
+    if (!o.first) dismissCoach();
 
     // The bot hops to its mark on the new slide.
     const m = def.main || {};
@@ -354,26 +359,36 @@
     if (MODE === 'reel') scheduleReel(slide);
   }
 
-  // ── reel: each slide stays up for its choreography plus the time it takes to read it ──────────
-  const READ_SEL = '.h2, .lead, .display, .body, .body-sm, .plain, .term, .statement, .check-text, .rule-list li, .stair-title, .stair-body, .plans-note, .plan-line, .msg .what, .bullets li, .block-title, .rung p, .news, .quote, .tie, .reality, .misses li, .hand__text';
-  // `cues` is the sound track's score: when each slide came in and when the bot landed on it, in
+  // ── reel: quick, and in time with the music ──────────────────────────────────────────────────
+  // The reel plays every animation 1.25× faster than the site does, and each slide stays up for its
+  // choreography plus a short beat, rounded to half a bar of the music (100 BPM, 1.2 s), so every
+  // cut lands on the first or third beat. A slide whose motion runs late gets the next half bar
+  // rather than being cut off mid-move. scripts/reel-score.js reads `bpm` to lay the music on the
+  // same grid.
+  const REEL = { speed: 1.25, bpm: 100, min: 4.8, max: 8.4, cover: 4.8, outro: 6 };
+  const half = 2 * 60 / REEL.bpm;
+  // `cues` is the sound track's score: when each slide came in and every sound the deck made, in
   // (virtual) milliseconds; scripts/render-grok-reel.mjs turns them into frame times.
-  const reel = { timer: null, done: false, log: [], cues: [] };
+  const reel = { timer: 0, done: false, log: [], cues: [], bpm: REEL.bpm };
   window.__reel = reel;
+  if (MODE === 'reel') gsap.globalTimeline.timeScale(REEL.speed);
   function scheduleReel(slide) {
-    if (reel.timer) reel.timer.kill();
+    clearTimeout(reel.timer);
     reel.cues.push({ type: 'slide', i: slide.idx, key: slide.key, t: performance.now() });
-    const words = Array.from(slide.el.querySelectorAll(READ_SEL)).reduce((n, el) => n + (el.textContent.trim().split(/\s+/).filter(Boolean).length), 0);
-    const show = slide.tl.duration();
+    const show = slide.tl.duration() / REEL.speed + (slide.def.tail || 0) / REEL.speed;
     const last = slide.idx === slideEls.length - 1;
-    let dur = Math.max(show + 1.4, words / 3.1 + 1.8);
-    dur = Math.min(slide.key === 'cover' ? 7.2 : 10.4, Math.max(slide.key === 'cover' ? 6.4 : 6.5, dur));
-    if (last) dur += 1.6;
-    reel.log.push({ key: slide.key, words: words, show: +show.toFixed(2), dur: +dur.toFixed(2) });
-    reel.timer = gsap.delayedCall(dur, () => {
+    let dur;
+    if (slide.key === 'cover') dur = REEL.cover;
+    else if (last) dur = REEL.outro;
+    else {
+      dur = Math.round(Math.min(REEL.max, Math.max(REEL.min, show + 0.7)) / half) * half;
+      if (dur < show + 0.4 && dur + half <= REEL.max + 1e-6) dur += half;
+    }
+    reel.log.push({ key: slide.key, show: +show.toFixed(2), dur: +dur.toFixed(2) });
+    reel.timer = setTimeout(() => {
       if (last) { reel.done = true; return; }
       go(slide.idx + 1, { force: true });
-    });
+    }, dur * 1000);
   }
 
   function leave(slide, dir, instant) {
@@ -465,8 +480,101 @@
       return;
     }
     if (e.target.closest('.rail, a, button')) return;
-    next();
+    if (zoneOf(e.clientX) === 'prev' && state.i > 0) prev();
+    else next();
   });
+
+  // ── where a click goes, said out loud ────────────────────────────────────────────────────────
+  // Anywhere on a slide moves on. The strip along the right edge, where a Hebrew line starts and so
+  // where "back" is, goes back. With a mouse, a small tag rides next to the pointer and names what a
+  // click will do, and an arrow wakes at the edge it points to; on the first slide a coach line says
+  // it once, for touch and mouse alike, until the first move.
+  const EDGE = 0.15;
+  function zoneOf(clientX) {
+    const r = sRect();
+    return (r.right - clientX) / Math.max(1, r.width) < EDGE ? 'prev' : 'next';
+  }
+  const tag = document.createElement('div');
+  tag.className = 'pointer-tag';
+  tag.setAttribute('aria-hidden', 'true');
+  tag.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span></span>';
+  const tagText = tag.querySelector('span');
+  const edges = ['prev', 'next'].map((z) => {
+    const el = document.createElement('div');
+    el.className = 'edge-hint edge-' + z;
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = z === 'prev' ? '<svg viewBox="0 0 40 120"><path d="M8 10l24 50-24 50"/></svg>' : '<svg viewBox="0 0 40 120"><path d="M32 10L8 60l24 50"/></svg>';
+    stage.appendChild(el);
+    return el;
+  });
+  let tagZone = '';
+  const finePointer = mq('(hover: hover) and (pointer: fine)');
+  if (MODE !== 'reel' && finePointer) {
+    document.body.appendChild(tag);
+    const tx = gsap.quickTo(tag, 'x', { duration: 0.28, ease: 'power3.out' });
+    const ty = gsap.quickTo(tag, 'y', { duration: 0.28, ease: 'power3.out' });
+    let placed = false;
+    const hide = () => { tag.classList.remove('is-on'); stage.removeAttribute('data-zone'); tagZone = ''; };
+    window.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const over = e.target && e.target.closest ? e.target : null;
+      const inStage = over && stage.contains(over) && !over.closest('.rail, a, button, .chrome');
+      if (!inStage) { hide(); return; }
+      const z = zoneOf(e.clientX) === 'prev' && state.i > 0 ? 'prev' : state.i < slideEls.length - 1 ? 'next' : '';
+      if (!z) { hide(); return; }
+      if (z !== tagZone) {
+        tagZone = z;
+        tagText.textContent = z === 'prev' ? 'לשקף הקודם' : 'לשקף הבא';
+        tag.dataset.zone = z;
+        stage.dataset.zone = z;
+      }
+      // The tag sits on the side the click will travel toward, clear of the pointer.
+      const x = e.clientX + (z === 'prev' ? 22 : -22);
+      const y = e.clientY + 26;
+      if (!placed) { gsap.set(tag, { x: x, y: y }); placed = true; }
+      tx(x); ty(y);
+      tag.classList.add('is-on');
+    }, { passive: true });
+    document.addEventListener('mouseleave', hide);
+    window.addEventListener('blur', hide);
+  }
+
+  // The coach line: once, on the first slide, after the cover has built.
+  const coach = document.createElement('div');
+  coach.className = 'coach';
+  coach.setAttribute('aria-hidden', 'true');
+  coach.innerHTML = '<span class="coach-ring"><i></i><i></i></span><span class="machine coach-text"></span>';
+  coach.querySelector('.coach-text').textContent = touch
+    ? 'נוגעים בשקף כדי להמשיך · החלקה הצידה עוברת בין השקפים'
+    : 'לחיצה בכל מקום על השקף ממשיכה · או רווח וחיצים';
+  let coachTimer = 0;
+  let coachDone = MODE === 'reel';
+  function showCoach() {
+    if (coachDone || reduce) return;
+    stage.appendChild(coach);
+    coachTimer = setTimeout(() => { if (!coachDone) coach.classList.add('is-on'); }, 2600);
+  }
+  function dismissCoach() {
+    if (coachDone) return;
+    coachDone = true;
+    clearTimeout(coachTimer);
+    coach.classList.remove('is-on');
+    setTimeout(() => coach.remove(), 600);
+  }
+
+  // A thin band of lit glyphs sweeps across the stage on every slide change, the way the field
+  // itself is typed into order: right to left going forward, left to right going back.
+  const band = document.createElement('div');
+  band.className = 'swap-band';
+  band.setAttribute('aria-hidden', 'true');
+  stage.appendChild(band);
+  function sweepBand(dir) {
+    const w = state.W;
+    gsap.killTweensOf(band);
+    gsap.fromTo(band,
+      { x: dir > 0 ? w : -260, opacity: 1, scaleX: dir > 0 ? 1 : -1 },
+      { x: dir > 0 ? -260 : w, duration: 0.62, ease: 'power2.inOut', onComplete: () => gsap.set(band, { opacity: 0 }) });
+  }
 
   let tx0 = null, ty0 = 0;
   stage.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; tx0 = t.clientX; ty0 = t.clientY; }, { passive: true });
@@ -499,8 +607,7 @@
   // deck is silent until then. The rail's speaker button (or M) turns it off and on, remembered.
   const soundBtn = stage.querySelector('[data-action="sound"]');
   const unlockSound = () => { if (window.GrokSFX) window.GrokSFX.unlock(); };
-  window.addEventListener('pointerdown', unlockSound, { capture: true, passive: true });
-  window.addEventListener('keydown', unlockSound, { capture: true });
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach((ev) => window.addEventListener(ev, unlockSound, { capture: true, passive: true }));
   function syncSound() {
     const on = !!(window.GrokSFX && window.GrokSFX.enabled);
     if (!soundBtn) return;
@@ -603,7 +710,9 @@
     if (document.fonts && document.fonts.addEventListener) {
       document.fonts.addEventListener('loadingdone', () => { FX.makeGlyphTexture(); if (fieldOk) Field.fontsReady(); });
     }
-    const fromHash = MODE === 'reel' ? -1 : keys.indexOf((location.hash || '').replace('#', ''));
+    // The reel always starts at the cover; `?reel&from=<key>` starts it elsewhere, for checking one
+    // part of it without rendering the whole thing.
+    const fromHash = MODE === 'reel' ? keys.indexOf(params.get('from') || '') : keys.indexOf((location.hash || '').replace('#', ''));
     const begin = () => {
       try {
         go(fromHash >= 0 ? fromHash : 0, { first: true, force: true });
@@ -611,13 +720,13 @@
         html.classList.remove('is-booting');
         clearTimeout(window.__bootFallback);
       }
-      if (MODE !== 'reel') pokeUI();
+      if (MODE !== 'reel') { pokeUI(); if (state.i === 0) showCoach(); }
       requestAnimationFrame(loop);
       setTimeout(watchdog, 1800);
     };
     if (MODE === 'embed') {
       const hint = stage.querySelector('.hint');
-      if (hint) hint.textContent = 'לחיצה על השקף מעבירה הלאה';
+      if (hint) hint.textContent = 'לחיצה על השקף ממשיכה · M לצלילים';
       watchVisibility(begin);
     } else begin();
   }

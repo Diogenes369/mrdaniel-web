@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import GlyphButton from '../ui/GlyphButton';
 import GrokDeckFrame from '../grok/GrokDeckFrame';
+import { BotCrew } from '../bots/SiteBot';
 import { GROK_COPY } from '../../data/siteCopy';
 import { rtl } from '../../lib/rtl';
 import { useFieldQuiet } from '../field/fieldState';
@@ -28,7 +29,9 @@ export default function GrokAgentSection() {
             </h2>
             <p className="story-body mt-6">{rtl(c.homeSub)}</p>
           </div>
-          <div className="lg:col-span-5 lg:flex lg:justify-end">
+          <div className="flex flex-col items-start gap-6 lg:col-span-5 lg:items-end">
+            {/* The deck's cast, waiting by the door: the same bots the frame below is full of. */}
+            <BotCrew size={50} lead={82} />
             <GlyphButton to="/grok">
               {rtl(c.open)}
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />

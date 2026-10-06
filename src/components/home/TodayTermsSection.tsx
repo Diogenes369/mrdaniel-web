@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BookOpenText, ArrowLeft } from 'lucide-react';
-import PopHeadline from './PopHeadline';
+import Depth from '../story/Depth';
+import SiteBot from '../bots/SiteBot';
 import ArticleModal from '../news/ArticleModal';
 import { useNewsFeed, type NewsItem } from '../../services/newsService';
 import { termsInStories } from '../../data/aiTerms';
@@ -39,44 +40,50 @@ export default function TodayTermsSection({ id = 'ai-terms', compact = false }: 
 
   if (hits.length < MIN_TERMS) return null;
 
+  // Glyph world since 2026-10-06: each term is a dotted frame with the term in the machine's voice,
+  // how often it came up today as a plain machine line, the meaning in Heebo, and the story it came
+  // from as a link. A bot reads along in the open side.
   return (
-    <section id={id} className={`relative ${compact ? 'py-10' : 'py-20 md:py-28'} overflow-x-clip cv-auto`} dir="rtl">
-      <div className="container-wide relative z-10">
+    <section id={id} className={compact ? 'relative py-10' : 'story-beat'} dir="rtl">
+      <div className="container-wide">
         {compact ? (
           <h2 className="mb-6 flex items-center gap-2 font-display text-xl font-black text-white md:text-2xl">
             <BookOpenText className="h-6 w-6 text-brand-400" aria-hidden="true" />
             מילים שמופיעות בחדשות היום
           </h2>
         ) : (
-          <div className="mb-12 max-w-3xl">
-            <PopHeadline lead="מילון AI" accent="מהחדשות של היום" />
-            <p className="font-sans text-fluid-body text-zinc-300 [text-shadow:0_1px_12px_rgba(0,0,0,0.7)]">
-              המונחים שחוזרים בכותרות של היום, כל אחד במשפט פשוט. מתעדכן לבד עם החדשות.
-            </p>
+          <div className="grid grid-cols-1 items-end gap-8 lg:grid-cols-12 lg:gap-10">
+            <div className="lg:col-span-8">
+              <h2 className="story-h2">
+                מילון AI <span className="text-brand-400">מהחדשות של היום</span>
+              </h2>
+              <p className="story-body mt-6" data-live="rise">
+                המונחים שחוזרים בכותרות של היום, כל אחד במשפט פשוט. מתעדכן לבד עם החדשות.
+              </p>
+            </div>
+            <div className="flex lg:col-span-4 lg:justify-end">
+              <Depth speed={0.18}>
+                <SiteBot shape="flower" tone="deep" mood="focus" size={120} className="offer-beat__bot" />
+              </Depth>
+            </div>
           </div>
         )}
 
-        <ul className={`mx-auto grid max-w-[1400px] grid-cols-1 gap-4 sm:grid-cols-2 ${compact ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} md:gap-5`}>
+        <ul className={`terms-grid ${compact ? 'terms-grid--compact' : 'mt-12 md:mt-16'}`} data-live="stagger">
           {hits.map(({ term, count, firstId }) => {
             const story = byId.get(firstId);
             return (
-              <li key={term.id} className="glass-panel glass-panel--info flex h-full flex-col rounded-2xl p-5">
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <h3 className="font-display text-lg font-extrabold text-white">{term.label}</h3>
-                  <span className="shrink-0 rounded-full border border-brand-500/30 bg-brand-500/10 px-2.5 py-0.5 text-[11px] font-bold text-brand-300">
-                    {count === 1 ? 'בכתבה אחת' : `ב-${count} כתבות`}
-                  </span>
+              <li key={term.id} className="glyph-frame term-card">
+                <div className="term-card__head">
+                  <h3 className="term-card__term">{term.label}</h3>
+                  <span className="term-card__count">{count === 1 ? 'בכתבה אחת' : `ב-${count} כתבות`}</span>
                 </div>
-                <p className="mb-4 flex-grow text-[15px] leading-relaxed text-zinc-300">{term.text}</p>
+                <p className="term-card__text">{term.text}</p>
                 {story && (
-                  <button
-                    type="button"
-                    onClick={() => setActive(story)}
-                    className="group inline-flex items-start gap-1.5 text-right text-sm text-zinc-400 hover:text-brand-300 focus-visible:outline-none focus-visible:underline"
-                  >
-                    <ArrowLeft className="mt-0.5 h-4 w-4 shrink-0 text-brand-400 transition-transform group-hover:-translate-x-0.5" aria-hidden="true" />
+                  <button type="button" onClick={() => setActive(story)} className="term-card__story group">
+                    <ArrowLeft className="mt-0.5 h-3.5 w-3.5 shrink-0 transition-transform group-hover:-translate-x-0.5" aria-hidden="true" />
                     <span className="line-clamp-2">
-                      <span className="font-bold text-zinc-300">איפה ראינו את זה: </span>
+                      <span className="term-card__where">איפה ראינו את זה: </span>
                       <bdi dir="rtl">{story.title}</bdi>
                     </span>
                   </button>

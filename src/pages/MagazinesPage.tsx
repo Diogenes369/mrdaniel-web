@@ -128,7 +128,7 @@ export default function MagazinesPage() {
           </h2>
           <p className="mt-2 text-zinc-400">{rtl(c.freeSub)}</p>
         </div>
-        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-5 md:grid-cols-2" data-live="stagger">
           {CREATOR_GUIDES.map((g) => (
             <button
               key={g.slug}

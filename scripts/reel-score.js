@@ -5,11 +5,12 @@
  *   await GrokReelScore.render(sheet, { parts })   → number of frames rendered
  *   GrokReelScore.chunk(i, size)                   → base64 of interleaved float32 PCM
  *
- * The music is a minimal groove in D major that keeps time with the deck: four bars to a slide,
- * so every cut lands on a downbeat, and the chord moves with it (D at one slide, G at the next).
- * Soft round kick, a clap on two and four, a quiet shaker, a sub bass, short chord stabs and a pad
- * underneath. The cover is the build: no drums, the chord hanging on A until the first cut drops
- * onto D. The "stops" slide opens without drums, and the close rings out on D.
+ * The music is a minimal groove in D major at the deck's tempo (sheet.bpm, 100): the deck holds
+ * every slide for whole half bars, so each cut lands on the first or third beat. Soft round kick, a
+ * clap on two and four, a quiet shaker on the eighths, a sub bass, short chord stabs and a pad
+ * underneath, the chord moving every two bars (D, Bm, G, A). The cover is the build: no drums, the
+ * chord hanging on A until the first cut drops onto D. The "stops" slide opens with a bar of no
+ * drums, the close is a breakdown, the outro brings the groove back, and the last bar rings on D.
  */
 (function () {
   'use strict';
@@ -28,12 +29,12 @@
   // By bar: the cover hangs on A for its two bars; from the first cut, D-Bm on one slide, G-A on
   // the next.
   const CYCLE = ['A', 'A', 'D', 'D', 'Bm', 'Bm', 'G', 'G'];
-  const CLOSE = ['D', 'D', 'G', 'A', 'D'];
 
-  // Levels, measured as stems (2026-10-06): the effects' active moments sit about 3 LU above the
-  // music, so a click or a stamp reads clearly while the groove stays present under everything.
+  // Levels, measured as stems (2026-10-06, second pass): the soft foley sits about 1 LU above the
+  // music. The sounds are heard as part of the picture without standing on the groove, and their
+  // short strikes leave the master limiter almost nothing to do.
   const MUSIC_GAIN = 0.21;
-  const SFX_GAIN = 2.4;
+  const SFX_GAIN = 1.7;
 
   function kick(ctx, out, t, v) {
     const o = ctx.createOscillator();
@@ -52,8 +53,9 @@
     S.tone(ctx, out, t, { f: 190, f1: 160, glide: 0.05, a: 0.001, d: 0.06, gain: 0.05 * v });
   }
 
+  // A brushed shaker: soft, short and well under the bright top end (the noise is pink).
   function shaker(ctx, out, t, v, pan) {
-    S.hiss(ctx, out, t, { type: 'bandpass', q: 0.9, fr: [[0, 4200]], a: 0.004, d: 0.03, gain: 0.045 * v, pan: pan });
+    S.hiss(ctx, out, t, { type: 'bandpass', q: 1.1, fr: [[0, 3000]], a: 0.006, d: 0.035, gain: 0.07 * v, pan: pan });
   }
 
   function bass(ctx, out, t, midi, len, v) {
@@ -144,26 +146,33 @@
     const end = sheet.duration;
     const slides = sheet.cues.filter((c) => c.type === 'slide').sort((a, b) => a.t - b.t);
     const cuts = slides.slice(1).map((c) => c.t);
-    const gaps = cuts.slice(1).map((t, i) => t - cuts[i]).sort((a, b) => a - b);
-    const span = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 10.4;
-    const bar = span / 4;
+    // The deck holds each slide for whole half bars at sheet.bpm, so the bar comes straight from the
+    // tempo. An older cue sheet without one falls back to four bars per (median) slide.
+    let bar;
+    if (sheet.bpm) bar = (4 * 60) / sheet.bpm;
+    else {
+      const gaps = cuts.slice(1).map((t, i) => t - cuts[i]).sort((a, b) => a - b);
+      bar = (gaps.length ? gaps[Math.floor(gaps.length / 2)] : 10.4) / 4;
+    }
     const step = bar / 16;
     const first = cuts.length ? cuts[0] : 2 * bar;
     const origin = first - Math.floor(first / bar + 1e-6) * bar;
-    const lastCut = cuts.length ? cuts[cuts.length - 1] : end;
-    const slideAt = (t) => cuts.filter((c) => c <= t + 1e-6).length;
+    const firstBar = Math.round((first - origin) / bar);
+    const slideAt = (t) => slides.filter((c) => c.t <= t + 1e-6).pop() || { key: 'cover', t: 0 };
 
+    // The cover hangs on A; the first cut drops onto D and the groove comes in. "stops" opens with a
+    // bar of no drums, the close is a breakdown (pad and bass only), the outro brings the groove
+    // back for the brand, and the last bar rings out on D.
     const plan = [];
     for (let b = 0; origin + b * bar < end - 0.05; b++) {
       const tb = origin + b * bar;
-      const s = slideAt(tb + 0.01);
-      const sl = slides[s] || {};
-      const inClose = s === slides.length - 1 && slides.length > 1;
-      const closeBar = inClose ? Math.round((tb - lastCut) / bar) : -1;
-      const name = inClose ? CLOSE[Math.min(CLOSE.length - 1, closeBar)] : CYCLE[b % CYCLE.length];
-      const intoSlide = Math.round((tb - (sl.t || 0)) / bar);
-      const drums = s > 0 && !(sl.key === 'stops' && intoSlide < 2) && !(inClose && closeBar >= 2);
-      plan.push({ tb: tb, name: name, drums: drums, ring: inClose && closeBar >= 4, cover: s === 0 });
+      const sl = slideAt(tb + 0.01);
+      const cover = b < firstBar;
+      const ring = tb + bar >= end - 0.05 && b > firstBar;
+      const name = cover ? 'A' : ring ? 'D' : CYCLE[(b - firstBar + 2) % CYCLE.length];
+      const into = (tb - sl.t) / bar;
+      const drums = !cover && !ring && sl.key !== 'close' && !(sl.key === 'stops' && into < 0.99);
+      plan.push({ tb: tb, name: name, drums: drums, ring: ring, cover: cover, soft: sl.key === 'close' });
     }
 
     // The pad, one span per chord, rising out of silence under the cover.
@@ -191,8 +200,14 @@
           if (k === 0 || k === 10 || (k === 7 && b % 2 === 1)) kick(ctx, out, t, k === 0 ? 1 : 0.75);
           if (k === 4 || k === 12) clap(ctx, out, t, 0.85);
         }
-        // A hint of swing on the off sixteenths; quieter while the drums are out.
-        shaker(ctx, out, t + (k % 2 ? step * 0.1 : 0), [0.55, 0.28, 0.85, 0.3][k % 4] * (p.drums ? 1 : 0.6), k % 4 === 2 ? 0.25 : -0.15);
+        // Eighths only, the off ones a touch later and softer; out with the drums.
+        if (p.drums && k % 2 === 0) shaker(ctx, out, t + (k % 4 ? step * 0.18 : 0), k % 4 ? 0.55 : 0.9, k % 8 === 4 ? 0.25 : -0.15);
+      }
+      if (p.soft) {
+        bass(ctx, out, p.tb, ch.bass, bar * 0.5 - 0.02, 0.8);
+        bass(ctx, out, p.tb + bar * 0.5, ch.bass, bar * 0.5 - 0.02, 0.7);
+        stab(ctx, out, p.tb + 3 * step, ch.keys, 0.6, 0.6);
+        return;
       }
       const notes = b % 2 ? [[0, 5, 0], [7, 2, 0], [10, 4, 0]] : [[0, 6, 0], [10, 3, 0], [14, 2, 7]];
       notes.forEach(([k, len, up]) => bass(ctx, out, p.tb + k * step, ch.bass + up, len * step * 0.92, 1));

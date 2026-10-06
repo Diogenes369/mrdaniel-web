@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import NewsTicker from './components/NewsTicker';
@@ -18,6 +18,7 @@ import { ScrollTrigger } from './lib/gsap';
 import RouteSeo from './components/seo/RouteSeo';
 import { shouldMountScene } from './lib/perfMode';
 import { mountSceneMotion } from './lib/sceneMotion';
+import { mountLiveLayer } from './lib/liveLayer';
 import { useInsightsPrefetch } from './services/newsInsightsService';
 
 // The site's background since 2026-10-01: the glyph field — a live scene rendered as typewriter
@@ -85,8 +86,15 @@ function usePrefetchRoutes(enabled: boolean) {
 import ErrorBoundary, { PageErrorFallback } from './components/ErrorBoundary';
 
 /** Mounted as the last child inside the route Suspense boundary, so its effect runs only once the
- * page chunk has rendered — the desktop scene layer then measures the page that is actually there. */
+ * page chunk has rendered — the desktop scene layer then measures the page that is actually there.
+ * The live layer (every device) runs before paint, so an element that is about to arrive never
+ * shows for a frame first. */
 function SceneMotionMount() {
+  useLayoutEffect(() => {
+    const main = document.querySelector('main');
+    if (!main) return;
+    return mountLiveLayer(main as HTMLElement);
+  }, []);
   useEffect(() => {
     const main = document.querySelector('main');
     if (!main) return;

@@ -68,7 +68,7 @@ export default function AboutPage() {
             <LayoutGrid className="w-5 h-5 text-brand-400" />
             <h3 className="font-display font-bold text-xl text-white">כל שירותי האתר במקום אחד</h3>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3" data-live="stagger">
             {HUB_LINKS.map((item) => (
               <Link
                 key={item.to}

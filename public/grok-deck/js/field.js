@@ -562,8 +562,11 @@ void main() {
     ctx.lineJoin = 'round';
     ctx.lineWidth = fontPx * 0.035;
     ctx.font = `${cs.fontWeight} ${STRETCH[cs.fontStretch] || ''} ${fontPx}px ${cs.fontFamily}`;
-    ctx.direction = 'rtl';
-    ctx.textAlign = 'right';
+    // Each word is drawn where the page laid it out, in the element's own direction: a Latin name
+    // set dir="ltr" ("MR. DANIEL") keeps its full stop after the R instead of before the M.
+    const ltr = cs.direction === 'ltr';
+    ctx.direction = ltr ? 'ltr' : 'rtl';
+    ctx.textAlign = ltr ? 'left' : 'right';
     ctx.textBaseline = 'alphabetic';
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     const range = document.createRange();
@@ -576,8 +579,9 @@ void main() {
         const r = range.getBoundingClientRect();
         if (r.width < 1) continue;
         const ascent = ctx.measureText(m[0]).fontBoundingBoxAscent || fontPx * 0.9;
-        ctx.strokeText(m[0], r.right - box.left, r.top - box.top + ascent);
-        ctx.fillText(m[0], r.right - box.left, r.top - box.top + ascent);
+        const x = ltr ? r.left - box.left : r.right - box.left;
+        ctx.strokeText(m[0], x, r.top - box.top + ascent);
+        ctx.fillText(m[0], x, r.top - box.top + ascent);
       }
     }
     renderer.setMask(c);

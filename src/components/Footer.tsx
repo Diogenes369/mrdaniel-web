@@ -4,6 +4,7 @@ import type React from 'react';
 import { Mail, Check, Copy } from 'lucide-react';
 import SocialLinks from './SocialLinks';
 import Logo from './Logo';
+import { BotCrew } from './bots/SiteBot';
 import { smoothScrollTo, scrollToTopSmooth } from '../hooks/useLenis';
 import { FOOTER_COPY } from '../data/siteCopy';
 import { rtl } from '../lib/rtl';
@@ -150,10 +151,12 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-between gap-4 border-t border-dotted border-[var(--color-rule)] pt-6 text-center text-xs text-ink-faint sm:flex-row sm:text-right">
+        <div className="flex flex-col items-center justify-between gap-5 border-t border-dotted border-[var(--color-rule)] pt-6 text-center text-xs text-ink-faint sm:flex-row sm:text-right">
           <div dir="ltr" className="font-type tracking-wide">
             © {new Date().getFullYear()} MR. DANIEL. ALL RIGHTS RESERVED.
           </div>
+          {/* The crew sees you off: the Grok Bot deck's bots, waving from the last line. */}
+          <BotCrew size={34} lead={52} />
         </div>
       </div>
     </footer>

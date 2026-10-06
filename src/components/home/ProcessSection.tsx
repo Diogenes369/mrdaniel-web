@@ -1,53 +1,55 @@
 import { ArrowLeft } from 'lucide-react';
-import WebButton from '../WebButton';
-import PopHeadline from './PopHeadline';
+import GlyphButton from '../ui/GlyphButton';
+import SiteBot from '../bots/SiteBot';
 import { PROCESS_COPY } from '../../data/siteCopy';
 import { rtl } from '../../lib/rtl';
+import { useFieldQuiet } from '../field/fieldState';
 
 /**
- * "How a working agent gets built" — three steps under the pillars (homepage redesign, 2026-09-23;
- * the 01/02/03 step numbers were removed 2026-10-01 — the brief bans sequential numbering).
- *
- * The flow it fixes: the page used to go from "here is what agents do" straight to "estimate your
- * savings", which asks for commitment before answering the obvious question in between — what
- * happens if I say yes. Three steps, each ending in the visitor's own decision, lower that step.
- *
- * Layout: a connected rail. Desktop = three columns joined by a glowing line that "charges" left
- * along the RTL reading order (CSS only, `.process-rail`); mobile = a vertical stack with the line
- * running down the right edge. No pinning, no scroll-jacking — it is a plain section.
+ * "How a working agent gets built": three stops on one dotted line (glyph world since 2026-10-06;
+ * the 01/02/03 numbers were removed 2026-10-01, the brief bans sequential numbering). Order is the
+ * line itself, read from the right: when the stops scroll in, they light one after another and a
+ * small bot walks the line from the first to the last. On a phone the line runs down the reading
+ * edge and the bot waits at the top. No pinning, no scroll-jacking.
  */
 export default function ProcessSection() {
   const c = PROCESS_COPY;
+  const quiet = useFieldQuiet();
   const openLead = () =>
-    window.dispatchEvent(
-      new CustomEvent('open-lead-modal', { detail: { subject: 'אפיון סוכן AI', sourceSection: 'Home · Process' } })
-    );
+    window.dispatchEvent(new CustomEvent('open-lead-modal', { detail: { subject: 'אפיון סוכן AI', sourceSection: 'Home · Process' } }));
 
   return (
-    <section id="process" className="relative py-20 md:py-28 overflow-x-clip cv-auto">
-      <div className="container-wide relative z-10">
-        <div className="max-w-3xl mb-12 md:mb-16">
-          <PopHeadline lead={rtl(c.lead)} accent={rtl(c.accent)} />
-          <p className="story-body">{rtl(c.sub)}</p>
+    <section id="process" className="story-beat">
+      <div className="container-wide">
+        <div ref={quiet} className="max-w-3xl">
+          <h2 className="story-h2">
+            {rtl(c.lead)} <span className="text-brand-400">{rtl(c.accent)}</span>
+          </h2>
+          <p className="story-body mt-6" data-live="rise">
+            {rtl(c.sub)}
+          </p>
         </div>
 
-        <ol className="process-rail relative mx-auto grid max-w-[1400px] gap-5 md:grid-cols-3 md:gap-6" dir="rtl">
-          {c.steps.map((s) => (
-            <li key={s.title} className="process-step relative">
-              <div className="glass-panel glass-panel--marketing h-full rounded-3xl p-7 lg:p-9">
-                <span className="process-step__node" aria-hidden="true" />
-                <h3 className="mb-3 font-display text-xl font-extrabold text-white lg:text-2xl">{rtl(s.title)}</h3>
-                <p className="text-base leading-relaxed text-zinc-300 lg:text-lg">{rtl(s.body)}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <div className="process-line mt-14 md:mt-20">
+          <ol className="process-stops" data-live="stagger" data-live-delay="150">
+            {c.steps.map((s) => (
+              <li key={s.title} className="process-stop">
+                <span className="process-stop__node" aria-hidden="true" />
+                <h3 className="process-stop__title">{rtl(s.title)}</h3>
+                <p className="process-stop__body">{rtl(s.body)}</p>
+              </li>
+            ))}
+          </ol>
+          <span className="process-walker" aria-hidden="true">
+            <SiteBot shape="triangle" tone="fill" mood="focus" size={62} hop="tap" />
+          </span>
+        </div>
 
         <div className="mt-12 flex">
-          <WebButton variant="primary" onClick={openLead} className="cta-sheen !px-8">
+          <GlyphButton onClick={openLead}>
             {rtl(c.cta)}
-            <ArrowLeft className="w-4 h-4" />
-          </WebButton>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          </GlyphButton>
         </div>
       </div>
     </section>

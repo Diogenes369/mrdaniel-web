@@ -28,6 +28,18 @@
       tl.from(S.q('.hint'), { opacity: 0, duration: 0.8 }, 1.8);
       if (S.first) S.at(0.15, () => S.main.assemble({ duration: 1.5 }));
       else S.at(0.1, () => S.main.setMood('happy'));
+      // The reel opens with the whole crew: once the bot has built itself, four more pop in around
+      // it, so the first frame anyone sees (and the cover) is the cast, not one face.
+      if (S.first && document.documentElement.dataset.mode === 'reel') {
+        S.at(2.2, () => {
+          const m = S.anchor('main');
+          const crew = [['k1', 'triangle', 'fill', -0.82, 0.2, 0.36], ['k2', 'square', 'hi', 0.82, 0.2, 0.36], ['k3', 'flower', 'deep', -1.25, -0.08, 0.27], ['k4', 'diamond', 'pale', 1.25, -0.08, 0.27]];
+          crew.forEach(([id, shape, tone, dx, dy, k], i) => {
+            const b = S.spawn(id, { x: m.x + dx * m.w, y: m.y + dy * m.w, size: m.w * k, shape: shape, tone: tone, hidden: true, mood: 'happy' });
+            b.popIn({ delay: 0.1 + i * 0.12 });
+          });
+        });
+      }
       S.at(S.first ? 2.1 : 0.9, () => { S.main.look(S.q('.cover-display')); S.main.setMood('idle'); });
       S.at(S.first ? 3.3 : 2.1, () => { S.main.look(S.q('.cover-cta .gbtn')); });
       S.at(S.first ? 4.1 : 2.9, () => { S.main.look(null); S.main.setMood('happy'); S.main.nod(); });
@@ -141,6 +153,8 @@
   SLIDES.control = {
     section: 'מה הוא יודע',
     field: CALM,
+    // The cursor, the click and "sent" run on S.later after the timeline's last entry.
+    tail: 2.8,
     main: { anchor: 'main', shape: 'circle', tone: 'ink', mood: 'idle' },
     enter(S) {
       const tl = S.tl;
@@ -677,6 +691,55 @@
       });
       S.rise(S.q('.statement'), 4.1);
       S.at(4.0, () => { S.main.setMood('happy'); S.main.look(null); });
+    },
+  };
+
+  // ── outro (the reel only): the brand ─────────────────────────────────────────────────────────
+  // The field writes the name, the address types itself, a click "opens" the site, and the crew
+  // turns up to wave. Every move has its sound: keys, the click, the page loading, the crew landing.
+  SLIDES.outro = {
+    section: '',
+    field: { chaos: 0.38, order: 0.66, calm: 0.84, lens: 0.75, dim: 0.38 },
+    mask: '.outro-display',
+    fill: 'mrdaniel',
+    main: { anchor: 'main', shape: 'circle', tone: 'ink', mood: 'happy' },
+    enter(S) {
+      const tl = S.tl;
+      S.decode(S.q('.outro-kicker'), 0.1);
+      if (!S.fieldOk) tl.from(S.q('.outro-display'), { yPercent: 16, opacity: 0, duration: 1.0, ease: 'expo.out' }, 0.2);
+      S.frameIn(S.q('.outro-bar'), 0.5);
+      tl.from(S.q('.outro-lock'), { scale: 0, duration: 0.45, ease: 'back.out(3)' }, 0.75);
+      S.typeText(S.q('.outro-url .addr-text'), 'mrdaniel.co.il', 0.9, 18);
+      tl.from(S.q('.outro-go'), { scale: 0, duration: 0.4, ease: 'back.out(3)' }, 1.3);
+      S.at(0.3, () => S.main.look(S.q('.outro-bar')));
+      S.at(1.5, () => {
+        const go = S.q('.outro-go');
+        const p = S.point(go);
+        const c = S.cursor({ x: p.x + 150, y: p.y + 190 });
+        S.main.look(c.el);
+        c.moveTo(p.x + 10, p.y + 8, { duration: 0.55 });
+        S.later(0.62, () => { c.click(); S.cls(go, 'is-pressed'); S.ripple(p.x, p.y); });
+        S.later(0.9, () => go.classList.remove('is-pressed'));
+        S.later(1.25, () => c.away());
+      });
+      // ...and the site loads: the line runs across the bar, the name brightens, the crew turns up.
+      tl.fromTo(S.q('.outro-load'), { scaleX: 0, opacity: 1 }, { scaleX: 1, duration: 0.6, ease: 'power2.inOut' }, 2.2);
+      tl.to(S.q('.outro-load'), { opacity: 0, duration: 0.3 }, 2.85);
+      S.at(2.2, () => S.sfx('sent'));
+      S.at(2.8, () => S.cls(S.q('.outro'), 'is-loaded'));
+      const crew = [['o1', 'triangle', 'fill'], ['o2', 'square', 'hi'], ['o3', 'diamond', 'pale'], ['o4', 'flower', 'deep']];
+      S.at(2.85, () => {
+        crew.forEach(([id, shape, tone], i) => {
+          const a = S.anchor(id);
+          const b = S.spawn(id, { x: a.x, y: a.y, size: a.w, shape: shape, tone: tone, hidden: true, mood: 'happy' });
+          b.popIn({ delay: i * 0.11 });
+        });
+        S.main.look(null);
+        S.main.setMood('happy');
+      });
+      S.wipe(S.q('.outro-sub'), 3.0);
+      S.at(3.9, () => S.bots().forEach((b, i) => S.later(i * 0.09, () => b.hopInPlace(24))));
+      S.at(4.6, () => S.main.wave());
     },
   };
 

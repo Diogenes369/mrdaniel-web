@@ -1,14 +1,40 @@
 import { type ReactNode } from 'react';
-import { motion } from 'motion/react';
 import { Mail, MessageCircle, type LucideIcon } from 'lucide-react';
 import WebButton from '../WebButton';
 import SocialLinks, { CONTACT_EMAIL, buildWhatsAppUrl } from '../SocialLinks';
-import TitleUnderline from '../TitleUnderline';
+import SiteBot from '../bots/SiteBot';
+import type { BotShape, BotTone } from '../bots/botShapes';
+import { useFieldQuiet } from '../field/fieldState';
+
+/**
+ * The shared blocks of the inner pages (About, AI, JARVIS, News). Moved into the glyph world on
+ * 2026-10-06, so every page that uses them changed at once: the site's headline voice (Rubik Lines)
+ * and a typing caret instead of the gradient underline and the icon in front of every heading,
+ * dotted frames with square corners instead of glowing rounded cards, no 01/02/03 index numbers
+ * (the brief bans them), and the live layer's arrivals (src/lib/liveLayer.ts). Every page hero has
+ * one of the Grok Bot crew standing in its open side; which one is picked from the title, so a page
+ * always gets the same bot.
+ */
+const HERO_BOTS: [BotShape, BotTone][] = [
+  ['circle', 'ink'],
+  ['triangle', 'fill'],
+  ['square', 'hi'],
+  ['diamond', 'pale'],
+  ['flower', 'deep'],
+  ['star', 'hi'],
+  ['heart', 'pale'],
+];
+function botFor(title: string): [BotShape, BotTone] {
+  let h = 0;
+  for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) >>> 0;
+  return HERO_BOTS[h % HERO_BOTS.length];
+}
 
 export function PageHero({
   title,
   subtitle,
   metaChips = [],
+  bot,
 }: {
   /** No longer rendered (the small pill above the title was removed site-wide) — kept optional so
    * existing call sites that still pass a badge don't need to be touched. */
@@ -17,39 +43,46 @@ export function PageHero({
   title: string;
   subtitle: string;
   metaChips?: { icon: LucideIcon; label: string }[];
+  /** Which of the crew hosts the page; picked from the title when not given. */
+  bot?: [BotShape, BotTone];
 }) {
+  const quiet = useFieldQuiet();
+  const [shape, tone] = bot ?? botFor(title);
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className="pt-14 md:pt-20 pb-8"
-    >
-      <div className="group inline-flex max-w-full flex-col items-start mb-5">
-        <h1 className="font-display font-black text-3xl sm:text-5xl lg:text-6xl leading-[1.1] text-white">{title}</h1>
-        <TitleUnderline className="w-full" base="w-14" />
-      </div>
-      <p className={`text-lg md:text-xl text-brand-400 font-semibold leading-relaxed max-w-3xl ${metaChips.length ? 'mb-6' : 'mb-2'}`}>{subtitle}</p>
-      {metaChips.length > 0 && (
-        <div className="flex items-center gap-3 text-sm text-zinc-400 flex-wrap pb-6 border-b border-white/10">
-          {metaChips.map((chip) => (
-            <span key={chip.label} className="inline-flex items-center gap-2 bg-white/[0.03] border border-white/10 px-3 py-1.5 rounded-lg">
-              <chip.icon className="w-3.5 h-3.5 text-brand-400" />
-              {chip.label}
-            </span>
-          ))}
+    <div className="grid grid-cols-1 items-end gap-8 pb-8 pt-14 md:pt-20 lg:grid-cols-12 lg:gap-10">
+      <div ref={quiet} className="lg:col-span-9">
+        <h1 className="page-hero__title">{title}</h1>
+        <div className="mt-5 flex items-center gap-2" aria-hidden="true">
+          <span className="story-statusbar__live" />
+          <span className="h-px w-24 border-t border-dotted border-[var(--color-rule)]" />
         </div>
-      )}
-    </motion.div>
+        <p className={`page-hero__sub ${metaChips.length ? 'mb-6' : 'mb-2'}`} data-live="wipe">
+          {subtitle}
+        </p>
+        {metaChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-dotted border-[var(--color-rule)] pb-6" data-live="stagger">
+            {metaChips.map((chip) => (
+              <span key={chip.label} className="inline-flex items-center gap-2 font-type text-[12.5px] font-bold text-ink-faint">
+                <chip.icon className="h-3.5 w-3.5 text-brand-400" aria-hidden="true" />
+                {chip.label}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="flex lg:col-span-3 lg:justify-end">
+        <SiteBot shape={shape} tone={tone} mood="happy" size={118} className="offer-beat__bot" />
+      </div>
+    </div>
   );
 }
 
 export function SectionHeading({
-  icon: Icon,
   title,
   description,
 }: {
-  icon: LucideIcon;
+  /** No longer drawn (2026-10-06): headings speak in type, not in icons. Kept for call sites. */
+  icon?: LucideIcon;
   title: string;
   description: string;
   /** Deprecated / ignored. Previously made the heading `position: sticky` on mobile; that was
@@ -59,16 +92,16 @@ export function SectionHeading({
   sticky?: boolean;
 }) {
   return (
-    <div className="mb-8">
-      <div className="group inline-flex max-w-full flex-col items-start mb-3">
-        <h2 className="flex items-center gap-3 font-display font-black text-2xl sm:text-3xl lg:text-4xl text-white">
-          <Icon className="w-6 h-6 lg:w-7 lg:h-7 text-brand-400 shrink-0" />
-          <span>{title}</span>
-        </h2>
-        <TitleUnderline className="w-full" base="w-12" />
+    <div className="mb-9">
+      <h2 className="story-h2">{title}</h2>
+      <div className="mt-4 flex items-center gap-2" aria-hidden="true">
+        <span className="story-statusbar__live" />
+        <span className="h-px w-20 border-t border-dotted border-[var(--color-rule)]" />
       </div>
       {/* Description stays a comfortable measure even inside a wide `.container-wide` page. */}
-      <p className="text-zinc-400 text-base md:text-lg max-w-3xl">{description}</p>
+      <p className="story-body mt-5 max-w-3xl" data-live="rise">
+        {description}
+      </p>
     </div>
   );
 }
@@ -77,10 +110,10 @@ export function SectionHeading({
  * site-wide) — kept optional so existing call sites that still pass one don't need to be touched. */
 export function InfoBox({ title, children }: { badgeIcon?: LucideIcon; badgeLabel?: string; title?: string; children: ReactNode }) {
   return (
-    <div className="glass-panel glass-panel--info rounded-2xl p-5 sm:p-6 lg:p-10 mb-16">
-      {title && <h2 className="font-display font-black text-xl md:text-2xl text-white mb-4">{title}</h2>}
+    <div className="glyph-frame mb-16 p-5 sm:p-6 lg:p-10" data-live="frame">
+      {title && <h2 className="story-h2 mb-5 !text-[clamp(1.5rem,1rem+1.6vw,2.4rem)]">{title}</h2>}
       {/* Prose measure so a wide page doesn't stretch these paragraphs past a readable line length. */}
-      <div className="space-y-4 text-base md:text-lg text-zinc-300 leading-[1.85] max-w-4xl">{children}</div>
+      <div className="max-w-4xl space-y-4 text-base leading-[1.85] text-ink-muted md:text-lg">{children}</div>
     </div>
   );
 }
@@ -91,74 +124,43 @@ export interface ServiceItem {
   description: string;
 }
 
+function Cell({ item, big = false }: { item: ServiceItem; big?: boolean }) {
+  return (
+    <div className={`glyph-frame frame-cell ${big ? 'frame-cell--big' : ''}`}>
+      <span className="frame-cell__icon" aria-hidden="true">
+        <item.icon className={big ? 'h-6 w-6' : 'h-5 w-5'} />
+      </span>
+      <div className="min-w-0">
+        <h3 className="frame-cell__title">{item.title}</h3>
+        <p className="frame-cell__text">{item.description}</p>
+      </div>
+    </div>
+  );
+}
+
 export function ServiceGrid({ items }: { items: ServiceItem[] }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6 mb-16">
+    <div className="mb-16 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-3" data-live="stagger">
       {items.map((item) => (
-        <motion.div
-          key={item.title}
-          className="glass-panel glass-panel--marketing rounded-2xl p-5 sm:p-6 lg:p-8"
-        >
-          <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-brand-400 mb-4">
-            <item.icon className="w-6 h-6" />
-          </div>
-          <h3 className="font-display font-bold text-lg text-white mb-2 leading-snug">{item.title}</h3>
-          <p className="text-zinc-400 text-base leading-relaxed">{item.description}</p>
-        </motion.div>
+        <Cell key={item.title} item={item} />
       ))}
     </div>
   );
 }
 
-/** One card in `InteractiveServiceGrid` — `featured` renders it full-width with larger type and an
- * icon-beside-text layout (used for the first item only, to establish visual hierarchy); the rest
- * render as a standard 2-col grid card. The oversized, near-invisible index number in the corner
- * plus the hover-triggered border/glow/icon-fill are what make this read as "interactive" versus
- * the plain ServiceGrid above — all pure CSS/motion hover, so touch devices still get a clean
- * static card with no broken hover-only affordance. */
-function InteractiveServiceCard({ item, index, featured = false }: { item: ServiceItem; index: number; featured?: boolean }) {
-  return (
-    <motion.div
-      whileHover={{ y: -4 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-      className={`glass-panel glass-panel--marketing group rounded-2xl p-5 sm:p-6 lg:p-8 ${
-        featured ? 'md:flex md:items-center md:gap-8' : ''
-      }`}
-    >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -left-2 -top-6 font-display font-black text-white/[0.04] group-hover:text-brand-500/10 transition-colors select-none leading-none"
-        style={{ fontSize: featured ? '9rem' : '6rem' }}
-      >
-        {String(index + 1).padStart(2, '0')}
-      </span>
-      <div
-        className={`relative z-10 shrink-0 w-14 h-14 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-brand-400 mb-4 md:mb-0 group-hover:bg-brand-500/15 group-hover:border-brand-500/40 group-hover:text-brand-300 transition-colors ${
-          featured ? 'md:w-16 md:h-16' : ''
-        }`}
-      >
-        <item.icon className={featured ? 'w-7 h-7' : 'w-6 h-6'} />
-      </div>
-      <div className="relative z-10">
-        <h3 className={`font-display font-bold text-white mb-2 leading-snug ${featured ? 'text-xl md:text-2xl' : 'text-lg'}`}>{item.title}</h3>
-        <p className={`text-zinc-400 leading-relaxed ${featured ? 'text-base md:text-lg' : 'text-base'}`}>{item.description}</p>
-      </div>
-    </motion.div>
-  );
-}
-
-/** Sleeker alternative to `ServiceGrid` for pages that want stronger visual hierarchy — the first
- * item is promoted to a full-width featured card, the rest sit in a 2-col grid beneath it. Same
- * `ServiceItem[]` shape, so any page can swap between the two without touching its data. */
+/** The first item leads, full width and larger; the rest sit in a grid beneath it. Same
+ * `ServiceItem[]` shape as ServiceGrid, so any page can swap between the two. */
 export function InteractiveServiceGrid({ items }: { items: ServiceItem[] }) {
   if (items.length === 0) return null;
   const [featured, ...rest] = items;
   return (
-    <div className="mb-16 space-y-5">
-      <InteractiveServiceCard item={featured} index={0} featured />
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6">
-        {rest.map((item, i) => (
-          <InteractiveServiceCard key={item.title} item={item} index={i + 1} />
+    <div className="mb-16 space-y-4 md:space-y-5">
+      <div data-live="frame">
+        <Cell item={featured} big />
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-3" data-live="stagger">
+        {rest.map((item) => (
+          <Cell key={item.title} item={item} />
         ))}
       </div>
     </div>
@@ -167,13 +169,13 @@ export function InteractiveServiceGrid({ items }: { items: ServiceItem[] }) {
 
 export function SpecTable({ rows }: { rows: { label: string; value: ReactNode }[] }) {
   return (
-    <div className="glass-panel glass-panel--info overflow-x-auto rounded-2xl mb-16">
+    <div className="glyph-frame mb-16 overflow-x-auto" data-live="frame">
       <table className="w-full text-right text-base">
         <tbody>
           {rows.map((row, idx) => (
-            <tr key={row.label} className={idx !== rows.length - 1 ? 'border-b border-white/10' : ''}>
-              <th className="p-4 md:p-5 bg-white/[0.03] text-brand-400 font-bold w-1/3 align-top">{row.label}</th>
-              <td className="p-4 md:p-5 text-zinc-300 leading-relaxed">{row.value}</td>
+            <tr key={row.label} className={idx !== rows.length - 1 ? 'border-b border-dotted border-[var(--color-rule)]' : ''}>
+              <th className="w-1/3 p-4 align-top font-type text-[14px] font-bold text-brand-400 md:p-5">{row.label}</th>
+              <td className="p-4 leading-relaxed text-ink-muted md:p-5">{row.value}</td>
             </tr>
           ))}
         </tbody>
@@ -190,12 +192,12 @@ export interface AudienceItem {
 
 export function AudienceGrid({ items }: { items: AudienceItem[] }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 md:gap-6 mb-16">
+    <div className="mb-16 grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 xl:grid-cols-3" data-live="stagger">
       {items.map((item) => (
-        <div key={item.title} className="glass-panel glass-panel--marketing rounded-2xl p-5 sm:p-6 lg:p-8">
-          <div className="font-mono text-xs font-bold text-brand-400 mb-2 uppercase tracking-wide">{item.tag}</div>
-          <h3 className="font-display font-bold text-lg text-white mb-2">{item.title}</h3>
-          <p className="text-zinc-400 text-base leading-relaxed">{item.description}</p>
+        <div key={item.title} className="glyph-frame frame-cell frame-cell--stack">
+          <p className="font-type text-[12px] font-bold text-brand-400">{item.tag}</p>
+          <h3 className="frame-cell__title mt-1.5">{item.title}</h3>
+          <p className="frame-cell__text">{item.description}</p>
         </div>
       ))}
     </div>
@@ -211,19 +213,16 @@ export interface TocEntry {
 
 export function TocGrid({ items }: { items: TocEntry[] }) {
   return (
-    <div className="glass-panel glass-panel--info rounded-2xl p-5 sm:p-6 lg:p-8 mb-16">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className="glyph-frame mb-16 p-4 sm:p-5 lg:p-6" data-live="frame">
+      <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2" data-live="stagger">
         {items.map((item) => (
-          <div
-            key={item.title}
-            className={`flex gap-4 p-4 bg-black/25 border border-white/5 rounded-xl ${item.wide ? 'sm:col-span-2 bg-brand-500/5 border-brand-500/20' : ''}`}
-          >
-            <span className={`shrink-0 h-fit font-bold text-sm px-2.5 py-1 rounded-md ${item.wide ? 'bg-brand-500 text-black' : 'bg-brand-500/15 text-brand-400'}`}>
+          <div key={item.title} className={`flex gap-4 border-b border-dotted border-[var(--color-rule)] px-1 py-4 ${item.wide ? 'sm:col-span-2' : ''}`}>
+            <span className={`h-fit shrink-0 px-2 py-1 font-type text-[12px] font-bold ${item.wide ? 'bg-brand-400 text-ground' : 'border border-dotted border-[var(--color-rule)] text-brand-400'}`}>
               {item.badge}
             </span>
             <div>
-              <strong className="block text-white text-base mb-1">{item.title}</strong>
-              <span className="block text-zinc-400 text-sm leading-relaxed">{item.description}</span>
+              <strong className="mb-1 block text-base text-ink-paper">{item.title}</strong>
+              <span className="block text-sm leading-relaxed text-ink-muted">{item.description}</span>
             </div>
           </div>
         ))}
@@ -233,27 +232,26 @@ export function TocGrid({ items }: { items: TocEntry[] }) {
 }
 
 /**
- * Minimalist, high-converting bottom CTA — replaces the old two-card/four-button `DualCta` layout
- * with one clean panel: a direct mailto button, a direct WhatsApp button (both pre-filled with
- * page-specific context), and the full social bar underneath. `mailSubject`/`whatsappMessage` let
- * each page keep its own contextual copy without needing separate card content.
+ * The bottom call to action: one frame with a direct mailto, a direct WhatsApp (both pre-filled with
+ * page-specific context) and the social bar underneath. `mailSubject`/`whatsappMessage` let each
+ * page keep its own contextual copy.
  */
 export function UnifiedCta({ mailSubject, whatsappMessage }: { mailSubject: string; whatsappMessage: string }) {
   return (
-    <div className="glass-panel glass-panel--marketing rounded-2xl p-6 sm:p-8 lg:p-10 mb-8 text-center">
-      <p className="text-zinc-400 text-base md:text-lg mb-7 max-w-xl mx-auto">הדרך המהירה ביותר להתחיל — פנייה ישירה במייל או ב-WhatsApp, בלי טפסים מיותרים.</p>
-      <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
+    <div className="glyph-frame mb-8 p-6 text-center sm:p-8 lg:p-10" data-live="frame">
+      <p className="story-body mx-auto mb-7 max-w-xl">הדרך המהירה ביותר להתחיל — פנייה ישירה במייל או ב-WhatsApp, בלי טפסים מיותרים.</p>
+      <div className="mb-8 flex flex-wrap items-center justify-center gap-4">
         <WebButton variant="primary" href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(mailSubject)}`}>
-          <Mail className="w-4 h-4" />
+          <Mail className="h-4 w-4" />
           פנייה ישירה במייל
         </WebButton>
         <WebButton variant="glass" href={buildWhatsAppUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
-          <MessageCircle className="w-4 h-4" />
+          <MessageCircle className="h-4 w-4" />
           פנייה ישירה ב-WhatsApp
         </WebButton>
       </div>
-      <div className="flex flex-col items-center gap-3 pt-7 border-t border-white/10">
-        <span className="text-xs font-mono font-bold text-zinc-500 uppercase tracking-widest">או דרך הרשתות החברתיות</span>
+      <div className="flex flex-col items-center gap-3 border-t border-dotted border-[var(--color-rule)] pt-7">
+        <span className="font-type text-xs font-bold text-ink-faint">או דרך הרשתות החברתיות</span>
         <SocialLinks />
       </div>
     </div>
