@@ -15,6 +15,7 @@
  * The three pillars, in this order everywhere: (1) building AI agents, (2) the model lab — new
  * models tried out and explained, (3) the AI news + practical guides hub.
  */
+import { ltr } from '../lib/rtl';
 
 export const HERO_COPY = {
   // Learners first since 2026-10-01 (by decision): the opening meets the visitor's real fear — being
@@ -203,4 +204,25 @@ export const ABOUT_COPY = {
   quote: 'AI טוב נמדד בעבודה שהוא מוריד מכם, לא בהדגמה שהוא מייצר.',
   ctaTitle: 'בואו נבנה סוכן שעובד',
   ctaDescription: 'שיחה קצרה על העבודה שחוזרת אצלכם, ובסופה תוכנית פשוטה וברורה.',
+};
+
+/**
+ * "סוכן GROK" (2026-10-06): the live Grok Bot deck (public/grok-deck — static HTML, GSAP and its
+ * own glyph field) on its own page (/grok), in the main menu, and as a homepage section. The deck
+ * carries its own copy; only the framing around it lives here.
+ */
+export const GROK_COPY = {
+  nav: 'סוכן GROK',
+  kicker: 'Grok Bot',
+  kickerTail: 'מצגת חיה',
+  title: 'סוכן GROK',
+  lead: 'מה Grok Bot יודע לעשות, ואיך עובדים איתו באמת',
+  sub: 'רובנו עדיין מדברים עם Grok כמו עם צ׳אט. Grok Bot מקבל משימה, עובד עליה במחשב משלו וחוזר רק כשצריך אתכם. במצגת הזאת עוברים על מה שהוא יודע, איך מתחילים, ואיפה רוב האנשים נתקעים. מתחת למצגת הכל כתוב גם במילים, בקצב שלכם.',
+  homeSub: 'Grok Bot מקבל משימה, עובד עליה במחשב משלו וחוזר רק כשצריך אתכם. מצגת חיה בעברית פשוטה על מה שהוא יודע ואיך מעבירים לו עבודה אמיתית.',
+  howTo: 'לוחצים על השקף או על החצים כדי לעבור',
+  fullscreen: 'מסך מלא',
+  open: 'לכל המצגת',
+  frameTitle: 'סוכן GROK, מצגת חיה על Grok Bot',
+  // The handle is isolated: left to rtl(), its "@" lands on the Hebrew side and reads "maestrooth@".
+  sources: `מבוסס על המאמר של ${ltr('@maestrooth')} ב-X ועל העמודים הרשמיים של Grok Bot, נכון לאוקטובר 2026.`,
 };

@@ -1,4 +1,4 @@
-import { Home, Workflow, Layers, BookOpen, Mail, Newspaper, AtSign, Share2, type LucideIcon } from 'lucide-react';
+import { Home, Workflow, Layers, BookOpen, Mail, Newspaper, AtSign, Share2, Bot, type LucideIcon } from 'lucide-react';
 
 export interface SearchEntry {
   id: string;
@@ -24,6 +24,7 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { id: 'hero', title: 'עמוד הבית', snippet: 'לומדים AI בעברית פשוטה, צעד אחרי צעד', keywords: 'home דף הבית ראשי', icon: Home, route: '/', targetSelector: '#hero' },
   { id: 'story-launches', title: 'השקות AI אחרונות', snippet: 'המודלים והכלים שיצאו בימים האחרונים', keywords: 'launches השקות מודלים חדשים models', icon: Layers, route: '/', targetSelector: '#story' },
   { id: 'story-path', title: 'המסלול ללמוד AI', snippet: 'מהצעד הראשון ועד לבנות כמו מפתחים', keywords: 'learn path מסלול ללמוד מתחילים מפתחים', icon: BookOpen, route: '/', targetSelector: '#path' },
+  { id: 'grok-agent', title: 'סוכן GROK', snippet: 'מצגת חיה על Grok Bot ואיך מעבירים לו עבודה', keywords: 'grok bot xai cursor גרוק סוכן מצגת', icon: Bot, route: '/', targetSelector: '#grok-agent' },
   { id: 'story-start', title: 'מדריך חינם למתחילים', snippet: 'בינה מלאכותית מהיסודות, להורדה', keywords: 'guide מדריך חינם pdf מתחילים', icon: BookOpen, route: '/', targetSelector: '#start' },
   { id: 'offer-ai-agents', title: 'סוכני AI', snippet: 'סוכנים שעונים בוואטסאפ, קובעים פגישות ומכינים מסמכים בשבילכם', keywords: 'agents סוכנים אוטומציה whatsapp', icon: Workflow, route: '/', targetSelector: '#offer-ai-agents' },
   { id: 'offer-llm-lab', title: 'מעבדת מודלים', snippet: 'כל מודל AI חדש נבדק, ומה כדאי לבחור לאיזו עבודה', keywords: 'llm מודלים gpt claude gemini grok llama השוואה', icon: Layers, route: '/', targetSelector: '#offer-llm-lab' },
@@ -35,6 +36,7 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { id: 'about-page', title: 'עמוד אודות מלא', snippet: 'בונה סוכני AI ומפרסם חדשות AI בעברית', keywords: 'about אודות רקע', icon: Workflow, route: '/about', targetSelector: '#page-top' },
   { id: 'ai-page', title: 'המדריך לסוכני AI', snippet: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד', keywords: 'AI page עמוד מלא סוכנים', icon: Workflow, route: '/ai', targetSelector: '#page-top' },
   { id: 'jarvis-page', title: 'מערכת JARVIS', snippet: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות', keywords: 'jarvis עוזר אישי assistant', icon: Workflow, route: '/jarvis', targetSelector: '#page-top' },
+  { id: 'grok-page', title: 'סוכן GROK', snippet: 'מה Grok Bot יודע לעשות ואיך עובדים איתו, במצגת ובמדריך כתוב', keywords: 'grok bot xai spacexai cursor גרוק סוכן מצגת מדריך שגרה בודק', icon: Bot, route: '/grok', targetSelector: '#page-top' },
   { id: 'magazines-page', title: 'לומדים AI', snippet: 'מדריכים ומגזינים חדשים על AI, בקרוב', keywords: 'מגזין חוברת מדריך AI guide', icon: BookOpen, route: '/magazines', targetSelector: '#page-top' },
   { id: 'news-page', title: 'עמוד החדשות', snippet: 'כל חדשות ה-AI, מתעדכנות בזמן אמת', keywords: 'news חדשות ai', icon: Newspaper, route: '/news', targetSelector: null },
 ];

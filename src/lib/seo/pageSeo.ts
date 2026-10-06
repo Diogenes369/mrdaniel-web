@@ -54,6 +54,13 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
       breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'מערכת JARVIS', path: '/jarvis' }]),
     ],
   },
+  '/grok': {
+    title: 'סוכן GROK: מה Grok Bot יודע לעשות ואיך עובדים איתו | דניאל בן ברוך',
+    description:
+      'מצגת חיה ומדריך מלא בעברית על Grok Bot: מה הוא יודע לעשות, איך מתחילים, איזו משימה לתת לו קודם, ואיך יודעים שהעבודה טובה. בלי רקע טכני.',
+    path: '/grok',
+    jsonLd: breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'סוכן GROK', path: '/grok' }]),
+  },
   '/news': {
     title: 'חדשות AI בעברית — מודלי שפה, סוכנים וכלים חדשים | דניאל בן ברוך',
     description:

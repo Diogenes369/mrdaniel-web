@@ -20,6 +20,8 @@ type NavLink = { name: string; to?: string; action?: 'contact' };
 const navLinks: NavLink[] = [
   { name: 'סוכני AI', to: '/ai' },
   { name: 'מערכת JARVIS', to: '/jarvis' },
+  // Added 2026-10-06: the live Grok Bot deck (public/grok-deck) on its own page.
+  { name: 'סוכן GROK', to: '/grok' },
   { name: 'לומדים AI', to: '/magazines' },
   // Restored 2026-09-27 at Daniel's request (removed in fe0311e): /news is the full live feed, and
   // the ticker it relied on instead is desktop-only, so phones had no visible way in.
@@ -32,6 +34,7 @@ const SHUFFLE_DESTINATIONS = [
   '/magazines',
   '/ai',
   '/jarvis',
+  '/grok',
   '/about',
   '/news',
 ];

@@ -12,6 +12,16 @@ import { sanitizeHebrewText } from '../agent/hebrewTextSanitizer';
  * because the same few dozen strings re-render on every scroll-driven state change.
  */
 const cache = new Map<string, string>();
+const LRI = String.fromCharCode(0x2066);
+const PDI = String.fromCharCode(0x2069);
+
+/**
+ * An LTR isolate around a token rtl() can't anchor by itself: a handle ("@grok", whose "@" otherwise
+ * lands on the Hebrew side of the word and reads "grok@") or a name that starts with a digit
+ * ("1Password", which the Latin-run match never sees as one word). rtl() leaves isolated spans
+ * alone, so the two compose: rtl(`דרך ${ltr('1Password')}`).
+ */
+export const ltr = (text: string): string => `${LRI}${text}${PDI}`;
 
 export function rtl(text: string): string {
   let out = cache.get(text);

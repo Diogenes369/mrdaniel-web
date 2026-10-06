@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>שקפי Grok Bot</title>
+<meta name="theme-color" content="#0A0B09">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230A0B09'/%3E%3Ccircle cx='32' cy='33' r='24' fill='%238FD400'/%3E%3Crect x='21' y='22' width='7' height='15' rx='3.5' transform='rotate(12 24.5 29.5)' fill='%230A0B09'/%3E%3Crect x='36' y='22' width='7' height='15' rx='3.5' transform='rotate(12 39.5 29.5)' fill='%230A0B09'/%3E%3C/svg%3E">
+<script>
+  // Hold the stage back until fonts and the engine are ready, but never for long: if the engine
+  // never arrives, the slides are plain readable HTML after 1.6s.
+  // The page is Hebrew and right-to-left wherever it is hosted, even inside a wrapper that owns <html>.
+  document.documentElement.setAttribute('dir', 'rtl');
+  document.documentElement.setAttribute('lang', 'he');
+  document.documentElement.classList.add('is-booting');
+  window.__bootFallback = setTimeout(function () { document.documentElement.classList.remove('is-booting'); }, 1600);
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=Cousine:wght@400;700&family=Noto+Sans+Hebrew:wdth,wght@75,700;75,800;75,900&family=Playpen+Sans+Hebrew:wght@600&family=Rubik+Lines&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/deck.css">
+</head>
+<body>
+
+<div class="field-layer" id="fieldLayer" aria-hidden="true"><canvas id="fieldCanvas"></canvas></div>
+
+<div id="viewport" dir="rtl" lang="he">
+<main class="stage" id="stage" data-orient="landscape" aria-roledescription="מצגת" aria-label="Grok Bot, מה הוא יודע ואיך עובדים איתו">
+
+  <!-- ═════════════ COVER ═════════════ -->
+  <section class="slide s-cover" data-key="cover" aria-label="Grok Bot">
+    <div class="cover-grid">
+      <div class="cover-text">
+        <p class="machine kicker" data-quiet><i class="caret" aria-hidden="true"></i><bdi>SpaceXAI × Cursor</bdi> · בטא מאוגוסט 2026</p>
+        <h1 class="cover-h1">
+          <span class="rise-host"><span class="lead cover-lead" data-quiet>רובנו עדיין מדברים איתו כמו עם צ׳אט</span></span>
+          <span class="display cover-display" data-glyph="Grok">Grok Bot</span>
+        </h1>
+        <p class="body cover-sub" data-quiet>הוא בנוי לקבל עבודה, לסיים אותה עד הסוף ולחזור רק כשצריך אתכם. ככה עובדים איתו באמת.</p>
+        <div class="cover-cta">
+          <button class="gbtn gbtn--primary" type="button" data-action="next">
+            <span class="gbtn__fill" aria-hidden="true"></span>
+            <span class="gbtn__label">מתחילים <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>
+            <i class="tk tk-tr" aria-hidden="true"></i><i class="tk tk-tl" aria-hidden="true"></i><i class="tk tk-br" aria-hidden="true"></i><i class="tk tk-bl" aria-hidden="true"></i>
+          </button>
+          <span class="machine hint">רווח או חיצים כדי לעבור · <bdi>F</bdi> למסך מלא</span>
+        </div>
+      </div>
+      <div class="cover-bot"><div class="anchor anchor--cover" data-anchor="main"></div></div>
+    </div>
+  </section>
+
+  <!-- ═════════════ YOU ARE THE LOOP ═════════════ -->
+  <section class="slide s-loop" data-key="loop" aria-label="בצ׳אט, אתם הלולאה">
+    <div class="stack">
+      <header class="head" data-quiet>
+        <div class="rise-host"><h2 class="h2">בצ׳אט, אתם הלולאה</h2></div>
+        <p class="body">שואלים, מחכים, קוראים, שואלים שוב. כל משימה זזה בקצב של אדם אחד שמסתכל על דבר אחד.</p>
+      </header>
+      <div class="duo">
+        <figure class="frame loop-frame" data-quiet>
+          <figcaption class="machine frame-label">צ׳אט</figcaption>
+          <div class="loop-diagram">
+            <svg class="loop-ring" viewBox="0 0 400 400" aria-hidden="true"><circle cx="200" cy="200" r="150"/></svg>
+            <span class="machine loop-word w-top">שואלים</span>
+            <span class="machine loop-word w-left">מחכים</span>
+            <span class="machine loop-word w-bottom">קוראים</span>
+            <span class="machine loop-word w-right">שואלים שוב</span>
+            <span class="loop-orbit" aria-hidden="true"><i class="loop-runner"></i></span>
+            <div class="anchor anchor--loop" data-anchor="loop-center"></div>
+          </div>
+          <p class="machine frame-foot">משימה אחת זזה בכל רגע</p>
+        </figure>
+        <figure class="frame fleet-frame" data-quiet>
+          <figcaption class="machine frame-label"><bdi>Grok Bot</bdi></figcaption>
+          <div class="fleet-grid">
+            <div class="anchor fleet-cell" data-anchor="f1"></div><div class="anchor fleet-cell" data-anchor="f2"></div><div class="anchor fleet-cell" data-anchor="f3"></div><div class="anchor fleet-cell" data-anchor="f4"></div>
+            <div class="anchor fleet-cell" data-anchor="f5"></div><div class="anchor fleet-cell" data-anchor="f6"></div><div class="anchor fleet-cell" data-anchor="f7"></div><div class="anchor fleet-cell" data-anchor="f8"></div>
+            <div class="anchor fleet-cell" data-anchor="f9"></div><div class="anchor fleet-cell" data-anchor="f10"></div><div class="anchor fleet-cell" data-anchor="f11"></div><div class="anchor fleet-cell" data-anchor="f12"></div>
+          </div>
+          <p class="machine frame-foot">שתים עשרה משימות במקביל, ואף אחת לא מחכה לכם</p>
+        </figure>
+      </div>
+      <div class="rise-host"><p class="statement" data-quiet>השאלה כבר לא אם המודל מספיק טוב. השאלה כמה כאלה רצים אצלכם במקביל, ועל מה.</p></div>
+    </div>
+  </section>
+
+  <!-- ═════════════ NOT THE @grok REPLY BOT ═════════════ -->
+  <section class="slide s-notgrok" data-key="notgrok" aria-label="זה לא ה-@grok מהתגובות">
+    <div class="split">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">זה לא ה-<bdi>@grok</bdi> שמתייגים בתגובות</h2></div>
+        <dl class="decoder decoder--big">
+          <div class="drow"><dt class="term"><bdi>@grok</bdi> ב-<bdi>X</bdi></dt><dd class="plain">עונה לשאלה בתוך שרשור. התשובה נשארת שם, ואתם ממשיכים לבד.</dd></div>
+          <div class="drow"><dt class="term term--on"><bdi>Grok Bot</bdi></dt><dd class="plain">מקבל משימה, נכנס לכלים שלכם ועובד עליה עד שהיא גמורה, גם כשאתם לא מול המסך.</dd></div>
+        </dl>
+        <div class="rise-host"><p class="statement statement--sm">רוב הכלים מביאים אתכם כמעט עד הסוף. כאן העבודה נוחתת בתוך הכלי עצמו, איפה שאדם היה שם אותה.</p></div>
+      </div>
+      <div class="col-vis notgrok-vis">
+        <figure class="frame reply-card" data-quiet aria-hidden="true">
+          <div class="reply-row"><span class="reply-avatar"></span><p class="machine reply-q"><bdi>@grok</bdi> תסביר את זה במשפט</p></div>
+          <div class="reply-answer"><i class="sk"></i><i class="sk"></i><i class="sk sk--short"></i></div>
+          <p class="machine reply-end"><i class="end-mark"></i>כאן השרשור נגמר</p>
+        </figure>
+        <div class="notgrok-bot">
+          <div class="anchor anchor--md" data-anchor="main"></div>
+          <figure class="frame win win--tasks" data-quiet aria-hidden="true">
+            <div class="win-bar"><i></i><i></i><i></i><span class="machine win-title">המחשב של הבוט</span></div>
+            <ul class="task-list">
+              <li class="task"><i class="chk"></i><span class="machine">פותח את <bdi>Gmail</bdi></span></li>
+              <li class="task"><i class="chk"></i><span class="machine">מסדר את הטיוטות</span></li>
+              <li class="task"><i class="chk"></i><span class="machine">מעלה קובץ ל-<bdi>Drive</bdi></span></li>
+            </ul>
+            <p class="machine done-chip">גמור, בתוך הכלי</p>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ A COMPUTER OF ITS OWN ═════════════ -->
+  <section class="slide s-computer" data-key="computer" aria-label="יש לו מחשב משלו">
+    <div class="split">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">יש לו מחשב משלו</h2></div>
+        <p class="body intro">כל בוט מקבל מחשב בענן, עם דפדפן וטרמינל. אתם סוגרים את הלפטופ, והוא ממשיך.</p>
+        <dl class="decoder">
+          <div class="drow"><dt class="term">נכנס לכלים שלכם</dt><dd class="plain">מייל, <bdi>Drive</bdi>, <bdi>GitHub</bdi>, <bdi>Notion</bdi> ו-<bdi>Slack</bdi>. גם אתרים שאין להם חיבור מסודר.</dd></div>
+          <div class="drow"><dt class="term">עובד עד הסוף</dt><dd class="plain">העבודה נוחתת איפה שהייתם שמים אותה. טיוטה במייל, קובץ ב-<bdi>Drive</bdi>, משימה בכלי.</dd></div>
+          <div class="drow"><dt class="term">רץ לפי לוח זמנים</dt><dd class="plain">שגרות כל שעה או כל יום, ותזכורות חד־פעמיות. עוצרים וממשיכים מתי שרוצים.</dd></div>
+          <div class="drow"><dt class="term">מדבר כמו חבר לעבודה</dt><dd class="plain">מהטלפון או מהמחשב, בטקסט או בהודעה קולית, ואותה שיחה ממשיכה בשניהם.</dd></div>
+        </dl>
+      </div>
+      <div class="col-vis computer-vis">
+        <figure class="frame win win--cloud" data-quiet aria-hidden="true">
+          <div class="win-bar"><i></i><i></i><i></i><span class="machine win-title">המחשב של הבוט · בענן</span></div>
+          <div class="addr machine" dir="ltr"><span class="addr-text"></span><i class="caret caret--sm"></i></div>
+          <div class="cloud-rows"><i class="sk"></i><i class="sk"></i><i class="sk sk--mid"></i><i class="sk"></i><i class="sk sk--short"></i></div>
+          <p class="machine cloud-status"><i class="live"></i><span>עובד</span></p>
+        </figure>
+        <div class="computer-row">
+          <div class="anchor anchor--md" data-anchor="main"></div>
+          <figure class="laptop" aria-hidden="true">
+            <svg viewBox="0 0 160 110"><g class="lid"><rect x="22" y="6" width="116" height="74" rx="4"/><rect class="lid-screen" x="30" y="14" width="100" height="58"/></g><path class="base" d="M6 86h148l-10 14H16z"/></svg>
+            <figcaption class="machine laptop-cap"><span class="cap-open">הלפטופ שלכם</span><span class="cap-closed">הלפטופ שלכם, סגור</span></figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ YOU APPROVE ═════════════ -->
+  <section class="slide s-control" data-key="control" aria-label="הוא עושה, אתם מאשרים">
+    <div class="split">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">הוא עושה, אתם מאשרים</h2></div>
+        <p class="body intro">הוא לא שואל על כל צעד. אבל כברירת מחדל, מייל יוצא אליכם כטיוטה ורכישה מחכה לאישור שלכם.</p>
+        <dl class="decoder">
+          <div class="drow"><dt class="term">טיוטות</dt><dd class="plain">מייל או הודעת <bdi>Slack</bdi> מגיעים כטיוטה. שולחים או זורקים, ולבוט שסומכים עליו אפשר לבטל את הטיוטות.</dd></div>
+          <div class="drow"><dt class="term">בקשת אישור</dt><dd class="plain">כרטיס שאומר במשפט אחד מה הוא רוצה לעשות. מאשרים, דוחים, או מתירים תמיד פעולה שחוזרת.</dd></div>
+          <div class="drow"><dt class="term">התחברות</dt><dd class="plain">כשצריך להיכנס לאתר, הוא מבקש בטופס מאובטח בצ׳אט או דרך <bdi>1Password</bdi>.</dd></div>
+          <div class="drow"><dt class="term">עצירה</dt><dd class="plain">אפשר לקחת ממנו את המסך באמצע. ועצירה שלו עוצרת גם את מי שהוא העביר לו עבודה.</dd></div>
+        </dl>
+      </div>
+      <div class="col-vis control-vis">
+        <figure class="frame approve" data-quiet aria-hidden="true">
+          <div class="approve-head machine"><i class="ping"></i>הבוט מבקש אישור</div>
+          <p class="approve-text">טיוטת מייל מוכנה לשליחה</p>
+          <div class="approve-actions">
+            <span class="gbtn gbtn--primary gbtn--mock" data-role="send"><span class="gbtn__fill"></span><span class="gbtn__label">שליחה</span><i class="tk tk-tr"></i><i class="tk tk-tl"></i><i class="tk tk-br"></i><i class="tk tk-bl"></i></span>
+            <span class="gbtn gbtn--line gbtn--mock"><span class="gbtn__fill"></span><span class="gbtn__label">לא עכשיו</span></span>
+          </div>
+          <p class="machine approve-sent"><i class="chk is-on"></i>נשלח</p>
+        </figure>
+        <div class="anchor anchor--md" data-anchor="main"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ SHOW IT ONCE ═════════════ -->
+  <section class="slide s-teach" data-key="teach" aria-label="מראים לו פעם אחת">
+    <div class="split">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">מראים לו פעם אחת</h2></div>
+        <p class="body">בפעם הבאה שאתם עושים משהו שחוזר על עצמו, מבקשים ממנו לעקוב. הוא רואה את הצעדים, שומר אותם כשגרה, מקבל תיקונים, ומריץ לבד בפעם הבאה.</p>
+        <p class="body body--soft">אחרי כמה משימות הוא קולט את הקול שלכם, את מקרי הקצה, ומתי לשאול ומתי פשוט להמשיך.</p>
+      </div>
+      <div class="col-vis teach-vis">
+        <div class="teach-demo" data-quiet aria-hidden="true">
+          <ol class="tsteps">
+            <li class="tstep"><span class="machine"><bdi>Gmail</bdi> · חשבונית חדשה</span></li>
+            <li class="tstep"><span class="machine">מורידים את ה-<bdi>PDF</bdi></span></li>
+            <li class="tstep"><span class="machine">מעלים ל-<bdi>Drive</bdi></span></li>
+            <li class="tstep"><span class="machine">מעדכנים את הטבלה</span></li>
+          </ol>
+          <p class="machine routine-chip"><i class="chk is-on"></i>נשמר כשגרה · חשבוניות מהמייל</p>
+        </div>
+        <div class="anchor anchor--md" data-anchor="main"></div>
+        <figure class="hand hand--teach" aria-hidden="true">
+          <figcaption class="hand__text">את זה כדאי לנסות ראשון</figcaption>
+          <svg class="hand__arrow" viewBox="0 0 120 96"><path class="hand__body" d="M104 6 C 108 34, 92 58, 62 70 C 46 76, 30 78, 14 84"/><path class="hand__head" d="M28 72 L 13 84 L 31 91"/></svg>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ A SMALL TEAM ═════════════ -->
+  <section class="slide s-team" data-key="team" aria-label="צוות קטן שעובד במקביל">
+    <div class="split split--wide-vis">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">צוות קטן שעובד במקביל</h2></div>
+        <p class="body">מריצים כמה בוטים, כל אחד על תחום משלו. הם מעבירים עבודה אחד לשני בקבוצה משותפת, ומושכים אתכם רק כשצריך החלטה.</p>
+        <div class="news" data-quiet>
+          <p class="machine news-tag"><i class="caret caret--sm"></i>חדש מ-2 באוקטובר</p>
+          <p class="body body--paper">בוט ראשי, מסומן בכוכב. הוא בודק מה קורה ומתאם את כל השאר.</p>
+        </div>
+        <p class="body-sm quote">באחד הצוותים ב-<bdi>SpaceXAI</bdi> תיארו את זה כמו תמנון שכל הזרועות שלו עובדות ביחד.</p>
+      </div>
+      <div class="col-vis team-vis">
+        <div class="org" aria-hidden="true">
+          <svg class="org-lines"></svg>
+          <div class="org-top"><div class="anchor anchor--chief" data-anchor="main"></div></div>
+          <div class="org-row">
+            <div class="org-cell"><div class="anchor anchor--team" data-anchor="t-mail"></div><span class="machine org-label">מייל</span></div>
+            <div class="org-cell"><div class="anchor anchor--team" data-anchor="t-exp"></div><span class="machine org-label">הוצאות</span></div>
+            <div class="org-cell"><div class="anchor anchor--team" data-anchor="t-res"></div><span class="machine org-label">מחקר</span></div>
+            <div class="org-cell"><div class="anchor anchor--team" data-anchor="t-con"></div><span class="machine org-label">תוכן</span></div>
+          </div>
+        </div>
+        <figure class="frame chat" data-quiet aria-hidden="true">
+          <figcaption class="machine frame-label">קבוצה משותפת</figcaption>
+          <ul class="chat-list">
+            <li class="msg" data-from="main"><span class="machine who">★ ראשי</span><span class="what">מי לוקח את החשבוניות מהמייל</span></li>
+            <li class="msg" data-from="t-exp"><span class="machine who">הוצאות</span><span class="what">אני. מתייק ומעדכן את הטבלה</span></li>
+            <li class="msg" data-from="t-mail"><span class="machine who">מייל</span><span class="what">הטיוטות מחכות לאישור</span></li>
+            <li class="msg" data-from="main"><span class="machine who">★ ראשי</span><span class="what">צריך ממך החלטה אחת</span></li>
+          </ul>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ START TODAY ═════════════ -->
+  <section class="slide s-start" data-key="start" aria-label="איך מתחילים היום">
+    <div class="split">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">איך מתחילים היום</h2></div>
+        <ol class="ladder">
+          <li class="rung"><i class="rung-caret" aria-hidden="true"></i><p>מורידים את האפליקציה. ההגדרה הראשונה כבר פותחת לכם בוט.</p></li>
+          <li class="rung"><i class="rung-caret" aria-hidden="true"></i><p>מחברים רק את הכלים שהמשימה צריכה, לא את כל החיים.</p></li>
+          <li class="rung"><i class="rung-caret" aria-hidden="true"></i><p>כותבים לו משימה אמיתית, כמו שהייתם כותבים לחבר לצוות.</p></li>
+          <li class="rung"><i class="rung-caret" aria-hidden="true"></i><p>בפעם הבאה שאתם עושים אותה, מבקשים ממנו לעקוב.</p></li>
+        </ol>
+      </div>
+      <div class="col-vis start-vis">
+        <div class="shape-show">
+          <div class="anchor anchor--md" data-anchor="main"></div>
+          <p class="machine shape-cap">הבוט יכול להחליף לעצמו צורה וצבע</p>
+        </div>
+        <figure class="frame plans" data-quiet>
+          <figcaption class="machine frame-label">מי מקבל</figcaption>
+          <p class="machine plan-line" dir="ltr">SuperGrok · SuperGrok Plus · SuperGrok Heavy</p>
+          <p class="machine plan-line" dir="ltr">Cursor Pro · Pro+ · Ultra · Teams</p>
+          <p class="plans-note">לבוט יש מכסת שימוש משלו, נפרדת מהמנוי. מה שמעבירים לו לא יורד מהשימוש הרגיל שלכם.</p>
+          <p class="machine plans-where">מחשב (<bdi>Mac, Windows, Linux</bdi>) ו-<bdi>iOS</bdi> · עדיין בבטא</p>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ THREE TESTS ═════════════ -->
+  <section class="slide s-tests" data-key="tests" aria-label="לא כל משימה מוכנה לבוט">
+    <div class="split">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">לא כל משימה מוכנה לבוט</h2></div>
+        <p class="body">רוב האנשים נופלים כאן, עוד לפני הפרומפט הראשון. משימה עוברת לבוט רק אם היא עוברת את שלושת אלה.</p>
+        <div class="rise-host"><p class="statement">אי אפשר להפוך לאוטומטי סטנדרט שעוד לא מצאתם.</p></div>
+        <p class="body-sm">מדלגים על המבחן האחרון, ומקבלים זבל בביטחון מלא.</p>
+      </div>
+      <div class="col-vis tests-vis">
+        <ul class="checks frame" data-quiet>
+          <li class="check"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span><span class="check-text">אפשר לכתוב אותה כצ׳קליסט, ולא כשיחה</span><span class="anchor anchor--pin" data-anchor="c1"></span></li>
+          <li class="check"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span><span class="check-text">יש הגדרה של "גמור" שמישהו אחר יכול לבדוק</span><span class="anchor anchor--pin" data-anchor="c2"></span></li>
+          <li class="check"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span><span class="check-text">עשיתם אותה בעצמכם לפחות עשר פעמים</span><span class="anchor anchor--pin" data-anchor="c3"></span></li>
+        </ul>
+        <figure class="hand hand--tests" aria-hidden="true">
+          <figcaption class="hand__text">על זה כולם מדלגים</figcaption>
+          <svg class="hand__arrow" viewBox="0 0 120 96"><path class="hand__body" d="M10 88 C 14 60, 34 34, 66 22 C 82 16, 96 14, 108 10"/><path class="hand__head" d="M92 4 L 108 10 L 96 22"/></svg>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ THE REVIEWER ═════════════ -->
+  <section class="slide s-review" data-key="review" aria-label="מי שלא כתב, בודק">
+    <div class="split">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">מי שלא כתב, בודק</h2></div>
+        <p class="body">מי שכתב את העבודה בטוח שהיא גמורה. אז מוסיפים בודק שלא עשה אותה, ונותנים לו שיניים.</p>
+        <figure class="frame rules">
+          <div class="win-bar"><i></i><i></i><i></i><span class="machine win-title" dir="ltr">reviewer.md</span></div>
+          <ul class="rule-list">
+            <li>שורה ראשונה: <bdi class="mono">PASS</bdi> או <bdi class="mono">FAIL</bdi>, בלי פסקת נימוסים</li>
+            <li>מספר בלי מקור הוא <bdi class="mono">FAIL</bdi>, לא הערה</li>
+            <li>אם חסר לו מידע כדי לבדוק, גם זה <bdi class="mono">FAIL</bdi></li>
+            <li>גישת קריאה בלבד. בודק שיכול לערוך יתקן בשקט במקום לדווח</li>
+          </ul>
+        </figure>
+        <p class="body-sm">בודק מאותה חברה רואה פחות, כי מודלים מאותו בית חולקים נקודות עיוורות. אם יש תקציב לבדיקה אחת במודל אחר, שימו אותה כאן.</p>
+        <p class="machine tie">ב-<bdi>Grok Bot</bdi> אפשר לתת את התפקיד הזה לבוט נפרד בקבוצה</p>
+      </div>
+      <div class="col-vis review-vis">
+        <div class="review-stage" aria-hidden="true">
+          <div class="anchor anchor--md" data-anchor="main"></div>
+          <div class="doc frame" data-quiet>
+            <i class="sk"></i><i class="sk"></i><i class="sk sk--mid"></i><i class="sk"></i><i class="sk sk--short"></i>
+            <span class="scanline"></span>
+            <span class="stamp stamp--fail" dir="ltr">FAIL</span>
+            <span class="stamp stamp--pass" dir="ltr">PASS</span>
+          </div>
+          <div class="anchor anchor--md" data-anchor="reviewer"></div>
+        </div>
+        <ul class="misses machine" aria-hidden="true">
+          <li>מספר בלי מקור, בפסקה השלישית</li>
+          <li>הפתיחה כתובה בגוף שלישי</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ THREE TRIES ═════════════ -->
+  <section class="slide s-tries" data-key="tries" aria-label="שלושה ניסיונות, ואז זה אצלכם">
+    <div class="split">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">שלושה ניסיונות, ואז זה אצלכם</h2></div>
+        <p class="body">כותב, בודק, ואם נפל, ההערות של הבודק נכנסות לבריף והוא מנסה שוב. אחרי שלושה כישלונות העבודה מגיעה אליכם. לא החוצה, ולא ללולאה אינסופית שתגלו ביום שני.</p>
+        <div class="lives" aria-hidden="true"><span class="machine">ניסיונות</span><i class="life"></i><i class="life"></i><i class="life"></i></div>
+        <p class="machine tie">התקרה הזאת היא מה שמאפשר לסגור את הלפטופ</p>
+      </div>
+      <div class="col-vis tries-vis">
+        <figure class="frame term" data-quiet aria-hidden="true">
+          <div class="win-bar"><i></i><i></i><i></i><span class="machine win-title" dir="ltr">run</span></div>
+          <div class="term-body" dir="ltr">
+            <p class="tl"><span class="t-dim">$</span> run --task weekly-digest</p>
+            <p class="tl"><span class="t-key">[attempt 1]</span></p>
+            <p class="tl">  produce   <span class="t-dim">grok-build-0.1</span></p>
+            <p class="tl">  review    <span class="t-dim">grok-4.6</span></p>
+            <p class="tl" data-beat="fail">  verdict   <span class="t-fail">FAIL</span></p>
+            <p class="tl t-note">            - unsourced figure, paragraph 3</p>
+            <p class="tl t-note">            - opens in third person</p>
+            <p class="tl"><span class="t-key">[attempt 2]</span></p>
+            <p class="tl">  produce   <span class="t-dim">grok-build-0.1</span></p>
+            <p class="tl">  review    <span class="t-dim">grok-4.6</span></p>
+            <p class="tl" data-beat="pass">  verdict   <span class="t-pass">PASS</span></p>
+            <p class="tl"><span class="t-key">[deliver]</span> saved to drafts</p>
+            <p class="tl t-dim">attempts 2/3</p>
+          </div>
+        </figure>
+        <div class="anchor anchor--md" data-anchor="main"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ WHICH GROK FOR WHICH JOB ═════════════ -->
+  <section class="slide s-roster" data-key="roster" aria-label="איזה Grok לאיזו עבודה">
+    <div class="stack">
+      <header class="head" data-quiet>
+        <div class="rise-host"><h2 class="h2">איזה <bdi>Grok</bdi> לאיזו עבודה</h2></div>
+        <p class="body">למי שבונה עם ה-<bdi>API</bdi>. מתאימים את המודל לצורה של העבודה, לא לתג המחיר.</p>
+      </header>
+      <div class="roster">
+        <dl class="decoder decoder--roster" data-quiet>
+          <div class="drow" data-lane="0"><dt class="term"><bdi>Grok 4.1 Fast</bdi></dt><dd class="plain">עבודה מכנית בכמויות. חילוץ, סידור, תיוג, ניקוי.</dd></div>
+          <div class="drow" data-lane="1"><dt class="term"><bdi>Grok Build 0.1</bdi></dt><dd class="plain">סוס העבודה. מכוון לקוד, ומייצר את רוב התוצרים: טיוטות, טקסטים ומימושים.</dd></div>
+          <div class="drow" data-lane="2"><dt class="term"><bdi>Grok 4.6</bdi></dt><dd class="plain">ריצות ארוכות ומחקר עמוק. מחזיק 500 אלף טוקנים בלי ללכת לאיבוד באמצע.</dd></div>
+          <div class="drow" data-lane="3"><dt class="term"><bdi>Grok 4.6</bdi>, שוב</dt><dd class="plain">בתור בודק, בשיחה נפרדת עם הקשר נקי.</dd></div>
+        </dl>
+        <div class="router" aria-hidden="true">
+          <div class="anchor anchor--md" data-anchor="main"></div>
+          <span class="machine card" data-lane="0">לנקות רשימת אנשי קשר</span>
+          <span class="machine card" data-lane="1">טיוטה לניוזלטר</span>
+          <span class="machine card" data-lane="2">מחקר על תחום חדש</span>
+          <span class="machine card" data-lane="3">לבדוק את הטיוטה</span>
+        </div>
+      </div>
+      <div class="roster-foot" data-quiet>
+        <p class="body-sm">טוקן הוא חתיכת טקסט קטנה שהמודל קורא. חלון הקשר הוא כמה טקסט הוא מחזיק בראש בבת אחת.</p>
+        <p class="machine reality"><i class="caret caret--sm"></i>מאז שהמאמר יצא הגיע <bdi>Grok 4.7</bdi>, ו-<bdi>4.1 Fast</bdi> כבר לא מופיע ברשימת המודלים של <bdi>xAI</bdi>. מי שמחזיק את הטבלה בנפרד מהקוד מחליף שורה אחת.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ THE 200K CLIFF ═════════════ -->
+  <section class="slide s-cliff" data-key="cliff" aria-label="המלכודת של 200 אלף">
+    <div class="split">
+      <div class="col-text" data-quiet>
+        <div class="rise-host"><h2 class="h2">המלכודת של 200 אלף</h2></div>
+        <p class="body">ב-<bdi>API</bdi> של <bdi>xAI</bdi>, ברגע שהקלט עובר 200 אלף טוקנים, המחיר מוכפל על כל הבקשה. לא רק על מה שעבר את הקו.</p>
+        <ul class="bullets">
+          <li>מקצצים את הקלט במקום לשלם על עודף</li>
+          <li>עבודה שבאמת צריכה יותר, מפצלים לכמה בקשות</li>
+          <li>בודקים בקוד לפני השליחה. אזהרה מתעלמים ממנה ביום עמוס, והיא מגיעה בחשבונית שלושה שבועות אחר כך</li>
+        </ul>
+      </div>
+      <div class="col-vis cliff-vis">
+        <figure class="frame tokens" data-quiet aria-hidden="true">
+          <div class="tok-head"><span class="machine">טוקנים בקלט</span><span class="machine tok-count" dir="ltr">0</span></div>
+          <div class="tok-track">
+            <div class="tok-bar"><div class="tok-fill"></div></div>
+            <div class="tok-line"><span class="machine" dir="ltr">200K</span></div>
+            <div class="anchor anchor--walker" data-anchor="main"></div>
+          </div>
+          <div class="tok-price"><span class="machine">מחיר לבקשה</span><b class="price" dir="ltr">×1</b></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ WHAT REALLY STOPS PEOPLE ═════════════ -->
+  <section class="slide s-stops" data-key="stops" aria-label="מה שבאמת עוצר אנשים">
+    <div class="stack">
+      <header class="head" data-quiet>
+        <div class="rise-host"><h2 class="h2">מה שבאמת עוצר אנשים</h2></div>
+        <p class="body">לא הכסף ולא הטכנולוגיה. לפי החישוב במאמר, תוצר שלם עולה פחות מדולר במודלים.</p>
+      </header>
+      <div class="duo duo--blocks">
+        <figure class="frame block" data-quiet>
+          <figcaption class="block-title">לדעת על מה לכוון אותו</figcaption>
+          <p class="body-sm">במאמר זה להשיג לקוחות. אצלכם זה לבחור משימה אמיתית, ברורה, שחוזרת על עצמה.</p>
+        </figure>
+        <figure class="frame block block--tray" data-quiet>
+          <figcaption class="block-title">כמה אתם מסוגלים לבדוק</figcaption>
+          <p class="body-sm">כל מה שנכשל שלוש פעמים נוחת אצלכם. כשזה 5% מהעבודה, המערכת סוחבת אתכם. ב-30% בניתם דרך יקרה לקרוא טיוטות.</p>
+          <div class="anchor anchor--perch" data-anchor="main"></div>
+          <div class="tray" aria-hidden="true">
+            <span class="machine tray-rate" dir="ltr">5%</span>
+            <div class="tray-box"><div class="sheets"></div></div>
+            <div class="brief"><span class="machine">בריף</span><i class="brief-bar"></i></div>
+          </div>
+        </figure>
+      </div>
+      <div class="rise-host stops-say">
+        <p class="statement" data-quiet>כשהמספר מטפס, הפתרון הוא בריף צר יותר. אף פעם לא מודל גדול יותר.</p>
+        <figure class="hand hand--stops" aria-hidden="true">
+          <figcaption class="hand__text">הבריף, לא המודל</figcaption>
+          <svg class="hand__arrow hand__arrow--flat" viewBox="0 0 160 60"><path class="hand__body" d="M8 40 C 40 52, 92 50, 146 24"/><path class="hand__head" d="M128 14 L 147 23 L 136 41"/></svg>
+        </figure>
+      </div>
+      <p class="machine tie" data-quiet>המערכת מייצרת, אתם אחראים. מה שנוגע בחשבון אמיתי נשאר אצלכם.</p>
+    </div>
+  </section>
+
+  <!-- ═════════════ ONE MONTH ═════════════ -->
+  <section class="slide s-month" data-key="month" aria-label="חודש אחד, לולאה אחת">
+    <div class="stack">
+      <header class="head" data-quiet>
+        <div class="rise-host"><h2 class="h2">חודש אחד, לולאה אחת</h2></div>
+      </header>
+      <ol class="stairs" data-quiet>
+        <li class="stair"><span class="stair-tread" aria-hidden="true"></span><h3 class="stair-title">השבוע הראשון</h3><p class="stair-body">בוחרים משימה אחת שכבר עשיתם עשר פעמים. כותבים צ׳קליסט והגדרה של "גמור", ועושים אותה עוד שלוש פעמים ביד.</p><span class="anchor anchor--step" data-anchor="m1"></span></li>
+        <li class="stair"><span class="stair-tread" aria-hidden="true"></span><h3 class="stair-title">השבוע השני</h3><p class="stair-body">מקימים בוט שעושה ובוט שבודק, ומריצים אותם על שלוש העבודות האלה. אם הבודק מעביר משהו שאתם הייתם פוסלים, מהדקים לו את הכללים.</p><span class="anchor anchor--step" data-anchor="m2"></span></li>
+        <li class="stair"><span class="stair-tread" aria-hidden="true"></span><h3 class="stair-title">השבוע השלישי</h3><p class="stair-body">מוסיפים קובץ קול, איך אתם כותבים ומה אתם אף פעם לא אומרים. הלולאה רצה על עבודה אמיתית, ואתם קוראים כל תוצר לפני שהוא יוצא.</p><span class="anchor anchor--step" data-anchor="m3"></span></li>
+        <li class="stair"><span class="stair-tread" aria-hidden="true"></span><h3 class="stair-title">השבוע הרביעי</h3><p class="stair-body">רק עכשיו מוסיפים משימה שנייה.</p><span class="anchor anchor--step" data-anchor="m4"></span></li>
+      </ol>
+      <div class="rise-host"><p class="statement" data-quiet>לולאה אחת שרצה לבד שווה יותר משלוש שאתם עדיין עושים להן בייביסיטר.</p></div>
+    </div>
+  </section>
+
+  <!-- ═════════════ CLOSE ═════════════ -->
+  <section class="slide s-close" data-key="close" aria-label="משימה אחת">
+    <div class="cover-grid cover-grid--close">
+      <div class="cover-text">
+        <div class="rise-host"><p class="lead close-lead" data-quiet>רוב האנשים יקראו את זה, ירגישו את הדקירה, ולא יבנו כלום.</p></div>
+        <p class="display close-display" data-glyph="משימה">משימה אחת</p>
+        <p class="body close-sub" data-quiet>בוחרים משהו שאתם כבר יודעים בעל פה, ומעבירים אותו לבוט עוד השבוע.</p>
+        <p class="body-sm close-small" data-quiet>המודלים יתחלפו. הצ׳קליסט, הבודק וקובץ הקול שלכם יישארו, ויעבדו טוב יותר עם כל מודל חדש.</p>
+        <div class="sign" data-quiet>
+          <img class="sign-logo" src="assets/logo.png" alt="MR. DANIEL">
+          <p class="machine sources">מקורות: המאמר של <bdi>@maestrooth</bdi> ב-<bdi>X</bdi> (אוגוסט 2026), ועמודי <bdi>Grok Bot</bdi> של <bdi>SpaceXAI</bdi></p>
+        </div>
+      </div>
+      <div class="close-bots">
+        <div class="anchor anchor--close" data-anchor="main"></div>
+        <div class="close-row">
+          <div class="anchor anchor--crew" data-anchor="k1"></div>
+          <div class="anchor anchor--crew" data-anchor="k2"></div>
+          <div class="anchor anchor--crew" data-anchor="k3"></div>
+          <div class="anchor anchor--crew" data-anchor="k4"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- layers above the slides -->
+  <canvas class="fx-layer" id="fxCanvas" aria-hidden="true"></canvas>
+  <div class="bots-layer" id="botsLayer" aria-hidden="true"></div>
+  <div class="overlay-layer" id="overlayLayer" aria-hidden="true"></div>
+
+  <header class="chrome" aria-hidden="true">
+    <p class="machine chrome-title"><i class="caret caret--sm"></i><bdi>Grok Bot</bdi><span class="chrome-sep"> · </span><span class="chrome-section"></span></p>
+    <img class="chrome-logo" src="assets/logo.png" alt="">
+  </header>
+
+  <nav class="rail" aria-label="ניווט בין השקפים">
+    <button class="nav-btn nav-prev" type="button" data-action="prev" aria-label="השקף הקודם"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    <div class="rail-track"><span class="rail-line" aria-hidden="true"></span><span class="rail-caret" aria-hidden="true"></span></div>
+    <button class="nav-btn nav-next" type="button" data-action="next" aria-label="השקף הבא"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <button class="nav-btn nav-fs" type="button" data-action="fullscreen" aria-label="מסך מלא"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </nav>
+</main>
+</div>
+
+<p class="sr-only" id="liveRegion" aria-live="polite" dir="rtl" lang="he"></p>
+
+<script src="lib/gsap.min.js"></script>
+<script src="js/field.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/bots.js"></script>
+<script src="js/slides.js"></script>
+<script src="js/deck.js"></script>
+</body>
+</html>

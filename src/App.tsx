@@ -42,6 +42,7 @@ const ROUTE_CHUNKS = {
   about: () => import('./pages/AboutPage'),
   ai: () => import('./pages/AIPage'),
   jarvis: () => import('./pages/JarvisPage'),
+  grok: () => import('./pages/GrokAgentPage'),
   magazines: () => import('./pages/MagazinesPage'),
   news: () => import('./pages/NewsPage'),
   newsArticle: () => import('./pages/NewsArticlePage'),
@@ -54,6 +55,7 @@ const ROUTE_CHUNKS = {
 const AboutPage = lazy(ROUTE_CHUNKS.about);
 const AIPage = lazy(ROUTE_CHUNKS.ai);
 const JarvisPage = lazy(ROUTE_CHUNKS.jarvis);
+const GrokAgentPage = lazy(ROUTE_CHUNKS.grok);
 const MagazinesPage = lazy(ROUTE_CHUNKS.magazines);
 const NewsPage = lazy(ROUTE_CHUNKS.news);
 const NewsArticlePage = lazy(ROUTE_CHUNKS.newsArticle);
@@ -190,6 +192,7 @@ export default function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/ai" element={<AIPage />} />
           <Route path="/jarvis" element={<JarvisPage />} />
+          <Route path="/grok" element={<GrokAgentPage />} />
           {/* The site is AI-only since 2026-09-21: the old cyber / web-dev / architecture pages
               were removed, and their URLs (still in backlinks and search results) land on /ai. */}
           {['/cyber', '/digital', '/architecture', '/capabilities'].map((path) => (

@@ -9,6 +9,7 @@ import TodayTermsSection from '../components/home/TodayTermsSection';
 import ServicesSection from '../components/home/ServicesSection';
 import TechMarquee from '../components/TechMarquee';
 import ContactPortal from '../components/ContactPortal';
+import GrokAgentSection from '../components/home/GrokAgentSection';
 import { HOME_OFFERS } from '../data/homeOffers';
 
 /**
@@ -21,7 +22,10 @@ import { HOME_OFFERS } from '../data/homeOffers';
  * the free beginner guide. Each beat registers itself with the field, which stages the background
  * from the beat under the reading line.
  *
- * Below the story the earlier sections continue, the agent-building offer among them as the
+ * Right after the story, "סוכן GROK" (2026-10-06): the live Grok Bot deck in a frame, the next
+ * thing to learn, with its own page at /grok.
+ *
+ * Below that the earlier sections continue, the agent-building offer among them as the
  * secondary path. The ROI / agent-savings calculator was removed on 2026-10-01 by decision.
  * TODO(redesign): those sections still wear the pre-2026-10-01 look and move into the glyph world
  * next.
@@ -34,6 +38,7 @@ export default function HomePage() {
       <OrderBeat />
       <PathBeat />
       <StartBeat />
+      <GrokAgentSection />
       {HOME_OFFERS.map((offer) => (
         <OfferSection key={offer.id} offer={offer} />
       ))}

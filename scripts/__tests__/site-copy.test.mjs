@@ -6,8 +6,9 @@
 //   - a placeholder that never got filled,
 //   - rtl() output that is not idempotent or leaves a Latin run un-anchored.
 // Run: npx tsx scripts/__tests__/site-copy.test.mjs
-import { HERO_COPY, STORY_COPY, PROCESS_COPY, ROTATOR_TERMS, SERVICES_COPY, CONTACT_COPY, CONTACT_FORM_COPY, FOOTER_COPY, ABOUT_COPY } from '../../src/data/siteCopy.ts';
+import { HERO_COPY, STORY_COPY, PROCESS_COPY, ROTATOR_TERMS, SERVICES_COPY, CONTACT_COPY, CONTACT_FORM_COPY, FOOTER_COPY, ABOUT_COPY, GROK_COPY } from '../../src/data/siteCopy.ts';
 import { AI_GUIDE_HERO, AI_GUIDE_WHAT, AI_GUIDE_PREP, AI_GUIDE_PROCESS, AI_GUIDE_CTA } from '../../src/data/aiAgentGuide.ts';
+import { GROK_GUIDE } from '../../src/data/grokGuide.ts';
 import { HOME_OFFERS } from '../../src/data/homeOffers.ts';
 import { SERVICES } from '../../src/data/homeServices.ts';
 import { rtl } from '../../src/lib/rtl.ts';
@@ -51,6 +52,28 @@ ABOUT_COPY.pillars.forEach((p, i) => {
 add('about.quote', ABOUT_COPY.quote, 18);
 add('about.ctaTitle', ABOUT_COPY.ctaTitle, 7);
 add('about.ctaDescription', ABOUT_COPY.ctaDescription, 20);
+// סוכן GROK (2026-10-06): the frame around the Grok Bot deck on the homepage and on /grok.
+const GROK_BUDGET = { sub: 48, homeSub: 26, lead: 10, sources: 22, howTo: 8, frameTitle: 8 };
+Object.entries(GROK_COPY).forEach(([k, v]) => add(`grok.${k}`, v, GROK_BUDGET[k] ?? 4));
+// The written guide under the deck on /grok (2026-10-06). Every Hebrew string, budgeted by the key
+// it sits under. Plan, model and file names are Latin-only and rendered as their own LTR elements,
+// so they skip the prose checks.
+const GUIDE_BUDGET = {
+  kicker: 4, nav: 4, label: 4, tag: 5, tocLabel: 3, role: 3, guideCta: 4, backCta: 4, official: 6,
+  title: 8, note: 6, term: 3, plain: 14, tests: 14, steps: 6, rules: 16, tips: 26, closing: 16,
+  takeaway: 24, why: 24, tail: 24, quota: 26, status: 16, beginners: 24, tip: 34, update: 40,
+  text: 50, body: 60,
+};
+const LATIN_ONLY = new Set(['plans', 'name', 'file']);
+const walkGuide = (node, label, key) => {
+  if (typeof node === 'string') {
+    if (!LATIN_ONLY.has(key)) add(`grokGuide.${label}`, node, GUIDE_BUDGET[key] ?? 30);
+  } else if (Array.isArray(node)) node.forEach((v, i) => walkGuide(v, `${label}[${i}]`, key));
+  else for (const [k, v] of Object.entries(node)) walkGuide(v, label ? `${label}.${k}` : k, k);
+};
+walkGuide(GROK_GUIDE, '', '');
+t('grokGuide hand note: no figures', !/\d/.test(GROK_GUIDE.first.note), GROK_GUIDE.first.note);
+t('grokGuide: order is never numbered', !JSON.stringify(GROK_GUIDE).match(/\b0[1-9]\b/), '01/02/03 kicker found');
 HOME_OFFERS.forEach((o) => {
   for (const k of ['eyebrow', 'title', 'accent', 'ctaLabel', 'secondaryLabel']) add(`${o.id}.${k}`, o[k], 6);
   add(`${o.id}.intro`, o.intro, 34);

@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { name: 'אודות', to: '/about' },
   { name: 'AI', to: '/ai' },
   { name: 'מערכת JARVIS', to: '/jarvis' },
+  { name: 'סוכן GROK', to: '/grok' },
   { name: 'לומדים AI', to: '/magazines' },
   { name: 'חדשות', to: '/news' },
 ];
