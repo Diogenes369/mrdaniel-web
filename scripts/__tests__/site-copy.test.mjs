@@ -53,7 +53,7 @@ add('about.quote', ABOUT_COPY.quote, 18);
 add('about.ctaTitle', ABOUT_COPY.ctaTitle, 7);
 add('about.ctaDescription', ABOUT_COPY.ctaDescription, 20);
 // סוכן GROK (2026-10-06): the frame around the Grok Bot deck on the homepage and on /grok.
-const GROK_BUDGET = { sub: 48, homeSub: 26, lead: 10, sources: 22, howTo: 8, frameTitle: 8 };
+const GROK_BUDGET = { sub: 48, homeSub: 26, lead: 10, howTo: 8, frameTitle: 8 };
 Object.entries(GROK_COPY).forEach(([k, v]) => add(`grok.${k}`, v, GROK_BUDGET[k] ?? 4));
 // The written guide under the deck on /grok (2026-10-06). Every Hebrew string, budgeted by the key
 // it sits under. Plan, model and file names are Latin-only and rendered as their own LTR elements,

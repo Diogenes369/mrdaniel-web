@@ -16,6 +16,8 @@
   const LAT = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
   const DIG = '0123456789';
   const rnd = (s) => s[Math.floor(Math.random() * s.length)];
+  // Every effect that is an action also makes its sound (js/sfx.js decides what that sounds like).
+  const sfx = (name, o) => { if (window.GrokSFX) window.GrokSFX.emit(name, o); };
 
   function dispose(fn) {
     if (FX.ctx && FX.ctx.disposers) FX.ctx.disposers.push(fn);
@@ -152,6 +154,7 @@
     dispose(restore);
     const noise = (c) => (/[א-ת]/.test(c) ? rnd(HEB) : /[A-Za-z]/.test(c) ? rnd(LAT) : /[0-9]/.test(c) ? rnd(DIG) : c);
     const proxy = { p: 0 };
+    const dur = o.duration || Math.min(1.3, 0.45 + total * 0.014);
     let last = 0;
     const paint = (force) => {
       const now = performance.now();
@@ -164,8 +167,8 @@
         idx += chars.length;
       });
     };
-    tl.fromTo(el, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01, onComplete: () => paint(true) });
-    tl.to(proxy, { p: 1, duration: o.duration || Math.min(1.3, 0.45 + total * 0.014), ease: 'none', onUpdate: () => paint(false), onComplete: restore, onInterrupt: restore });
+    tl.fromTo(el, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01, onStart: () => { if (!o.quiet) sfx('decode', { dur: dur }); }, onComplete: () => paint(true) });
+    tl.to(proxy, { p: 1, duration: dur, ease: 'none', onUpdate: () => paint(false), onComplete: restore, onInterrupt: restore });
     return tl;
   };
 
@@ -178,7 +181,7 @@
     const from = ltr ? 'inset(-15% 100% -15% 0%)' : 'inset(-15% 0% -15% 100%)';
     const to = 'inset(-15% 0% -15% 0%)';
     const dur = o.duration || n / (o.cps || 40);
-    return gsap.fromTo(el, { clipPath: from, webkitClipPath: from }, { clipPath: to, webkitClipPath: to, duration: dur, ease: `steps(${n})`, clearProps: 'clipPath,webkitClipPath' });
+    return gsap.fromTo(el, { clipPath: from, webkitClipPath: from }, { clipPath: to, webkitClipPath: to, duration: dur, ease: `steps(${n})`, clearProps: 'clipPath,webkitClipPath', onStart: () => sfx('type', { n: n, dur: dur }) });
   };
 
   // ── stroke draw (solid strokes) ──────────────────────────────────────────────────────────────
@@ -234,6 +237,7 @@
     });
     const release = lastArrive + hold;
     P.list.forEach((p) => { if (p.kind === 'in' && !p.release) p.release = release; });
+    sfx('assemble', { dur: (lastArrive - now) / 1000 });
     return release - now;
   };
 
@@ -242,6 +246,7 @@
     o = o || {};
     const now = performance.now();
     const n = o.count || 22;
+    sfx('burst', { count: n });
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + Math.random() * 0.5;
       const sp = (o.speed || 150) * (0.5 + Math.random() * 0.8);
@@ -260,6 +265,7 @@
     const now = performance.now();
     const n = o.count || 12;
     const mx = (ax + bx) / 2, my = Math.min(ay, by) - (o.arc || 80);
+    sfx('stream');
     for (let i = 0; i < n; i++) {
       P.list.push({
         kind: 'stream', x0: ax + (Math.random() - 0.5) * 18, y0: ay + (Math.random() - 0.5) * 18, x1: bx + (Math.random() - 0.5) * 24, y1: by + (Math.random() - 0.5) * 12,
@@ -365,6 +371,7 @@
         });
       },
       click() {
+        sfx('click');
         gsap.fromTo(el, { scale: 1 }, { scale: 0.82, duration: 0.09, yoyo: true, repeat: 1, ease: 'power2.out' });
         const ring = document.createElement('div');
         ring.className = 'click-ring';

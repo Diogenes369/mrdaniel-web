@@ -228,6 +228,9 @@ html.hide-cursor, html.hide-cursor * { cursor: none !important; }
 .stage[data-orient="portrait"] .nav-btn { width: 76px; height: 76px; opacity: 1; }
 .stage[data-orient="portrait"] .nav-btn svg { width: 34px; height: 34px; }
 .stage[data-orient="portrait"] .nav-fs { display: none; }
+/* The speaker: waves while the sounds are on, a cross while they're off. */
+.nav-sound[aria-pressed="true"] .snd-off, .nav-sound[aria-pressed="false"] .snd-on { display: none; }
+.nav-sound[aria-pressed="false"] { color: var(--faint); }
 .stage[data-orient="portrait"] .rail-caret { width: 16px; height: 34px; top: calc(50% - 17px); margin-right: -8px; }
 
 /* ── layers above slides ──────────────────────────────────────────────────────────────────── */
@@ -271,7 +274,6 @@ html.hide-cursor, html.hide-cursor * { cursor: none !important; }
 .close-small { margin-top: 18px; max-width: 34em; }
 .sign { margin-top: 48px; display: flex; align-items: center; gap: 30px; flex-wrap: wrap; }
 .sign-logo { height: 34px; width: auto; }
-.sources { font-size: 16px; color: var(--faint); max-width: 44em; }
 .cover-grid--close { grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.55fr); column-gap: 40px; }
 .close-display { font-size: calc(var(--fs-display) * 0.74); }
 .close-bots { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 70px; }
@@ -283,7 +285,6 @@ html.hide-cursor, html.hide-cursor * { cursor: none !important; }
 .stage[data-orient="portrait"] .anchor--close { width: 150px; height: 150px; }
 .stage[data-orient="portrait"] .close-row { grid-template-columns: repeat(2, auto); gap: 16px 18px; }
 .stage[data-orient="portrait"] .close-display { font-size: calc(var(--fs-display) * 0.9); }
-.stage[data-orient="portrait"] .sources { font-size: 22px; }
 
 /* you are the loop */
 .s-loop .duo { align-items: stretch; }

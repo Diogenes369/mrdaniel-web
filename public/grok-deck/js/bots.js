@@ -13,6 +13,10 @@
 (function () {
   'use strict';
 
+  // What a bot does, it also sounds (js/sfx.js): the hop and the landing, popping in, a change of
+  // shape or mood. `size` lets a small bot sound smaller than the main one.
+  const sfx = (name, o) => { if (window.GrokSFX) window.GrokSFX.emit(name, o); };
+
   const NS = 'http://www.w3.org/2000/svg';
   const N = 84;
   const R = 100;
@@ -357,7 +361,7 @@
     // anticipation
     tl.call(() => { self.sy.t = 0.84; self.sx.t = 1.12; });
     tl.to({}, { duration: 0.11 });
-    tl.call(() => { self.sy.t = 1.12; self.sx.t = 0.9; self.sy.v += 4; });
+    tl.call(() => { self.sy.t = 1.12; self.sx.t = 0.9; self.sy.v += 4; sfx('hop', { size: self.size.t }); });
     tl.to(prog, {
       t: 1, duration: dur, ease: 'power1.inOut',
       onUpdate() {
@@ -374,6 +378,7 @@
         self.sy.t = 1; self.sx.t = 1;
         self.sy.v -= 7.5; self.sx.v += 6;
         self.hop = null;
+        sfx('land', { size: self.size.t });
         if (o.onLand) o.onLand();
       },
     });
@@ -391,8 +396,8 @@
       const t = gsap.timeline();
       t.call(() => { self.sy.t = 0.86; self.sx.t = 1.1; });
       t.to({}, { duration: 0.09 });
-      t.call(() => { self.sy.t = 1.08; self.sx.t = 0.94; });
-      t.to(prog, { t: 1, duration: 0.42, ease: 'none', onUpdate() { self.arcY = -Math.sin(Math.PI * prog.t) * h; }, onComplete() { self.arcY = 0; self.sy.t = 1; self.sx.t = 1; self.sy.v -= 6; self.sx.v += 5; self.hop = null; } });
+      t.call(() => { self.sy.t = 1.08; self.sx.t = 0.94; sfx('hop', { size: self.size.t, small: true }); });
+      t.to(prog, { t: 1, duration: 0.42, ease: 'none', onUpdate() { self.arcY = -Math.sin(Math.PI * prog.t) * h; }, onComplete() { self.arcY = 0; self.sy.t = 1; self.sx.t = 1; self.sy.v -= 6; self.sx.v += 5; self.hop = null; sfx('land', { size: self.size.t, small: true }); } });
       return t;
     });
     this.hop = { tween: tl };
@@ -410,6 +415,7 @@
     const p = { t: 0 };
     this.settled = false;
     this.sy.v += 3; this.sx.v -= 2.5;
+    sfx('morph', { size: this.size.t });
     this.morph = free(() => gsap.to(p, {
       t: 1, duration: o.duration || 0.7, ease: o.ease || 'back.out(1.6)',
       onUpdate() {
@@ -429,6 +435,7 @@
   Bot.prototype.setMood = function (mood) {
     const m = MOODS[mood];
     if (!m) return;
+    if (mood !== this.mood && (mood === 'surprised' || mood === 'sad')) sfx(mood === 'sad' ? 'sad' : 'surprise');
     this.mood = mood;
     const e = this.eye;
     e.openL.t = m.openL; e.openR.t = m.openR; e.tiltL.t = m.tiltL; e.tiltR.t = m.tiltR;
@@ -443,6 +450,7 @@
   Bot.prototype.setPing = function (on) {
     if (!!on === !!this.pinging) return;
     this.pinging = !!on;
+    if (on) sfx('ping');
     const el = this.ping;
     free(() => {
       gsap.killTweensOf(el);
@@ -453,6 +461,7 @@
   Bot.prototype.setStar = function (on) {
     if (!!on === !!this.starred) return;
     this.starred = !!on;
+    if (on) sfx('star');
     const el = this.starEl;
     free(() => {
       gsap.killTweensOf(el);
@@ -465,7 +474,7 @@
     o = o || {};
     const self = this;
     if (Bots.reduce) { this.pop.x = this.pop.t = 1; this.alpha = 1; return; }
-    free(() => gsap.delayedCall(o.delay || 0, () => { self.alpha = 1; self.pop.t = 1; self.pop.v += 4; }));
+    free(() => gsap.delayedCall(o.delay || 0, () => { self.alpha = 1; self.pop.t = 1; self.pop.v += 4; sfx('pop', { size: self.size.t }); }));
   };
   Bot.prototype.popOut = function (cb) {
     const self = this;
@@ -484,10 +493,12 @@
   };
   Bot.prototype.wince = function () {
     if (Bots.reduce) return;
+    sfx('wince');
     this.sy.v -= 6; this.sx.v += 5; this.rot.v += (Math.random() < 0.5 ? -1 : 1) * 160;
   };
   Bot.prototype.wave = function () {
     if (Bots.reduce) return;
+    sfx('wave');
     const self = this;
     this.setMood('happy');
     free(() => [0, 0.22, 0.44, 0.66].forEach((t, i) => gsap.delayedCall(t, () => { self.rot.v += (i % 2 ? -1 : 1) * 300; })));

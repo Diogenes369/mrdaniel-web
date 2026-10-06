@@ -43,7 +43,7 @@
             <span class="gbtn__label">מתחילים <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>
             <i class="tk tk-tr" aria-hidden="true"></i><i class="tk tk-tl" aria-hidden="true"></i><i class="tk tk-br" aria-hidden="true"></i><i class="tk tk-bl" aria-hidden="true"></i>
           </button>
-          <span class="machine hint">רווח או חיצים כדי לעבור · <bdi>F</bdi> למסך מלא</span>
+          <span class="machine hint">רווח או חיצים כדי לעבור · <bdi>F</bdi> למסך מלא · <bdi>M</bdi> לצלילים</span>
         </div>
       </div>
       <div class="cover-bot"><div class="anchor anchor--cover" data-anchor="main"></div></div>
@@ -385,7 +385,7 @@
       </div>
       <div class="roster-foot" data-quiet>
         <p class="body-sm">טוקן הוא חתיכת טקסט קטנה שהמודל קורא. חלון הקשר הוא כמה טקסט הוא מחזיק בראש בבת אחת.</p>
-        <p class="machine reality"><i class="caret caret--sm"></i>מאז שהמאמר יצא הגיע <bdi>Grok 4.7</bdi>, ו-<bdi>4.1 Fast</bdi> כבר לא מופיע ברשימת המודלים של <bdi>xAI</bdi>. מי שמחזיק את הטבלה בנפרד מהקוד מחליף שורה אחת.</p>
+        <p class="machine reality"><i class="caret caret--sm"></i>בינתיים הגיע <bdi>Grok 4.7</bdi>, ו-<bdi>4.1 Fast</bdi> כבר לא מופיע ברשימת המודלים של <bdi>xAI</bdi>. מי שמחזיק את הטבלה בנפרד מהקוד מחליף שורה אחת.</p>
       </div>
     </div>
   </section>
@@ -421,12 +421,12 @@
     <div class="stack">
       <header class="head" data-quiet>
         <div class="rise-host"><h2 class="h2">מה שבאמת עוצר אנשים</h2></div>
-        <p class="body">לא הכסף ולא הטכנולוגיה. לפי החישוב במאמר, תוצר שלם עולה פחות מדולר במודלים.</p>
+        <p class="body">לא הכסף ולא הטכנולוגיה. תוצר שלם יכול לעלות פחות מדולר במודלים.</p>
       </header>
       <div class="duo duo--blocks">
         <figure class="frame block" data-quiet>
           <figcaption class="block-title">לדעת על מה לכוון אותו</figcaption>
-          <p class="body-sm">במאמר זה להשיג לקוחות. אצלכם זה לבחור משימה אמיתית, ברורה, שחוזרת על עצמה.</p>
+          <p class="body-sm">למי שבונה עסק זה להשיג לקוחות. אצלכם זה לבחור משימה אמיתית, ברורה, שחוזרת על עצמה.</p>
         </figure>
         <figure class="frame block block--tray" data-quiet>
           <figcaption class="block-title">כמה אתם מסוגלים לבדוק</figcaption>
@@ -476,7 +476,6 @@
         <p class="body-sm close-small" data-quiet>המודלים יתחלפו. הצ׳קליסט, הבודק וקובץ הקול שלכם יישארו, ויעבדו טוב יותר עם כל מודל חדש.</p>
         <div class="sign" data-quiet>
           <img class="sign-logo" src="assets/logo.png" alt="MR. DANIEL">
-          <p class="machine sources">מקורות: המאמר של <bdi>@maestrooth</bdi> ב-<bdi>X</bdi> (אוגוסט 2026), ועמודי <bdi>Grok Bot</bdi> של <bdi>SpaceXAI</bdi></p>
         </div>
       </div>
       <div class="close-bots">
@@ -506,6 +505,7 @@
     <div class="rail-track"><span class="rail-line" aria-hidden="true"></span><span class="rail-caret" aria-hidden="true"></span></div>
     <button class="nav-btn nav-next" type="button" data-action="next" aria-label="השקף הבא"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
     <button class="nav-btn nav-fs" type="button" data-action="fullscreen" aria-label="מסך מלא"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    <button class="nav-btn nav-sound" type="button" data-action="sound" aria-pressed="true" aria-label="השתקת הצלילים"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path class="snd-on" d="M15.5 9.2a4 4 0 0 1 0 5.6M18.2 6.6a7.6 7.6 0 0 1 0 10.8"/><path class="snd-off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
   </nav>
 </main>
 </div>
@@ -514,6 +514,7 @@
 
 <script src="lib/gsap.min.js"></script>
 <script src="js/field.js"></script>
+<script src="js/sfx.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/bots.js"></script>
 <script src="js/slides.js"></script>

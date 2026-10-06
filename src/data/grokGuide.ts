@@ -2,7 +2,7 @@ import { ltr } from '../lib/rtl';
 
 /**
  * /grok: the written guide under the Grok Bot deck (2026-10-06). Same facts as the deck
- * (public/grok-deck), from @maestrooth's article of 2026-08-26 and x.ai's Grok Bot pages, checked
+ * (public/grok-deck), from the X article the deck was built on (2026-08-26) and x.ai's Grok Bot pages, checked
  * again on 2026-10-06. Here they are explained for someone meeting the subject for the first time:
  * plain words, every term glossed once, nothing promised that the sources don't say. Order is shown
  * by layout (stairs, arrows), never by 01/02/03. Guarded by `npm run test:copy`.
@@ -205,7 +205,7 @@ export const GROK_GUIDE = {
       { name: 'Grok 4.6', role: 'בתור בודק', text: 'בשיחה נפרדת, עם הקשר נקי, כדי שלא יושפע ממה שהכותב חשב.' },
     ],
     rule: 'מתאימים את המודל לסוג העבודה, לא לתג המחיר.',
-    update: 'מאז שהמאמר יצא הגיע Grok 4.7, ו-Grok 4.1 Fast כבר לא מופיע ברשימת המודלים של xAI. לכן כדאי להחזיק את הבחירה במודלים בטבלה נפרדת מהקוד, ולהחליף בה שורה אחת כשמשהו משתנה.',
+    update: 'בינתיים הגיע Grok 4.7, ו-Grok 4.1 Fast כבר לא מופיע ברשימת המודלים של xAI. לכן כדאי להחזיק את הבחירה במודלים בטבלה נפרדת מהקוד, ולהחליף בה שורה אחת כשמשהו משתנה.',
     cliff: {
       title: 'המלכודת של 200 אלף טוקנים',
       text: 'ב-API של xAI, ברגע שהקלט של בקשה אחת עובר 200 אלף טוקנים, המחיר מוכפל על כל הבקשה, ולא רק על מה שעבר את הקו.',

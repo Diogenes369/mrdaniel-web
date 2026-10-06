@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Renders the Grok Bot deck (public/grok-deck) into a 1080×1920 Instagram Reel.
+ * Renders the Grok Bot deck (public/grok-deck) into a 1080×1920 Instagram Reel, with its sound.
  *
  * The deck plays itself in `?reel` mode (fixed vertical frame, text kept out of the Reels UI, each
  * slide held for its choreography plus reading time). This script runs it in headless Chrome on a
@@ -8,9 +8,11 @@
  * performance.now, GSAP and CSS animations alike — so the video is smooth however slowly the
  * machine renders, and the frames go straight into ffmpeg.
  *
- * While it records, the deck logs the moment each slide comes in and each time the bot lands. Those
- * become the cue sheet (<name>.cues.json, exact to the frame), and scripts/reel-audio.mjs scores the
- * video from it, so the sound follows the picture without any hand timing.
+ * While it records, every sound the deck would make on the website (a click, a hop, a stamp, a
+ * slide change; public/grok-deck/js/sfx.js) is logged as a cue instead, with the moment each slide
+ * came in. Those become the cue sheet (<name>.cues.json, exact to the frame), and
+ * scripts/reel-audio.mjs scores the video from it: the same sounds at the same frames, under music
+ * that keeps time with the slides.
  *
  *   node scripts/render-grok-reel.mjs [out.mp4] [--seconds N]
  *
@@ -19,10 +21,11 @@
  * connection.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { openChrome } from './lib/headless.mjs';
 import { cuePath, scoreVideo } from './reel-audio.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,15 +38,6 @@ const SILENT = path.join(tmpdir(), `grok-reel-picture-${process.pid}.mp4`);
 const FPS = 30;
 const W = 1080;
 const H = 1920;
-const PORT = 9471;
-const CHROMES = [
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/usr/bin/google-chrome',
-];
-const CHROME = CHROMES.find((p) => existsSync(p));
-if (!CHROME) throw new Error('Chrome or Edge not found');
 mkdirSync(path.dirname(OUT), { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -85,39 +79,10 @@ const VIRTUAL_CLOCK = `(() => {
   };
 })();`;
 
-const chrome = spawn(CHROME, [
-  '--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${path.join(tmpdir(), 'grok-reel-' + PORT)}`,
-  '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--hide-scrollbars', '--mute-audio', '--no-first-run',
-  '--no-default-browser-check', '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
-  `--window-size=${W},${H}`, 'about:blank',
-], { stdio: 'ignore' });
-
-async function devtools(p, method = 'GET') {
-  for (let i = 0; i < 80; i++) {
-    try {
-      const r = await fetch(`http://127.0.0.1:${PORT}${p}`, { method });
-      if (r.ok) return r.json();
-    } catch { /* not up yet */ }
-    await sleep(250);
-  }
-  throw new Error('Chrome DevTools endpoint never came up');
-}
-
+const chrome = await openChrome({ port: 9471, width: W, height: H });
 let ff = null;
 try {
-  const target = await devtools('/json/new?about:blank', 'PUT');
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
-  let id = 0;
-  const pending = new Map();
-  ws.onmessage = (m) => {
-    const d = JSON.parse(m.data);
-    if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
-    else if (d.method === 'Runtime.exceptionThrown') console.error('page exception:', d.params.exceptionDetails.text, d.params.exceptionDetails.exception?.description || '');
-  };
-  await new Promise((r) => { ws.onopen = r; });
-  const send = (method, params = {}) => new Promise((res) => { const i = ++id; pending.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
-  const evaluate = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true })).result?.result?.value;
-
+  const { send, evaluate } = await chrome.newPage();
   await send('Runtime.enable');
   await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
@@ -166,12 +131,11 @@ try {
     .filter((c) => c.t < duration);
   ff.stdin.end();
   await ffDone;
-  ws.close();
   const sheet = { fps: FPS, duration, slideCount, cues };
-  writeFileSync(cuePath(OUT), JSON.stringify(sheet, null, 2));
-  const sound = scoreVideo(SILENT, sheet, OUT);
+  writeFileSync(cuePath(OUT), JSON.stringify(sheet, null, 1));
+  const sound = await scoreVideo(SILENT, sheet, OUT, { chrome });
   rmSync(SILENT, { force: true });
-  console.log(`\nwrote ${OUT} (${(frame / FPS).toFixed(1)}s, ${frame} frames) and ${COVER}`);
+  console.log(`\nwrote ${OUT} (${duration.toFixed(1)}s, ${frame} frames) and ${COVER}`);
   console.log('per slide:', log);
   console.log(`sound: ${cues.length} cues, ${sound.loudness} LUFS, true peak ${sound.peak} dBTP`);
 } catch (err) {
@@ -179,5 +143,5 @@ try {
   console.error(err);
   process.exitCode = 1;
 } finally {
-  chrome.kill();
+  chrome.close();
 }

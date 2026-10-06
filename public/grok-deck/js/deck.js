@@ -29,6 +29,7 @@
   let inFrame = false;
   try { inFrame = window.self !== window.top; } catch (e) { inFrame = true; }
   const MODE = params.has('reel') ? 'reel' : inFrame || params.has('embed') ? 'embed' : 'full';
+  const sfx = (name, o) => { if (window.GrokSFX) window.GrokSFX.emit(name, o); };
   html.dataset.mode = MODE;
 
   const state = { i: -1, W: 1920, H: 1080, scale: 1, orient: '', lastNav: 0, swipedAt: 0 };
@@ -107,7 +108,7 @@
     if (!reduce && section) {
       const prev = FX.ctx;
       FX.ctx = null;
-      FX.decode(chromeSection, { duration: 0.6 });
+      FX.decode(chromeSection, { duration: 0.6, quiet: true });
       FX.ctx = prev;
     }
   }
@@ -145,6 +146,7 @@
       later: (d, fn) => { const dc = gsap.delayedCall(d, () => run(slide, fn)); slide.keep.push(dc); return dc; },
       keep: (tw) => { slide.keep.push(tw); return tw; },
       dispose: (fn) => { slide.disposers.push(fn); },
+      sfx: (name, opt) => sfx(name, opt),
       rise: (node, t, opt) => { if (node) slide.tl.add(FX.rise(node, opt), t); },
       wipe: (node, t, opt) => { if (node) slide.tl.add(FX.wipe(node, opt), t); },
       decode: (node, t, opt) => { if (node) slide.tl.add(FX.decode(node, opt), t); },
@@ -158,14 +160,16 @@
         const n = Math.max(1, ln.textContent.replace(/\s+$/, '').length);
         const from = 'inset(-20% 100% -20% 0%)';
         const to = 'inset(-20% 0% -20% 0%)';
-        slide.tl.fromTo(ln, { clipPath: from, webkitClipPath: from }, { clipPath: to, webkitClipPath: to, duration: Math.max(0.16, n / (cps || 50)), ease: `steps(${n})`, clearProps: 'clipPath,webkitClipPath' }, t);
+        const dur = Math.max(0.16, n / (cps || 50));
+        slide.tl.fromTo(ln, { clipPath: from, webkitClipPath: from }, { clipPath: to, webkitClipPath: to, duration: dur, ease: `steps(${n})`, clearProps: 'clipPath,webkitClipPath', onStart: () => sfx('type', { n: n, dur: dur }) }, t);
       },
       typeText: (node, text, t, cps) => {
         if (!node) return;
         const orig = node.textContent;
         slide.disposers.push(() => { node.textContent = orig; });
         const proxy = { n: 0 };
-        slide.tl.to(proxy, { n: text.length, duration: text.length / (cps || 20), ease: 'none', onUpdate: () => { node.textContent = text.slice(0, Math.round(proxy.n)); } }, t);
+        const dur = text.length / (cps || 20);
+        slide.tl.to(proxy, { n: text.length, duration: dur, ease: 'none', onStart: () => sfx('type', { n: text.length, dur: dur }), onUpdate: () => { node.textContent = text.slice(0, Math.round(proxy.n)); } }, t);
       },
       row: (row, t) => {
         if (!row) return;
@@ -185,7 +189,7 @@
         if (!fig) return;
         const text = fig.querySelector('.hand__text');
         const paths = fig.querySelectorAll('path');
-        slide.tl.fromTo(fig, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01 }, t);
+        slide.tl.fromTo(fig, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01, onStart: () => sfx('scribble', { dur: 0.6 + paths.length * 0.45 }) }, t);
         if (text) slide.tl.from(text, { opacity: 0, y: 12, rotation: -5, duration: 0.7, ease: 'back.out(2)' }, t);
         paths.forEach((p, i) => slide.tl.add(FX.draw(p, { duration: i ? 0.3 : 0.7 }), t + 0.25 + i * 0.6));
       },
@@ -306,6 +310,7 @@
       if (!o.first && !o.instant) Field.kick(dir);
     }
     if (!o.first && !o.instant && !reduce) FX.Particles.sweep(dir);
+    if (!o.first && !o.instant) sfx('swap', { dir: dir });
 
     // The bot hops to its mark on the new slide.
     const m = def.main || {};
@@ -320,7 +325,6 @@
           hop: true,
           onLand: () => {
             if (active !== slide) return;
-            if (MODE === 'reel') reel.cues.push({ type: 'land', i: n, t: performance.now() });
             if (fieldOk) { const c = main.center(); const v = toView(c.x, c.y + c.r); Field.ripple(v.x, v.y); }
           },
         });
@@ -439,6 +443,7 @@
     else if (k === 'Home') { e.preventDefault(); go(0); }
     else if (k === 'End') { e.preventDefault(); go(slideEls.length - 1); }
     else if (e.code === 'KeyF') { e.preventDefault(); toggleFS(); }
+    else if (e.code === 'KeyM') { e.preventDefault(); toggleSound(); }
   });
 
   stage.addEventListener('click', (e) => {
@@ -449,6 +454,7 @@
       if (a === 'next') next();
       else if (a === 'prev') prev();
       else if (a === 'fullscreen') toggleFS();
+      else if (a === 'sound') toggleSound();
       return;
     }
     const track = e.target.closest('.rail-track');
@@ -487,6 +493,27 @@
   }
   window.addEventListener('pointermove', pokeUI, { passive: true });
   window.addEventListener('pointerdown', pokeUI, { passive: true });
+
+  // ── sound (js/sfx.js) ────────────────────────────────────────────────────────────────────────
+  // A browser lets a page make sound only after a click or a key, so the first one opens it; the
+  // deck is silent until then. The rail's speaker button (or M) turns it off and on, remembered.
+  const soundBtn = stage.querySelector('[data-action="sound"]');
+  const unlockSound = () => { if (window.GrokSFX) window.GrokSFX.unlock(); };
+  window.addEventListener('pointerdown', unlockSound, { capture: true, passive: true });
+  window.addEventListener('keydown', unlockSound, { capture: true });
+  function syncSound() {
+    const on = !!(window.GrokSFX && window.GrokSFX.enabled);
+    if (!soundBtn) return;
+    soundBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    soundBtn.setAttribute('aria-label', on ? 'השתקת הצלילים' : 'הפעלת הצלילים');
+  }
+  function toggleSound() {
+    if (!window.GrokSFX) return;
+    window.GrokSFX.setEnabled(!window.GrokSFX.enabled);
+    syncSound();
+    if (window.GrokSFX.enabled) sfx('pop', { size: 160 });
+  }
+  syncSound();
 
   let wake = null;
   function requestWake() {
@@ -607,6 +634,9 @@
       if (!reduce) FX.Particles.burst(c.x, c.y - c.r * 0.3, { count: 14, speed: Math.max(80, c.r * 1.4) });
     };
     main = Bots.create('main', { x: state.W * 0.25, y: state.H * 0.5, size: 300, hidden: true });
+    // In the reel every sound becomes a cue on the virtual clock; scripts/reel-score.js renders
+    // them under the music afterwards.
+    if (MODE === 'reel' && window.GrokSFX) window.GrokSFX.recorder = (name, o) => reel.cues.push(Object.assign({ type: name }, o, { t: performance.now() }));
     if (Field) {
       Field.getScale = () => state.scale;
       if (MODE === 'reel') Field.cellScale = 1.5;

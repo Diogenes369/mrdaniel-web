@@ -7,13 +7,12 @@ import { useFieldQuiet } from '../components/field/fieldState';
 /**
  * /grok — "סוכן GROK": the live Grok Bot deck on its own page, opened from the main menu. The deck
  * (public/grok-deck) loads straight away here. Under it, the same story as a written guide for
- * people who would rather read (GrokGuide, copy in src/data/grokGuide.ts), and at the very end
- * where the facts come from.
+ * people who would rather read (GrokGuide, copy in src/data/grokGuide.ts). No source line, by the
+ * owner's decision (2026-10-06).
  */
 export default function GrokAgentPage() {
   const c = GROK_COPY;
   const quietHead = useFieldQuiet();
-  const quietFoot = useFieldQuiet();
   return (
     <div id="page-top" className="relative pb-24">
       <section className="relative pt-28 md:pt-36" aria-labelledby="grok-page-title">
@@ -35,9 +34,6 @@ export default function GrokAgentPage() {
             <GrokDeckFrame eager className="mt-10" />
           </div>
           <GrokGuide />
-          <p ref={quietFoot} className="mt-8 max-w-3xl font-type text-[12.5px] leading-relaxed text-ink-faint">
-            {rtl(c.sources)}
-          </p>
         </div>
       </section>
     </div>

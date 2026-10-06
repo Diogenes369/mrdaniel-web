@@ -15,7 +15,6 @@
  * The three pillars, in this order everywhere: (1) building AI agents, (2) the model lab — new
  * models tried out and explained, (3) the AI news + practical guides hub.
  */
-import { ltr } from '../lib/rtl';
 
 export const HERO_COPY = {
   // Learners first since 2026-10-01 (by decision): the opening meets the visitor's real fear — being
@@ -223,6 +222,4 @@ export const GROK_COPY = {
   fullscreen: 'מסך מלא',
   open: 'לכל המצגת',
   frameTitle: 'סוכן GROK, מצגת חיה על Grok Bot',
-  // The handle is isolated: left to rtl(), its "@" lands on the Hebrew side and reads "maestrooth@".
-  sources: `מבוסס על המאמר של ${ltr('@maestrooth')} ב-X ועל העמודים הרשמיים של Grok Bot, נכון לאוקטובר 2026.`,
 };

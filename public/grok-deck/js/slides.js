@@ -99,7 +99,7 @@
       const tasks = S.qa('.task');
       tasks.forEach((t, i) => {
         tl.from(t, { opacity: 0, x: 26, duration: 0.5, ease: 'expo.out' }, 1.75 + i * 0.5);
-        S.at(2.15 + i * 0.5, () => S.cls(t.querySelector('.chk'), 'is-on'));
+        S.at(2.15 + i * 0.5, () => { S.cls(t.querySelector('.chk'), 'is-on'); S.sfx('check'); });
       });
       tl.from(S.q('.done-chip'), { scaleX: 0, duration: 0.6, ease: 'expo.out' }, 3.55);
       S.at(0.7, () => S.main.look(S.q('.reply-card')));
@@ -126,6 +126,7 @@
       tl.from(S.q('.cloud-status'), { opacity: 0, duration: 0.4 }, 2.3);
       tl.from(S.q('.laptop'), { opacity: 0, y: 22, duration: 0.7, ease: 'expo.out' }, 0.9);
       tl.to(S.q('.laptop .lid'), { scaleY: 0.06, duration: 0.65, ease: 'power3.in', transformOrigin: '50% 100%' }, 3.0);
+      S.at(3.55, () => S.sfx('lid'));
       tl.to(S.q('.cap-open'), { opacity: 0, duration: 0.2 }, 3.5);
       tl.to(S.q('.cap-closed'), { opacity: 1, duration: 0.25 }, 3.6);
       S.at(0.55, () => S.main.look(S.q('.win--cloud')));
@@ -164,6 +165,7 @@
           gsap.to(S.qa('.approve-actions, .approve-text'), { opacity: 0.25, duration: 0.35 });
           gsap.fromTo(S.q('.approve-sent'), { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.45, ease: 'expo.out' });
           S.main.setPing(false);
+          S.sfx('sent');
           S.main.setMood('happy');
           S.main.hopInPlace(46);
           S.burst(p.x, p.y, { count: 18 });
@@ -201,6 +203,7 @@
       });
       const save = 1.2 + 0.9 + 4 * per;
       S.at(save, () => {
+        S.sfx('save');
         S.main.setMood('happy');
         S.main.nod();
         const chip = S.q('.routine-chip');
@@ -285,7 +288,7 @@
       rungs.forEach((r, i) => {
         const t = 0.5 + i * 0.55;
         tl.from(r, { opacity: 0, x: 44, duration: 0.75, ease: 'expo.out' }, t);
-        S.at(t + 0.1, () => { rungs.forEach((x) => x.classList.remove('is-here')); S.cls(r, 'is-on'); S.cls(r, 'is-here'); });
+        S.at(t + 0.1, () => { rungs.forEach((x) => x.classList.remove('is-here')); S.cls(r, 'is-on'); S.cls(r, 'is-here'); S.sfx('step', { i: i }); });
       });
       S.frameIn(S.q('.plans'), 0.8);
       S.decode(S.q('.plans .frame-label'), 1.0);
@@ -317,6 +320,7 @@
         else S.at(t, () => S.main.hopInPlace(30));
         S.at(t + 0.55, () => {
           S.cls(c, 'is-on');
+          S.sfx('check');
           S.draw(c.querySelector('.tick'));
           const b = S.point(c.querySelector('.box'));
           S.ripple(b.x, b.y);
@@ -370,6 +374,7 @@
         tl.fromTo(line, { top: 30, opacity: 1 }, { top: doc.offsetHeight - 30, duration: 1.3, ease: 'none' }, t0);
         tl.to(line, { opacity: 0, duration: 0.2 }, t0 + 1.3);
         S.at(t0, () => {
+          S.sfx('scan', { dur: 1.3 });
           if (!rev) return;
           rev.setMood('focus');
           const d = S.point(doc);
@@ -384,6 +389,7 @@
       tl.fromTo(fail, { opacity: 0, scale: 2.3, rotation: -18 }, { opacity: 1, scale: 1, rotation: -8, duration: 0.42, ease: 'back.out(2.2)' }, 3.0);
       S.at(3.05, () => {
         const d = S.point(doc);
+        S.sfx('stamp', { kind: 'fail' });
         S.ripple(d.x, d.y);
         S.shake();
         S.burst(d.x, d.y, { count: 20, speed: 180, color: '#E6ECDD' });
@@ -398,12 +404,14 @@
       tl.to(fail, { opacity: 0, scale: 0.85, duration: 0.3 }, 4.6);
       tl.to(S.qa('.misses li'), { opacity: 0.35, duration: 0.3 }, 4.6);
       tl.to(sks, { scaleX: 0.15, transformOrigin: 'right center', duration: 0.3, stagger: 0.05, ease: 'power2.in' }, 4.7);
+      S.at(4.7, () => S.sfx('fix'));
       tl.to(sks, { scaleX: 1, duration: 0.45, stagger: 0.06, ease: 'expo.out' }, 5.2);
       S.at(5.8, () => { S.main.work(false); S.main.setMood('idle'); });
       scan(5.9);
       tl.fromTo(pass, { opacity: 0, scale: 2.3, rotation: -18 }, { opacity: 1, scale: 1, rotation: -8, duration: 0.42, ease: 'back.out(2.2)' }, 7.4);
       S.at(7.45, () => {
         const d = S.point(doc);
+        S.sfx('stamp', { kind: 'pass' });
         S.ripple(d.x, d.y);
         S.burst(d.x, d.y, { count: 24, speed: 200 });
         if (rev) { rev.setMood('happy'); rev.hopInPlace(30); rev.look(null); }
@@ -441,6 +449,7 @@
         if (/attempt 2/.test(ln.textContent)) S.at(t - 0.1, () => { S.main.setMood('focus'); S.main.work(true); });
         if (ln.dataset.beat === 'fail') {
           S.at(t, () => {
+            S.sfx('fail');
             S.main.work(false); S.main.setMood('sad'); S.main.wince();
             S.cls(lives[0], 'is-failed');
             const p = S.point(ln); S.ripple(p.x, p.y);
@@ -449,6 +458,7 @@
         }
         if (ln.dataset.beat === 'pass') {
           S.at(t, () => {
+            S.sfx('pass');
             S.main.work(false); S.main.setMood('happy'); S.main.hopInPlace(44);
             S.cls(lives[1], 'is-passed');
             const p = S.point(ln.querySelector('.t-pass') || ln); S.ripple(p.x, p.y); S.burst(p.x, p.y, { count: 16 });
@@ -489,6 +499,7 @@
           const tw = gsap.timeline();
           tw.to(card, { opacity: 1, scale: 1, duration: 0.3, ease: 'back.out(2)' });
           tw.call(() => S.main.look(row));
+          tw.call(() => S.sfx('toss'), null, 0.45);
           tw.to(card, { x: term.x - router.x, y: term.y - router.y, duration: 0.75, ease: 'power3.inOut' }, 0.45);
           tw.to(card, { scale: 0.4, opacity: 0, duration: 0.25, ease: 'power2.in' }, 1.05);
           tw.call(() => { S.cls(row, 'is-on'); S.ripple(term.x, term.y); S.burst(term.x, term.y, { count: 10, speed: 80 }); }, null, 1.15);
@@ -536,12 +547,14 @@
         count.textContent = fmt(proxy.v).toLocaleString('en-US');
       };
       S.at(1.2, () => { S.main.track(edge); S.main.walk(true); S.main.setMood('focus'); S.main.look(S.q('.tok-line')); });
+      S.at(1.3, () => S.sfx('fill', { dur: 2.8 }));
       tl.to(proxy, {
         v: 214000, duration: 3.4, ease: 'power1.inOut',
         onUpdate: () => {
           paint();
           if (!crossed && proxy.v >= LINE) {
             crossed = true;
+            S.sfx('alert');
             price.textContent = '×2';
             price.classList.add('is-hot');
             fill.classList.add('is-hot');
@@ -564,6 +577,7 @@
           paint();
           if (crossed && proxy.v < LINE) {
             crossed = false;
+            S.sfx('relief');
             price.textContent = '×1';
             price.classList.remove('is-hot');
             fill.classList.remove('is-hot');
@@ -607,6 +621,7 @@
           sheets.appendChild(s);
           const idx = sheets.children.length - 1;
           gsap.fromTo(s, { bottom: idx * 11 + 70, opacity: 0, rotation: (Math.random() - 0.5) * 16 }, { bottom: idx * 11, opacity: 1, rotation: (Math.random() - 0.5) * 6, duration: 0.5, delay: delay + k * 0.07, ease: 'bounce.out' });
+          S.later(delay + k * 0.07 + 0.3, () => S.sfx('drop'));
         }
       };
       S.at(1.4, () => { add(2, 0); S.main.look(S.q('.tray')); });
@@ -618,12 +633,14 @@
         S.main.wobble(1);
       });
       S.at(3.3, () => {
+        S.sfx('shrink');
         gsap.to(brief, { scaleX: 0.5, duration: 0.8, ease: 'power3.inOut' });
         S.main.look(brief);
         S.main.setMood('focus');
       });
       S.at(3.9, () => {
         const all = Array.from(sheets.children).slice(2);
+        S.sfx('whisk');
         gsap.to(all, { opacity: 0, y: -40, duration: 0.4, stagger: 0.03, ease: 'power2.in', onComplete: () => all.forEach((x) => x.remove()) });
         rate.textContent = '5%';
         gsap.fromTo(rate, { scale: 1.4 }, { scale: 1, duration: 0.45, ease: 'back.out(3)' });
@@ -655,6 +672,7 @@
           if (i) S.main.goTo(a.x, a.y, a.w, { hop: true, arc: 110, duration: 0.55 });
           else S.main.hopInPlace(26);
           S.cls(st, 'is-on');
+          S.sfx('step', { i: i + 1 });
         });
       });
       S.rise(S.q('.statement'), 4.1);
