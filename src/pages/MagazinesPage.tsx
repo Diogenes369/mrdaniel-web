@@ -1,37 +1,42 @@
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
-import { Bell, ArrowLeft, Lock, Asterisk } from 'lucide-react';
-import WebButton from '../components/WebButton';
+import { Bell, ArrowLeft, Lock } from 'lucide-react';
+import GlyphButton from '../components/ui/GlyphButton';
 import SocialLinks from '../components/SocialLinks';
+import SiteBot from '../components/bots/SiteBot';
 import GuideCover from '../components/guides/GuideCover';
 import { LEARN_AI_COPY } from '../data/siteCopy';
 import { CREATOR_GUIDES } from '../data/creatorContent';
 import { useModelCatalog } from '../services/modelCatalogService';
+import { useFieldHeadline, useFieldQuiet } from '../components/field/fieldState';
 import { rtl } from '../lib/rtl';
 
 /**
- * /magazines — "לומדים AI" (renamed in the nav 2026-09-23). A single, deliberately oversized
- * "coming soon" screen while the new guides and magazines are written; the old paid-guide store
- * that lived here is in git history (commit before 2026-09-23) and the ready-made agents moved to
- * /ai.
+ * /magazines — "לומדים AI" (renamed in the nav 2026-09-23). A "coming soon" screen while the new
+ * guides and magazines are written; the old paid-guide store that lived here is in git history
+ * (commit before 2026-09-23) and the ready-made agents moved to /ai.
  *
  * Three things keep it from being a dead end: a "notify me" CTA (the site's lead modal, tagged so
  * the dashboard can filter these), the two free guides that already exist, and the social links.
  * The guide cards carry code-drawn 3D covers (GuideCover); the download itself asks for a free
  * sign-in on the guide page (2026-09-24).
- * The floating chips are the live model catalog (ModelUpdateAgent) — "the models we'll explain" —
- * so even the placeholder page stays current.
  *
- * Motion: CSS-only drift on the backdrop orbs and chips (`.learn-*` in index.css), switched off
- * under reduced motion. No sticky/pin (webview rule).
+ * The opening is in the glyph world since 2026-10-07, in the homepage hero's own form: the page's
+ * name is the first line, and "בקרוב" is not typeset by the browser but built by the field out of
+ * the same characters as the noise around it, with a block caret after it, because the guides are
+ * still being written. The old pill kicker, glowing headline, orbs, grid and floating chips are
+ * gone. The floating chips were the live model catalog (ModelUpdateAgent), "the models we'll
+ * explain"; that list now stands in a dotted frame on the open side, with one of the crew on it.
+ * No sticky/pin (webview rule).
  */
-const EASE = [0.16, 1, 0.3, 1] as const;
-
 export default function MagazinesPage() {
   const navigate = useNavigate();
   const { data: catalog } = useModelCatalog();
   const c = LEARN_AI_COPY;
-  const chips = (catalog?.frontier ?? []).slice(0, 4);
+  const models = (catalog?.frontier ?? []).slice(0, 4);
+  const headline = useFieldHeadline();
+  const quietLead = useFieldQuiet();
+  const quietBody = useFieldQuiet();
+  const quietDesk = useFieldQuiet();
 
   const notify = () =>
     window.dispatchEvent(
@@ -41,82 +46,65 @@ export default function MagazinesPage() {
   return (
     <div id="page-top" className="relative min-h-screen pb-24">
       {/* ── Hero: fills the first screen ─────────────────────────────────────────────────── */}
-      <section className="learn-hero relative flex min-h-[100dvh] items-center overflow-hidden pt-28 pb-16" dir="rtl">
-        <span className="learn-orb learn-orb--a" aria-hidden="true" />
-        <span className="learn-orb learn-orb--b" aria-hidden="true" />
-        <span className="learn-orb learn-orb--c" aria-hidden="true" />
-        <div className="learn-grid" aria-hidden="true" />
+      <section className="learn-hero" aria-labelledby="learn-title">
+        <div className="container-wide learn-hero__grid">
+          <div className="learn-hero__copy">
+            <h1 id="learn-title" className="story-h1">
+              <span ref={quietLead} className="story-h1__lead">
+                {rtl(c.kicker)}
+              </span>
+              <span className="learn-hero__line">
+                <span ref={headline} className="glyph-accent">
+                  {c.headline}
+                </span>
+                <span className="learn-hero__caret" aria-hidden="true" />
+              </span>
+            </h1>
 
-        {/* The models the guides will explain — live, from the sync agent. Decorative on desktop. */}
-        <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
-          {chips.map((m, i) => (
-            <span key={m.id} className={`learn-chip learn-chip--${i}`}>
-              <bdi dir="ltr">{m.name}</bdi>
-            </span>
-          ))}
-        </div>
-
-        <div className="container-wide relative z-10 text-center">
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: EASE }}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-500/40 bg-brand-500/10 px-4 py-1.5 text-sm font-bold text-brand-300"
-          >
-            <Asterisk className="h-4 w-4" aria-hidden="true" />
-            {c.kicker}
-          </motion.p>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 1.2, ease: EASE }}
-            className="learn-headline font-display font-black leading-none text-white"
-          >
-            <span className="neon-text">{c.headline}</span>
-            <span className="learn-dots" aria-hidden="true">
-              <span>.</span>
-              <span>.</span>
-              <span>.</span>
-            </span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.25, ease: EASE }}
-            className="mx-auto mt-8 max-w-3xl font-display text-2xl font-extrabold leading-snug text-white md:text-4xl [text-shadow:0_2px_18px_rgba(0,0,0,0.85)]"
-          >
-            {rtl(c.sub)}
-          </motion.p>
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.4, ease: EASE }}
-            className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-zinc-300 md:text-xl [text-shadow:0_2px_14px_rgba(0,0,0,0.9)]"
-          >
-            {rtl(c.body)}
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.55, ease: EASE }}
-            className="mt-10 flex flex-col items-center gap-6"
-          >
-            <WebButton variant="primary" magnetic onClick={notify} className="cta-sheen !px-9">
-              <Bell className="h-5 w-5" />
-              {c.notifyCta}
-            </WebButton>
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-sm text-zinc-500">{c.followCta}</span>
-              <SocialLinks
-                className="justify-center"
-                iconClassName="w-10 h-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 transition-colors"
-                channels={['instagram', 'threads', 'tiktok', 'x', 'linkedin']}
-              />
+            <div ref={quietBody} className="learn-hero__body">
+              <p className="learn-hero__sub" data-live="wipe">
+                {rtl(c.sub)}
+              </p>
+              <p className="story-body mt-4" data-live="rise" data-live-delay="120">
+                {rtl(c.body)}
+              </p>
+              <div className="mt-9" data-live="rise" data-live-delay="200">
+                <GlyphButton onClick={notify}>
+                  <Bell className="h-4 w-4" aria-hidden="true" />
+                  {c.notifyCta}
+                </GlyphButton>
+              </div>
+              <div className="learn-hero__follow" data-live="rise" data-live-delay="280">
+                <span>{c.followCta}</span>
+                <SocialLinks iconClassName="hdr-icon-btn learn-hero__social" channels={['instagram', 'threads', 'tiktok', 'x', 'linkedin']} />
+              </div>
             </div>
-          </motion.div>
+          </div>
+
+          {/* The models the guides will explain — live, from the sync agent. Desktop only: on a
+              phone the promise and the button are the whole first screen. */}
+          {models.length > 0 && (
+            <aside ref={quietDesk} className="learn-desk" aria-labelledby="learn-desk-title">
+              <SiteBot shape="square" tone="hi" mood="focus" size={92} className="learn-desk__bot" />
+              <div className="glyph-frame" data-live="frame">
+                <p id="learn-desk-title" className="learn-desk__bar">
+                  <span className="story-statusbar__live" aria-hidden="true" />
+                  המודלים שנסביר
+                </p>
+                <ul className="learn-desk__list" data-live="stagger" data-live-delay="300">
+                  {models.map((m) => (
+                    <li key={m.id}>
+                      <span className="learn-desk__vendor">{m.vendor}</span>
+                      <bdi dir="ltr" className="learn-desk__name">
+                        {m.name}
+                      </bdi>
+                    </li>
+                  ))}
+                </ul>
+                <p className="learn-desk__note">הרשימה מתעדכנת לבד כשיוצא מודל חדש.</p>
+              </div>
+            </aside>
+          )}
         </div>
       </section>
 

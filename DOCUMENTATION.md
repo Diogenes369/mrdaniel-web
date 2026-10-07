@@ -54,6 +54,7 @@ src/
 ├── components/
 │   ├── Header / Footer / NewsTicker / Hero / WordRotator / ContactPortal
 │   ├── home/               # OfferSection, PricingSection, RoiCalculator
+│   ├── jarvis/             # MissionConsole (הדגמת המשימות ב-/jarvis), MissionArtifacts, VoiceWave, missions
 │   ├── content/            # ContentPrimitives (SectionHeading, ServiceGrid…), AgentFinder,
 │   │                        #   AIPulseWidget, CaseStudies, EnterpriseServicesSection, VideoEmbed,
 │   │                        #   ProjectEstimator, TermTooltip

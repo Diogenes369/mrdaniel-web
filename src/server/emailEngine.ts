@@ -96,7 +96,7 @@ export function servicesHighlightsHtml(campaign?: string): string {
   const items = [
     { t: 'סוכני AI מותאמים אישית', d: 'אוטומציה מקצה לקצה, RAG, אינטגרציה למערכות קיימות.', href: `${SITE}/ai` },
     { t: 'חדשות AI ומודלי שפה', d: 'מה חדש במודלים, בסוכנים ובכלים, עם פירוק בעברית.', href: `${SITE}/news` },
-    { t: 'מערכת JARVIS', d: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות.', href: `${SITE}/jarvis` },
+    { t: 'מערכת JARVIS', d: 'סוכן AI אוטונומי שמבצע משימות שלמות מפקודה קולית.', href: `${SITE}/jarvis` },
   ];
   const rows = items
     .map(

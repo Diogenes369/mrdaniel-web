@@ -1035,140 +1035,150 @@ html.a11y-large-cursor * {
   100% { transform: translateY(290%); opacity: 0; }
 }
 
-/* Process rail: the line joining the three steps. Desktop runs it across the node row; mobile
-   runs it down the right edge (RTL start). It "charges" once when the section is first painted. */
-.process-rail::before {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-  background: linear-gradient(to left, rgba(143, 212, 0, 0.8), rgba(34, 211, 238, 0.55));
-  box-shadow: 0 0 14px rgba(118, 185, 0, 0.5);
-  /* Mobile: the list has 1.25rem inline-start padding; the line runs inside that gutter and each
-     step's node (-1.19rem from its card) is centred on it. */
-  inset-block: 1.25rem;
-  inset-inline-start: 0.35rem;
-  width: 2px;
-  transform-origin: top;
-  animation: process-charge-y 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.process-step__node {
-  position: absolute;
-  inset-inline-start: -1.19rem;
-  top: 2.25rem;
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 9999px;
-  background: #9fe870;
-  box-shadow: 0 0 0 4px rgba(118, 185, 0, 0.18), 0 0 16px rgba(143, 212, 0, 0.8);
+/* ══ "לומדים AI" (2026-09-23; glyph world since 2026-10-07) ═════════════════════════════════════
+   The homepage hero's own form: the page's name on the lead line, "בקרוב" built by the field out
+   of glyphs (.glyph-accent), a block caret after it because the guides are still being written,
+   and the live model list in a dotted frame on the open side, with one of the crew on it. */
+.learn-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 100dvh;
+  padding-block: 7rem 4rem;
 }
 @media (min-width: 768px) {
-  .process-rail::before {
-    inset-inline: 8%;
-    inset-block: auto;
-    top: -1.1rem;
-    width: auto;
-    height: 2px;
-    transform-origin: right;
-    animation-name: process-charge-x;
-  }
-  .process-step__node {
-    inset-inline-start: 50%;
-    top: -1.4rem;
-    transform: translateX(50%);
+  .learn-hero {
+    min-height: calc(100dvh - 2.25rem);
+    padding-block: 6.5rem 3.5rem;
   }
 }
-@media (max-width: 767px) {
-  .process-rail {
-    padding-inline-start: 1.25rem;
+.learn-hero__grid {
+  display: grid;
+  gap: 3rem;
+  width: 100%;
+}
+@media (min-width: 1024px) {
+  .learn-hero__grid {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+    align-items: end;
+    gap: 4rem;
   }
 }
-@keyframes process-charge-x {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
+.learn-hero__copy {
+  min-width: 0;
 }
-@keyframes process-charge-y {
-  from { transform: scaleY(0); }
-  to   { transform: scaleY(1); }
+.learn-hero__line {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.07em;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: min(clamp(6.6rem, 1.6rem + 10vw, 11rem), 17.5vh);
+  line-height: 0.98;
 }
-
-/* ══ "לומדים AI" coming-soon hero (2026-09-23) ═════════════════════════════════════════════════
-   Three blurred brand-colour orbs drifting slowly, a masked grid, an oversized headline with
-   breathing dots, and the live model names floating at the edges. Transform/opacity only. */
-.learn-headline {
-  font-size: clamp(4.5rem, 16vw, 13rem);
-  letter-spacing: -0.02em;
-  filter: drop-shadow(0 0 48px rgba(118, 185, 0, 0.35));
+/* The caret stands after the last letter, as tall as the letters' body, blinking in steps. */
+.learn-hero__caret {
+  flex: none;
+  width: 0.11em;
+  height: 0.68em;
+  margin-bottom: 0.2em;
+  background: var(--color-brand-400);
+  animation: caret-blink 1.05s steps(1) infinite;
 }
-.learn-dots span {
-  display: inline-block;
-  color: #9fe870;
-  animation: learn-dot 1.6s ease-in-out infinite;
-}
-.learn-dots span:nth-child(2) { animation-delay: 0.2s; }
-.learn-dots span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes learn-dot {
-  0%, 100% { opacity: 0.25; transform: translateY(0); }
-  50%      { opacity: 1;    transform: translateY(-0.08em); }
-}
-.learn-orb {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(80px);
-  opacity: 0.5;
-  pointer-events: none;
-  will-change: transform;
-}
-.learn-orb--a { width: 42vw; height: 42vw; top: -10%; right: -8%; background: radial-gradient(circle, rgba(118, 185, 0, 0.55), transparent 65%); animation: learn-drift-a 18s ease-in-out infinite alternate; }
-.learn-orb--b { width: 36vw; height: 36vw; bottom: -12%; left: -6%; background: radial-gradient(circle, rgba(34, 211, 238, 0.45), transparent 65%); animation: learn-drift-b 22s ease-in-out infinite alternate; }
-.learn-orb--c { width: 24vw; height: 24vw; top: 38%; left: 38%; background: radial-gradient(circle, rgba(159, 232, 112, 0.35), transparent 65%); animation: learn-drift-a 26s ease-in-out infinite alternate-reverse; }
-@keyframes learn-drift-a { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(-6vw, 5vh, 0) scale(1.12); } }
-@keyframes learn-drift-b { from { transform: translate3d(0, 0, 0) scale(1.05); } to { transform: translate3d(5vw, -6vh, 0) scale(0.95); } }
-.learn-grid {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(118, 185, 0, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(118, 185, 0, 0.07) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 75%);
-}
-.learn-chip {
-  position: absolute;
-  padding: 0.5rem 1rem;
-  border-radius: 9999px;
-  border: 1px solid rgba(118, 185, 0, 0.35);
-  background: rgba(8, 9, 12, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  font-family: var(--font-display, inherit);
-  font-weight: 800;
-  font-size: 0.95rem;
-  color: #d9f7c2;
-  box-shadow: 0 0 28px -8px rgba(118, 185, 0, 0.6);
-  animation: learn-float 9s ease-in-out infinite;
-}
-.learn-chip--0 { top: 22%; right: 8%; }
-.learn-chip--1 { top: 30%; left: 7%; animation-delay: -2.2s; }
-.learn-chip--2 { bottom: 24%; right: 12%; animation-delay: -4.5s; }
-.learn-chip--3 { bottom: 18%; left: 11%; animation-delay: -6.7s; }
-@keyframes learn-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
-
-html.motion-reduced .learn-orb,
-html.motion-reduced .learn-chip,
-html.motion-reduced .learn-dots span {
+html.motion-reduced .learn-hero__caret {
   animation: none;
 }
-@media (prefers-reduced-motion: reduce) {
-  .learn-orb,
-  .learn-chip,
-  .learn-dots span {
-    animation: none;
+.learn-hero__body {
+  max-width: 40rem;
+  margin-top: 2rem;
+}
+.learn-hero__sub {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: clamp(1.15rem, 0.98rem + 0.65vw, 1.5rem);
+  line-height: 1.55;
+  color: var(--color-ink-paper);
+  text-wrap: pretty;
+}
+.learn-hero__follow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.1rem;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px dotted var(--color-rule);
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  color: var(--color-ink-faint);
+}
+.learn-hero__social.hdr-icon-btn {
+  border-color: var(--color-rule);
+}
+.learn-desk {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .learn-desk {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding-bottom: 0.5rem;
   }
 }
-html.perf-lite .learn-orb {
-  filter: blur(48px);
+/* The bot stands on the frame's far corner, looking over the list. */
+.learn-desk__bot {
+  align-self: flex-end;
+  margin-inline-end: 1.4rem;
+  margin-bottom: -4px;
+}
+.learn-desk__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px dotted var(--color-rule);
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.learn-desk__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.learn-desk__list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.1rem;
+}
+.learn-desk__list li + li {
+  border-top: 1px dotted var(--color-rule);
+}
+.learn-desk__vendor {
+  font-family: var(--font-type);
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+.learn-desk__name {
+  font-family: var(--font-type);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink-paper);
+}
+.learn-desk__note {
+  margin: 0;
+  padding: 0.75rem 1.1rem 0.85rem;
+  border-top: 1px dotted var(--color-rule);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
 }
 
 /* ══ Graceful degradation ═══════════════════════════════════════════════════════════════════════
@@ -1217,8 +1227,7 @@ html.motion-reduced .hero-grid {
 html.motion-reduced .signal-console__scan {
   display: none;
 }
-html.motion-reduced .signal-row,
-html.motion-reduced .process-rail::before {
+html.motion-reduced .signal-row {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1227,8 +1236,7 @@ html.motion-reduced .process-rail::before {
   .signal-console__scan {
     display: none;
   }
-  .signal-row,
-  .process-rail::before {
+  .signal-row {
     animation: none;
   }
   .channel-card,
@@ -2229,7 +2237,6 @@ h2.headline-plain {
 /* Decoration the world does not use. */
 .cta-sheen::after,
 .hero-grid,
-.learn-orb,
 .channel-card::after,
 .signal-console__scan {
   display: none;
@@ -2634,36 +2641,6 @@ html.motion-reduced .mobile-menu__caret {
   animation: none;
 }
 
-/* Process rail in the glyph world: a dotted rule instead of a glowing green→cyan bar, square nodes
-   instead of glowing dots. (Its geometry and charge-in animation above are unchanged.) */
-.process-rail::before {
-  background: none;
-  border-inline-start: 1px dotted rgba(143, 212, 0, 0.6);
-  border-top: 1px dotted rgba(143, 212, 0, 0.6);
-  box-shadow: none;
-}
-.process-step__node {
-  border-radius: 0;
-  width: 0.5rem;
-  height: 0.8rem;
-  background: var(--color-brand-400);
-  box-shadow: none;
-}
-
-/* "לומדים AI" floating model chips: square frames on the grid, no blur, no glow. */
-.learn-chip {
-  border-radius: 0;
-  border-style: dotted;
-  border-color: var(--color-rule);
-  background: rgba(10, 11, 9, 0.9);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
-  font-family: var(--font-type);
-  font-weight: 700;
-  color: var(--color-ink-paper);
-}
-
 /* ── Popups: modals, dialogs and slide-overs (2026-10-02) ───────────────────────────────────
    One shell for every popup. The backdrop is the field's calm lattice over a deep dim (no blur);
    the panel is the ground with a hairline green rule and a second, offset registration outline —
@@ -2817,10 +2794,12 @@ html.motion-reduced .mobile-menu__caret {
   color: var(--color-ink-muted);
   text-wrap: pretty;
 }
+/* The site's dotted rule (DESIGN.md: every leader and divider is a 1px dotted line), at the
+   brighter weight a request turn on /jarvis uses, so the takeaway still reads as the point. */
 .grok-takeaway {
   max-width: 44rem;
-  padding-inline-start: 1rem;
-  border-inline-start: 3px solid var(--color-brand-400);
+  padding-inline-start: 1.1rem;
+  border-inline-start: 1px dotted rgba(143, 212, 0, 0.6);
   font-family: var(--font-sans);
   font-weight: 700;
   font-size: clamp(1.1rem, 1rem + 0.45vw, 1.35rem);
@@ -3847,7 +3826,7 @@ html.live-on [data-live='stagger'] > * {
 }
 @media (min-width: 1024px) {
   .jv-hero__grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
   }
 }
 .jv-hero__copy {
@@ -3855,9 +3834,9 @@ html.live-on [data-live='stagger'] > * {
 }
 .jv-title {
   margin: 0;
-  /* The inner pages' title size (.page-hero__title). */
-  font-size: clamp(2.3rem, 1.2rem + 3.4vw, 4.4rem);
-  line-height: 1.08;
+  /* A step above the inner pages' title (.page-hero__title): this one is the promise. */
+  font-size: clamp(2.5rem, 1.25rem + 3.7vw, 4.9rem);
+  line-height: 1.06;
   text-wrap: balance;
   color: var(--color-ink-paper);
 }
@@ -3883,8 +3862,14 @@ html.live-on [data-live='stagger'] > * {
   gap: clamp(1rem, 2vw, 1.5rem);
   min-width: 0;
 }
-/* A short desktop window (a 1366x768 laptop) keeps the whole exchange, approval row included, in
-   the first screen: the mark gives up size there, and on a 1x screen its glyph build with it. */
+/* A short desktop window (a 1366x768 laptop) keeps the top of the demo in the first screen: the
+   mark gives up size there, and on a 1x screen its glyph build with it. Phones get a smaller mark
+   so the demo is not a long scroll away; at a phone's pixel density it still builds in glyphs. */
+@media (max-width: 767px) {
+  .jv-hero .jv-mark {
+    font-size: min(3.9rem, calc(100cqi / 4.9));
+  }
+}
 @media (min-width: 1024px) and (max-height: 860px) {
   .jv-hero {
     padding-top: 6.5rem;
@@ -3893,7 +3878,8 @@ html.live-on [data-live='stagger'] > * {
     font-size: min(5rem, calc(100cqi / 4.9));
   }
 }
-#jarvis-does {
+#jarvis-demo,
+#jarvis-missions {
   scroll-margin-top: 4.5rem;
 }
 
@@ -3950,9 +3936,6 @@ html.live-on [data-live='stagger'] > * {
   padding: 0 1.1rem 1.15rem;
   text-align: start;
 }
-.jv-chat--hero {
-  min-height: 20rem;
-}
 .jv-chat__bar {
   display: flex;
   align-items: center;
@@ -3988,9 +3971,6 @@ html.live-on [data-live='stagger'] > * {
     margin-inline-start: auto;
     justify-items: end;
   }
-  .jv-turn--jarvis .jv-ask {
-    justify-content: flex-end;
-  }
 }
 .jv-turn__who {
   font-family: var(--font-type);
@@ -4011,27 +3991,6 @@ html.live-on [data-live='stagger'] > * {
 .jv-turn--jarvis .jv-turn__text {
   color: var(--color-ink-muted);
 }
-.jv-done {
-  display: grid;
-  gap: 0.4rem;
-  margin: 0.1rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-.jv-done li {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  font-family: var(--font-sans);
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--color-ink-paper);
-}
-.jv-done svg {
-  flex: none;
-  margin-top: 0.24rem;
-  color: var(--color-brand-400);
-}
 .jv-caret {
   display: inline-block;
   width: 0.5em;
@@ -4043,26 +4002,6 @@ html.live-on [data-live='stagger'] > * {
 }
 html.motion-reduced .jv-caret {
   animation: none;
-}
-/* The question and its two answers on one line where they fit. */
-.jv-ask {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1.1rem;
-  margin-top: 0.6rem;
-}
-.jv-ask__btns {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.9rem;
-  padding-block: 0.3rem;
-}
-/* The approval buttons are the site's glyph buttons, in miniature. */
-.glyph-btn.glyph-btn--mini {
-  min-height: 2.25rem;
-  padding: 0 0.95rem;
-  font-size: 0.875rem;
 }
 .jv-replay {
   display: inline-flex;
@@ -4086,60 +4025,11 @@ html.motion-reduced .jv-caret {
   outline-offset: 3px;
 }
 
-/* What it does: a zigzag of capability and exchange */
 .jv-note {
   margin: 1rem 0 0;
   font-size: 0.95rem;
   line-height: 1.6;
   color: var(--color-ink-faint);
-}
-.jv-abilities {
-  display: grid;
-  gap: clamp(3.5rem, 7vw, 6rem);
-  margin-top: clamp(3rem, 6vw, 4.5rem);
-}
-.jv-ability {
-  display: grid;
-  gap: 1.5rem 3.5rem;
-  align-items: start;
-}
-@media (min-width: 1024px) {
-  .jv-ability {
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-  }
-  .jv-ability:nth-child(even) .jv-ability__copy {
-    order: 2;
-  }
-}
-.jv-ability__title {
-  margin: 0;
-  font-family: var(--font-poster);
-  font-weight: 900;
-  font-stretch: 75%;
-  font-size: clamp(1.6rem, 1.15rem + 1.3vw, 2.3rem);
-  line-height: 1.1;
-  color: var(--color-ink-paper);
-  text-wrap: balance;
-}
-.jv-ability__points {
-  display: grid;
-  gap: 0.8rem;
-  max-width: 32rem;
-  margin: 1.1rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-.jv-ability__points li {
-  font-size: 1rem;
-  line-height: 1.7;
-  color: var(--color-ink-muted);
-}
-.jv-ability__points b {
-  font-weight: 700;
-  color: var(--color-ink-paper);
-}
-.jv-ability .jv-chat {
-  max-width: none;
 }
 
 /* Inside: the ring returns at the middle of a sheet, its four parts on leaders around it */
@@ -4378,4 +4268,1521 @@ html.motion-reduced .jv-caret {
   flex: none;
   margin-top: 0.3rem;
   color: var(--color-brand-400);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   /ai (glyph world since 2026-10-07; AIPage.tsx, AiAgentsSection.tsx). The agents are spec sheets
+   in dotted frames (the /jarvis install sheets' language): rows on dotted rules instead of boxes
+   nested in a card, the price in the poster face, one primary action per sheet. The filters are
+   the model board's chips. Phones get one native swipe rail; md up, a grid of the same list.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+.ai-diff {
+  max-width: 46rem;
+  margin: 0 0 2rem;
+  padding-inline-start: 1.1rem;
+  border-inline-start: 1px dotted rgba(143, 212, 0, 0.6);
+  font-weight: 700;
+  font-size: clamp(1.05rem, 1rem + 0.35vw, 1.25rem);
+  line-height: 1.65;
+  color: var(--color-ink-paper);
+  text-wrap: pretty;
+}
+/* What to prepare: one to-do list, a row per item; from md the item's name and its note sit side by
+   side, like the rows of a sheet. Five items never fill a two- or three-column grid evenly. */
+.ai-prep {
+  max-width: none;
+}
+.ai-prep .offer-tasks {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
+.ai-prep .offer-task + .offer-task {
+  border-top: 1px dotted var(--color-rule);
+}
+@media (min-width: 768px) {
+  .ai-prep .offer-task > div {
+    display: grid;
+    grid-template-columns: 16rem minmax(0, 1fr);
+    gap: 2rem;
+    align-items: baseline;
+  }
+  .ai-prep .offer-task__body {
+    margin-top: 0;
+    max-width: 44rem;
+  }
+}
+/* The build: the homepage's stops on one line, four of them, with no walker on this page. Between
+   md and lg four columns would leave each body a dozen characters wide, so the line runs down the
+   reading edge there, as it does on phones. */
+.ai-process.process-line {
+  padding-top: 0;
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .process-stops--four {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .process-stops--four::before {
+    display: none;
+  }
+  .process-stops--four .process-stop {
+    padding: 0 0 2.2rem;
+    padding-inline: 2.4rem 0;
+    border-inline-start: 1px dotted var(--color-rule);
+  }
+  .process-stops--four .process-stop:last-child {
+    padding-bottom: 0;
+  }
+  .process-stops--four .process-stop__node {
+    inset-inline-start: -9px;
+  }
+}
+@media (min-width: 1024px) {
+  .process-stops--four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* The store's toolbar: the filters on the reading start, the wizard on the far side. */
+.agent-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  margin-top: 2.25rem;
+  padding-block: 1rem;
+  border-block: 1px dotted var(--color-rule);
+}
+.agent-toolbar .model-filter {
+  min-width: 0;
+}
+.agent-toolbar__help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  font-size: 0.95rem;
+  color: var(--color-ink-muted);
+}
+.agent-grid {
+  display: flex;
+  gap: 1rem;
+  margin: 1.75rem calc(clamp(1rem, 4vw, 3rem) * -1) 0;
+  padding: 0.5rem clamp(1rem, 4vw, 3rem) 0.75rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-width: none;
+  list-style: none;
+}
+.agent-grid::-webkit-scrollbar {
+  display: none;
+}
+/* Phones: each sheet at its own height, so a short one has no empty band before its price. */
+.agent-grid > li {
+  flex: none;
+  display: flex;
+  align-self: flex-start;
+  width: min(86%, 23rem);
+  scroll-snap-align: center;
+}
+@media (min-width: 768px) {
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin: 2rem 0 0;
+    padding: 0;
+    overflow: visible;
+  }
+  .agent-grid > li {
+    align-self: stretch;
+    width: auto;
+  }
+}
+@media (min-width: 1180px) {
+  .agent-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.agent-sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  padding: 1.35rem 1.35rem 1.3rem;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
+}
+.agent-sheet:hover {
+  border-color: rgba(143, 212, 0, 0.6);
+  background-color: rgba(143, 212, 0, 0.035);
+}
+.agent-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.95rem;
+}
+.agent-sheet__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.6rem;
+  margin: 0.1rem 0 0;
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.agent-sheet__badge {
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-ground);
+  background: var(--color-brand-400);
+}
+.agent-sheet__title {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.45rem, 1.2rem + 0.6vw, 1.8rem);
+  line-height: 1.1;
+  color: var(--color-ink-paper);
+  text-wrap: balance;
+}
+.agent-sheet__tagline {
+  margin: 1rem 0 0;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+  text-wrap: pretty;
+}
+.agent-sheet__gain {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0.85rem 0 0;
+  font-size: 0.97rem;
+  line-height: 1.6;
+  color: var(--color-ink-paper);
+}
+.agent-sheet__gain svg {
+  flex: none;
+  margin-top: 0.27rem;
+  color: var(--color-brand-400);
+}
+.agent-sheet__rows {
+  margin: 1.15rem 0 1.25rem;
+}
+.agent-sheet__row {
+  display: grid;
+  grid-template-columns: 5.2rem minmax(0, 1fr);
+  gap: 0.9rem;
+  padding-block: 0.7rem;
+  border-top: 1px dotted var(--color-rule);
+}
+.agent-sheet__row dt {
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.75;
+  color: var(--color-ink-faint);
+}
+.agent-sheet__row dd {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+}
+.agent-sheet__model {
+  display: block;
+}
+.agent-sheet__model + .agent-sheet__model {
+  margin-top: 0.2rem;
+}
+.agent-sheet__model bdi {
+  font-family: var(--font-type);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink-paper);
+}
+.agent-sheet__foot {
+  margin-top: auto;
+  padding-top: 1.1rem;
+  border-top: 1px dotted var(--color-rule);
+}
+.agent-sheet__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.85rem;
+  margin: 0;
+}
+.agent-sheet__price b {
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: 2.1rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-brand-400);
+}
+.agent-sheet__price span {
+  font-size: 12.5px;
+  color: var(--color-ink-faint);
+}
+.agent-sheet__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.95rem;
+  margin-top: 1.05rem;
+}
+.agent-sheet__actions .glyph-btn {
+  padding-inline: 1rem;
+  font-size: 0.9rem;
+}
+.agent-sheet__ask.story-link {
+  align-self: flex-start;
+  padding: 0.2rem 0;
+  font-size: 12.5px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+/* Phones: which sheet is centred in the rail. Square marks, the current one longer and filled. */
+.agent-ticks {
+  display: flex;
+  justify-content: center;
+  gap: 0.15rem;
+  margin-top: 0.5rem;
+}
+.agent-ticks button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.agent-ticks button::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(143, 212, 0, 0.55);
+  transition:
+    width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.2s;
+}
+.agent-ticks button[aria-current='true']::before {
+  width: 20px;
+  background: var(--color-brand-400);
+  border-color: var(--color-brand-400);
+}
+.agent-ticks button:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: -2px;
+}
+@media (min-width: 768px) {
+  .agent-ticks {
+    display: none;
+  }
+}
+/* The models under the hood, live from the catalog: one row of cells on dotted dividers. */
+.agent-models {
+  margin-top: 2.5rem;
+}
+.agent-models__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px dotted var(--color-rule);
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.agent-models__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  color: var(--color-ink-paper);
+}
+.agent-models__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-models__list li {
+  min-width: 0;
+  padding: 0.85rem 1.1rem;
+}
+.agent-models__list li:nth-child(even) {
+  border-inline-start: 1px dotted var(--color-rule);
+}
+.agent-models__list li:nth-child(n + 3) {
+  border-top: 1px dotted var(--color-rule);
+}
+@media (min-width: 768px) {
+  .agent-models__list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .agent-models__list li + li {
+    border-inline-start: 1px dotted var(--color-rule);
+  }
+  .agent-models__list li:nth-child(n + 3) {
+    border-top: 0;
+  }
+}
+.agent-models__vendor {
+  display: block;
+  font-family: var(--font-type);
+  font-size: 11px;
+  color: var(--color-ink-faint);
+}
+.agent-models__name {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--font-type);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: right;
+  color: var(--color-ink-paper);
+  overflow-wrap: anywhere;
+}
+.agent-models__note {
+  margin: 0;
+  padding: 0.8rem 1.1rem 0.9rem;
+  border-top: 1px dotted var(--color-rule);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+}
+.agent-close {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  margin-top: 2rem;
+}
+.agent-close p {
+  margin: 0;
+  max-width: 34rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+}
+
+/* ── /jarvis demo: MissionConsole (2026-10-07) ─────────────────────────────────────────────────
+   One sentence said out loud, and the whole mission run by JARVIS on its own, in one dotted frame:
+   the voice and the plan on the reading start, what it is making in a pane on the far side (on
+   phones, under them). The pane is the field's calm lattice, like a screen with nothing on it yet.
+   Arrivals spring; the scan line and every caret move in steps, like the machine typing. */
+.jv-demo {
+  margin-top: clamp(2.75rem, 5vw, 4.5rem);
+}
+.jv-demo .jv-note {
+  margin-top: 0.9rem;
+  font-size: 0.88rem;
+}
+.jv-console__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1.5rem;
+  padding: 0.55rem 1.15rem;
+  border-bottom: 1px dotted var(--color-rule);
+}
+.jv-console__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.jv-console__tabs {
+  display: flex;
+  gap: 1.35rem;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-width: none;
+}
+.jv-console__tabs::-webkit-scrollbar {
+  display: none;
+}
+.jv-tab {
+  position: relative;
+  flex: none;
+  padding: 0.5rem 0.05rem;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.jv-tab:hover,
+.jv-tab[aria-pressed='true'] {
+  color: var(--color-ink-paper);
+}
+.jv-tab:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 2px;
+}
+/* The chosen mission's cursor sits on the bar's own rule and springs between tabs. */
+.jv-tab__caret {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(-0.55rem - 1px);
+  height: 2px;
+  background: var(--color-brand-400);
+}
+.jv-console__bar .jv-replay {
+  margin-top: 0;
+  margin-inline-start: auto;
+}
+@media (max-width: 639px) {
+  .jv-console__tabs {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+/* Four cells. On phones they stack in story order: the request, the plan, what JARVIS is making,
+   its reply. From 900px the pane takes the far column and the other three stack beside it. */
+.jv-console__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'you' 'plan' 'pane' 'say';
+}
+.jv-voice--you {
+  grid-area: you;
+}
+.jv-plan {
+  grid-area: plan;
+}
+.jv-console__pane {
+  grid-area: pane;
+}
+.jv-voice--jarvis {
+  grid-area: say;
+}
+.jv-voice,
+.jv-plan {
+  min-width: 0;
+  padding: 1rem 1.15rem 1.05rem;
+}
+.jv-plan,
+.jv-voice--jarvis {
+  border-top: 1px dotted var(--color-rule);
+}
+@media (min-width: 900px) {
+  .jv-console__body {
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.25fr);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      'you pane'
+      'plan pane'
+      'say pane';
+  }
+  .jv-voice,
+  .jv-plan {
+    border-inline-end: 1px dotted var(--color-rule);
+  }
+}
+.jv-voice__who,
+.jv-plan__who {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.jv-voice--jarvis .jv-voice__who,
+.jv-plan__who > [dir='ltr'] {
+  color: var(--color-brand-400);
+}
+.jv-voice__who svg {
+  color: var(--color-ink-paper);
+}
+.jv-wave {
+  display: block;
+  width: 100%;
+  height: 35px;
+  margin-top: 0.4rem;
+}
+.jv-voice__text {
+  margin: 0.45rem 0 0;
+  min-height: 6.4em;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-ink-paper);
+  text-wrap: pretty;
+}
+@media (min-width: 900px) {
+  .jv-voice__text {
+    min-height: 4.8em;
+  }
+}
+.jv-plan__phase {
+  margin-inline-start: auto;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-ink-faint);
+}
+.jv-plan__list {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.jv-plan__list > li {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.jv-plan__list > li.is-planned {
+  opacity: 1;
+  transform: none;
+}
+.jv-plan__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: calc(100% + 1rem);
+  margin-inline: -0.5rem;
+  padding: 0.55rem 0.5rem;
+  font: inherit;
+  text-align: start;
+  color: var(--color-ink-muted);
+  background: none;
+  border: 0;
+  cursor: default;
+  transition:
+    color 0.2s,
+    background-color 0.2s;
+}
+.jv-plan__row.is-run,
+.jv-plan__row.is-done {
+  color: var(--color-ink-paper);
+}
+.jv-plan__row:not(:disabled) {
+  cursor: pointer;
+}
+.jv-plan__row:not(:disabled):hover,
+.jv-plan__row[aria-pressed='true'] {
+  background: rgba(143, 212, 0, 0.06);
+}
+.jv-plan__row:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 1px;
+}
+.jv-plan__mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--color-brand-400);
+}
+.jv-plan__mark .jv-caret {
+  margin: 0;
+  vertical-align: 0;
+}
+.jv-plan__box {
+  width: 11px;
+  height: 11px;
+  border: 1px dotted rgba(143, 212, 0, 0.6);
+}
+.jv-plan__label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.97rem;
+  line-height: 1.45;
+}
+.jv-plan__tool {
+  flex: none;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+.jv-voice--jarvis .jv-voice__text {
+  font-weight: 500;
+}
+
+/* The pane: what JARVIS is making right now. */
+.jv-console__pane {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1 / 1.04;
+  overflow: hidden;
+  border-top: 1px dotted var(--color-rule);
+  background-color: rgba(8, 9, 7, 0.5);
+  background-image: radial-gradient(rgba(143, 212, 0, 0.13) 0.9px, transparent 1.3px);
+  background-size: 21px 27px;
+}
+@media (min-width: 640px) {
+  .jv-console__pane {
+    aspect-ratio: 4 / 3;
+  }
+}
+@media (min-width: 900px) {
+  .jv-console__pane {
+    aspect-ratio: auto;
+    min-height: 30rem;
+    border-top: 0;
+  }
+}
+.jv-pane {
+  position: absolute;
+  inset: 0;
+}
+.jv-standby {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-type);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.jv-standby > [dir='ltr'] {
+  font-size: 1.5rem;
+  letter-spacing: 0.32em;
+  color: var(--color-brand-400);
+}
+.jv-art {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1.1rem 1.2rem;
+}
+.jv-art__title {
+  margin: 0 0 0.75rem;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.jv-art__count {
+  position: absolute;
+  top: 0.9rem;
+  inset-inline-start: 1rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+  background: var(--color-ground);
+  border: 1px dotted var(--color-rule);
+}
+.jv-art__count b {
+  font-family: var(--font-type);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-brand-400);
+}
+
+/* Map: dotted streets, the search area, a scan line moving from the reading start. */
+.jv-map {
+  padding: 0;
+}
+.jv-map__streets {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.jv-map__streets path {
+  fill: none;
+  stroke: rgba(143, 212, 0, 0.32);
+  stroke-width: 1.4;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
+}
+/* The search radius: a true circle, a mark and not a control. */
+.jv-map__area {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(62%, 88cqh, 26rem);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border: 1px dashed rgba(143, 212, 0, 0.45);
+  border-radius: 50%;
+}
+.jv-map {
+  container-type: size;
+}
+.jv-map__you {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-ground);
+  background: var(--color-brand-400);
+}
+.jv-map__scan {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 100%;
+  width: 2px;
+  background: var(--color-brand-400);
+  animation: jv-scan linear forwards;
+  animation-timing-function: steps(40, end);
+}
+.jv-map__scan::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 2px;
+  width: 4.5rem;
+  background: linear-gradient(to right, rgba(143, 212, 0, 0.13), transparent);
+}
+@keyframes jv-scan {
+  from {
+    left: 100%;
+  }
+  to {
+    left: 0%;
+  }
+}
+.jv-pin {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  translate: -50% -8px;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 0.3s,
+    transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.jv-pin.is-on {
+  opacity: 1;
+  transform: none;
+}
+.jv-pin__dot {
+  width: 7px;
+  height: 12px;
+  background: var(--color-ink-faint);
+}
+.jv-pin--none .jv-pin__dot {
+  background: var(--color-brand-400);
+}
+.jv-pin__name,
+.jv-pin__tag {
+  padding: 0 4px;
+  white-space: nowrap;
+  background: rgba(10, 11, 9, 0.88);
+}
+.jv-pin__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-paper);
+}
+.jv-pin__tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+  border: 1px dotted var(--color-rule);
+}
+.jv-pin--none .jv-pin__tag {
+  color: var(--color-ground);
+  background: var(--color-brand-400);
+  border-color: var(--color-brand-400);
+}
+
+/* Sites: a browser on the bench, the site assembling in it, and the list of what is built. */
+.jv-sites {
+  gap: 0.8rem;
+}
+.jv-browser {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-ground);
+  border: 1px dotted rgba(143, 212, 0, 0.5);
+}
+.jv-browser__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.7rem;
+  direction: ltr;
+  font-family: var(--font-type);
+  font-size: 11.5px;
+  color: var(--color-ink-faint);
+  border-bottom: 1px dotted var(--color-rule);
+}
+.jv-site {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+}
+.jv-site__nav,
+.jv-site__media,
+.jv-site__title,
+.jv-site__tagline,
+.jv-site__btn,
+.jv-site__items,
+.jv-site__foot {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.28s ease,
+    transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.jv-site .is-on {
+  opacity: 1;
+  transform: none;
+}
+.jv-site__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px dotted var(--color-rule);
+}
+.jv-site__nav b {
+  margin-inline-end: auto;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: 1rem;
+  color: var(--color-ink-paper);
+}
+.jv-site__nav i {
+  width: 2.1rem;
+  height: 5px;
+  background: rgba(230, 236, 221, 0.18);
+}
+.jv-site__hero {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: center;
+}
+.jv-site__title {
+  margin: 0;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.35rem, 1rem + 1.1vw, 2rem);
+  line-height: 1.02;
+  color: var(--color-ink-paper);
+}
+.jv-site__tagline {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--color-ink-muted);
+}
+.jv-site__btn {
+  display: inline-block;
+  margin-top: 0.6rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-ground);
+  background: var(--color-brand-400);
+}
+.jv-site__media {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px dotted var(--color-rule);
+}
+.jv-site__pic {
+  margin: 0;
+  font-family: var(--font-type);
+  font-size: clamp(8px, 0.45rem + 0.35vw, 11px);
+  line-height: 1.05;
+  letter-spacing: 0.1em;
+  white-space: pre;
+  color: var(--color-brand-400);
+}
+.jv-site__items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.jv-site__items li {
+  padding: 0.45rem 0.55rem;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-paper);
+  border: 1px dotted var(--color-rule);
+}
+.jv-site__foot {
+  height: 6px;
+  background: rgba(230, 236, 221, 0.1);
+}
+.jv-sites__built {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+.jv-sites__built li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.jv-sites__built li > i {
+  width: 8px;
+  height: 8px;
+  border: 1px dotted rgba(143, 212, 0, 0.6);
+}
+.jv-sites__built li.is-now,
+.jv-sites__built li.is-built {
+  color: var(--color-ink-paper);
+}
+.jv-sites__built li.is-now > i {
+  background: var(--color-brand-400);
+  border-style: solid;
+  animation: caret-blink 1.05s steps(1) infinite;
+}
+.jv-sites__built svg {
+  color: var(--color-brand-400);
+}
+
+/* Messages: written at machine speed, sent one after another. */
+.jv-msgs__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.jv-msgs__list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.65rem 0;
+  border-top: 1px dotted var(--color-rule);
+  transition: opacity 0.3s;
+}
+.jv-msgs__list li:not(.is-sent):not(.is-now) {
+  opacity: 0.5;
+}
+.jv-msgs__list li > div {
+  flex: 1;
+}
+.jv-msgs__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--color-brand-400);
+  border: 1px dotted rgba(143, 212, 0, 0.6);
+}
+.jv-msgs__to {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-ink-paper);
+}
+.jv-msgs__text {
+  margin: 0.15rem 0 0;
+  min-height: 1.5em;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-ink-muted);
+}
+/* Phones: two lines a message, so all four rows fit the pane. */
+@media (max-width: 639px) {
+  .jv-msgs__list li {
+    padding: 0.55rem 0;
+  }
+  .jv-msgs__text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+}
+.jv-msgs__status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.jv-msgs__list li.is-sent .jv-msgs__status {
+  color: var(--color-brand-400);
+}
+.jv-msgs__list li.is-now .jv-msgs__status {
+  color: var(--color-ink-paper);
+}
+
+/* Code: a file, typed at machine speed, then its tests. */
+.jv-code {
+  padding: 0;
+  font-family: var(--font-type);
+}
+.jv-code__tab {
+  display: flex;
+  padding: 0.55rem 0.9rem 0;
+  border-bottom: 1px dotted var(--color-rule);
+}
+.jv-code__tab span {
+  padding-bottom: 0.45rem;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-paper);
+  border-bottom: 2px solid var(--color-brand-400);
+}
+.jv-code__body {
+  flex: 1;
+  min-height: 0;
+  padding: 0.8rem 0.5rem 0.8rem 0;
+  overflow: hidden;
+}
+.jv-code__line {
+  display: flex;
+  gap: 0.85rem;
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+@media (min-width: 1200px) {
+  .jv-code__line {
+    font-size: 13.5px;
+    line-height: 1.85;
+  }
+}
+.jv-code__no {
+  flex: none;
+  width: 2rem;
+  text-align: right;
+  color: rgba(138, 149, 125, 0.6);
+}
+.jv-code__line code {
+  min-width: 0;
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-ink-paper);
+}
+.tk-k {
+  font-weight: 700;
+  color: var(--color-brand-400);
+}
+.tk-s,
+.tk-n {
+  color: #c8f46e;
+}
+.jv-code__run {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-brand-400);
+  border-top: 1px dotted var(--color-rule);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.jv-code__run.is-on {
+  opacity: 1;
+}
+@media (max-width: 639px) {
+  .jv-code__line {
+    font-size: 11px;
+    gap: 0.55rem;
+  }
+  .jv-code__no {
+    width: 1.4rem;
+  }
+}
+
+/* Trading: the back-test and the bot running, real points on a dotted baseline. */
+.jv-trade {
+  gap: 0.75rem;
+}
+.jv-chart {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-bottom: 1px dotted var(--color-rule);
+}
+.jv-chart svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.jv-chart__price {
+  fill: none;
+  stroke: rgba(230, 236, 221, 0.85);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.jv-chart__avg {
+  fill: none;
+  stroke: var(--color-brand-400);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 4;
+}
+.jv-chart__buy {
+  fill: var(--color-brand-400);
+}
+.jv-chart__sell {
+  fill: var(--color-ground);
+  stroke: var(--color-ink-paper);
+  stroke-width: 1.2;
+}
+.jv-chart__tip {
+  fill: var(--color-brand-400);
+  animation: caret-blink 1.05s steps(1) infinite;
+}
+.jv-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+.jv-chart__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.jv-chart__legend i {
+  width: 9px;
+  height: 9px;
+}
+.jv-chart__legend .is-buy {
+  background: var(--color-brand-400);
+}
+.jv-chart__legend .is-sell {
+  border: 1.2px solid var(--color-ink-paper);
+}
+.jv-chart__legend .is-avg {
+  width: 16px;
+  height: 0;
+  border-top: 1.5px dashed var(--color-brand-400);
+}
+.jv-trade__status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px dotted var(--color-rule);
+}
+.jv-trade__status li {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+}
+.jv-trade__status li + li {
+  border-inline-start: 1px dotted var(--color-rule);
+}
+.jv-trade__status span {
+  font-size: 11.5px;
+  color: var(--color-ink-faint);
+}
+.jv-trade__status b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--color-ink-paper);
+}
+.jv-trade__status svg {
+  color: var(--color-brand-400);
+}
+
+/* The booking app, live on a phone. */
+.jv-app {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1rem, 3vw, 2rem);
+}
+.jv-phone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: min(13.5rem, 48%);
+  max-height: 100%;
+  aspect-ratio: 9 / 17;
+  padding: 0.9rem 0.8rem;
+  background: var(--color-ground);
+  border: 1px solid rgba(143, 212, 0, 0.55);
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.3s,
+    transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.jv-phone.is-on,
+.jv-phone .is-on {
+  opacity: 1;
+  transform: none;
+}
+.jv-phone__head,
+.jv-phone__services,
+.jv-phone__days,
+.jv-phone__slots li,
+.jv-phone__done,
+.jv-phone__btn {
+  opacity: 0;
+  transform: translateY(5px);
+  transition:
+    opacity 0.25s,
+    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.jv-phone__head {
+  display: grid;
+  gap: 0.1rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px dotted var(--color-rule);
+}
+.jv-phone__head b {
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: 1.25rem;
+  line-height: 1.05;
+  color: var(--color-ink-paper);
+}
+.jv-phone__head span {
+  font-size: 11.5px;
+  color: var(--color-ink-faint);
+}
+.jv-phone__services {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.jv-phone__services li {
+  flex: 1;
+  padding: 0.3rem 0;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  border: 1px dotted var(--color-rule);
+}
+.jv-phone__services li.is-pick {
+  color: var(--color-ink-paper);
+  border: 1px solid rgba(143, 212, 0, 0.6);
+}
+.jv-phone__done {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-brand-400);
+}
+.jv-phone__days {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+.jv-phone__days li {
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+}
+.jv-phone__days li.is-day {
+  font-weight: 700;
+  color: var(--color-ground);
+  background: var(--color-brand-400);
+}
+.jv-phone__slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.jv-phone__slots li {
+  padding: 0.38rem 0;
+  text-align: center;
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-paper);
+  border: 1px dotted var(--color-rule);
+}
+.jv-phone__slots li.is-taken {
+  color: var(--color-ink-faint);
+  text-decoration: line-through;
+}
+.jv-phone__slots li.is-chosen {
+  color: var(--color-ground);
+  background: var(--color-brand-400);
+  border: 1px solid var(--color-brand-400);
+}
+.jv-phone__btn {
+  margin-top: auto;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ground);
+  background: var(--color-brand-500);
+}
+.jv-app__live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  max-width: 8rem;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-ink-paper);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.jv-app__live.is-on {
+  opacity: 1;
+}
+.jv-app__live code {
+  flex-basis: 100%;
+  font-family: var(--font-type);
+  font-size: 12px;
+  color: var(--color-brand-400);
+}
+html.motion-reduced .jv-sites__built li.is-now > i,
+html.motion-reduced .jv-chart__tip {
+  animation: none;
+}
+
+/* More missions to say: a log of requests and what JARVIS does with each. */
+.jv-missions__head {
+  max-width: 48rem;
+}
+.jv-missions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 3.5rem;
+  margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 1024px) {
+  .jv-missions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.jv-mission {
+  padding: 1.35rem 0 1.5rem;
+  border-top: 1px dotted var(--color-rule);
+}
+.jv-mission__say {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin: 0;
+  font-size: clamp(1.08rem, 1rem + 0.4vw, 1.3rem);
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--color-ink-paper);
+  text-wrap: pretty;
+}
+.jv-mission__say svg {
+  flex: none;
+  margin-top: 0.38rem;
+  color: var(--color-brand-400);
+}
+.jv-mission__does {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  margin: 0.6rem 0 0;
+  padding-inline-start: 1.6rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+}
+.jv-mission__who {
+  flex: none;
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-brand-400);
+}
+
+/* The limits the owner sets, said once, under the parts. */
+.jv-limits {
+  max-width: 54rem;
+  margin: clamp(2.5rem, 5vw, 3.5rem) auto 0;
+  padding: 1.1rem 1.3rem;
+  text-align: center;
+  font-size: clamp(1.05rem, 1rem + 0.35vw, 1.25rem);
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--color-ink-paper);
+  border-block: 1px dotted var(--color-rule);
+  text-wrap: balance;
 }

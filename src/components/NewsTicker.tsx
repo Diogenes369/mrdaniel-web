@@ -39,7 +39,7 @@ const FALLBACK_ITEM_COUNT = 8;
 const FALLBACK_TICKER: TickerRow[] = [
   { id: 'fb-ai', title: 'סוכני AI: מה הם באמת יודעים לעשות היום', stamp: 'עדכני', href: '/ai' },
   { id: 'fb-llm', title: 'מודלי AI חדשים: איך בוחרים את המתאים לכם', stamp: 'עדכני', href: '/news' },
-  { id: 'fb-jarvis', title: 'JARVIS: עוזר AI אישי בעברית למייל, ליומן ולמשימות', stamp: 'עדכני', href: '/jarvis' },
+  { id: 'fb-jarvis', title: 'JARVIS: סוכן AI אוטונומי שמבצע משימות שלמות מפקודה קולית', stamp: 'עדכני', href: '/jarvis' },
   { id: 'fb-rag', title: 'איך גורמים ל-AI לענות מהמסמכים שלכם בלי להמציא', stamp: 'עדכני', href: '/ai' },
   { id: 'fb-guides', title: 'לומדים AI: מדריכים ומגזינים חדשים בדרך', stamp: 'בקרוב', href: '/magazines' },
   { id: 'fb-news', title: 'חדשות AI בזמן אמת ממקורות מובילים', stamp: 'עדכני', href: '/news' },

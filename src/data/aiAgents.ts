@@ -37,7 +37,6 @@ export interface AiAgent {
   tierLabel: string;
   icon: LucideIcon;
   accent: string;
-  glow: string;
   models: AgentModel[];
   /** What the agent does, in one or two plain sentences. */
   coreCapability: string;
@@ -71,7 +70,6 @@ export const AI_AGENTS: AiAgent[] = [
     tierLabel: 'לעסקים',
     icon: Rocket,
     accent: 'text-brand-400',
-    glow: 'group-hover:shadow-[0_20px_70px_rgba(0,255,102,0.2)]',
     models: [
       { vendor: 'Anthropic', role: 'מנהל את השיחה' },
       { vendor: 'OpenAI', role: 'עונה מהר על שאלות פשוטות' },
@@ -92,7 +90,6 @@ export const AI_AGENTS: AiAgent[] = [
     tierLabel: 'לעסקים',
     icon: Headset,
     accent: 'text-brand-300',
-    glow: 'group-hover:shadow-[0_20px_60px_rgba(159,232,112,0.15)]',
     models: [
       { vendor: 'Anthropic', role: 'עונה ללקוח' },
       { vendor: 'Google', role: 'ממיין את הפניות לפי נושא' },
@@ -112,7 +109,6 @@ export const AI_AGENTS: AiAgent[] = [
     tierLabel: 'לעסקים',
     icon: BrainCog,
     accent: 'text-brand-400',
-    glow: 'group-hover:shadow-[0_20px_70px_rgba(0,255,102,0.2)]',
     models: [
       { vendor: 'Anthropic', role: 'קורא את המסמכים ועונה' },
       { vendor: 'Google', role: 'קורא גם קבצים סרוקים ותמונות' },
@@ -132,7 +128,6 @@ export const AI_AGENTS: AiAgent[] = [
     tierLabel: 'החבילה המלאה',
     icon: UserCog,
     accent: 'text-black',
-    glow: 'group-hover:shadow-[0_20px_80px_rgba(0,255,102,0.3)]',
     models: [
       { vendor: 'Anthropic', role: 'מנהל את הצוות ובודק את העבודה' },
       { vendor: 'OpenAI', role: 'משימות מהירות ושגרתיות' },
@@ -155,7 +150,6 @@ export const AI_AGENTS: AiAgent[] = [
     tierLabel: 'לעצמאים',
     icon: Users,
     accent: 'text-brand-300',
-    glow: 'group-hover:shadow-[0_20px_60px_rgba(159,232,112,0.15)]',
     models: [
       { vendor: 'Google', role: 'עונה מהר ובזול' },
       { vendor: 'OpenAI', role: 'מנסח הודעות ותזכורות' },
@@ -176,7 +170,6 @@ export const AI_AGENTS: AiAgent[] = [
     tierLabel: 'לעצמאים',
     icon: Share2,
     accent: 'text-brand-400',
-    glow: 'group-hover:shadow-[0_20px_60px_rgba(0,255,102,0.15)]',
     models: [
       { vendor: 'Anthropic', role: 'כותב את הפוסטים' },
       { vendor: 'xAI', role: 'מזהה על מה מדברים עכשיו' },

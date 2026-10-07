@@ -23,7 +23,7 @@ const PILLAR_ICONS = [Workflow, Cpu, Network, Rocket];
 const HUB_LINKS = [
   { icon: Terminal, to: '/news', title: 'חדשות ומדריכי AI', description: 'מה חדש ב-AI כל יום, והסבר פשוט על המודלים החדשים' },
   { icon: Workflow, to: '/ai', title: 'סוכני AI', description: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד' },
-  { icon: Rocket, to: '/jarvis', title: 'מערכת JARVIS', description: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות' },
+  { icon: Rocket, to: '/jarvis', title: 'מערכת JARVIS', description: 'סוכן AI אוטונומי שמבצע משימות שלמות מפקודה קולית' },
   { icon: LayoutGrid, to: '/magazines', title: 'לומדים AI', description: 'מדריכים ומגזינים חדשים על AI, בקרוב' },
 ];
 

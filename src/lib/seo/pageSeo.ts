@@ -39,16 +39,16 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
     ],
   },
   '/jarvis': {
-    title: 'JARVIS: עוזר AI אישי בעברית | דניאל בן ברוך',
+    title: 'JARVIS: סוכן AI אוטונומי בפקודה קולית | דניאל בן ברוך',
     description:
-      'עוזר AI אישי בעברית שקובע פגישות, עונה למיילים, מזכיר מה פתוח ושולט במכשירים בבית ובמשרד. בקול או בהודעה, בענן או על מחשב אצלכם.',
+      'אומרים ל-JARVIS משפט אחד בקול, והוא מבצע את כל המשימה לבד: מחפש, בונה אתרים, אפליקציות ובוטים, שולח הודעות בשמכם ומדווח. בענן או על מחשב אצלכם.',
     path: '/jarvis',
     jsonLd: [
       serviceLd({
-        name: 'מערכת JARVIS — עוזר AI לעסקים ולבית חכם',
-        serviceType: 'AI Assistant & Automation System',
+        name: 'מערכת JARVIS — סוכן AI אוטונומי בפקודה קולית',
+        serviceType: 'Autonomous AI Agent',
         description:
-          'תכנון והטמעה של מערכת JARVIS: ממשק קולי טבעי (NLP), אוטומציה וניהול עסקי, שליטה במכשירי IoT בבית ובמשרד, מבוססת LLM, RAG וזיכרון וקטורי.',
+          'תכנון והטמעה של JARVIS: סוכן AI אוטונומי בעברית שמקבל משימה בקול, מתכנן אותה ומבצע אותה בכלים ובחשבונות של הלקוח, בענן או על מחשב מקומי.',
         path: '/jarvis',
       }),
       breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'מערכת JARVIS', path: '/jarvis' }]),

@@ -35,7 +35,7 @@ export const SEARCH_INDEX: SearchEntry[] = [
   // Dedicated pages
   { id: 'about-page', title: 'עמוד אודות מלא', snippet: 'בונה סוכני AI ומפרסם חדשות AI בעברית', keywords: 'about אודות רקע', icon: Workflow, route: '/about', targetSelector: '#page-top' },
   { id: 'ai-page', title: 'המדריך לסוכני AI', snippet: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד', keywords: 'AI page עמוד מלא סוכנים', icon: Workflow, route: '/ai', targetSelector: '#page-top' },
-  { id: 'jarvis-page', title: 'מערכת JARVIS', snippet: 'עוזר AI אישי בעברית למייל, ליומן ולמשימות', keywords: 'jarvis עוזר אישי assistant', icon: Workflow, route: '/jarvis', targetSelector: '#page-top' },
+  { id: 'jarvis-page', title: 'מערכת JARVIS', snippet: 'סוכן AI אוטונומי שמבצע משימות שלמות מפקודה קולית', keywords: 'jarvis סוכן אוטונומי עוזר אישי assistant voice קולי', icon: Workflow, route: '/jarvis', targetSelector: '#page-top' },
   { id: 'grok-page', title: 'סוכן GROK', snippet: 'מה Grok Bot יודע לעשות ואיך עובדים איתו, במצגת ובמדריך כתוב', keywords: 'grok bot xai spacexai cursor גרוק סוכן מצגת מדריך שגרה בודק', icon: Bot, route: '/grok', targetSelector: '#page-top' },
   { id: 'magazines-page', title: 'לומדים AI', snippet: 'מדריכים ומגזינים חדשים על AI, בקרוב', keywords: 'מגזין חוברת מדריך AI guide', icon: BookOpen, route: '/magazines', targetSelector: '#page-top' },
   { id: 'news-page', title: 'עמוד החדשות', snippet: 'כל חדשות ה-AI, מתעדכנות בזמן אמת', keywords: 'news חדשות ai', icon: Newspaper, route: '/news', targetSelector: null },

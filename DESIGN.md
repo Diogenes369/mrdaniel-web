@@ -191,7 +191,7 @@ The public site is the AI world as a learner actually meets it: a full-bleed wal
 
 The system spans three surfaces. The **public site** (`src/`) is The Sorted Noise; its homepage hero and story beats (`Hero`, `NoiseBeat`, `OrderBeat`, `PathBeat`, `StartBeat`), the shared `GlyphButton`, the header, the cookie notice and the background field are built in it. The **operator dashboard** (`dashboard/`) and the **canvas-rendered carousels and 9:16 videos** (`dashboard/src/lib/*Renderer.ts`, `designAssets.ts`) remain **"The Annotated Workbench"**: dark carbon, one green signal, real tools on the table, a person's handwriting in the margin. The two share the green hue, condensed Noto Sans Hebrew headlines, the Playpen hand and the no-invented-facts stance, so they read as one product.
 
-**Known gap.** Since 2026-10-06 the lower homepage sections (the three pillars, today's AI words, the process line, the services catalogue), the inner-page primitives (`ContentPrimitives`: page hero, section heading, frames, CTA), the cookie notice, the footer and the 404 page are in The Sorted Noise too; since 2026-10-07 so are the header and the /jarvis page. Still pending: the AI page's agent cards and the magazines hero. Their old neon/glass/pill look is not current site guidance; the harmony layer (below) keeps them in step until they move.
+**Known gap.** Since 2026-10-06 the lower homepage sections (the three pillars, today's AI words, the process line, the services catalogue), the inner-page primitives (`ContentPrimitives`: page hero, section heading, frames, CTA), the cookie notice, the footer and the 404 page are in The Sorted Noise too; since 2026-10-07 so are the header, the /jarvis page (with its mission demo), the whole /ai page (agents store, preparation checklist, build line) and the "לומדים AI" opening on /magazines. What is left of the old neon/glass look (the free-guide cards under the "לומדים AI" opening, a few older blocks) is not current site guidance; the harmony layer (below) keeps it in step until it moves.
 
 **Key Characteristics:**
 - One green ink on warm carbon (`ground`); tone made by glyph density, not by gradients or glow.
@@ -246,7 +246,7 @@ Site: one green ink on warm carbon, with a green-tinted paper ramp for text. Das
 **Character:** on the site, scanline headlines give every page its terminal voice, a tall condensed poster face carries the glyph-built promise and the titles, and a typewriter mono speaks for the machine; Heebo keeps the prose plain and eye-to-eye. On slides the same condensed face sets every headline, Assistant carries the body, and the Playpen hand supplies the one human aside.
 
 ### Hierarchy
-- **Site display** (900 condensed, `min(clamp(6.6rem, 1.6rem + 10vw, 11rem), 17.5vh)`, 0.98, nowrap): the hero's promise line only. Built out of glyphs by the field where each letter gets at least 9 glyph rows (two lines from `sm` up, three on phones); solid Field Green otherwise. A ring mark of Latin capitals (below) needs only 7 rows, a dot-matrix display's height.
+- **Site display** (900 condensed, `min(clamp(6.6rem, 1.6rem + 10vw, 11rem), 17.5vh)`, 0.98, nowrap): the homepage hero's promise line, and the "בקרוב" line of the "לומדים AI" opening (followed by a block caret, since the guides are still being written). Built out of glyphs by the field where each letter gets at least 9 glyph rows (two lines from `sm` up, three on phones); solid Field Green otherwise. A ring mark of Latin capitals (below) needs only 7 rows, a dot-matrix display's height.
 - **Site lead** (Rubik Lines 400, `clamp(1.55rem, 0.95rem + 1.7vw, 2.55rem)`, 1.22, max 22ch): the hero's first line, in paper ink.
 - **Site headline** (Rubik Lines 400, `clamp(2rem, 1rem + 2.6vw, 3.5rem)`, 1.14, balanced): every section heading on every page. A global unlayered `h1, h2` rule applies the face, so it beats `font-display` / `font-black` utilities; `.headline-plain` opts a long informational title back into the condensed display face.
 - **Site title** (900 condensed, `clamp(1.6rem, 1.15rem + 1.3vw, 2.3rem)`, 1.1): stair steps and card titles.
@@ -304,7 +304,7 @@ A sharp rectangle that fills with type.
 - **Line:** transparent with a 1px Field Green outline and green label; on hover a Field Green fill springs in from the right (the reading start) and the label turns ground-coloured.
 - **Press:** sinks 2px on a stiff spring and sends a ripple through the glyph field from the pointer (from the centre on keyboard activation).
 - **Focus:** 2px `field-ink-hi` outline, 5px offset.
-- **Sizes:** compact (min-height 2.6rem, `0 1rem`, 0.875rem) for the header action; mini (min-height 2.25rem, `0 0.95rem`, 0.875rem) for approval buttons inside a conversation turn.
+- **Sizes:** compact (min-height 2.6rem, `0 1rem`, 0.875rem) for the header action and an inline secondary action (the AI store's "help me choose").
 - Exactly one primary button per decision; the hero's never runs full width.
 
 ### Links (site)
@@ -325,10 +325,22 @@ A two-pass WebGL2 renderer: a per-cell scene pass, then a per-pixel glyph pass f
 ### The glyph-ring mark and the headline handoff (signature, since 2026-10-07)
 A short Latin mark inside a ring (the J.A.R.V.I.S mark on /jarvis, `data-glyph-ring`): the field draws the ring into its mask first, then clears the band the name runs through, so the ring breaks where the name crosses it. The ring is a true circle (a mark, not a control). Masks are drawn in the element's own CSS direction, so an LTR mark keeps its punctuation at the right end.
 - **One mark at a time.** The field draws a single headline; a page may hand it from one element to another (/jarvis hands it from the hero mark to the parts-sheet ring while that ring is at least 35% on screen). The new element assembles out of the noise again; only the element being drawn carries `data-glyph-live` and goes transparent, the other keeps its solid look.
-- **Solid fallback.** Where the letters would get fewer than 7 glyph rows (a 1x screen in a narrow or short window, the mark shrinks below 860px of height to keep the hero exchange in the first screen), and under reduced motion where the field does not mount, the mark is solid Field Green in a CSS ring broken the same way. It is a finished look, not a loading state.
+- **Solid fallback.** Where the letters would get fewer than 7 glyph rows (a 1x screen in a narrow or short window, the mark shrinks below 860px of height to keep the top of the demo in the first screen), and under reduced motion where the field does not mount, the mark is solid Field Green in a CSS ring broken the same way. It is a finished look, not a loading state.
 
 ### Conversation (since 2026-10-07)
-A page told as an exchange (/jarvis): a dotted frame with a Cousine bar that labels the exchange as an example (`דוגמה`), because it is an illustration, not a transcript. Request turns sit on the reading start behind a dotted rule, tagged `אתם`; the other side's turns are indented on phones and stand on the far side from 768px, tagged in Cousine (green for the agent). Completed steps are drawn check lines in Field Green, and the exchange ends on a blinking block caret. A turn that asks for approval carries miniature GlyphButtons (one primary, one line). No bubbles. An FAQ in this pattern makes the questions request turns inside disclosure buttons; an answer is tagged with whoever actually speaks it (on /jarvis, `דניאל`).
+Questions and answers told as an exchange (the /jarvis FAQ): a dotted frame with a Cousine bar. Request turns sit on the reading start behind a dotted rule, tagged `אתם`, inside disclosure buttons; the answer turns are indented on phones and stand on the far side from 768px, tagged in Cousine with whoever actually speaks them (on /jarvis, `דניאל`). No bubbles.
+
+### Mission console (signature, /jarvis, since 2026-10-07)
+The page's demo of an autonomous agent (`src/components/jarvis/MissionConsole.tsx`): one sentence said out loud, and the whole mission run without a click. One dotted frame, labelled `הדגמה` in its Cousine bar, with the missions as tabs (Heebo; a 2px Field Green cursor springs along the bar's rule) and a "start again" link.
+- **Four cells:** the request, the plan, the pane, the reply. Phones stack them in that order; from 900px the pane takes the far column and the other three stack beside it.
+- **Voice** is a line of the field's density glyphs (`VoiceWave`, canvas): the newest moment enters at the reading start and scrolls left; paper ink for the person, Field Green for JARVIS. The words arrive one by one under it. The site makes no sound.
+- **Plan rows:** a dotted square while waiting, the blinking block caret while running, a drawn check when done, with the tool on the far side. Each finished step sends a ripple through the glyph field from its check. After the mission, finished rows are buttons that bring their result back into the pane.
+- **The pane** is the field's calm lattice (dots on `ground`), and every result is drawn in the site's materials (`MissionArtifacts.tsx`): a map of dotted streets with block pins and a stepped scan line, a site assembling in a dotted browser with a picture made of density glyphs, messages written at machine speed and ticked off, code in Cousine with green keywords, a chart of real points on a dotted baseline with square buy/sell marks, a booking app on a square-cornered phone. Arrivals spring; scans, typing and carets move in steps.
+- It starts when a third of it is on screen, moves on to the next mission only while it is visible, and hands control to the visitor on any tab or replay. Reduced motion shows each mission finished.
+- Everything in it is labelled an illustration: made-up businesses and code, counts that are the demo's own items, and no profit, return or result figure (the trading bot runs on a demo account).
+
+### Spec sheet (the /ai store, the /jarvis install sheets)
+A product as a sheet, not a card with boxes nested in it: a dotted frame; a head with the drawn icon in a dotted square, a Cousine meta line and, when there is one, a badge as a small Field Green block; the name in the condensed poster face; the pitch in Heebo; the gain as one drawn check line; then rows on dotted rules (a Heebo 700 label column, the value beside it; model names in Cousine). The foot holds the price in the poster face in Field Green and one primary GlyphButton, with any second action as a text link under it. Filters are the model board's square chips; on phones the sheets are one native swipe rail with square position marks.
 
 ### Jargon decoder
 Rows of `term` (Cousine 700, faint, green on hover) → dotted leader → plain-Hebrew meaning (Heebo 500, paper). Stacks on phones; the leader appears from `md`.
@@ -401,4 +413,5 @@ Dashboard: the pill tab rail.
 - **Don't** put a stock photo behind a prompt, code or workflow slide.
 - **Don't** add a light theme to the site or dashboard; they are dark-only by decision.
 - **Don't** invent numbers, clients or results in any visual, including a handwritten note.
-- **Don't** treat the legacy neon/glass/pill sections (the AI page's agent cards, the magazines hero) as site guidance; they are pending migration.
+- **Don't** treat what is left of the legacy neon/glass/pill look as site guidance; the harmony layer only keeps it in step until it moves.
+- **Don't** put a made-up result, count or return in a demo; a demo counts only its own items and says it is a demo.
