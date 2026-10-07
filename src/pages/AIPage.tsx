@@ -99,10 +99,7 @@ export default function AIPage() {
           </section>
 
           <SectionHeading title={AI_GUIDE_CTA.title} description={rtl(AI_GUIDE_CTA.body)} />
-          <UnifiedCta
-            mailSubject="שיחת היכרות על סוכן AI"
-            leadMessage="יש לי עבודה שחוזרת כל יום, ואני רוצה לבדוק אם סוכן AI יכול לקחת אותה."
-          />
+          <UnifiedCta mailSubject="שיחת היכרות על סוכן AI" />
         </div>
       </div>
     </div>

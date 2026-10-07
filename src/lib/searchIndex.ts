@@ -30,9 +30,10 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { id: 'offer-llm-lab', title: 'מעבדת מודלים', snippet: 'כל מודל AI חדש נבדק, ומה כדאי לבחור לאיזו עבודה', keywords: 'llm מודלים gpt claude gemini grok llama השוואה', icon: Layers, route: '/', targetSelector: '#offer-llm-lab' },
   { id: 'offer-ai-hub', title: 'חדשות ומדריכי AI', snippet: 'חדשות AI בזמן אמת ומדריכים מעשיים צעד אחר צעד', keywords: 'news חדשות מדריכים tutorials', icon: BookOpen, route: '/', targetSelector: '#offer-ai-hub' },
   { id: 'services', title: 'מה אני בונה', snippet: 'JARVIS, סוכנים, AI שעונה מהמסמכים ואוטומציות', keywords: 'services שירותים rag jarvis אוטומציה', icon: Layers, route: '/', targetSelector: '#services' },
-  { id: 'contact', title: 'יצירת קשר', snippet: 'שיחה ישירה איתי, בלי בוטים', keywords: 'קשר contact פנייה', icon: Mail, route: '/', targetSelector: '#contact-portal' },
+  { id: 'contact', title: 'יצירת קשר', snippet: 'הודעה ישירה אליי, ואני עונה בעצמי', keywords: 'קשר contact פנייה', icon: Mail, route: '/', targetSelector: '#contact-portal' },
 
   // Dedicated pages
+  { id: 'chat-page', title: 'דברו עם הסוכן', snippet: 'שואלים כל דבר על AI, מקבלים תשובה מיד, ודניאל מקבל את השיחה', keywords: 'chat צאט צ׳אט סוכן שיחה קשר contact bot', icon: Bot, route: '/chat', targetSelector: '#page-top' },
   { id: 'about-page', title: 'עמוד אודות מלא', snippet: 'בונה סוכני AI ומפרסם חדשות AI בעברית', keywords: 'about אודות רקע', icon: Workflow, route: '/about', targetSelector: '#page-top' },
   { id: 'ai-page', title: 'המדריך לסוכני AI', snippet: 'מה זה סוכן, מה צריך להכין ואיך בונים אותו יחד', keywords: 'AI page עמוד מלא סוכנים', icon: Workflow, route: '/ai', targetSelector: '#page-top' },
   { id: 'jarvis-page', title: 'מערכת JARVIS', snippet: 'סוכן AI אוטונומי שמבצע משימות שלמות מפקודה קולית', keywords: 'jarvis סוכן אוטונומי עוזר אישי assistant voice קולי', icon: Workflow, route: '/jarvis', targetSelector: '#page-top' },

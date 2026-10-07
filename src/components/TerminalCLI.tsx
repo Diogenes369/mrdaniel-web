@@ -96,7 +96,7 @@ const CONTACT: Line[] = [
   { text: 'instagram https://www.instagram.com/mrdaniel.ai/', tone: 'out' },
   { text: 'linkedin  linkedin.com/in/daniel-ben-baruch', tone: 'out' },
   { text: '', tone: 'out' },
-  { text: "tip: run 'exit' then use “דברו איתי” in the nav for the form.", tone: 'dim' },
+  { text: "tip: run 'exit' then use “דברו איתי” in the nav to talk to the agent.", tone: 'dim' },
 ];
 
 export default function TerminalCLI() {

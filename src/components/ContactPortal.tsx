@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import ContactInlineForm from './ContactInlineForm';
 import { CONTACT_COPY } from '../data/siteCopy';
 import { rtl } from '../lib/rtl';
@@ -21,6 +23,11 @@ export default function ContactPortal() {
           <div ref={quietText} className="lg:col-span-5 lg:pt-10">
             <h2 className="story-h2">{rtl(CONTACT_COPY.headline)}</h2>
             <p className="story-body mt-6">{rtl(CONTACT_COPY.sub)}</p>
+            {/* The other way in (2026-10-07): the chat agent answers now and hands Daniel the conversation. */}
+            <Link to="/chat" className="story-link mt-8 text-[15px]">
+              {rtl(CONTACT_COPY.chat)}
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            </Link>
           </div>
           <div ref={quietForm} className="min-w-0 lg:col-span-7">
             <ContactInlineForm />

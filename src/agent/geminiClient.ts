@@ -328,7 +328,7 @@ export interface GenerateOptions {
    * one is waiting on — feed translation — and starts on Groq's small model so it never drains the
    * flash-lite daily quota that interactive agent calls depend on. Default `interactive`.
    */
-  priority?: 'interactive' | 'background';
+  priority?: 'interactive' | 'background' | 'chat';
   /**
    * Default true. Locks versioned model names ("Claude Opus 5.5") to what the user content states,
    * in the prompt and again on the answer — see sourceFidelity.ts. Opt out only where the answer
@@ -379,6 +379,10 @@ function stripInlineData(params: GenContentReq): GenContentReq {
 //   background            : Groq gpt-oss-20b → Groq gpt-oss-120b → gemini-3.5-flash-lite
 //                           (feed translation runs every refresh; it must not drain the ~500/day
 //                           flash-lite quota the operator's clicks depend on)
+//   chat                  : Groq gpt-oss-120b → the Gemini legs, LAST first → Groq gpt-oss-20b
+//                           (the site's chat agent, where a person watches a typing mark: measured
+//                           2026-10-07, Groq ~2s, gemini-3.5-flash-lite ~3s, gemini-3.1-flash-lite
+//                           ~15s on the same short prompt. Order only; every leg still serves.)
 //   media in the payload  : the Gemini legs only (Groq cannot read images/video/audio)
 //
 // A request naming a SPECIFIC non-general model (TTS, image generation, Gemma) is sent to that model
@@ -401,17 +405,18 @@ function isGeneralFlashModel(model: string): boolean {
 
 type Leg = { provider: 'gemini' | 'groq' | 'claude'; model: string };
 
-function planLegs(requested: string, textOnly: boolean, priority: 'interactive' | 'background', tier?: 'carousel'): Leg[] {
+function planLegs(requested: string, textOnly: boolean, priority: 'interactive' | 'background' | 'chat', tier?: 'carousel'): Leg[] {
   if (!isGeneralFlashModel(requested)) return [{ provider: 'gemini', model: requested }];
   // The paid carousel leg goes first; everything the free waterfall would have done follows it.
   if (tier === 'carousel' && textOnly && isClaudeConfigured()) {
     return [{ provider: 'claude', model: CLAUDE_CAROUSEL_MODEL }, ...planLegs(requested, textOnly, priority)];
   }
   const gemini: Leg[] = genAI ? GEMINI_FREE_CHAIN.map((model) => ({ provider: 'gemini' as const, model })) : [];
-  if (!textOnly || !isGroqConfigured()) return gemini;
+  if (!textOnly || !isGroqConfigured()) return priority === 'chat' ? [...gemini].reverse() : gemini;
   const bigGroq: Leg = { provider: 'groq', model: GROQ_TEXT_MODEL };
   const smallGroq: Leg = { provider: 'groq', model: GROQ_SMALL_MODEL };
   if (priority === 'background') return [smallGroq, bigGroq, ...gemini.slice(-1)];
+  if (priority === 'chat') return [bigGroq, ...[...gemini].reverse(), smallGroq];
   return [...gemini, bigGroq, smallGroq];
 }
 

@@ -50,6 +50,7 @@ const ROUTE_CHUNKS = {
   privacy: () => import('./pages/PrivacyPage'),
   terms: () => import('./pages/TermsPage'),
   accessibility: () => import('./pages/AccessibilityPage'),
+  chat: () => import('./pages/ChatPage'),
   guideDownload: () => import('./pages/GuideDownloadPage'),
   notFound: () => import('./pages/NotFoundPage'),
 };
@@ -63,6 +64,7 @@ const NewsArticlePage = lazy(ROUTE_CHUNKS.newsArticle);
 const PrivacyPage = lazy(ROUTE_CHUNKS.privacy);
 const TermsPage = lazy(ROUTE_CHUNKS.terms);
 const AccessibilityPage = lazy(ROUTE_CHUNKS.accessibility);
+const ChatPage = lazy(ROUTE_CHUNKS.chat);
 const GuideDownloadPage = lazy(ROUTE_CHUNKS.guideDownload);
 const NotFoundPage = lazy(ROUTE_CHUNKS.notFound);
 
@@ -212,6 +214,7 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/accessibility" element={<AccessibilityPage />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <SceneMotionMount key={location.pathname} />

@@ -3,10 +3,8 @@ import { randomUUID } from 'crypto';
 import express from 'express';
 import type { Request, Response } from 'express';
 import nodemailer from 'nodemailer';
-import { GoogleGenAI } from '@google/genai';
 import { getNewsItemBySlug, getNewsItems } from './src/server/newsFeed';
 import { getAINews } from './src/server/aiNewsFeed';
-import { AI_ASSISTANT_SYSTEM_INSTRUCTION } from './src/server/aiSystemPrompt';
 import { generateSocialContent, generateVideoScript, draftEngagementMessage, scoreLeadIntent, isEngineConfigured, transcribeAudio, detectGeminiRateLimit, classifyGeminiError, generateVisualSearchQuery, generateImageGenerationPrompt } from './src/agent/SocialAgentEngine';
 import { sanitizeOutput, containsPromptInjection } from './src/agent/AgentSecurityGuard';
 import { buildMediaFrames } from './src/agent/MediaTemplateRenderer';
@@ -42,6 +40,7 @@ import {
 import { runAutoPublishCycle, dispatchPublish } from './src/server/autoPublish';
 import { generateEmailCampaign, isCopywriterConfigured } from './src/server/emailCopywriter';
 import leadsHandler from './api/leads';
+import chatHandler from './api/chat';
 import newsHandler from './api/news';
 import { isHiggsfieldAction, handleHiggsfieldAction } from './src/server/openHiggsfieldActions';
 
@@ -52,53 +51,12 @@ const app = express();
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
-// Gemini chat
+// Chat agent — delegate to the Vercel handler (api/chat.ts → src/server/intakeAgent.ts), like the
+// lead routes below, so local dev runs the same conversation as production. This route used to
+// carry its own Gemini call and error replies that drifted from the deployed ones.
 // ---------------------------------------------------------------------------
 
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-  : null;
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-app.post('/api/chat', async (req: Request, res: Response) => {
-  const messages: ChatMessage[] = Array.isArray(req.body?.messages) ? req.body.messages : [];
-
-  if (!genAI) {
-    res.json({
-      reply: 'שירות הצ׳אט אינו זמין כרגע. ניתן למלא את טופס יצירת הקשר או לפנות ישירות במייל danihell3039@gmail.com.',
-    });
-    return;
-  }
-
-  try {
-    const contents = messages.map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-
-    const response = await genAI.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents,
-      config: {
-        systemInstruction: AI_ASSISTANT_SYSTEM_INSTRUCTION,
-        temperature: 0.7,
-        topP: 0.95,
-      },
-    });
-
-    const reply = response.text?.trim() || 'תודה על פנייתך. אשמח לסייע בהמשך.';
-    res.json({ reply });
-  } catch (err) {
-    console.error('Gemini chat error:', err);
-    res.json({
-      reply: 'מצטער, חלה שגיאת תקשורת רגעית. אפשר גם למלא את טופס יצירת הקשר באתר או לפנות ישירות במייל danihell3039@gmail.com.',
-    });
-  }
-});
+app.post('/api/chat', (req: Request, res: Response) => chatHandler(req, res));
 
 // ---------------------------------------------------------------------------
 // Lead capture + email engine — delegate to the Vercel handler (api/leads.ts), which is

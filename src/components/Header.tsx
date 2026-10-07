@@ -40,7 +40,8 @@ const navLinks: NavLink[] = [
   // Restored 2026-09-27 at Daniel's request: /news is the full live feed, and the ticker is
   // desktop-only, so phones need a visible way in.
   { name: 'חדשות', to: '/news' },
-  { name: 'דברו איתי', action: 'contact' },
+  // Since 2026-10-07 the way in is a conversation: /chat, the chat agent that hands Daniel the lead.
+  { name: 'דברו איתי', to: '/chat' },
 ];
 
 // "Surprise me" destinations, now in the more panel and the mobile menu.

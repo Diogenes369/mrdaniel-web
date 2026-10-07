@@ -49,7 +49,7 @@ const api = fs.readFileSync('api/leads.ts', 'utf8');
 t('api · an unusable email is stored as empty, never as typed', /if \(!isEmail\(lead\.email\)\) lead\.email = ''/.test(api));
 t('api · no replyTo on the owner email when there is no address', /replyTo: email \|\| undefined/.test(api));
 t('api · every lead with an address gets the reply email', /const reply = leadReplyEmail\(name\);/.test(api) && /if \(isEmail\(email\) && isEmailConfigured\(\)\)/.test(api));
-t('api · replies set the public address as Reply-To', (api.match(/replyTo: CONTACT_ADDRESS/g) ?? []).length === 2);
+t('api · every reply to a visitor sets the public address as Reply-To (lead, quiz, chat)', (api.match(/replyTo: CONTACT_ADDRESS/g) ?? []).length === 3);
 t('api · the quiz agent is resolved from AI_AGENTS by id, never from the body', /AI_AGENTS\.find\(\(a\) => a\.id === formText\(body\.agentId, 80\)\)/.test(api) && !/body\.agentName|body\.tagline/.test(api));
 t('api · the owner fallback inbox is the public address', /LEAD_EMAIL_TO = process\.env\.LEAD_EMAIL_TO \|\| CONTACT_ADDRESS/.test(api));
 

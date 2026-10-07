@@ -23,6 +23,7 @@ import {
 } from '../src/server/emailEngine.js';
 import { findStaticGuide, findCampaignGuide } from '../src/server/leadMagnets.js';
 import { notifyLead } from '../src/server/leadNotify.js';
+import { cleanMessages, emailFromMessages, mergeFields, isComplete, summarizeIntake, intakeLeadEmail, type IntakeFields } from '../src/server/intakeAgent.js';
 
 // Vercel Serverless Function — the site's lead endpoint AND the email engine (folded in here
 // rather than a new `/api/send-email` because Vercel Hobby caps a deployment at 12 functions).
@@ -32,6 +33,8 @@ import { notifyLead } from '../src/server/leadNotify.js';
 //                                          env-configured) and send the visitor an automatic reply.
 //   • POST { action: 'qualification' }    → the agent quiz result: store it in `leads`, no email.
 //   • POST { action: 'qualification-email' } → the quiz result sent to the visitor by email.
+//   • POST { action: 'chat-lead' }        → a chat-agent conversation as a lead: summarised, stored,
+//                                          emailed to the owner with the whole transcript.
 //
 // The site's agents answer by email (owner decision, 2026-10-07). There is no phone or WhatsApp
 // link anywhere on the site any more, so every lead with an address gets a reply in its inbox, and
@@ -185,6 +188,12 @@ export default async function handler(req: any, res: any) {
       await sendOne({ to: email, subject, html });
     }
     res.status(200).json({ ok: true });
+    return;
+  }
+
+  // ---- A chat-agent conversation as a lead -------------------------------------------------
+  if (action === 'chat-lead') {
+    await handleChatLead(res, body);
     return;
   }
 
@@ -419,6 +428,79 @@ async function handleQualificationEmail(res: any, body: Record<string, unknown>)
   // The visitor was promised the recommendation in their inbox, so only a sent email is a success;
   // otherwise the modal shows the direct address instead.
   res.status(sent.ok ? 200 : 502).json({ ok: sent.ok, stored: Boolean(leadId) });
+}
+
+// ---- The chat agent's lead ---------------------------------------------------------------------
+
+/**
+ * A conversation with the chat agent (src/server/intakeAgent.ts) handed to the owner. The browser
+ * sends it once when the agent has a need, a name and an email, then again (`update`) if the visitor
+ * kept talking, and from `pagehide` (via sendBeacon) when they leave mid-conversation after giving an
+ * email, so nothing they said is lost.
+ *
+ * The address comes from the visitor's own messages, never from the fields the browser sends, and
+ * only the owner's email carries the transcript and the summary. The visitor gets the fixed reply
+ * template, once, on the first send: a conversation is text a stranger controls, and it must not be
+ * mailed to an address they typed.
+ */
+async function handleChatLead(res: any, body: Record<string, unknown>) {
+  const messages = cleanMessages(body.messages);
+  const email = emailFromMessages(messages);
+  if (!isEmail(email)) {
+    res.status(400).json({ ok: false, error: 'no email in the conversation' });
+    return;
+  }
+  const sent = (body.fields && typeof body.fields === 'object' ? body.fields : {}) as IntakeFields;
+  const fields = mergeFields(sent, {}, messages);
+  const update = body.update === true;
+  const complete = isComplete(fields);
+  const name = fields.name || 'לא נמסר';
+  const ts = Date.now();
+  const source = 'Chat Agent';
+
+  const notifying = update ? Promise.resolve([]) : notifyLead({ name, email, phone: fields.phone, message: fields.need, project: fields.need, sourceSection: source, ts });
+  const summary = await summarizeIntake(messages, fields);
+  const lead = intakeLeadEmail({ fields, summary, messages, complete, update });
+
+  const leadId = await pushSiteLead({
+    name,
+    email,
+    ...(fields.phone ? { phone: fields.phone } : {}),
+    ...(fields.need ? { project: fields.need.slice(0, 200) } : {}),
+    notes: lead.text.slice(0, 10_000),
+    sourceSection: update ? `${source} (עדכון)` : source,
+    productCategory: 'chat',
+    ...(fields.who ? { userCompanySize: fields.who.slice(0, 80) } : {}),
+    ts,
+  });
+
+  let ownerEmailed = false;
+  const transporter = getLeadTransporter();
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: `"הסוכן באתר" <${process.env.SMTP_USER}>`,
+        to: LEAD_EMAIL_TO,
+        replyTo: email,
+        subject: lead.subject,
+        html: lead.html,
+        text: lead.text,
+      });
+      ownerEmailed = true;
+    } catch (err) {
+      console.error('[api/leads] chat lead email to the owner failed:', err);
+    }
+  }
+
+  if (!update && isEmailConfigured()) {
+    const reply = leadReplyEmail(fields.name ?? '');
+    await sendOne({ to: email, subject: reply.subject, html: reply.html, replyTo: CONTACT_ADDRESS });
+  }
+  const delivered = (await notifying).some((r) => r.ok);
+  if (!leadId) console.error('[api/leads] chat lead not stored in Firebase');
+
+  const ok = ownerEmailed || Boolean(leadId) || delivered;
+  res.status(ok ? 200 : 503).json({ ok, emailed: ownerEmailed, heat: summary.heat });
 }
 
 // ---- ManyChat -------------------------------------------------------------------------------

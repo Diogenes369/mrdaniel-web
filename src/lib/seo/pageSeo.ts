@@ -22,6 +22,13 @@ export const PAGE_SEO: Record<string, PageSeoConfig> = {
     // Organization + WebSite JSON-LD is already emitted statically in index.html (survives client
     // navigation) — no managed block needed here.
   },
+  '/chat': {
+    title: 'דברו עם הסוכן | דניאל בן ברוך',
+    description:
+      'שיחה עם הסוכן של דניאל: שואלים כל דבר על AI, על סוכנים ועל העבודה שלכם, מקבלים תשובה מיד, ודניאל מקבל את השיחה וחוזר במייל.',
+    path: '/chat',
+    jsonLd: [breadcrumbLd([{ name: 'בית', path: '/' }, { name: 'דברו עם הסוכן', path: '/chat' }])],
+  },
   '/ai': {
     title: 'סוכן AI לעסק: מה זה, מה צריך להכין ואיך בונים | דניאל בן ברוך',
     description:

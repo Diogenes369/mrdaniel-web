@@ -36,7 +36,7 @@ import type { LeadIntent, Platform, ContentFormat, LeadScoreResultShape, VideoSc
 // The actual service pillars this site sells, kept in one place so every generation call
 // (post/carousel/engagement/weekly plan) draws from the same facts instead of the model
 // improvising its own description of what Daniel does. Mirrors the substance of
-// src/server/aiSystemPrompt.ts's service list, phrased for content-writing rather than Q&A.
+// the chat agent's fact list (src/server/intakeAgent.ts), phrased for content-writing rather than Q&A.
 export const BRAND_KNOWLEDGE_BASE = `זהות המותג — דניאל בן ברוך (Daniel Ben Baruch), MrDaniel.co.il:
 מה דניאל עושה: מפרסם חדשות AI בעברית, מפרק את מודלי השפה החדשים (Grok, Claude, Gemini, GPT, Llama) ובונה סוכני AI אוטונומיים שרצים בפועל. הוא בונה מערכות, לא מוכר הרצאות.
 

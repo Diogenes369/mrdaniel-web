@@ -232,7 +232,7 @@ helpers ב-`src/agent/firebaseServer.ts`. UI: `dashboard/src/components/EmailMan
 | `SMTP_USER` | — (חובה) | כתובת השליחה, למשל `daniel@mrdaniel.co.il` |
 | `SMTP_PASS` | — (חובה) | סיסמת SMTP מ-ImprovMX (Account → SMTP) |
 | `SMTP_FROM` | `SMTP_USER` | כתובת "מאת" תצוגתית (אופציונלי) |
-| `LEAD_EMAIL_TO` | `danihell3039@gmail.com` | לאן נשלחת התראת ליד חדש |
+| `LEAD_EMAIL_TO` | (מוגדר ב-Vercel) | לאן נשלחת התראת ליד חדש; ברירת המחדל היא הכתובת הציבורית |
 
 **הגדרת ImprovMX**: מוסיפים את הדומיין `mrdaniel.co.il`, מגדירים alias
 `daniel@ → <inbox היעד>`, ובלשונית SMTP מפיקים סיסמת שליחה. רשומות ה-MX/SPF של ImprovMX

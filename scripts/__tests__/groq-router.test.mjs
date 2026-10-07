@@ -160,10 +160,12 @@ const client = readFileSync(new URL('../../src/agent/geminiClient.ts', import.me
 // Free-tier waterfall (2026-09-22): the 20/day general flash model is never called; free
 // flash-lite models serve interactive calls first, Groq serves text after them, and background
 // work (translation) starts on Groq's small model so it cannot drain the flash-lite quota.
-t('interactive text starts on free flash-lite, then Groq', /if \(priority === 'background'\) return \[smallGroq, bigGroq, \.\.\.gemini\.slice\(-1\)\];\s*return \[\.\.\.gemini, bigGroq, smallGroq\];/.test(client));
+t('interactive text starts on free flash-lite, then Groq', /if \(priority === 'background'\) return \[smallGroq, bigGroq, \.\.\.gemini\.slice\(-1\)\];[\s\S]{0,120}return \[\.\.\.gemini, bigGroq, smallGroq\];/.test(client));
+// The chat agent (2026-10-07): a person is watching a typing mark, so the fastest legs go first.
+t('chat starts on Groq, then the Gemini legs last-first', /if \(priority === 'chat'\) return \[bigGroq, \.\.\.\[\.\.\.gemini\]\.reverse\(\), smallGroq\];/.test(client));
 t('the Gemini legs are the free flash-lite models', /'gemini-3\.1-flash-lite',\s*'gemini-3\.5-flash-lite'/.test(client));
 t('the general flash model is swapped, specialised models are not', /function isGeneralFlashModel/.test(client) && /if \(!isGeneralFlashModel\(requested\)\) return \[\{ provider: 'gemini', model: requested \}\]/.test(client));
-t('media never routes to Groq', /if \(!textOnly \|\| !isGroqConfigured\(\)\) return gemini;/.test(client));
+t('media never routes to Groq', /if \(!textOnly \|\| !isGroqConfigured\(\)\) return priority === 'chat' \? \[\.\.\.gemini\]\.reverse\(\) : gemini;/.test(client));
 t('a spent daily quota benches the model until UTC midnight', /rate\.kind === 'rate' \? Date\.now\(\) \+ 60_000 : nextUtcMidnight\(\)/.test(client));
 t('a failed leg falls through to the next one', /benchLeg\(leg, err\);[\s\S]{0,200}trying next leg/.test(client));
 t('the last error is rethrown unchanged', /if \(lastError\) throw lastError;/.test(client));
