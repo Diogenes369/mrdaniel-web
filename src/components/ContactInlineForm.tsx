@@ -7,11 +7,11 @@ import { CONTACT_FORM_COPY as C } from '../data/siteCopy';
 import { rtl } from '../lib/rtl';
 import { sendLeadWebhook } from '../lib/leadWebhook';
 import { loadTracker } from '../lib/loadTracker';
-import { parseContact } from '../lib/contactField';
 
 const SOURCE = 'Contact Inline Form';
 const CONTACT_EMAIL = 'daniel@mrdaniel.co.il';
 const SWAP = { type: 'spring', stiffness: 380, damping: 32 } as const;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const trackField = (field: string, action: 'focus' | 'blur' | 'submit') =>
   loadTracker().then((t) => t.trackFormInteraction('ContactInline', field, action));
@@ -25,12 +25,16 @@ interface Errors {
 function validate(name: string, contact: string): Errors {
   const errors: Errors = {};
   if (name.trim().length < 2) errors.name = C.nameError;
-  if (!parseContact(contact)) errors.contact = C.contactError;
+  if (!EMAIL_RE.test(contact.trim())) errors.contact = C.contactError;
   return errors;
 }
 
 /**
  * The homepage's closing lead form, open on the page instead of behind a button (2026-10-03).
+ *
+ * The reply goes to an email (2026-10-07): the field used to take "phone or email", and the owner
+ * answers by email only, with no phone or WhatsApp. /api/leads sends the visitor an automatic reply
+ * the moment the lead is stored, so the confirmation below can promise one.
  *
  * Three fields and nothing to choose: the old modal's topic picker and multi-step flow are what a
  * button-first form needs to qualify a stranger; here the visitor has just read the whole story and
@@ -64,16 +68,16 @@ export default function ContactInlineForm() {
     if (found.name) return nameRef.current?.focus();
     if (found.contact) return contactRef.current?.focus();
 
-    const reach = parseContact(contact)!;
+    const email = contact.trim().toLowerCase();
     const notes = message.trim();
     setStatus('sending');
     trackField('submit', 'submit');
-    sendLeadWebhook({ name: name.trim(), ...reach, message: notes, sourceSection: SOURCE, inquiryTopic: 'יצירת קשר' });
+    sendLeadWebhook({ name: name.trim(), email, phone: '', message: notes, sourceSection: SOURCE, inquiryTopic: 'יצירת קשר' });
     try {
       const res = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), ...reach, project: 'יצירת קשר', notes, sourceSection: SOURCE }),
+        body: JSON.stringify({ name: name.trim(), email, project: 'יצירת קשר', notes, sourceSection: SOURCE }),
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
       setStatus('sent');
@@ -161,19 +165,20 @@ export default function ContactInlineForm() {
                   <label htmlFor={`${id}-contact`} className="term-label">
                     {rtl(C.contactLabel)}
                   </label>
-                  {/* LTR: both a phone and an address are typed left-to-right; right-aligned so the
-                      column edge matches the Hebrew fields beside it. */}
+                  {/* LTR: an address is typed left-to-right; right-aligned so the column edge
+                      matches the Hebrew fields beside it. */}
                   <input
                     ref={contactRef}
                     id={`${id}-contact`}
-                    name="contact"
-                    type="text"
+                    name="email"
+                    type="email"
+                    inputMode="email"
                     autoComplete="email"
                     dir="ltr"
                     value={contact}
                     onChange={(e) => setContact(e.target.value)}
                     onFocus={() => trackField('contact', 'focus')}
-                    placeholder="050-1234567 / name@mail.com"
+                    placeholder="name@mail.com"
                     aria-invalid={!!errors.contact}
                     aria-describedby={errors.contact ? `${id}-contact-err` : undefined}
                     className="term-field text-right"

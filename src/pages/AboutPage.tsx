@@ -125,7 +125,7 @@ export default function AboutPage() {
         </div>
 
         <SectionHeading title={rtl(ABOUT_COPY.ctaTitle)} description={rtl(ABOUT_COPY.ctaDescription)} />
-        <UnifiedCta mailSubject="אפיון סוכן AI" whatsappMessage="שלום דניאל, אשמח לשיחת אפיון ראשונית על סוכן AI." />
+        <UnifiedCta mailSubject="אפיון סוכן AI" leadMessage="אשמח לשיחת אפיון ראשונית על סוכן AI." />
       </div>
     </div>
   );

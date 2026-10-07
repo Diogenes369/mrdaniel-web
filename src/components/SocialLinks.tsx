@@ -15,28 +15,13 @@ export const CONTACT_EMAIL = 'daniel@mrdaniel.co.il';
 /** Every public profile, for schema.org `sameAs` (index.html mirrors this list statically). */
 export const SAME_AS_URLS = [INSTAGRAM_URL, THREADS_URL, TIKTOK_URL, X_URL, 'https://www.linkedin.com/in/daniel-ben-baruch', SPOTIFY_URL, LINKTREE_URL];
 
-// The one official WhatsApp Business number for the site — every direct-contact link (header CTA,
-// lead form, agent qualifier, this bar) points here.
-export const WHATSAPP_NUMBER = '972506473039';
+// No phone or WhatsApp link anywhere on the site (owner decision, 2026-10-07): the number that used
+// to be here was a personal line. Visitors write by email, through a form (every form gets an
+// automatic reply by email, see /api/leads) or on the social networks above.
 
-/** Builds a wa.me link, optionally pre-filling the chat with `message` (Hebrew or mixed content —
- * WhatsApp renders plain text natively with correct RTL, no sanitization needed here). */
-export function buildWhatsAppUrl(message?: string): string {
-  return message ? `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}` : `https://wa.me/${WHATSAPP_NUMBER}`;
-}
-
-// lucide-react ships no WhatsApp/TikTok glyphs (only general-purpose icons, not brand marks) — these
-// are the standard public brand glyph paths, inlined as `currentColor` SVGs so they inherit the same
-// sizing/color classes as the lucide icons alongside them.
-export function WhatsAppIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-      <path d="M12.004 2.003c-5.514 0-9.997 4.483-9.997 9.997 0 1.763.462 3.483 1.34 4.997L2 22l5.117-1.334a9.96 9.96 0 0 0 4.887 1.264h.004c5.514 0 9.997-4.483 9.997-9.997 0-2.67-1.04-5.18-2.928-7.067a9.933 9.933 0 0 0-7.073-2.863zm0 18.174h-.003a8.16 8.16 0 0 1-4.163-1.14l-.299-.177-3.037.792.811-2.96-.194-.304a8.163 8.163 0 0 1-1.253-4.365c0-4.508 3.669-8.177 8.181-8.177a8.13 8.13 0 0 1 5.786 2.398 8.13 8.13 0 0 1 2.394 5.786c0 4.508-3.67 8.177-8.223 8.177z" />
-    </svg>
-  );
-}
-
+// lucide-react ships no TikTok/X/Threads/Spotify glyphs (only general-purpose icons, not brand
+// marks) — these are the standard public brand glyph paths, inlined as `currentColor` SVGs so they
+// inherit the same sizing/color classes as the lucide icons alongside them.
 export function TikTokIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
@@ -77,17 +62,17 @@ const DEFAULT_ICON_CLASS =
 // `focus-visible` so it never flashes on an ordinary mouse click, only on real keyboard focus.
 const FOCUS_SAFE_CLASS = 'outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 focus-visible:ring-offset-0';
 
-export type SocialChannel = 'instagram' | 'threads' | 'tiktok' | 'x' | 'linkedin' | 'whatsapp' | 'mail';
+export type SocialChannel = 'instagram' | 'threads' | 'tiktok' | 'x' | 'linkedin' | 'mail';
 
-const ALL_CHANNELS: SocialChannel[] = ['instagram', 'threads', 'tiktok', 'x', 'linkedin', 'whatsapp', 'mail'];
+const ALL_CHANNELS: SocialChannel[] = ['instagram', 'threads', 'tiktok', 'x', 'linkedin', 'mail'];
 
 interface SocialLinksProps {
   className?: string;
   iconClassName?: string;
   glyphClassName?: string;
-  /** Which channels to render, in order — defaults to all 7. The header keeps a smaller
-   * (Instagram/LinkedIn/mail) subset; TikTok and WhatsApp stay exclusive to the footer and the
-   * bottom-of-page social bar. */
+  /** Which channels to render, in order — defaults to all 6. The header keeps a smaller
+   * (Instagram/LinkedIn/mail) subset; TikTok stays exclusive to the footer and the bottom-of-page
+   * social bar. */
   channels?: SocialChannel[];
 }
 
@@ -120,11 +105,6 @@ export default function SocialLinks({ className = '', iconClassName, glyphClassN
       {show('x') && (
         <a href={X_URL} target="_blank" rel="noopener noreferrer" aria-label="X (טוויטר)" title="X" className={cls}>
           <XIcon className={glyphClassName} />
-        </a>
-      )}
-      {show('whatsapp') && (
-        <a href={buildWhatsAppUrl()} target="_blank" rel="noopener noreferrer" aria-label="וואטסאפ" title="וואטסאפ" className={cls}>
-          <WhatsAppIcon className={glyphClassName} />
         </a>
       )}
       {show('mail') && (

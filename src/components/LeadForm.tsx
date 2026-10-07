@@ -10,6 +10,7 @@ import {
   Code2,
   BookOpen,
   MessageCircle,
+  Mail,
   Network,
   MessagesSquare,
   Globe,
@@ -29,11 +30,10 @@ import { loadTracker } from '../lib/loadTracker';
 const trackField = (field: string, action: 'focus' | 'blur' | 'submit') =>
   loadTracker().then((t) => t.trackFormInteraction('LeadForm', field, action));
 
-// The real WhatsApp Business number surfaced as a direct-contact option on the confirmation step
-// of the product-qualification flow (see PRODUCT_STEPS below) — deliberately a plain constant, not
-// an env var: it's meant to be public-facing (it's literally what a wa.me link exposes), matching
-// how CONTACT_EMAIL is defined the same way in Footer.tsx/SocialLinks.tsx elsewhere in this codebase.
-const WHATSAPP_NUMBER = '972506473039';
+// Every lead gets its answer by email: /api/leads sends the visitor an automatic reply the moment
+// the lead is stored, and Daniel answers from the same thread. The phone field is optional and no
+// phone or WhatsApp link is offered anywhere (owner decision, 2026-10-07).
+const CONTACT_EMAIL = 'daniel@mrdaniel.co.il';
 
 const SERVICES = [
   { id: 'ai', label: 'סוכן AI שיעבוד בשבילי', icon: Workflow },
@@ -96,6 +96,11 @@ interface FormState {
 const EMPTY_FORM: FormState = { name: '', email: '', phone: '', service: '', goal: '', companySize: '', message: '' };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Name and email are required, the answer goes to the email; a phone is optional but must be valid
+ * when it is typed. */
+const contactReady = (f: FormState) =>
+  f.name.trim().length > 1 && EMAIL_RE.test(f.email) && (f.phone.trim() === '' || isValidPhone(f.phone));
+
 export default function LeadForm() {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(0);
@@ -155,10 +160,10 @@ export default function LeadForm() {
     ? step === 0
       ? form.goal !== '' && form.companySize !== ''
       : step === 1
-        ? form.name.trim().length > 1 && EMAIL_RE.test(form.email) && isValidPhone(form.phone)
+        ? contactReady(form)
         : true
     : step === 0
-      ? form.name.trim().length > 1 && EMAIL_RE.test(form.email) && isValidPhone(form.phone)
+      ? contactReady(form)
       : step === 1
         ? form.service !== ''
         : true;
@@ -214,9 +219,7 @@ export default function LeadForm() {
 
   const steps = isProductFlow ? ['מטרה ומידע', 'פרטי קשר', 'אישור ושליחה'] : ['פרטי קשר', 'תחום עניין', 'פרטי הפרויקט'];
 
-  const whatsappHref = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
-    `שלום, אשמח לשוחח לגבי ${product?.name ?? subjectContext ?? 'התאמת פתרון'}${form.name ? ` — ${form.name}` : ''}`
-  )}`;
+  const mailHref = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(product?.name ?? (subjectContext || 'פנייה מהאתר'))}`;
 
   return (
     <AnimatePresence>
@@ -307,9 +310,9 @@ export default function LeadForm() {
                   >
                     <Check className="w-8 h-8 text-brand-400" />
                   </motion.div>
-                  <h4 className="modal-title text-2xl mb-2">קיבלתי. מדבר איתך בקרוב.</h4>
+                  <h4 className="modal-title text-2xl mb-2">קיבלתי. התשובה תגיע למייל.</h4>
                   <p className="text-zinc-300 text-base leading-relaxed max-w-xs">
-                    תודה {form.name.split(' ')[0]} — הפרטים אצלי. אחזור אליך למייל שהשארת, בדרך כלל תוך יום עסקים.
+                    תודה {form.name.split(' ')[0]}. אישור כבר בדרך למייל שהשארת, ואני עונה באותו מייל, בדרך כלל תוך יום עסקים.
                   </p>
                   <WebButton variant="glass" onClick={close} className="mt-8">
                     סגירה
@@ -425,13 +428,12 @@ export default function LeadForm() {
                           </Field>
 
                           <a
-                            href={whatsappHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/10 bg-white/[0.02] text-sm font-bold text-zinc-300 hover:border-brand-500/40 hover:text-white transition-colors"
+                            href={mailHref}
+                            className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 w-full py-3 px-3 rounded-xl border border-white/10 bg-white/[0.02] text-sm font-bold text-zinc-300 hover:border-brand-500/40 hover:text-white transition-colors"
                           >
-                            <MessageCircle size={16} className="text-brand-400" />
-                            מעדיפים לדבר ישירות? המשיכו ב-WhatsApp
+                            <Mail size={16} className="text-brand-400" />
+                            או ישירות במייל
+                            <span dir="ltr">{CONTACT_EMAIL}</span>
                           </a>
 
                           {status === 'error' && (
@@ -583,7 +585,7 @@ function ContactFields({
           className="input-glow text-left"
         />
       </Field>
-      <Field label="טלפון נייד">
+      <Field label="טלפון נייד (לא חובה)">
         <input
           type="tel"
           value={form.phone}

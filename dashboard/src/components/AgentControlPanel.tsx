@@ -45,7 +45,6 @@ import {
   type VideoProvider,
 } from '../lib/agentTypes';
 
-const WHATSAPP_NUMBER = '972506473039';
 const CRON_HOUR_UTC = 8; // matches vercel.json's "0 8 * * *"
 
 const MODE_OPTIONS: { id: AgentMode; icon: typeof Play }[] = [
@@ -178,7 +177,9 @@ function QueueCard({
   };
 
   const openWhatsApp = () => {
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(finalText)}`, '_blank', 'noopener');
+    // No number in the link: WhatsApp asks which chat to send to. The personal number that used to
+    // be here is gone from the whole codebase (owner decision, 2026-10-07).
+    window.open(`https://wa.me/?text=${encodeURIComponent(finalText)}`, '_blank', 'noopener');
     onStatus(item.id, 'handed-off');
   };
 

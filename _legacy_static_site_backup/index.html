@@ -1125,7 +1125,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (message) finalMsg += `
 הודעה: ${message}`;
       
-      const whatsappUrl = `https://wa.me/972506473039?text=${encodeURIComponent(finalMsg)}`;
+      const whatsappUrl = `mailto:daniel@mrdaniel.co.il?subject=${encodeURIComponent(topic)}&body=${encodeURIComponent(finalMsg)}`;
       window.open(whatsappUrl, '_blank');
       
       waOverlay.classList.add('is-closing');

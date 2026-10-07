@@ -101,7 +101,7 @@ export default function AIPage() {
           <SectionHeading title={AI_GUIDE_CTA.title} description={rtl(AI_GUIDE_CTA.body)} />
           <UnifiedCta
             mailSubject="שיחת היכרות על סוכן AI"
-            whatsappMessage="היי דניאל, יש לי עבודה שחוזרת כל יום ואני רוצה לבדוק אם סוכן AI יכול לקחת אותה."
+            leadMessage="יש לי עבודה שחוזרת כל יום, ואני רוצה לבדוק אם סוכן AI יכול לקחת אותה."
           />
         </div>
       </div>

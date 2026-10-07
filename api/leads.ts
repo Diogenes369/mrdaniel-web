@@ -11,16 +11,31 @@ import {
   pushSiteLead,
   readCommentDmCampaigns,
 } from '../src/agent/firebaseServer.js';
-import { sendOne, sendCampaign, welcomeEmailHtml, wrapBrandedEmail, isEmailConfigured } from '../src/server/emailEngine.js';
+import {
+  sendOne,
+  sendCampaign,
+  welcomeEmailHtml,
+  wrapBrandedEmail,
+  isEmailConfigured,
+  leadReplyEmail,
+  agentRecommendationEmail,
+  CONTACT_ADDRESS,
+} from '../src/server/emailEngine.js';
 import { findStaticGuide, findCampaignGuide } from '../src/server/leadMagnets.js';
 import { notifyLead } from '../src/server/leadNotify.js';
 
 // Vercel Serverless Function — the site's lead endpoint AND the email engine (folded in here
 // rather than a new `/api/send-email` because Vercel Hobby caps a deployment at 12 functions).
 //
-//   • POST (no `action`)                 → a site lead: store it in `leads`, email the owner and ping
-//                                          their phone (src/server/leadNotify.ts, env-configured).
+//   • POST (no `action`)                 → a site lead: store it in `leads`, email the owner, ping
+//                                          their notification channels (src/server/leadNotify.ts,
+//                                          env-configured) and send the visitor an automatic reply.
 //   • POST { action: 'qualification' }    → the agent quiz result: store it in `leads`, no email.
+//   • POST { action: 'qualification-email' } → the quiz result sent to the visitor by email.
+//
+// The site's agents answer by email (owner decision, 2026-10-07). There is no phone or WhatsApp
+// link anywhere on the site any more, so every lead with an address gets a reply in its inbox, and
+// that thread is where the conversation continues.
 //   • POST { action: 'manychat-lead' }    → ManyChat External Request: save a Comment-to-DM lead.
 //   • POST { action: 'guide-signup' }     → a visitor signed in to download a free guide.
 //
@@ -32,7 +47,9 @@ import { notifyLead } from '../src/server/leadNotify.js';
 //   • POST { action: 'send-welcome' }     → admin: send the welcome template to one address.
 //   • POST { action: 'send-campaign' }    → admin: blast subscribers / leads / a custom list.
 
-const LEAD_EMAIL_TO = process.env.LEAD_EMAIL_TO || 'danihell3039@gmail.com';
+// The owner's inbox is configured in Vercel (LEAD_EMAIL_TO); the fallback is the public address,
+// never a personal one, because this file is public.
+const LEAD_EMAIL_TO = process.env.LEAD_EMAIL_TO || CONTACT_ADDRESS;
 
 function setCors(res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -171,11 +188,17 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  // ---- Agent-quiz result sent by email (the quiz's contact step) ---------------------------
+  if (action === 'qualification-email') {
+    await handleQualificationEmail(res, body);
+    return;
+  }
+
   // ---- Agent-quiz result (open; it carries no contact details, so nothing is emailed) --------
   if (action === 'qualification') {
     const leadId = await pushSiteLead({
       ...siteLeadFields(body),
-      name: 'לא נמסר (שאלון התאמה → WhatsApp)',
+      name: 'לא נמסר (שאלון התאמה)',
       email: 'לא נמסר',
       productCategory: 'ai-agent',
       sourceSection: 'Agent Qualification Modal',
@@ -314,18 +337,13 @@ export default async function handler(req: any, res: any) {
       text: `שם: ${name}\nאימייל: ${email || '-'}\nטלפון: ${phone || '-'}\nמקור הפנייה: ${sourceSection || '-'}\nפרויקט: ${project || '-'}${productLines}\nהערות:\n${notes || '-'}`,
     });
 
-    // Auto-welcome the lead too, if enabled.
-    try {
-      const cfg = await readEmailConfig();
-      if (cfg.autoWelcome && isEmail(email) && isEmailConfigured()) {
-        const w = welcomeEmailHtml(name);
-        await sendOne({ to: email, subject: w.subject, html: w.html });
-      }
-    } catch (err) {
-      // Best-effort by design — the lead is already saved and the owner already notified, so this
-      // must not fail the request. Logged rather than discarded: a welcome email that silently
-      // stops going out otherwise looks exactly like one that was never enabled.
-      console.warn('[api/leads] auto-welcome email failed:', err);
+    // The agent's answer by email: every lead with an address gets an automatic reply, whatever
+    // the newsletter's autoWelcome setting says (that welcome thanked a lead "for signing up", which
+    // it never did). Best-effort by design: the lead is already saved and the owner already
+    // notified, so a failed reply must not fail the request. sendOne logs its own failures.
+    if (isEmail(email) && isEmailConfigured()) {
+      const reply = leadReplyEmail(name);
+      await sendOne({ to: email, subject: reply.subject, html: reply.html, replyTo: CONTACT_ADDRESS });
     }
 
     if (!leadId) console.error('[api/leads] lead emailed but not stored in Firebase:', sourceSection);
@@ -338,6 +356,69 @@ export default async function handler(req: any, res: any) {
     if (leadId || (await delivered())) res.status(200).json({ ok: true, emailed: false });
     else res.status(500).json({ ok: false, error: 'send failed' });
   }
+}
+
+// ---- The quiz's answer by email ----------------------------------------------------------------
+
+/**
+ * The agent quiz's contact step: the visitor leaves an address and the quiz sends its
+ * recommendation there, then the owner answers from the same thread. The agent is resolved here
+ * from its id and never taken from the request: this action mails an address the browser supplied,
+ * so nothing else the browser wrote may reach that email's body (greetingName guards the name).
+ * aiAgents.ts pulls lucide-react in for its icons, so it is imported only on this path.
+ */
+async function handleQualificationEmail(res: any, body: Record<string, unknown>) {
+  const email = formText(body.email, 200).toLowerCase();
+  if (!isEmail(email)) {
+    res.status(400).json({ ok: false, error: 'invalid email' });
+    return;
+  }
+  const { AI_AGENTS } = await import('../src/data/aiAgents.js');
+  const agent = AI_AGENTS.find((a) => a.id === formText(body.agentId, 80));
+  if (!agent) {
+    res.status(400).json({ ok: false, error: 'unknown agent' });
+    return;
+  }
+  const name = formText(body.name, 80);
+  const notes = formText(body.notes, 1000);
+  const ts = Date.now();
+  const source = 'Agent Qualification → Email';
+
+  const notifying = notifyLead({ name: name || 'לא נמסר', email, message: notes, project: agent.name, sourceSection: source, ts });
+  const leadId = await pushSiteLead({
+    name: name || 'לא נמסר',
+    email,
+    selectedProduct: agent.name,
+    productCategory: 'ai-agent',
+    price: agent.price,
+    ...(notes ? { notes } : {}),
+    sourceSection: source,
+    ts,
+  });
+
+  const reply = agentRecommendationEmail(name, agent);
+  const sent = await sendOne({ to: email, subject: reply.subject, html: reply.html, replyTo: CONTACT_ADDRESS });
+
+  const transporter = getLeadTransporter();
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: `"אתר דניאל בן ברוך" <${process.env.SMTP_USER}>`,
+        to: LEAD_EMAIL_TO,
+        replyTo: email,
+        subject: `ליד חדש · שאלון התאמה: ${agent.name}`,
+        text: `שם: ${name || '-'}\nאימייל: ${email}\nהסוכן שהומלץ: ${agent.name} (₪${agent.price})\nההמלצה נשלחה למבקר: ${sent.ok ? 'כן' : 'לא'}\n\n${notes || '-'}`,
+      });
+    } catch (err) {
+      console.error('[api/leads] qualification lead email to the owner failed:', err);
+    }
+  }
+  await notifying;
+  if (!leadId) console.error('[api/leads] qualification lead not stored in Firebase');
+
+  // The visitor was promised the recommendation in their inbox, so only a sent email is a success;
+  // otherwise the modal shows the direct address instead.
+  res.status(sent.ok ? 200 : 502).json({ ok: sent.ok, stored: Boolean(leadId) });
 }
 
 // ---- ManyChat -------------------------------------------------------------------------------

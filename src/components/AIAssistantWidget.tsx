@@ -233,9 +233,14 @@ export default function AIAssistantWidget() {
     }
   };
 
+  // Name and email are required: the answer goes out by email (/api/leads sends an automatic reply
+  // the moment the lead is stored). A phone is optional and only checked when typed.
+  const leadReady =
+    Boolean(leadData.name) && EMAIL_RE.test(leadData.email) && (leadData.phone.trim() === '' || isValidPhone(leadData.phone));
+
   const handleLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!leadData.name || !EMAIL_RE.test(leadData.email) || !isValidPhone(leadData.phone)) return;
+    if (!leadReady) return;
 
     const notes = messages.map(m => `[${m.role}] ${m.content}`).join('\n');
     sendLeadWebhook({
@@ -264,7 +269,7 @@ export default function AIAssistantWidget() {
       const confirmMsg: Message = {
         id: `lead-confirm-${Date.now()}`,
         role: 'assistant',
-        content: `תודה רבה ${leadData.name}! הפרטים שלך נקלטו בהצלחה במערכת.\n\nדניאל יבחן את הפרטים ויחזור אליך בהקדם למייל שהשארת.\nבינתיים, ניתן לעיין בחוברות ובתכנים הטכנולוגיים באתר!`,
+        content: `תודה ${leadData.name}, הפרטים אצלנו.\n\nאישור כבר בדרך למייל שהשארת, ודניאל עונה באותו מייל, בדרך כלל תוך יום עסקים.`,
         timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
       };
 
@@ -362,7 +367,7 @@ export default function AIAssistantWidget() {
                   {leadSubmitted ? (
                     <div className="flex items-center gap-2 text-brand-400 text-sm font-medium py-1">
                       <CheckCircle2 size={18} />
-                      <span>הפרטים נשלחו בהצלחה! דניאל ייצור עמך קשר בקרוב.</span>
+                      <span>הפרטים נשלחו. התשובה תגיע אליכם למייל.</span>
                     </div>
                   ) : (
                     <form onSubmit={handleLeadSubmit} className="space-y-2.5">
@@ -400,8 +405,7 @@ export default function AIAssistantWidget() {
                       <div className="grid grid-cols-2 gap-2">
                         <input
                           type="tel"
-                          required
-                          placeholder="טלפון נייד *"
+                          placeholder="טלפון (לא חובה)"
                           value={leadData.phone}
                           onChange={e => setLeadData({ ...leadData, phone: e.target.value })}
                           dir="ltr"
@@ -417,7 +421,7 @@ export default function AIAssistantWidget() {
                       </div>
                       <button
                         type="submit"
-                        disabled={!leadData.name || !EMAIL_RE.test(leadData.email) || !isValidPhone(leadData.phone)}
+                        disabled={!leadReady}
                         className="w-full py-2 bg-brand-400 hover:bg-brand-300 text-black font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <CheckCircle2 size={14} /> שליחת פרטים ישירות לדניאל

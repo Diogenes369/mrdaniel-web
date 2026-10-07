@@ -17,6 +17,11 @@ export const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
 export const FROM_ADDRESS = process.env.SMTP_FROM || process.env.SMTP_USER || 'daniel@mrdaniel.co.il';
 
 const SITE = 'https://mrdaniel.co.il';
+/** The one public contact address. Every reply email sets it as Reply-To, so a visitor who answers
+ * lands in the owner's inbox even when SMTP_FROM is a different mailbox. There is no phone or
+ * WhatsApp on any email (owner decision, 2026-10-07). */
+export const CONTACT_ADDRESS = 'daniel@mrdaniel.co.il';
+const LINKEDIN_URL = 'https://www.linkedin.com/in/daniel-ben-baruch';
 const GREEN = '#76B900';
 const GREEN_LIGHT = '#9FE870';
 
@@ -128,6 +133,9 @@ export interface WrapOptions {
   unsubscribeUrl?: string;
   /** Extra section HTML (from servicesHighlightsHtml / featuredNewsHtml) appended after the body. */
   extraSections?: string;
+  /** A one-to-one reply to someone who wrote in, not a list mailing: the footer says why they got
+   * it and carries no unsubscribe line, since there is no list to leave. */
+  reply?: boolean;
 }
 
 /**
@@ -137,7 +145,10 @@ export interface WrapOptions {
  * socials, copyright, anti-spam unsubscribe note).
  */
 export function wrapBrandedEmail(inner: string, opts: WrapOptions = {}): string {
-  const { title = 'MR. DANIEL', preheader = '', campaign = 'newsletter', unsubscribeUrl = `${SITE}/unsubscribe`, extraSections = '' } = opts;
+  const { title = 'MR. DANIEL', preheader = '', campaign = 'newsletter', unsubscribeUrl = `${SITE}/unsubscribe`, extraSections = '', reply = false } = opts;
+  const why = reply
+    ? 'קיבלתם את המייל הזה בתשובה לפנייה שלכם ב-mrdaniel.co.il.'
+    : `קיבלת מייל זה כי נרשמת לעדכונים ב-mrdaniel.co.il. <a href="${escapeHtml(unsubscribeUrl)}" style="color:#7c848d;text-decoration:underline;">להסרה מרשימת התפוצה</a>.`;
   const year = new Date().getFullYear();
   const link = (href: string, label: string) =>
     `<a href="${escapeHtml(withUtm(href, campaign))}" style="color:${GREEN_LIGHT};text-decoration:none;">${escapeHtml(label)}</a>`;
@@ -174,14 +185,13 @@ export function wrapBrandedEmail(inner: string, opts: WrapOptions = {}): string 
 
   <tr><td style="padding:22px 30px 6px;color:#6e727b;font:400 12px/1.9 Arial,Helvetica,sans-serif;text-align:center;">
     ${link(SITE, 'האתר')} &nbsp;·&nbsp; ${link(`${SITE}/ai`, 'סוכני AI')} &nbsp;·&nbsp; ${link(`${SITE}/news`, 'חדשות')} &nbsp;·&nbsp; ${link(`${SITE}/jarvis`, 'JARVIS')}<br>
-    <a href="mailto:daniel@mrdaniel.co.il" style="color:${GREEN_LIGHT};text-decoration:none;">daniel@mrdaniel.co.il</a>
-    &nbsp;·&nbsp; ${link('https://www.linkedin.com/', 'LinkedIn')}
+    <a href="mailto:${CONTACT_ADDRESS}" style="color:${GREEN_LIGHT};text-decoration:none;">${CONTACT_ADDRESS}</a>
+    &nbsp;·&nbsp; ${link(LINKEDIN_URL, 'LinkedIn')}
     &nbsp;·&nbsp; ${link('https://www.instagram.com/mrdaniel.ai/', 'Instagram')}
-    &nbsp;·&nbsp; ${link('https://wa.me/972506473039', 'WhatsApp')}
   </td></tr>
   <tr><td style="padding:6px 30px 0;color:#54575e;font:400 11px/1.8 Arial,Helvetica,sans-serif;text-align:center;">
     &copy; ${year} דניאל בן ברוך · כל הזכויות שמורות.<br>
-    קיבלת מייל זה כי נרשמת לעדכונים ב-mrdaniel.co.il. <a href="${escapeHtml(unsubscribeUrl)}" style="color:#7c848d;text-decoration:underline;">להסרה מרשימת התפוצה</a>.
+    ${why}
   </td></tr>
 
 </table>
@@ -200,6 +210,74 @@ export function welcomeEmailHtml(name?: string): { subject: string; html: string
   return {
     subject: 'ברוכים הבאים — MR. DANIEL',
     html: wrapBrandedEmail(inner, { title: 'ברוכים הבאים', preheader: 'תודה שנרשמת לעדכונים', campaign: 'welcome', extraSections: servicesHighlightsHtml('welcome') }),
+  };
+}
+
+/**
+ * The visitor's name as a greeting, or '' when it can't be used safely. The reply emails below go to
+ * an address the browser supplied, so the name is the only text a stranger controls in them: one
+ * word, short, and never anything that reads as a link, an address or a number, so the reply can't
+ * be turned into a way to mail someone else a message.
+ */
+export function greetingName(raw: unknown): string {
+  const first = String(raw ?? '').trim().split(/\s+/)[0] ?? '';
+  if (!first || first.length > 24) return '';
+  if (/[@:/<>]|www|\.[a-z]{2,}|\d{3,}/i.test(first)) return '';
+  return first;
+}
+
+function hello(name: string): string {
+  const n = greetingName(name);
+  return `<p style="margin:0 0 14px;color:#ffffff;font:700 19px/1.5 Arial,Helvetica,sans-serif;">${n ? `שלום ${escapeHtml(n)},` : 'שלום,'}</p>`;
+}
+
+/**
+ * The automatic reply every site lead gets (2026-10-07): the owner wanted the site's agents to
+ * answer by email, in place of the WhatsApp links that used to be the fast way to reach him. It
+ * promises only what is true: the message arrived, Daniel answers it himself, by email.
+ */
+export function leadReplyEmail(name: string): { subject: string; html: string } {
+  const inner = `
+    ${hello(name)}
+    <p style="margin:0 0 14px;">תודה שכתבתם. הפנייה הגיעה אליי, ואני עונה עליה בעצמי, במייל הזה, בדרך כלל תוך יום עסקים.</p>
+    <p style="margin:0 0 18px;">רוצים להוסיף משהו בינתיים? משיבים למייל הזה, והכול מגיע ישר אליי.</p>
+    <p style="margin:0;">${emailButton(`${SITE}/news`, 'בינתיים, חדשות AI מהיום', 'lead-reply')}</p>`;
+  return {
+    subject: 'קיבלתי את הפנייה שלכם',
+    html: wrapBrandedEmail(inner, { title: 'קיבלתי את הפנייה', preheader: 'אני עונה בעצמי, במייל הזה', campaign: 'lead-reply', reply: true }),
+  };
+}
+
+/** What the recommendation email needs from an agent. The caller resolves it from AI_AGENTS by id,
+ * never from the request, so every word in the email is the site's own copy. */
+export interface RecommendedAgent {
+  name: string;
+  tagline: string;
+  coreCapability: string;
+  benefit: string;
+  price: number;
+}
+
+/** The qualification agent's answer by email: the agent it matched, in the site's own words. */
+export function agentRecommendationEmail(name: string, agent: RecommendedAgent): { subject: string; html: string } {
+  const price = `₪${agent.price.toLocaleString('he-IL')}`;
+  const inner = `
+    ${hello(name)}
+    <p style="margin:0 0 16px;">עברתם את שאלון ההתאמה באתר. זה הסוכן שהכי מתאים למה שתיארתם:</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#0e0e14;border:1px solid #24242e;border-right:3px solid ${GREEN};border-radius:12px;padding:18px 20px;">
+      <div style="color:#ffffff;font:800 18px/1.4 Arial,Helvetica,sans-serif;">${escapeHtml(agent.name)}</div>
+      <div style="color:#c7cad0;font:400 14px/1.7 Arial,Helvetica,sans-serif;margin-top:6px;">${escapeHtml(agent.tagline)}</div>
+      <div style="color:#8a8f98;font:700 12px/1.6 Arial,Helvetica,sans-serif;margin-top:14px;">מה הוא עושה</div>
+      <div style="color:#d8dade;font:400 14px/1.7 Arial,Helvetica,sans-serif;">${escapeHtml(agent.coreCapability)}</div>
+      <div style="color:#8a8f98;font:700 12px/1.6 Arial,Helvetica,sans-serif;margin-top:12px;">מה משתנה אצלכם</div>
+      <div style="color:#d8dade;font:400 14px/1.7 Arial,Helvetica,sans-serif;">${escapeHtml(agent.benefit)}</div>
+      <div style="color:${GREEN_LIGHT};font:800 20px/1.4 Arial,Helvetica,sans-serif;margin-top:14px;">${escapeHtml(price)}</div>
+    </td></tr></table>
+    <p style="margin:18px 0 18px;">רוצים להתקדם? משיבים למייל הזה עם כמה מילים על העבודה שהסוכן אמור לקחת, ואני חוזר אליכם עם הצעה לשיחת אפיון.</p>
+    <p style="margin:0;">${emailButton(`${SITE}/ai`, 'כל הסוכנים באתר', 'agent-match')}</p>`;
+  return {
+    subject: `ההמלצה שלכם: ${agent.name}`,
+    html: wrapBrandedEmail(inner, { title: 'ההמלצה שלכם', preheader: agent.name, campaign: 'agent-match', reply: true }),
   };
 }
 

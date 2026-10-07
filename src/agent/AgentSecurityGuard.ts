@@ -23,8 +23,10 @@ const SECRET_PATTERNS: RegExp[] = [
   /-----BEGIN [A-Z ]+PRIVATE KEY-----/, // PEM private key block
 ];
 const CREDIT_CARD_PATTERN = /\b(?:\d[ -]*?){13,19}\b/;
-const OFF_BRAND_CONTACT_PATTERN = /\b0(?:5\d|[23489])[-\s]?\d{7}\b/; // any Israeli phone NOT the sanctioned WhatsApp number
-const SANCTIONED_PHONE = '0506473039';
+// Any Israeli phone number. The site publishes no phone or WhatsApp number at all (owner decision,
+// 2026-10-07; the one that used to be allowed here was a personal line), so every number in generated
+// output is flagged for a human to look at before it goes out.
+const PHONE_PATTERN = /\b0(?:5\d|[23489])[-\s]?\d{7}\b/;
 
 // --- Unverified-claim detection (run on OUTPUT only) ------------------------------------------
 // Numeric stat claims already sanctioned elsewhere on the site (aiAgents.ts / PremiumAdvantage /
@@ -60,8 +62,7 @@ export function sanitizeOutput(text: string): SecurityCheckResult {
     flags.push('possible-payment-data');
   }
 
-  const phoneMatches = text.match(OFF_BRAND_CONTACT_PATTERN) ?? [];
-  if (phoneMatches.some((m) => m.replace(/[-\s]/g, '') !== SANCTIONED_PHONE)) {
+  if (PHONE_PATTERN.test(text)) {
     flags.push('unverified-contact-number');
   }
 

@@ -37,7 +37,13 @@ import makeWASocket, { useMultiFileAuthState, DisconnectReason, downloadMediaMes
 const PORT = process.env.PORT || 4000;
 const WEBHOOK_SECRET = process.env.WHATSAPP_WEBHOOK_SECRET || '';
 const MAIN_SITE_WEBHOOK_URL = process.env.MAIN_SITE_WEBHOOK_URL || '';
-const ADMIN_NUMBER = (process.env.ADMIN_WHATSAPP_NUMBER || '972506473039').replace(/\D/g, '');
+// The owner's number lives only in this service's gitignored .env, never in the code (2026-10-07).
+const ADMIN_NUMBER = (process.env.ADMIN_WHATSAPP_NUMBER || '').replace(/\D/g, '');
+
+if (!ADMIN_NUMBER) {
+  console.error('❌ ADMIN_WHATSAPP_NUMBER is not set — add it to whatsapp-server/.env (digits with country code).');
+  process.exit(1);
+}
 
 if (!WEBHOOK_SECRET) {
   console.warn('⚠️  WHATSAPP_WEBHOOK_SECRET is not set — both directions of this bridge will run unauthenticated. Set it in .env before exposing this service publicly.');

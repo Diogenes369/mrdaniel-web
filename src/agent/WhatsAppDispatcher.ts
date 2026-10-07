@@ -5,14 +5,16 @@ import type { QueueItem } from './types.js';
 // This module never talks to WhatsApp directly; it only knows how to reach the bridge.
 const BRIDGE_URL = process.env.WHATSAPP_BRIDGE_URL; // e.g. https://your-vps:PORT/send or an ngrok URL
 const BRIDGE_SECRET = process.env.WHATSAPP_WEBHOOK_SECRET; // same shared secret used on the inbound side
-const ADMIN_WHATSAPP_NUMBER = process.env.ADMIN_WHATSAPP_NUMBER || '972506473039';
+// The owner's own number for the approval prompts. Env only, no default: this file is public, and
+// the number is a personal line that appears nowhere in the codebase (2026-10-07).
+const ADMIN_WHATSAPP_NUMBER = (process.env.ADMIN_WHATSAPP_NUMBER || '').replace(/\D/g, '');
 
 export function isWhatsAppBridgeConfigured(): boolean {
-  return Boolean(BRIDGE_URL);
+  return Boolean(BRIDGE_URL && ADMIN_WHATSAPP_NUMBER);
 }
 
 async function sendRaw(to: string, message: string): Promise<boolean> {
-  if (!BRIDGE_URL) return false;
+  if (!BRIDGE_URL || !to) return false;
   try {
     const res = await fetch(BRIDGE_URL, {
       method: 'POST',
@@ -29,8 +31,8 @@ async function sendRaw(to: string, message: string): Promise<boolean> {
   }
 }
 
-/** Sends a plain message to the admin's WhatsApp (defaults to the site's sanctioned number, same
- * one used everywhere else in this codebase for the wa.me handoff links). */
+/** Sends a plain message to the admin's WhatsApp (ADMIN_WHATSAPP_NUMBER; nothing is sent when it
+ * is unset). */
 export function sendAdminMessage(message: string): Promise<boolean> {
   return sendRaw(ADMIN_WHATSAPP_NUMBER, message);
 }

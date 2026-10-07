@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { backdropMotion, panelMotion } from '../lib/modalMotion';
 import {
@@ -19,12 +19,11 @@ import {
   Headset,
   Share2,
   BrainCog,
-  MessageCircle,
+  Mail,
   type LucideIcon,
 } from 'lucide-react';
 import WebButton from './WebButton';
 import ModalHeaderBanner from './ModalHeaderBanner';
-import { buildWhatsAppUrl } from './SocialLinks';
 import { AI_AGENTS, GOAL_LABEL, type AiAgent, type AgentGoal, type AgentAudience } from '../data/aiAgents';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { loadTracker } from '../lib/loadTracker';
@@ -70,32 +69,6 @@ function recommendAgent(goal: AgentGoal, audience: AgentAudience, budget: Budget
 
   const target = BUDGET_OPTIONS.find((b) => b.id === budget)?.target ?? 9000;
   return [...pool].sort((a, b) => Math.abs(a.price - target) - Math.abs(b.price - target))[0];
-}
-
-function buildWhatsAppMessage(opts: {
-  businessType: BusinessType;
-  techStack: TechStack;
-  budget: BudgetTier;
-  goal: AgentGoal;
-  agent: AiAgent;
-}): string {
-  const businessLabel = BUSINESS_TYPE_OPTIONS.find((o) => o.id === opts.businessType)?.label ?? '';
-  const techLabel = TECH_STACK_OPTIONS.find((o) => o.id === opts.techStack)?.label ?? '';
-  const budgetLabel = BUDGET_OPTIONS.find((o) => o.id === opts.budget)?.label ?? '';
-  const goalLabel = GOAL_LABEL[opts.goal];
-
-  return [
-    'שלום דניאל! עברתי עכשיו את שאלון ההתאמה האישית באתר וקיבלתי המלצה על סוכן AI.',
-    '',
-    `סוג העסק: ${businessLabel}`,
-    `איך זה מתנהל היום: ${techLabel}`,
-    `תקציב משוער: ${budgetLabel}`,
-    `המטרה העיקרית: ${goalLabel}`,
-    '',
-    `הסוכן המומלץ: ${opts.agent.name} (${opts.agent.tierLabel}, ₪${opts.agent.price.toLocaleString('he-IL')})`,
-    '',
-    'אשמח להמשיך משם ולתאם שיחת אפיון קצרה.',
-  ].join('\n');
 }
 
 function OptionGrid<T extends string>({
@@ -190,6 +163,9 @@ export default function AgentQualificationModal() {
   const [techStack, setTechStack] = useState<TechStack | ''>('');
   const [budget, setBudget] = useState<BudgetTier | ''>('');
   const [goal, setGoal] = useState<AgentGoal | ''>('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
@@ -209,10 +185,10 @@ export default function AgentQualificationModal() {
   }, [businessType, techStack, budget, goal]);
 
   // Records the completed qualification in the dashboard's `leads` list as soon as a result is
-  // reached. It goes through `/api/leads` because `leads` is being closed to browsers, but as its own
-  // action: this flow never collects a name or email, so there is no owner email and no welcome
-  // email to send. The WhatsApp handoff below is the actual contact channel. This record only
-  // keeps the qualification visible to the business owner, so it stays fire-and-forget.
+  // reached, before any contact details exist, so a visitor who never leaves an email still shows up
+  // for the owner. It goes through `/api/leads` because `leads` is closed to browsers. The email step
+  // below is the contact channel (2026-10-07, it replaced a WhatsApp handoff): the agent sends its
+  // recommendation to the visitor by email, and the conversation continues in that thread.
   useEffect(() => {
     if (!result || !businessType || !techStack || !budget || !goal) return;
     const businessLabel = BUSINESS_TYPE_OPTIONS.find((o) => o.id === businessType)?.label;
@@ -239,6 +215,7 @@ export default function AgentQualificationModal() {
 
   function reset() {
     setStep(0);
+    setSendState('idle');
     setBusinessType('');
     setTechStack('');
     setBudget('');
@@ -248,10 +225,38 @@ export default function AgentQualificationModal() {
   const canProceed =
     step === 0 ? businessType !== '' : step === 1 ? techStack !== '' : step === 2 ? budget !== '' : goal !== '';
 
-  const whatsappHref =
-    result && businessType && techStack && budget && goal
-      ? buildWhatsAppUrl(buildWhatsAppMessage({ businessType, techStack, budget, goal, agent: result }))
-      : buildWhatsAppUrl();
+  const emailReady = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  /** The agent's answer by email: /api/leads resolves the agent from its id, sends the visitor the
+   * recommendation and tells the owner, who answers from the same thread. */
+  const sendRecommendation = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!result || !emailReady || sendState === 'sending') return;
+    setSendState('sending');
+    loadTracker().then((t) => t.trackConversion('Agent Qualification → Email'));
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'qualification-email',
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          agentId: result.id,
+          notes: [
+            `סוג העסק: ${BUSINESS_TYPE_OPTIONS.find((o) => o.id === businessType)?.label ?? '-'}`,
+            `מערכות קיימות: ${TECH_STACK_OPTIONS.find((o) => o.id === techStack)?.label ?? '-'}`,
+            `תקציב: ${BUDGET_OPTIONS.find((o) => o.id === budget)?.label ?? '-'}`,
+            `מטרה: ${goal ? GOAL_LABEL[goal] : '-'}`,
+          ].join('\n'),
+        }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      setSendState('sent');
+    } catch {
+      setSendState('error');
+    }
+  };
 
   // NOTE: deliberately NOT wrapped in <AnimatePresence>. This modal has a nested
   // <AnimatePresence mode="wait"> for its step transitions, and `close()` resets `step` — the
@@ -288,7 +293,7 @@ export default function AgentQualificationModal() {
                       בואו נמצא לכם <span className="text-brand-400">את הסוכן המושלם</span>
                     </h3>
                   </div>
-                  <p className="font-sans text-sm text-ink-muted mt-1">כמה שאלות קצרות — ותוך פחות מדקה תדעו בדיוק מה הכי מתאים לכם, עם מעבר ישיר לשיחה עם דניאל ב-WhatsApp.</p>
+                  <p className="font-sans text-sm text-ink-muted mt-1">כמה שאלות קצרות, ותוך פחות מדקה תדעו מה הכי מתאים לכם. את ההמלצה המלאה שולחים אליכם למייל.</p>
 
                   {!result && <Stepper labels={QUESTION_LABELS} step={step} />}
                 </div>
@@ -340,16 +345,53 @@ export default function AgentQualificationModal() {
                         <p className="text-zinc-400 text-sm leading-relaxed mb-4">{result.tagline}</p>
                         <div className="text-3xl font-black text-brand-400 mb-6">₪{result.price.toLocaleString('he-IL')}</div>
 
-                        <a
-                          href={whatsappHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => loadTracker().then((t) => t.trackConversion('Agent Qualification → WhatsApp'))}
-                          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-brand-500 text-black font-bold text-sm hover:bg-brand-400 transition-colors"
-                        >
-                          <MessageCircle size={17} />
-                          בואו נדבר על זה ב-WhatsApp
-                        </a>
+                        {sendState === 'sent' ? (
+                          <div role="status" className="border-t border-dotted border-[var(--color-rule)] pt-5 text-sm leading-relaxed text-zinc-300">
+                            <Check className="mx-auto mb-2 h-6 w-6 text-brand-400" aria-hidden="true" />
+                            ההמלצה בדרך למייל שלכם. רוצים להתקדם? משיבים לאותו מייל, ודניאל עונה משם.
+                          </div>
+                        ) : (
+                          <form onSubmit={sendRecommendation} noValidate className="space-y-2.5 border-t border-dotted border-[var(--color-rule)] pt-5 text-right">
+                            <p className="text-xs font-bold text-zinc-400">לאיזה מייל לשלוח את ההמלצה?</p>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <input
+                                name="name"
+                                autoComplete="name"
+                                aria-label="שם (לא חובה)"
+                                placeholder="שם (לא חובה)"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                maxLength={80}
+                                className="input-glow"
+                              />
+                              <input
+                                name="email"
+                                type="email"
+                                inputMode="email"
+                                autoComplete="email"
+                                aria-label="אימייל"
+                                placeholder="name@mail.com"
+                                dir="ltr"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="input-glow text-right"
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              disabled={!emailReady || sendState === 'sending'}
+                              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-brand-500 text-black font-bold text-sm hover:bg-brand-400 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Mail size={17} aria-hidden="true" />
+                              {sendState === 'sending' ? 'שולח…' : 'שלחו לי את ההמלצה למייל'}
+                            </button>
+                            {sendState === 'error' && (
+                              <p className="text-xs text-red-400" role="alert">
+                                השליחה לא עברה. נסו שוב, או כתבו ישירות ל-<a href="mailto:daniel@mrdaniel.co.il" dir="ltr" className="underline underline-offset-4">daniel@mrdaniel.co.il</a>
+                              </p>
+                            )}
+                          </form>
+                        )}
 
                         <button
                           type="button"

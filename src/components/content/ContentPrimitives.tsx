@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
-import { Mail, MessageCircle, type LucideIcon } from 'lucide-react';
+import { Mail, Send, type LucideIcon } from 'lucide-react';
 import WebButton from '../WebButton';
-import SocialLinks, { CONTACT_EMAIL, buildWhatsAppUrl } from '../SocialLinks';
+import SocialLinks, { CONTACT_EMAIL } from '../SocialLinks';
 import SiteBot from '../bots/SiteBot';
 import type { BotShape, BotTone } from '../bots/botShapes';
 import { useFieldQuiet } from '../field/fieldState';
@@ -232,22 +232,27 @@ export function TocGrid({ items }: { items: TocEntry[] }) {
 }
 
 /**
- * The bottom call to action: one frame with a direct mailto, a direct WhatsApp (both pre-filled with
- * page-specific context) and the social bar underneath. `mailSubject`/`whatsappMessage` let each
- * page keep its own contextual copy.
+ * The bottom call to action: one frame with a direct mailto (pre-filled with the page's subject),
+ * the lead form (its answer arrives by email, /api/leads sends the reply) and the social bar
+ * underneath. There is no phone or WhatsApp link (owner decision, 2026-10-07): `mailSubject` and
+ * `leadMessage` let each page keep its own contextual copy in both email routes.
  */
-export function UnifiedCta({ mailSubject, whatsappMessage }: { mailSubject: string; whatsappMessage: string }) {
+export function UnifiedCta({ mailSubject, leadMessage }: { mailSubject: string; leadMessage: string }) {
+  const openLeadForm = () =>
+    window.dispatchEvent(
+      new CustomEvent('open-lead-modal', { detail: { subject: mailSubject, prefillMessage: leadMessage, sourceSection: 'Unified CTA' } })
+    );
   return (
     <div className="glyph-frame mb-8 p-6 text-center sm:p-8 lg:p-10" data-live="frame">
-      <p className="story-body mx-auto mb-7 max-w-xl">הדרך המהירה ביותר להתחיל — פנייה ישירה במייל או ב-WhatsApp, בלי טפסים מיותרים.</p>
+      <p className="story-body mx-auto mb-7 max-w-xl">הדרך המהירה ביותר להתחיל: מייל ישיר, או כמה פרטים בטופס. התשובה מגיעה אליכם למייל.</p>
       <div className="mb-8 flex flex-wrap items-center justify-center gap-4">
         <WebButton variant="primary" href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(mailSubject)}`}>
           <Mail className="h-4 w-4" />
           פנייה ישירה במייל
         </WebButton>
-        <WebButton variant="glass" href={buildWhatsAppUrl(whatsappMessage)} target="_blank" rel="noopener noreferrer">
-          <MessageCircle className="h-4 w-4" />
-          פנייה ישירה ב-WhatsApp
+        <WebButton variant="glass" onClick={openLeadForm}>
+          <Send className="h-4 w-4" />
+          השארת פרטים
         </WebButton>
       </div>
       <div className="flex flex-col items-center gap-3 border-t border-dotted border-[var(--color-rule)] pt-7">

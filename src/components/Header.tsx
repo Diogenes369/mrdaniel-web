@@ -26,7 +26,7 @@ import { useFieldQuiet } from './field/fieldState';
  * Instagram and Facebook webviews are fine with it.
  */
 
-// TikTok and WhatsApp stay exclusive to the footer and the bottom-of-page social bar.
+// TikTok stays exclusive to the footer and the bottom-of-page social bar.
 const HEADER_SOCIAL_CHANNELS = ['instagram', 'linkedin', 'mail'] as const;
 
 // "צור קשר" is an action, not a route: it opens the lead modal (the site's contact funnel).
