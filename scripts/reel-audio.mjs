@@ -4,10 +4,11 @@
  *
  * The score is rendered in headless Chrome by scripts/reel-score.js, which plays the deck's own
  * sound recipes (public/grok-deck/js/sfx.js, the same ones the website plays live) at the cues the
- * render recorded, under a minimal groove that keeps time with the slides. All of it is
- * synthesized, so the reel carries no music anyone else owns, and the same cue sheet always gives
- * the same sound. This file then masters it (plain gain to -16 LUFS, a look-ahead limiter for the
- * few peaks) and muxes it with the picture, which is copied, never re-encoded.
+ * render recorded, under a pop groove that keeps time with the slides. All of it is synthesized,
+ * so the reel carries no music anyone else owns, and the same cue sheet always gives the same
+ * sound. This file then masters it (plain gain to -14 LUFS, the usual level on social apps, and a
+ * look-ahead limiter for the few peaks) and muxes it with the picture, which is copied, never
+ * re-encoded.
  *
  * Run on its own, it re-scores an existing render from its cue sheet (<name>.cues.json):
  *
@@ -24,7 +25,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SFX_JS = path.join(ROOT, 'public/grok-deck/js/sfx.js');
 const SCORE_JS = path.join(ROOT, 'scripts/reel-score.js');
 export const RATE = 48000;
-const TARGET_LUFS = -16;
+const TARGET_LUFS = -14;
 const CEILING_DB = -1.5;
 
 /** Renders the score in a fresh page of `chrome` and returns [left, right] Float32Arrays. */
@@ -113,13 +114,30 @@ export function measure(wav) {
   return { loudness: +m.input_i, peak: +m.input_tp };
 }
 
-/** Plain gain to the target loudness, then the limiter. In place. */
+/**
+ * Plain gain to the target loudness, then the limiter. In place. The limiter takes a little
+ * loudness off with the peaks it tucks under, so the result is measured once more and the gain
+ * corrected; the second pass loses a little again, so it lands within about half a LU under the
+ * target (-14.6 for the Grok Bot reel).
+ */
 export function master(track, dir) {
   const raw = path.join(dir, 'raw.wav');
+  const src = track.map((ch) => Float32Array.from(ch));
   writeWav(raw, track);
-  const gain = 10 ** ((TARGET_LUFS - measure(raw).loudness) / 20);
-  for (const ch of track) for (let s = 0; s < ch.length; s++) ch[s] *= gain;
-  limit(track, 10 ** (CEILING_DB / 20));
+  let db = TARGET_LUFS - measure(raw).loudness;
+  for (let pass = 0; pass < 2; pass++) {
+    const gain = 10 ** (db / 20);
+    track.forEach((ch, c) => {
+      const from = src[c];
+      for (let s = 0; s < ch.length; s++) ch[s] = from[s] * gain;
+    });
+    limit(track, 10 ** (CEILING_DB / 20));
+    if (pass) break;
+    writeWav(raw, track);
+    const off = TARGET_LUFS - measure(raw).loudness;
+    if (Math.abs(off) < 0.2) break;
+    db += off;
+  }
 }
 
 /**
@@ -127,10 +145,13 @@ export function master(track, dir) {
  * render passes its own browser), otherwise opens one for the job.
  */
 export async function scoreVideo(video, sheet, output, { chrome } = {}) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'grok-reel-audio-'));
   const own = chrome ? null : await openChrome({ port: 9472, width: 400, height: 400 });
+  let dir = null;
   try {
     const track = await renderScore(chrome || own, sheet);
+    // The work folder is made only once the score exists: an empty temp folder made before the
+    // render was once gone by the time the score, minutes later, needed it (2026-10-07).
+    dir = mkdtempSync(path.join(tmpdir(), 'grok-reel-audio-'));
     master(track, dir);
     const wav = path.join(dir, 'score.wav');
     writeWav(wav, track);
@@ -148,7 +169,7 @@ export async function scoreVideo(video, sheet, output, { chrome } = {}) {
     return m;
   } finally {
     if (own) own.close();
-    rmSync(dir, { recursive: true, force: true });
+    if (dir) rmSync(dir, { recursive: true, force: true });
   }
 }
 

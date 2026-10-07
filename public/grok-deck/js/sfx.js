@@ -67,6 +67,10 @@
   /** Gain that rises to `peak` over `a` and dies away over `d` (exponentially, like a struck thing). */
   function env(ctx, t, a, d, peak) {
     const g = ctx.createGain();
+    // Silent until the envelope starts. A gain's resting value is 1, and a source that starts a
+    // hair before t (rounding puts it one sample early now and then) would pass that one sample at
+    // full level: a click at the onset, loudest through a high-pass.
+    g.gain.value = 0;
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(Math.max(peak, 0.0002), t + a);
     g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
@@ -151,6 +155,7 @@
     ex.Q.value = 0.5;
     const len = o.ex || 0.004;
     const eg = ctx.createGain();
+    eg.gain.value = 0;
     eg.gain.setValueAtTime(0, t);
     eg.gain.linearRampToValueAtTime(1, t + 0.0008);
     eg.gain.exponentialRampToValueAtTime(0.0001, t + len);
