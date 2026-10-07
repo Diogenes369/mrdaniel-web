@@ -20,18 +20,46 @@ const RLM = '‏';
 // for a placeholder index.
 const PUA = '';
 
+// What the Unicode bidi algorithm itself keeps as ONE left-to-right number (UAX #9 rules W4 and W5,
+// confirmed character by character in Chrome on 2026-10-07): digit groups joined by a single
+// separator — "20,000", "12.9", a time "09:30", a date "7/10" or "2026-10-07", a range "10-20",
+// "24/7" — plus any terminator touching the digits: "50%", "$100", "₪50", "20°". The terminators
+// are UAX #9's European Terminator class; U+20A0-U+20CF is the currency-sign block (₪, €, ₹, ₿).
+// Anything else between two numbers is NOT part of the run: the browser reverses "10–20" (en dash)
+// and "1080×1350" in an RTL line, and so does this, rather than inventing an order of its own.
+const NUM_SEPARATOR = '[-+.,:/]';
+const NUM_TERMINATOR = '[#$%°±‰‱′″‴¢£¤¥\\u20A0-\\u20CF]';
+const DIGIT_RUN = `\\d+(?:(?:${NUM_SEPARATOR}|${NUM_TERMINATOR}+)\\d+)*`;
+
 // A maximal run of Latin letters/digits, allowing single embedded hyphens/apostrophes/spaces so a
 // multi-word term ("Agent Guardian") or a hyphenated one ("GPT-4") wraps as one unit — but a space
 // only extends the run if another Latin word-char immediately follows, so it never swallows the
 // space before a following Hebrew word.
-// A dot extends the run ONLY before digits, so a dotted version ("Claude 4.5") stays one bidi unit
-// while a sentence-ending period never glues two sentences into one run.
-const LATIN_RUN = /\b[A-Za-z][A-Za-z0-9]*(?:[-'’ ][A-Za-z0-9]+|\.\d+)*\b/g;
+// A number inside the run runs on through its separators and terminators ("Claude 4.5",
+// "Zoom 09:30", "SWE-bench 80.9%", "ChatGPT Plus $20"), but a separator only joins when a digit
+// follows it, so a sentence-ending period never glues two sentences into one run.
+// A number fused to a Latin unit STARTS a run: "32GB", "1.5B", "4K", "5G", "1Password", "$5B".
+// Isolating its digits split one LTR token into two bidi units, which an RTL line orders the wrong
+// way round — "32GB" rendered as "GB32", "9:30AM" as "AM30:9". As a run it also takes in the Latin
+// words after it ("32GB RAM", "128K tokens"), exactly as the browser groups them.
+// `\B` before a terminator (itself a non-word character) means "not glued to a word on its left":
+// the lookbehind-free spelling, because rtl() ships this file to the browser and a lookbehind is a
+// parse error on iOS Safari before 16.4, which would take the whole bundle down with it.
+// The trailing terminator may not be followed by a letter, digit or another terminator: two runs
+// touching would leave "[RLM][RLM]" between them, and the RLM collapse below would fuse the pair
+// into one mis-nested span.
+const LATIN_RUN = new RegExp(
+  `(?:(?:\\B${NUM_TERMINATOR}+|\\b)${DIGIT_RUN}[A-Za-z]|\\b[A-Za-z])[A-Za-z0-9]*` +
+    `(?:[-'’ ]${NUM_TERMINATOR}*[A-Za-z0-9]+|${NUM_SEPARATOR}\\d[A-Za-z0-9]*)*` +
+    `\\b(?:${NUM_TERMINATOR}+(?![A-Za-z0-9]|${NUM_TERMINATOR}))?`,
+  'g'
+);
 
-// A whole number including its grouping separators, so "20,000" stays one isolate instead of
-// becoming "[LRI]20[PDI],[LRI]000[PDI]" — which puts a bare comma between two isolates and lets it
-// drift to the wrong side of the number in an RTL line.
-const NUMBER = /\d+(?:[.,]\d+)*/g;
+// A whole number, so it stays ONE isolate instead of one per digit group ("[LRI]20[PDI],[LRI]000[PDI]"
+// for "20,000"). Split like that, a bare separator sits between two isolates, and an RTL line orders
+// consecutive isolates right to left: "09:30" rendered as "30:09", "7/10" as "10/7", "24/7" as
+// "7/24". A terminator left outside drifted to the far side of its number: "50%" as "%50".
+const NUMBER = new RegExp(`${NUM_TERMINATOR}*${DIGIT_RUN}${NUM_TERMINATOR}*`, 'g');
 
 // LTR ISOLATE / POP DIRECTIONAL ISOLATE — wrap a URL or bare domain so its internal order stays
 // left-to-right inside an RTL line (otherwise "mrdaniel.co.il" renders as "il.co.mrdaniel").

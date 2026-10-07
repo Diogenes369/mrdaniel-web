@@ -1,22 +1,20 @@
-import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
-import {
-  Terminal,
-  ShieldCheck,
-  Workflow,
-  Cpu,
-  Layout,
-  Network,
-  Rocket,
-  LayoutGrid,
-  ShoppingBag,
-  ArrowLeft,
-  Share2,
-} from 'lucide-react';
-import { PageHero, SectionHeading, ServiceGrid, UnifiedCta } from '../components/content/ContentPrimitives';
+import { Terminal, Workflow, Cpu, Network, Rocket, LayoutGrid, ArrowLeft, BookOpen } from 'lucide-react';
+import { PageHero, SectionHeading, UnifiedCta } from '../components/content/ContentPrimitives';
+import GlyphButton from '../components/ui/GlyphButton';
 import SocialLinks from '../components/SocialLinks';
 import { ABOUT_COPY } from '../data/siteCopy';
 import { rtl } from '../lib/rtl';
+import { useFieldQuiet } from '../components/field/fieldState';
+
+/**
+ * /about, in the glyph world since 2026-10-07 (it was the last page still built from glass panels).
+ * The copy is unchanged except the learn-alone block, which pointed to a store that no longer
+ * exists (/magazines has been the free guides and a coming-soon page since 2026-09-23) and opened
+ * on a rhetorical question the brief bans. Each block takes the form its content has: the lede is
+ * a line under a dotted rule, the story is prose under a site headline, the pillars are frame
+ * cells, the site's services a directory in one frame, the quote a pull quote in the poster face.
+ */
 
 const PILLAR_ICONS = [Workflow, Cpu, Network, Rocket];
 
@@ -28,103 +26,106 @@ const HUB_LINKS = [
 ];
 
 export default function AboutPage() {
+  const quietStory = useFieldQuiet();
+  const quietQuote = useFieldQuiet();
+
   return (
     <div id="page-top" className="min-h-screen pt-24 md:pt-28">
       <div className="container-wide">
-        <PageHero
-          badgeIcon={Terminal}
-          badgeLabel="AI News • LLMs • Autonomous Agents"
-          title={rtl(ABOUT_COPY.title)}
-          subtitle={rtl(ABOUT_COPY.subtitle)}
-        />
+        <PageHero title={rtl(ABOUT_COPY.title)} subtitle={rtl(ABOUT_COPY.subtitle)} />
 
-        <div className="glass-panel glass-panel--info text-lg text-zinc-200 leading-[1.9] rounded-xl p-5 sm:p-6 lg:p-7 mb-14 max-w-4xl">
+        <p className="about-lede" data-live="wipe">
           {rtl(ABOUT_COPY.lede)}
-        </div>
+        </p>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="glass-panel glass-panel--info rounded-2xl p-6 sm:p-8 mb-16 max-w-4xl">
-          <h2 className="flex items-center gap-3 font-display font-bold text-xl md:text-2xl text-white mb-5">
-            <ShieldCheck className="w-6 h-6 text-brand-400" />
+        {/* Who I am: prose under the site's headline voice, no panel around it. */}
+        <section ref={quietStory} className="mb-20 max-w-3xl" aria-labelledby="about-story">
+          <h2 id="about-story" className="story-h2">
             מי אני ומה אני בונה
           </h2>
-          <div className="space-y-4 text-base md:text-lg text-zinc-300 leading-[1.85]">
+          <div className="mt-4 flex items-center gap-2" aria-hidden="true">
+            <span className="story-statusbar__live" />
+            <span className="h-px w-20 border-t border-dotted border-[var(--color-rule)]" />
+          </div>
+          <div className="mt-6 space-y-5" data-live="stagger">
             {ABOUT_COPY.paras.map((para) => (
-              <p key={para}>{rtl(para)}</p>
+              <p key={para} className="story-body !max-w-none">
+                {rtl(para)}
+              </p>
             ))}
           </div>
-        </motion.div>
+        </section>
 
-        <SectionHeading icon={Layout} title="ארבעת עמודי התווך" description="מה אני בונה, למי, ואיפה לומדים את זה לבד" />
-        <ServiceGrid
-          items={ABOUT_COPY.pillars.map((pillar, i) => ({
-            icon: PILLAR_ICONS[i % PILLAR_ICONS.length],
-            title: rtl(pillar.title),
-            description: rtl(pillar.description),
-          }))}
-        />
+        <SectionHeading title="ארבעת עמודי התווך" description="מה אני בונה, למי, ואיפה לומדים את זה לבד" />
+        {/* Four pillars: two by two, then four in a row, so no row is left with one cell. */}
+        <ul className="mb-20 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-4" data-live="stagger">
+          {ABOUT_COPY.pillars.map((pillar, i) => {
+            const Icon = PILLAR_ICONS[i % PILLAR_ICONS.length];
+            return (
+              <li key={pillar.title} className="glyph-frame frame-cell frame-cell--stack">
+                <span className="frame-cell__icon mb-4" aria-hidden="true">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <h3 className="frame-cell__title">{rtl(pillar.title)}</h3>
+                <p className="frame-cell__text">{rtl(pillar.description)}</p>
+              </li>
+            );
+          })}
+        </ul>
 
-        <div className="glass-panel glass-panel--info rounded-2xl p-5 sm:p-6 lg:p-8 mb-16">
-          <div className="flex items-center gap-2.5 mb-5">
-            <LayoutGrid className="w-5 h-5 text-brand-400" />
-            <h3 className="font-display font-bold text-xl text-white">כל שירותי האתר במקום אחד</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3" data-live="stagger">
+        {/* Everything on the site, as a directory in one frame. */}
+        <nav className="glyph-frame about-hub mb-20" aria-labelledby="about-hub-title" data-live="frame">
+          <p id="about-hub-title" className="about-hub__bar">
+            <span className="story-statusbar__live" aria-hidden="true" />
+            כל שירותי האתר במקום אחד
+          </p>
+          <ul className="about-hub__list">
             {HUB_LINKS.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className="group flex items-center gap-4 bg-black/30 border border-white/5 rounded-xl p-4 hover:border-brand-500/40 hover:bg-black/50 transition-colors"
-              >
-                <span className="shrink-0 w-11 h-11 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-brand-400 group-hover:bg-brand-500/15 group-hover:border-brand-500/40 transition-colors">
-                  <item.icon className="w-5 h-5" />
-                </span>
-                <span className="min-w-0 flex-grow">
-                  <strong className="block text-white text-sm mb-0.5">{item.title}</strong>
-                  <span className="block text-zinc-500 text-xs leading-relaxed">{item.description}</span>
-                </span>
-                <ArrowLeft className="w-4 h-4 text-zinc-600 group-hover:text-brand-400 shrink-0 transition-colors" />
-              </Link>
+              <li key={item.to}>
+                <Link to={item.to} className="about-hub__row">
+                  <span className="frame-cell__icon" aria-hidden="true">
+                    <item.icon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <strong className="about-hub__title">{rtl(item.title)}</strong>
+                    <span className="about-hub__text">{rtl(item.description)}</span>
+                  </span>
+                  <ArrowLeft className="about-hub__arrow h-4 w-4" aria-hidden="true" />
+                </Link>
+              </li>
             ))}
+          </ul>
+        </nav>
+
+        <figure ref={quietQuote} className="about-quote mb-20">
+          <blockquote className="about-quote__text" data-live="wipe">
+            {rtl(ABOUT_COPY.quote)}
+          </blockquote>
+          <figcaption className="about-quote__by">דניאל</figcaption>
+        </figure>
+
+        <div className="about-follow mb-20">
+          <div className="min-w-0">
+            <h2 className="about-follow__title headline-plain">עקבו אחרי הפעילות באופן שוטף</h2>
+            <p className="about-follow__text">טיפים, עדכוני AI ומה שאני לומד תוך כדי עבודה, ישירות ברשתות או במייל.</p>
           </div>
+          <SocialLinks iconClassName="hdr-icon-btn hdr-icon-btn--framed" glyphClassName="w-5 h-5" />
         </div>
 
-        <div className="glass-panel glass-panel--info rounded-2xl p-6 sm:p-8 mb-16 text-center max-w-3xl mx-auto">
-          <div className="flex items-center justify-center gap-2.5 mb-3">
-            <Share2 className="w-5 h-5 text-brand-400" />
-            <h3 className="font-display font-bold text-xl text-white">עקבו אחרי הפעילות באופן שוטף</h3>
+        {/* Learning alone: the free guides on /magazines (it used to say "store", and there is none). */}
+        <div className="glyph-frame about-learn mb-20" data-live="frame">
+          <div className="min-w-0">
+            <h2 className="about-follow__title headline-plain">ללמוד לבד, בקצב שלכם</h2>
+            <p className="about-follow__text">מדריכים וחוברות על סוכני AI, צעד אחר צעד. דברים שאפשר לעשות, לא תיאוריה.</p>
           </div>
-          <p className="text-zinc-400 text-sm md:text-base leading-relaxed mb-6 max-w-lg mx-auto">
-            טיפים, עדכוני AI ומה שאני לומד תוך כדי עבודה, ישירות ברשתות או במייל.
-          </p>
-          <SocialLinks className="justify-center" iconClassName="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-brand-400 hover:border-brand-500/40 transition-all outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" glyphClassName="w-5 h-5" />
+          <GlyphButton variant="line" to="/magazines">
+            <BookOpen className="h-4 w-4" aria-hidden="true" />
+            למדריכים
+          </GlyphButton>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="glass-panel glass-panel--flagship rounded-2xl p-8 md:p-12 text-center mb-16 max-w-4xl mx-auto">
-          <p className="font-display text-xl md:text-2xl font-bold text-white leading-relaxed mb-4">
-            "{rtl(ABOUT_COPY.quote)}"
-          </p>
-          <span className="text-brand-400 font-medium">— דניאל</span>
-        </motion.div>
-
-        <div className="bg-gradient-to-br from-brand-500/15 via-carbon-900 to-carbon-900 border border-brand-500/30 rounded-2xl p-7 md:p-10 mb-16 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right max-w-5xl mx-auto">
-          <div>
-            <h3 className="font-display font-bold text-xl md:text-2xl text-white mb-2">רוצים ללמוד לבד? יש מדריכים</h3>
-            <p className="text-zinc-400 max-w-md">מדריכים וחוברות על סוכני AI, צעד אחר צעד. דברים שאפשר לעשות, לא תיאוריה.</p>
-          </div>
-          <Link
-            to="/magazines"
-            className="shrink-0 inline-flex items-center gap-2 bg-brand-500 text-black font-bold rounded-full px-6 py-3.5 text-sm md:text-base hover:bg-brand-400 transition-colors"
-          >
-            <ShoppingBag className="w-4 h-4" />
-            למעבר לחנות
-          </Link>
-        </div>
-
-        <SectionHeading icon={ShieldCheck} title={rtl(ABOUT_COPY.ctaTitle)} description={rtl(ABOUT_COPY.ctaDescription)} />
-        <UnifiedCta
-          mailSubject="אפיון סוכן AI"
-          whatsappMessage="שלום דניאל, אשמח לשיחת אפיון ראשונית על סוכן AI."
-        />
+        <SectionHeading title={rtl(ABOUT_COPY.ctaTitle)} description={rtl(ABOUT_COPY.ctaDescription)} />
+        <UnifiedCta mailSubject="אפיון סוכן AI" whatsappMessage="שלום דניאל, אשמח לשיחת אפיון ראשונית על סוכן AI." />
       </div>
     </div>
   );

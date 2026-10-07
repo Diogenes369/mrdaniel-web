@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Check, Lock } from 'lucide-react';
 import { BOOKING, CODE, MAP_PLACES, MESSAGES, SITES, type ArtifactKind, type Mission } from './missions';
+import { rtl } from '../../lib/rtl';
 
 /**
  * What JARVIS produces at each step of a demo mission, drawn in the site's own materials: dotted
@@ -204,9 +205,8 @@ const SEND_PAUSE = 14;
 
 function MessagesArt({ state, ms, mission }: ArtProps) {
   const set = MESSAGES[mission === 'app' ? 'app' : 'sites'];
-  // Plain text, not rtl(): it isolates "09" and "30" of a time separately and the time then reads
-  // "30:09"; the browser keeps an unmarked time as one run.
-  const texts = set.items.map((m) => m.text);
+  // Bidi-anchored once (a time like 09:30 becomes one LTR isolate), then typed out mark by mark.
+  const texts = useMemo(() => set.items.map((m) => rtl(m.text)), [set]);
   const per = texts.map((t) => t.length + SEND_PAUSE);
   const total = per.reduce((a, b) => a + b, 0);
   const n = useBeats(state, total, (ms - 500) / total, 200);

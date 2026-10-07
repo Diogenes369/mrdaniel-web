@@ -181,7 +181,7 @@ function ModalBody({ item, onClose }: { item: NewsItem; onClose: () => void }) {
 
         <section className="lg:flex-1">
           <SectionTitle index="02" icon={Newspaper}>הכתבה</SectionTitle>
-          <div className="space-y-[1.4dvh] border-r-2 border-white/10 pr-4">
+          <div className="space-y-[1.4dvh] border-r border-dotted border-[var(--color-rule)] pr-4">
             {pending
               ? SKELETON_ROWS.map((w, i) => <span key={i} aria-hidden="true" className={`block h-4 animate-pulse rounded bg-white/[0.06] ${w}`} />)
               : paras.map((p, i) => (

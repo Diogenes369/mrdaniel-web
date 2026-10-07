@@ -357,9 +357,7 @@ export default function JarvisPage() {
                   {s.rows.map((r) => (
                     <div key={r.label} className="jv-sheet__row">
                       <dt>{r.label}</dt>
-                      {/* Plain on purpose: rtl() isolates the digits of "32GB" or "1TB" apart from the
-                          unit, and the pair then reads backwards; the browser keeps them as one run. */}
-                      <dd>{r.value}</dd>
+                      <dd>{rtl(r.value)}</dd>
                     </div>
                   ))}
                 </dl>

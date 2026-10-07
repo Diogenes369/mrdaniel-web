@@ -44,7 +44,9 @@ const STACK: Tech[] = [
   { name: 'Claude MCP', icon: Plug, detail: 'הדרך שבה סוכן מתחבר ליומן, למייל ולמסמכים שלכם, כמו שקע סטנדרטי לכל כלי.' },
   { name: 'RAG', icon: Database, detail: 'השיטה שגורמת ל-AI לענות מתוך המסמכים שלכם, במקום לנחש.' },
   { name: 'Python', icon: Braces, detail: 'שפת התכנות שבה אני כותב את רוב הסוכנים והאוטומציות.' },
-  { name: 'React Three Fiber', icon: Atom, detail: 'הכלי שבו בניתי את הרקע התלת-ממדי של האתר.' },
+  // Was React Three Fiber ("the 3D background of the site"); since 2026-10-01 the background is the
+  // glyph field, drawn with raw WebGL2 (src/components/field/).
+  { name: 'WebGL', icon: Atom, detail: 'הטכנולוגיה שמציירת את רקע האותיות החי של האתר, ישר בכרטיס המסך.' },
 ];
 
 interface Anchor {
@@ -56,19 +58,12 @@ interface Anchor {
 const POP_HALF_WIDTH = 150;
 
 /**
- * Glass pill, ultra-minimal. The previous chip was a heavy card — 1.3rem extra-bold text, a solid
- * `bg-white/[0.05]` block, a brand-tinted border and a permanent double drop-shadow — which read as
- * eleven competing buttons rather than one calm band. This is a hairline-bordered, blurred pill
- * that is nearly invisible at rest and lights brand-green only on hover/focus. No resting glow, no
+ * In the glyph world since 2026-10-07: a square chip on a dotted hairline (`.tech-chip`), quiet at
+ * rest, lit in the site's one green on hover or focus. It used to be a blurred glass pill that lit
+ * in the dashboard's neon (#00FF66), a second accent the site does not use. No resting glow, no
  * scale bounce: the only motion in the band is the scroll itself.
  */
-const CHIP_CLASS =
-  'tech-pill group inline-flex items-center gap-2.5 rounded-full border border-white/10 backdrop-blur-md ' +
-  'px-5 py-2.5 md:px-6 md:py-3 font-mono text-[0.8rem] md:text-[0.9rem] font-medium tracking-wide ' +
-  'whitespace-nowrap text-zinc-300 transition-all duration-300 ' +
-  'hover:border-[#00FF66]/50 hover:text-[#00FF66] ' +
-  'focus-visible:outline-none focus-visible:border-[#00FF66]/50 ' +
-  'focus-visible:text-[#00FF66]';
+const CHIP_CLASS = 'tech-chip';
 
 export default function TechMarquee() {
   const reduced = prefersReducedMotion();
@@ -168,11 +163,7 @@ export default function TechMarquee() {
         }}
         className={CHIP_CLASS}
       >
-        <Icon
-          className="h-4 w-4 shrink-0 text-zinc-500 transition-colors duration-300 group-hover:text-[#00FF66] group-focus-visible:text-[#00FF66]"
-          aria-hidden="true"
-          strokeWidth={1.75}
-        />
+        <Icon className="tech-chip__icon h-4 w-4 shrink-0" aria-hidden="true" strokeWidth={1.75} />
         {tech.name}
         {dup === 1 && <span className="sr-only"> (עותק)</span>}
       </button>
@@ -183,7 +174,7 @@ export default function TechMarquee() {
     <section className="relative py-20 md:py-28 overflow-x-clip cv-auto">
       <div className="container-wide relative z-10 mb-10 md:mb-14">
         <PopHeadline lead="הכלים" accent="שאני עובד איתם" className="mb-3 md:mb-4" />
-        <p className="text-sm md:text-base text-zinc-400">לחצו על כלי כדי לראות מה הוא עושה, במילים פשוטות.</p>
+        <p className="text-sm text-ink-muted md:text-base">לחצו על כלי כדי לראות מה הוא עושה, במילים פשוטות.</p>
       </div>
 
       {reduced ? (
@@ -217,7 +208,7 @@ export default function TechMarquee() {
           {active && isMobile && (
             <motion.div
               key="tech-modal"
-              className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+              className="modal-backdrop fixed inset-0 z-[95] flex items-center justify-center p-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -234,23 +225,23 @@ export default function TechMarquee() {
                 exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.12 } }}
                 transition={{ type: 'spring', damping: 24, stiffness: 240 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-[90vw] sm:max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border border-brand-500/25 bg-carbon-900 p-6 pt-14 text-right shadow-[0_30px_80px_rgba(0,0,0,0.8)]"
+                className="tech-pop relative max-h-[80vh] w-full max-w-[90vw] overflow-y-auto p-6 pt-14 text-right sm:max-w-md"
               >
                 <button
                   type="button"
                   onClick={close}
                   aria-label="סגירה"
-                  className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white transition-colors hover:border-brand-400/60 hover:text-brand-300"
+                  className="hdr-icon-btn hdr-icon-btn--framed absolute left-3 top-3"
                 >
                   <X className="w-5 h-5" />
                 </button>
                 <div className="mb-3 flex items-center gap-2.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-brand-500/30 bg-brand-500/10 text-brand-300">
-                    <active.icon className="w-5 h-5" aria-hidden="true" />
+                  <span className="frame-cell__icon" aria-hidden="true">
+                    <active.icon className="h-5 w-5" />
                   </span>
-                  <strong className="font-display text-lg font-extrabold text-white">{active.name}</strong>
+                  <strong className="font-type text-lg font-bold text-ink-paper">{active.name}</strong>
                 </div>
-                <p className="text-[15px] leading-relaxed text-zinc-300">{active.detail}</p>
+                <p className="text-[15px] leading-relaxed text-ink-muted">{active.detail}</p>
               </motion.div>
             </motion.div>
           )}
@@ -264,7 +255,7 @@ export default function TechMarquee() {
               exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.1 } }}
               transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
               dir="rtl"
-              className="pointer-events-none fixed z-[95] w-[300px] max-w-[calc(100vw-24px)] rounded-2xl border border-brand-500/25 bg-carbon-900/95 backdrop-blur-md p-4 text-right shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
+              className="tech-pop pointer-events-none fixed z-[95] w-[300px] max-w-[calc(100vw-24px)] p-4 text-right"
               style={{
                 left: anchor.x,
                 top: anchor.placement === 'top' ? anchor.y - 12 : anchor.y + 12,
@@ -272,10 +263,10 @@ export default function TechMarquee() {
               }}
             >
               <div className="mb-1.5 flex items-center gap-2">
-                <active.icon className="w-4 h-4 text-brand-400 shrink-0" aria-hidden="true" />
-                <strong className="font-display text-sm font-bold text-brand-300">{active.name}</strong>
+                <active.icon className="h-4 w-4 shrink-0 text-brand-400" aria-hidden="true" />
+                <strong className="font-type text-sm font-bold text-ink-paper">{active.name}</strong>
               </div>
-              <p className="text-[13px] leading-relaxed text-zinc-300">{active.detail}</p>
+              <p className="text-[13px] leading-relaxed text-ink-muted">{active.detail}</p>
             </motion.div>
           )}
         </AnimatePresence>,

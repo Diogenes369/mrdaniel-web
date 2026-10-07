@@ -412,7 +412,7 @@ function GuideArticle({
                 {s.cards.map((card, j) => (
                   <li
                     key={j}
-                    className="flex items-start gap-3 border-r-2 border-brand-500/40 bg-white/[0.02] py-2.5 pr-4 pl-3 text-[14px] leading-relaxed text-zinc-300"
+                    className="flex items-start gap-3 border-r border-dotted border-[rgba(143,212,0,0.6)] py-2.5 pr-4 pl-3 text-[14px] leading-relaxed text-zinc-300"
                   >
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
                     <span>{card}</span>
@@ -423,7 +423,7 @@ function GuideArticle({
 
             {/* Pull-quote on the opening section, so the article has one moment of emphasis. */}
             {i === 0 && s.cards[0] && (
-              <blockquote className="mt-6 border-r-2 border-brand-500 bg-brand-500/[0.04] py-3 pr-5 pl-4">
+              <blockquote className="mt-6 border-r border-dotted border-[rgba(143,212,0,0.6)] py-3 pr-5 pl-4">
                 <Quote className="mb-1.5 h-4 w-4 text-brand-500/70" />
                 <p className="font-display text-[15px] leading-relaxed font-semibold text-zinc-100">{s.cards[0]}</p>
               </blockquote>

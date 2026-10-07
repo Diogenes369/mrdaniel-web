@@ -7,8 +7,9 @@ import { ltr } from '../lib/rtl';
  * plain words, every term glossed once, nothing promised that the sources don't say. Order is shown
  * by layout (stairs, arrows), never by 01/02/03. Guarded by `npm run test:copy`.
  *
- * `ltr()` holds the few tokens rtl() can't anchor on its own: a handle ("@grok") and a name that
- * starts with a digit ("1Password"). Plan and model names render as their own LTR elements.
+ * `ltr()` holds the token rtl() can't anchor on its own, a handle ("@grok"); "1Password" predates
+ * rtl() anchoring digit-led names itself (2026-10-07) and is harmless. Plan and model names render
+ * as their own LTR elements.
  */
 
 export const GROK_GUIDE_URL = 'https://x.ai/news/introducing-grok-bot';

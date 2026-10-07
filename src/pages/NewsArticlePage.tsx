@@ -89,40 +89,36 @@ export default function NewsArticlePage() {
       />
       <div className="container mx-auto px-6 max-w-3xl">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <button
-            onClick={() => navigate('/news')}
-            className="group inline-flex items-center gap-2 text-sm font-medium text-zinc-400 hover:text-brand-400 transition-colors mb-8"
-          >
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          <button type="button" onClick={() => navigate('/news')} className="story-link mb-8 gap-2 text-[13px]">
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
             חזרה לחדשות
           </button>
 
-          <div className="flex items-center gap-3 flex-wrap mb-5">
-            <span className="px-3 py-1 text-xs font-mono font-bold tracking-widest border border-brand-500/30 bg-brand-500/10 rounded-full text-brand-400">
-              {item.source}
-            </span>
-            <span className="px-3 py-1 text-xs font-mono font-bold tracking-widest border border-white/10 rounded-full text-zinc-400">
-              {item.category}
-            </span>
-            <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-              <Clock className="w-3.5 h-3.5" />
+          {/* Source, category and time as one machine line, the site's metadata voice. */}
+          <p className="news-meta mb-5">
+            <span className="news-meta__source">{item.source}</span>
+            <span aria-hidden="true">·</span>
+            <span>{item.category}</span>
+            <span aria-hidden="true">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
               {formatRelativeTime(item.publishedAt)}
             </span>
-          </div>
+          </p>
 
-          <h1 dir="auto" className="font-display font-black text-3xl md:text-5xl leading-[1.15] text-white mb-8">
+          <h1 dir="auto" className="headline-plain mb-8 text-3xl leading-[1.12] text-ink-paper md:text-5xl">
             {item.title}
           </h1>
 
-          <div className="flex items-center gap-3 pb-8 mb-8 border-b border-white/10">
-            <span className="text-xs font-bold text-zinc-500">שיתוף:</span>
+          <div className="mb-8 flex items-center gap-3 border-b border-dotted border-[var(--color-rule)] pb-8">
+            <span className="font-type text-xs font-bold text-ink-faint">שיתוף</span>
             <a
               href={`https://wa.me/?text=${encodeURIComponent(`${item.title} ${window.location.href}`)}`}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="שיתוף בוואטסאפ"
               title="שיתוף בוואטסאפ"
-              className="w-10 h-10 flex items-center justify-center rounded-full border border-white/15 text-zinc-400 hover:border-brand-400/50 hover:text-brand-300 transition-colors"
+              className="hdr-icon-btn hdr-icon-btn--framed"
             >
               <MessageCircle className="w-4 h-4" />
             </a>
@@ -130,15 +126,14 @@ export default function NewsArticlePage() {
               onClick={handleCopyLink}
               aria-label="העתקת קישור לכתבה"
               title="העתקת קישור"
-              className="w-10 h-10 flex items-center justify-center rounded-full border border-white/15 text-zinc-400 hover:border-brand-400/50 hover:text-brand-300 transition-colors"
+              className="hdr-icon-btn hdr-icon-btn--framed"
             >
               {copied ? <Check className="w-4 h-4 text-brand-400" /> : <Copy className="w-4 h-4" />}
             </button>
           </div>
 
-          <div className="relative overflow-hidden glass-panel glass-panel--info rounded-2xl p-5 sm:p-6 lg:p-10 mb-10">
-            <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" aria-hidden="true" />
-            <p dir="auto" className="relative text-zinc-300 text-lg leading-[1.9]">
+          <div className="glyph-frame mb-10 p-5 sm:p-6 lg:p-10">
+            <p dir="auto" className="text-lg leading-[1.9] text-ink-muted">
               {summary}
             </p>
           </div>

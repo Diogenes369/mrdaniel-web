@@ -754,24 +754,53 @@ html.a11y-large-cursor * {
    vertical swipe over the band going straight to the page on Android. Pauses
    on hover; collapses to a static centered wrap under reduced-motion.
    --------------------------------------------------------------------------- */
-/* Glass-pill surface for the Arsenal marquee chips.
-   The pills carry `backdrop-blur-md`, but inside this marquee that filter is INERT: the
-   `mask-image` on `.tech-marquee__viewport` establishes a backdrop root, so a descendant's
-   `backdrop-filter` samples the (empty) masked subtree instead of the page behind it. Without a
-   real surface the pills sat directly on the 3D wireframe layer and the labels became unreadable
-   wherever a bright green edge passed behind them.
-   So the translucency is painted here instead: a dark base plus the white/3% glass film as a
-   second layer. Still see-through — the scene reads faintly through the pill — but the text
-   always has contrast. The blur utility is kept on the element because the reduced-motion
-   fallback renders the same chips OUTSIDE the masked viewport, where it does apply. */
-.tech-pill {
-  background-color: rgba(10, 12, 16, 0.55);
-  background-image: linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03));
-  transition: background-color 0.3s ease;
+/* The Arsenal chips (glyph world since 2026-10-07): a square chip on a dotted hairline, the ground
+   behind it so the label always has contrast over the field, lit in Field Green on hover or focus.
+   Its popover (desktop) and dialog (phones) are ground panels with a green hairline, no blur. */
+.tech-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1.15rem;
+  font-family: var(--font-type);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--color-ink-muted);
+  background: rgba(10, 11, 9, 0.88);
+  border: 1px dotted var(--color-rule);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
 }
-.tech-pill:hover,
-.tech-pill:focus-visible {
-  background-color: rgba(10, 12, 16, 0.72);
+.tech-chip:hover,
+.tech-chip:focus-visible {
+  color: var(--color-ink-paper);
+  border-color: rgba(143, 212, 0, 0.65);
+  outline: none;
+}
+.tech-chip:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 2px;
+}
+.tech-chip__icon {
+  color: var(--color-ink-faint);
+  transition: color 0.2s;
+}
+.tech-chip:hover .tech-chip__icon,
+.tech-chip:focus-visible .tech-chip__icon {
+  color: var(--color-brand-400);
+}
+@media (min-width: 768px) {
+  .tech-chip {
+    padding: 0.7rem 1.35rem;
+    font-size: 0.9rem;
+  }
+}
+.tech-pop {
+  background: var(--color-ground);
+  border: 1px solid rgba(143, 212, 0, 0.45);
 }
 
 .tech-marquee__viewport {
@@ -1114,9 +1143,6 @@ html.motion-reduced .learn-hero__caret {
   font-size: 0.92rem;
   color: var(--color-ink-faint);
 }
-.learn-hero__social.hdr-icon-btn {
-  border-color: var(--color-rule);
-}
 .learn-desk {
   display: none;
 }
@@ -1179,6 +1205,69 @@ html.motion-reduced .learn-hero__caret {
   font-size: 0.88rem;
   line-height: 1.6;
   color: var(--color-ink-muted);
+}
+/* The free guides under the opening: the homepage's file card, two side by side from 900px. */
+.learn-guides {
+  display: grid;
+  gap: 1.25rem;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 900px) {
+  .learn-guides {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.learn-guides > li {
+  display: flex;
+}
+.learn-guide {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+.learn-guide:hover {
+  border-color: rgba(143, 212, 0, 0.6);
+}
+.learn-guide__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  border-bottom: 1px dotted var(--color-rule);
+}
+.learn-guide__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 1.25rem 1.25rem 1.5rem;
+}
+.learn-guide__title {
+  margin: 0;
+  font-size: clamp(1.6rem, 1.2rem + 1vw, 2rem);
+  line-height: 1.15;
+  color: var(--color-ink-paper);
+  text-wrap: balance;
+}
+.learn-guide__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
+  margin-top: auto;
+  padding-top: 1.6rem;
+}
+.learn-guide__gate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 12.5px;
+  color: var(--color-ink-faint);
 }
 
 /* ══ Graceful degradation ═══════════════════════════════════════════════════════════════════════
@@ -1631,6 +1720,12 @@ html[data-glyph-headline="live"] .glyph-accent {
   color: var(--color-brand-400);
   text-decoration: underline dotted rgba(143, 212, 0, 0.55);
   text-underline-offset: 6px;
+}
+button.story-link {
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 .story-link:hover {
   color: #c8f46e;
@@ -2248,11 +2343,6 @@ h2.headline-plain {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-.tech-pill {
-  background-color: rgba(10, 11, 9, 0.88);
-  background-image: none;
-  font-family: var(--font-type);
-}
 
 html.motion-reduced .glass-chip__dot {
   animation: none;
@@ -2381,6 +2471,10 @@ html.motion-reduced .glass-chip__dot {
 .hdr-icon-btn:focus-visible {
   outline: 2px solid #c8f46e;
   outline-offset: 2px;
+}
+/* The same square icon button with its dotted frame showing at rest: social rows in page content. */
+.hdr-icon-btn.hdr-icon-btn--framed {
+  border-color: var(--color-rule);
 }
 /* Search reads as the machine's prompt: a dotted field with its shortcut. */
 .hdr-search {
@@ -5785,4 +5879,175 @@ html.motion-reduced .jv-chart__tip {
   color: var(--color-ink-paper);
   border-block: 1px dotted var(--color-rule);
   text-wrap: balance;
+}
+
+/* ── /about (glyph world since 2026-10-07; AboutPage.tsx) ──────────────────────────────────────
+   The lede under a dotted rule, the story as prose, the site's services as a directory in one
+   frame, the quote in the poster face, and two short rows (follow, learn alone). */
+.about-lede {
+  max-width: 50rem;
+  margin: 0 0 4.5rem;
+  padding-inline-start: 1.2rem;
+  border-inline-start: 1px dotted rgba(143, 212, 0, 0.6);
+  font-weight: 500;
+  font-size: clamp(1.15rem, 1rem + 0.6vw, 1.45rem);
+  line-height: 1.7;
+  color: var(--color-ink-paper);
+  text-wrap: pretty;
+}
+.about-hub__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.7rem 1.15rem;
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+  border-bottom: 1px dotted var(--color-rule);
+}
+.about-hub__list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.about-hub__list li + li {
+  border-top: 1px dotted var(--color-rule);
+}
+@media (min-width: 900px) {
+  .about-hub__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .about-hub__list li:nth-child(2) {
+    border-top: 0;
+  }
+  .about-hub__list li:nth-child(even) {
+    border-inline-start: 1px dotted var(--color-rule);
+  }
+}
+.about-hub__row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  height: 100%;
+  padding: 1.05rem 1.15rem;
+  transition: background-color 0.2s;
+}
+.about-hub__row:hover {
+  background: rgba(143, 212, 0, 0.04);
+}
+.about-hub__row:hover .frame-cell__icon {
+  border-color: rgba(143, 212, 0, 0.7);
+}
+.about-hub__row:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: -2px;
+}
+.about-hub__title {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-ink-paper);
+}
+.about-hub__text {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--color-ink-muted);
+}
+.about-hub__arrow {
+  flex: none;
+  color: var(--color-ink-faint);
+  transition:
+    color 0.2s,
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.about-hub__row:hover .about-hub__arrow {
+  color: var(--color-brand-400);
+  transform: translateX(-4px);
+}
+.about-quote {
+  max-width: 52rem;
+  margin-inline: auto;
+  text-align: center;
+}
+.about-quote__text {
+  margin: 0;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.7rem, 1.15rem + 1.9vw, 2.9rem);
+  line-height: 1.15;
+  color: var(--color-ink-paper);
+  text-wrap: balance;
+}
+.about-quote__by {
+  margin-top: 1rem;
+  font-family: var(--font-type);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-brand-400);
+}
+.about-quote__by::before {
+  content: '— ';
+}
+.about-follow,
+.about-learn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem 2.5rem;
+}
+.about-follow {
+  padding-block: 1.4rem;
+  border-block: 1px dotted var(--color-rule);
+}
+.about-learn {
+  padding: 1.5rem 1.4rem;
+}
+.about-follow__title {
+  margin: 0;
+  font-size: clamp(1.4rem, 1.1rem + 0.9vw, 1.9rem);
+  line-height: 1.15;
+  color: var(--color-ink-paper);
+}
+.about-follow__text {
+  margin: 0.45rem 0 0;
+  max-width: 36rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+}
+
+/* A news article's source, category and time: one line in the machine voice. */
+.news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.7rem;
+  font-family: var(--font-type);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.news-meta__source {
+  color: var(--color-brand-400);
+}
+
+/* Legal pages (PolicyPrimitives): each section a dotted frame; the contact section on a solid green
+   hairline, the way a lead sheet stands out. */
+.policy-section {
+  transition: border-color 0.2s;
+}
+.policy-section:hover {
+  border-color: rgba(143, 212, 0, 0.6);
+}
+.policy-section--contact {
+  border-style: solid;
+  border-color: rgba(143, 212, 0, 0.55);
 }

@@ -24,7 +24,7 @@ export function PolicyHero({ title, metaLabel, lead }: PolicyHeroProps) {
         <span className="text-zinc-600">•</span>
         <span>{metaLabel}</span>
       </div>
-      <div className="text-lg text-zinc-200 leading-[1.9] bg-carbon-900/60 border border-white/10 border-r-4 border-r-brand-500 rounded-xl p-6 md:p-7 space-y-4">
+      <div className="glyph-frame space-y-4 border-s border-solid border-s-[rgba(143,212,0,0.6)] p-6 text-lg leading-[1.9] text-ink-paper md:p-7">
         {lead}
       </div>
     </motion.div>
@@ -41,7 +41,7 @@ export function Toc({ items }: { items: TocItem[] }) {
   return (
     <nav
       aria-label="תוכן עניינים"
-      className="bg-carbon-800/80 border border-white/10 rounded-2xl p-6 mb-12 shadow-[0_10px_30px_rgba(0,0,0,0.4)]"
+      className="glyph-frame mb-12 p-6"
     >
       <div className="flex items-center gap-2 font-bold text-white text-lg mb-4">
         <List className="w-5 h-5 text-brand-400" />
@@ -81,11 +81,11 @@ export function PolicySection({
       id={id}
       className={
         contact
-          ? 'bg-carbon-900 border border-brand-500/40 rounded-2xl p-7 md:p-9 mb-14 scroll-mt-28'
-          : 'bg-carbon-900/50 border border-white/10 hover:border-brand-500/30 rounded-2xl p-7 md:p-9 mb-6 transition-colors scroll-mt-28'
+          ? 'glyph-frame policy-section policy-section--contact mb-14 scroll-mt-28 p-7 md:p-9'
+          : 'glyph-frame policy-section mb-6 scroll-mt-28 p-7 md:p-9'
       }
     >
-      <div className={`flex items-center gap-3 pb-4 mb-5 border-b ${contact ? 'border-brand-500/20' : 'border-white/10'}`}>
+      <div className="mb-5 flex items-center gap-3 border-b border-dotted border-[var(--color-rule)] pb-4">
         <div
           className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-mono font-bold text-base ${
             contact ? 'bg-brand-500 text-black' : 'bg-brand-500/15 border border-brand-500/40 text-brand-400'

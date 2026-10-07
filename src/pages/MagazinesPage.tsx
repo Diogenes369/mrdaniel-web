@@ -1,9 +1,7 @@
-import { useNavigate } from 'react-router-dom';
 import { Bell, ArrowLeft, Lock } from 'lucide-react';
 import GlyphButton from '../components/ui/GlyphButton';
 import SocialLinks from '../components/SocialLinks';
 import SiteBot from '../components/bots/SiteBot';
-import GuideCover from '../components/guides/GuideCover';
 import { LEARN_AI_COPY } from '../data/siteCopy';
 import { CREATOR_GUIDES } from '../data/creatorContent';
 import { useModelCatalog } from '../services/modelCatalogService';
@@ -17,8 +15,9 @@ import { rtl } from '../lib/rtl';
  *
  * Three things keep it from being a dead end: a "notify me" CTA (the site's lead modal, tagged so
  * the dashboard can filter these), the two free guides that already exist, and the social links.
- * The guide cards carry code-drawn 3D covers (GuideCover); the download itself asks for a free
- * sign-in on the guide page (2026-09-24).
+ * The guides are file cards (2026-10-07), as on the homepage: the real file name and size, the
+ * title, one line and the way in; the code-drawn 3D covers (GuideCover) stay on each guide's own
+ * page, where the download happens after a free sign-in (2026-09-24).
  *
  * The opening is in the glyph world since 2026-10-07, in the homepage hero's own form: the page's
  * name is the first line, and "בקרוב" is not typeset by the browser but built by the field out of
@@ -28,8 +27,14 @@ import { rtl } from '../lib/rtl';
  * explain"; that list now stands in a dotted frame on the open side, with one of the crew on it.
  * No sticky/pin (webview rule).
  */
+
+/** The real files behind /g/<slug> (public/guides/*.pdf): 739,978 and 1,184,816 bytes. */
+const GUIDE_META: Record<string, string> = {
+  'ai-business-automations-2026': 'PDF · 740KB',
+  'ai-learning-guide-2026': 'PDF · 1.2MB',
+};
+
 export default function MagazinesPage() {
-  const navigate = useNavigate();
   const { data: catalog } = useModelCatalog();
   const c = LEARN_AI_COPY;
   const models = (catalog?.frontier ?? []).slice(0, 4);
@@ -37,6 +42,7 @@ export default function MagazinesPage() {
   const quietLead = useFieldQuiet();
   const quietBody = useFieldQuiet();
   const quietDesk = useFieldQuiet();
+  const quietFree = useFieldQuiet();
 
   const notify = () =>
     window.dispatchEvent(
@@ -52,7 +58,8 @@ export default function MagazinesPage() {
             <h1 id="learn-title" className="story-h1">
               <span ref={quietLead} className="story-h1__lead">
                 {rtl(c.kicker)}
-              </span>
+              </span>{' '}
+              {/* The space keeps the accessible name "לומדים AI בקרוב" two words apart. */}
               <span className="learn-hero__line">
                 <span ref={headline} className="glyph-accent">
                   {c.headline}
@@ -76,7 +83,7 @@ export default function MagazinesPage() {
               </div>
               <div className="learn-hero__follow" data-live="rise" data-live-delay="280">
                 <span>{c.followCta}</span>
-                <SocialLinks iconClassName="hdr-icon-btn learn-hero__social" channels={['instagram', 'threads', 'tiktok', 'x', 'linkedin']} />
+                <SocialLinks iconClassName="hdr-icon-btn hdr-icon-btn--framed" channels={['instagram', 'threads', 'tiktok', 'x', 'linkedin']} />
               </div>
             </div>
           </div>
@@ -109,38 +116,54 @@ export default function MagazinesPage() {
       </section>
 
       {/* ── Meanwhile: the free guides that already exist ─────────────────────────────────── */}
-      <section className="container-wide relative z-10" dir="rtl" aria-labelledby="learn-free-title">
-        <div className="mx-auto mb-8 max-w-3xl text-center">
-          <h2 id="learn-free-title" className="font-display text-2xl font-black text-white md:text-3xl">
+      {/* Each guide is the homepage's file card (StartBeat): the real file name and size, the title,
+          one line, and the way in. The download is gated behind a free sign-in (GuideDownloadPage),
+          and the card says so before the click, so the form is expected rather than a surprise. */}
+      <section className="container-wide relative z-10" aria-labelledby="learn-free-title">
+        <div ref={quietFree} className="max-w-3xl">
+          <h2 id="learn-free-title" className="story-h2">
             {rtl(c.freeTitle)}
           </h2>
-          <p className="mt-2 text-zinc-400">{rtl(c.freeSub)}</p>
+          <div className="mt-4 flex items-center gap-2" aria-hidden="true">
+            <span className="story-statusbar__live" />
+            <span className="h-px w-20 border-t border-dotted border-[var(--color-rule)]" />
+          </div>
+          <p className="story-body mt-5" data-live="rise">
+            {rtl(c.freeSub)}
+          </p>
         </div>
-        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-5 md:grid-cols-2" data-live="stagger">
+        <ul className="learn-guides" data-live="stagger">
           {CREATOR_GUIDES.map((g) => (
-            <button
-              key={g.slug}
-              type="button"
-              onClick={() => navigate(`/g/${g.slug}`)}
-              className="glass-panel glass-panel--marketing group flex h-full flex-col items-start rounded-2xl p-6 text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
-            >
-              {/* Code-drawn cover (GuideCover), not an image — see the component for why. */}
-              <GuideCover slug={g.slug} title={g.title} style={g.cover} className="mx-auto mb-2 max-w-[17rem]" />
-              <h3 className="mb-2 font-display text-lg font-bold text-white">{rtl(g.title)}</h3>
-              <p className="mb-5 flex-grow text-zinc-400">{rtl(g.blurb)}</p>
-              <span className="inline-flex items-center gap-1.5 text-sm font-bold text-brand-300 group-hover:text-brand-200">
-                להורדה חינם
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              </span>
-              {/* The download is gated behind a free sign-in (GuideDownloadPage) — say so before the
-                  click, so the modal is expected rather than a bait-and-switch. */}
-              <span className="mt-2 inline-flex items-center gap-1 text-xs text-zinc-500">
-                <Lock className="h-3 w-3" aria-hidden="true" />
-                בהרשמה חינמית עם Google או אימייל
-              </span>
-            </button>
+            <li key={g.slug}>
+              <article className="glyph-frame file-card learn-guide">
+                <header className="learn-guide__bar">
+                  <bdi dir="ltr" className="truncate font-type">
+                    {g.slug}.pdf
+                  </bdi>
+                  {GUIDE_META[g.slug] && (
+                    <bdi dir="ltr" className="shrink-0 font-type">
+                      {GUIDE_META[g.slug]}
+                    </bdi>
+                  )}
+                </header>
+                <div className="learn-guide__body">
+                  <h3 className="poster learn-guide__title">{rtl(g.title)}</h3>
+                  <p className="story-body mt-3 !text-[15px]">{rtl(g.blurb)}</p>
+                  <div className="learn-guide__actions">
+                    <GlyphButton variant="line" to={`/g/${g.slug}`}>
+                      להורדה חינם
+                      <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                    </GlyphButton>
+                    <span className="learn-guide__gate">
+                      <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                      בהרשמה חינמית עם Google או אימייל
+                    </span>
+                  </div>
+                </div>
+              </article>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
     </div>
   );

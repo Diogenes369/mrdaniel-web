@@ -135,21 +135,21 @@ export default function TermTooltip({
         isMobile &&
         createPortal(
           <div
-            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm md:hidden"
+            className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center p-4 md:hidden"
             onClick={() => setOpenId(null)}
           >
             <div
               role="dialog"
               aria-modal="true"
               aria-labelledby={`${id}-t`}
-              className="relative w-[90vw] max-w-sm rounded-2xl border border-white/15 bg-carbon-900 p-5 text-right shadow-2xl"
+              className="tech-pop relative w-[90vw] max-w-sm p-5 text-right"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 type="button"
                 onClick={() => setOpenId(null)}
                 aria-label="סגירה"
-                className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white transition-colors hover:border-brand-400/60 hover:text-brand-300"
+                className="hdr-icon-btn hdr-icon-btn--framed absolute left-3 top-3"
               >
                 <X className="w-4 h-4" />
               </button>
