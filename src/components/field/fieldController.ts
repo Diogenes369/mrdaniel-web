@@ -106,14 +106,17 @@ export function startField(canvas: HTMLCanvasElement, opts: FieldOptions): () =>
   let maskOn = false;
   let maskBuiltSize = '';
   let maskStart = 0;
+  let maskEl: HTMLElement | null = null;
   const buildMask = (): boolean => {
     const el = fieldState.headline;
     if (!renderer || !el) return false;
     const cs = getComputedStyle(el);
     const fontPx = parseFloat(cs.fontSize) || 0;
-    // The headline is drawn on its own sub-grid (pass 2), so count rows of sub-cells.
+    // The headline is drawn on its own sub-grid (pass 2), so count rows of sub-cells. A ring mark
+    // is a short run of Latin capitals, which read at seven rows (a dot-matrix display's height),
+    // so it can be built at sizes where a Hebrew headline could not.
     const rows = (fontPx * 0.68) / renderer.subCell[1];
-    if (rows < MIN_ROWS_PER_LETTER) return false;
+    if (rows < (el.dataset.glyphRing !== undefined ? 7 : MIN_ROWS_PER_LETTER)) return false;
     const box = el.getBoundingClientRect();
     if (box.width < 1 || box.height < 1) return false;
     const c = document.createElement('canvas');
@@ -127,10 +130,29 @@ export function startField(canvas: HTMLCanvasElement, opts: FieldOptions): () =>
     ctx.strokeStyle = '#fff';
     ctx.lineJoin = 'round';
     ctx.lineWidth = fontPx * 0.035;
+    // A mark with a ring (data-glyph-ring, the J.A.R.V.I.S mark on /jarvis): the ring first, then
+    // the band the name runs through is cleared, so the ring breaks where the name crosses it.
+    if (el.dataset.glyphRing !== undefined) {
+      const ring = Math.max(2, fontPx * 0.07);
+      const cx = c.width / 2;
+      const cy = c.height / 2;
+      ctx.lineWidth = ring;
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.min(cx, cy) - ring, 0, Math.PI * 2);
+      ctx.stroke();
+      const band = fontPx * 1.05;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, cy - band / 2, c.width, band);
+      ctx.fillStyle = '#fff';
+      ctx.lineWidth = fontPx * 0.035;
+    }
     // The stretch rides in the font shorthand: canvas has no reliable font-variation API.
     ctx.font = `${cs.fontWeight} ${STRETCH[cs.fontStretch] ?? ''} ${fontPx}px ${cs.fontFamily}`;
-    ctx.direction = 'rtl';
-    ctx.textAlign = 'right';
+    // Drawn in the element's own direction: an LTR mark set right-aligned in RTL would carry its
+    // trailing punctuation to the wrong end (the deck's field had "MR. DANIEL" come out ".MR").
+    const ltr = cs.direction === 'ltr';
+    ctx.direction = ltr ? 'ltr' : 'rtl';
+    ctx.textAlign = ltr ? 'left' : 'right';
     ctx.textBaseline = 'alphabetic';
     // Draw word by word at the positions the browser actually laid them out, so the glyph letters
     // sit exactly where the (transparent) real text is — selection and wrapping stay the DOM's.
@@ -145,7 +167,7 @@ export function startField(canvas: HTMLCanvasElement, opts: FieldOptions): () =>
         const r = range.getBoundingClientRect();
         if (r.width < 1) continue;
         const ascent = ctx.measureText(m[0]).fontBoundingBoxAscent || fontPx * 0.9;
-        const x = r.right - box.left;
+        const x = ltr ? r.left - box.left : r.right - box.left;
         const y = r.top - box.top + ascent;
         ctx.strokeText(m[0], x, y);
         ctx.fillText(m[0], x, y);
@@ -165,7 +187,16 @@ export function startField(canvas: HTMLCanvasElement, opts: FieldOptions): () =>
     maskDirty = false;
     maskVersion = fieldState.headlineVersion;
     const ok = buildMask();
-    if (ok && !maskOn) maskStart = now + 280;
+    // A page can hand the headline from one element to another (the J.A.R.V.I.S ring returns
+    // further down /jarvis): the new one assembles from the noise again, and only the element the
+    // field is drawing goes transparent (data-glyph-live), so the other keeps its solid look.
+    if (ok && (!maskOn || el !== maskEl)) maskStart = now + 280;
+    if (maskEl && maskEl !== el) delete maskEl.dataset.glyphLive;
+    if (el) {
+      if (ok) el.dataset.glyphLive = '';
+      else delete el.dataset.glyphLive;
+    }
+    maskEl = el;
     if (ok !== maskOn) {
       maskOn = ok;
       opts.onHeadlineLive(ok);
@@ -392,6 +423,7 @@ export function startField(canvas: HTMLCanvasElement, opts: FieldOptions): () =>
     document.fonts?.removeEventListener?.('loadingdone', onFonts);
     canvas.removeEventListener('webglcontextlost', onLost);
     canvas.removeEventListener('webglcontextrestored', onRestored);
+    if (maskEl) delete maskEl.dataset.glyphLive;
     opts.onHeadlineLive(false);
     renderer?.dispose();
     renderer = null;

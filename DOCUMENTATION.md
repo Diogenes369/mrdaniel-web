@@ -56,7 +56,7 @@ src/
 │   ├── home/               # OfferSection, PricingSection, RoiCalculator
 │   ├── content/            # ContentPrimitives (SectionHeading, ServiceGrid…), AgentFinder,
 │   │                        #   AIPulseWidget, CaseStudies, EnterpriseServicesSection, VideoEmbed,
-│   │                        #   JarvisShowcaseVideo, ProjectEstimator, TermTooltip
+│   │                        #   ProjectEstimator, TermTooltip
 │   ├── mobile/             # ScrollLockRail (native overflow-x, touch-action: pan-x), SwipeRow
 │   ├── seo/                # Seo (upsert של תגי head), RouteSeo
 │   ├── TechMarquee.tsx     # מרקיזה CSS אינסופית + פופאובר פורטל / מודל מובייל

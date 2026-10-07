@@ -1,21 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence, type Transition } from 'motion/react';
 import { panelMotion } from '../lib/modalMotion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, Shuffle, Search, ListChecks, SquareTerminal } from 'lucide-react';
-import WebButton from './WebButton';
+import { Menu, X, Shuffle, Search, ListChecks, SquareTerminal, Ellipsis } from 'lucide-react';
+import GlyphButton from './ui/GlyphButton';
 import SocialLinks from './SocialLinks';
 import Logo from './Logo';
+import SiteBot from './bots/SiteBot';
 import { smoothScrollTo, scrollToTopSmooth } from '../hooks/useLenis';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useFieldQuiet } from './field/fieldState';
 
-// TikTok and WhatsApp stay exclusive to the footer and the bottom-of-page social bar — the header
-// toolbar and mobile drawer keep just these three.
+/**
+ * The site's header, in the glyph world since 2026-10-07: one line of chrome over the field.
+ *
+ * At the top level only what a visitor reaches for: the logo, the sections, search and the one
+ * action (the personal-agent qualifier). Everything else the old toolbar carried (a random page,
+ * the terminal mode, the social links) lives one click away in the "more" panel, so the row stays
+ * calm. A Field Green bar under the links is the cursor: it springs to the link under the pointer
+ * and settles back under the page you are on.
+ *
+ * The header steps out of the way while you read down and comes back the moment you scroll up
+ * (never while the menu, the panel or a keyboard focus is inside it). It is fixed, not sticky, so
+ * Instagram and Facebook webviews are fine with it.
+ */
+
+// TikTok and WhatsApp stay exclusive to the footer and the bottom-of-page social bar.
 const HEADER_SOCIAL_CHANNELS = ['instagram', 'linkedin', 'mail'] as const;
 
-// Consolidated to the core offerings only. אודות stays a live route and remains in the footer. "צור קשר" is an action, not a route — it opens the lead
-// modal (the site's contact funnel).
+// "צור קשר" is an action, not a route: it opens the lead modal (the site's contact funnel).
 type NavLink = { name: string; to?: string; action?: 'contact' };
 const navLinks: NavLink[] = [
   { name: 'סוכני AI', to: '/ai' },
@@ -23,59 +37,62 @@ const navLinks: NavLink[] = [
   // Added 2026-10-06: the live Grok Bot deck (public/grok-deck) on its own page.
   { name: 'סוכן GROK', to: '/grok' },
   { name: 'לומדים AI', to: '/magazines' },
-  // Restored 2026-09-27 at Daniel's request (removed in fe0311e): /news is the full live feed, and
-  // the ticker it relied on instead is desktop-only, so phones had no visible way in.
+  // Restored 2026-09-27 at Daniel's request: /news is the full live feed, and the ticker is
+  // desktop-only, so phones need a visible way in.
   { name: 'חדשות', to: '/news' },
   { name: 'דברו איתי', action: 'contact' },
 ];
 
-// "Surprise me" destinations for the shuffle toolbar icon.
-const SHUFFLE_DESTINATIONS = [
-  '/magazines',
-  '/ai',
-  '/jarvis',
-  '/grok',
-  '/about',
-  '/news',
-];
+// "Surprise me" destinations, now in the more panel and the mobile menu.
+const SHUFFLE_DESTINATIONS = ['/magazines', '/ai', '/jarvis', '/grok', '/about', '/news'];
 
-// No native browser focus ring anywhere in the header — that default ring reads as a stray white
-// outline against this dark theme, especially noticeable while the header's own background is
-// mid-transition on scroll. Replaced with a branded green ring, and only via `focus-visible` so
-// it never flashes on an ordinary mouse click, only on real keyboard focus.
-const FOCUS_SAFE_CLASS = 'outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 focus-visible:ring-offset-0';
-
-// Desktop top toolbar (Shuffle/Search/Social): icon-only, no background circle or border — a
-// soft box-shadow glow on hover (visible even with a transparent fill) is the only affordance.
-const DESKTOP_ICON_CLASS =
-  `w-11 h-11 rounded-none flex items-center justify-center text-zinc-300 hover:text-brand-400 transition-all duration-300 cursor-pointer ${FOCUS_SAFE_CLASS}`;
-
-// How long the mobile drawer's own exit fade takes — routing/scroll is deliberately delayed by
-// this long after a nav click (see handleMobileNavClick) so the drawer finishes closing BEFORE
-// the route/section transition starts, instead of both animating over each other at once (the
-// cause of the reported "flash"/jump — the incoming page fading in while the drawer overlay was
-// still fading out on top of it).
+// How long the mobile menu's exit takes: a nav tap navigates only after it has closed, so the
+// incoming page never fades in under a menu that is still fading out.
 const DRAWER_EXIT_MS = 280;
+
+const CARET: Transition = { type: 'spring', stiffness: 520, damping: 38, mass: 0.7 };
+const SLIDE: Transition = { type: 'spring', stiffness: 380, damping: 40, mass: 0.8 };
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+function isCurrent(pathname: string, to?: string) {
+  return !!to && (pathname === to || pathname.startsWith(to + '/'));
+}
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  // The live news ticker (NewsTicker.tsx) sits above the header in normal flow. The header is
-  // fixed but is NOT bundled into that sticky ticker — instead it glues its own `top` to the
-  // ticker's bottom edge (top = tickerHeight - scrollY, clamped at 0) so the ticker scrolls
-  // fully away and then only the compact header stays pinned. No CSS transition on `top`: the
-  // scroll handler updates it every frame so it tracks the ticker 1:1 with no gap or overlap.
+  const [moreOpen, setMoreOpen] = useState(false);
+  // The live ticker (NewsTicker.tsx) sits above the header in normal flow, desktop only. The
+  // header is fixed and glues its own top to the ticker's bottom edge (top = tickerHeight - scrollY,
+  // clamped at 0), so the ticker scrolls away and only the header row stays.
   const [tickerOffset, setTickerOffset] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+  const headerRef = useRef<HTMLElement>(null);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
+  const morePanelRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const lock = useRef(false);
+  lock.current = mobileOpen || moreOpen;
 
   useEffect(() => {
     const bar = document.getElementById('news-ticker-bar');
     let barHeight = bar?.offsetHeight ?? 0;
+    let lastY = window.scrollY;
 
     const apply = () => {
-      setScrolled(window.scrollY > 80);
-      setTickerOffset(Math.max(0, barHeight - window.scrollY));
+      const y = window.scrollY;
+      setScrolled(y > 24);
+      setTickerOffset(Math.max(0, barHeight - y));
+      const dy = y - lastY;
+      if (Math.abs(dy) < 6) return;
+      lastY = y;
+      // Away while reading down, back on the first scroll up. A focus inside the header (keyboard
+      // users tabbing through it) or an open menu keeps it in place.
+      const focusInside = !!headerRef.current?.contains(document.activeElement);
+      setHidden(dy > 0 && y > 360 && !lock.current && !focusInside);
     };
     apply();
 
@@ -97,23 +114,19 @@ export default function Header() {
     };
   }, []);
 
+  // A new page starts with the header in view and every panel closed.
+  useEffect(() => {
+    setHidden(false);
+    setMoreOpen(false);
+  }, [location.pathname]);
+
   const openAgent = () => window.dispatchEvent(new CustomEvent('open-agent-qualifier'));
+  const openPalette = () => window.dispatchEvent(new CustomEvent('open-command-palette'));
+  const openCli = () => window.dispatchEvent(new CustomEvent('open-cli'));
+  const openContact = () =>
+    window.dispatchEvent(new CustomEvent('open-lead-modal', { detail: { subject: 'יצירת קשר', sourceSection: 'Navbar' } }));
 
-  const handleCtaClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    openAgent();
-  };
-
-  const openContact = () => {
-    window.dispatchEvent(
-      new CustomEvent('open-lead-modal', { detail: { subject: 'יצירת קשר', sourceSection: 'Navbar' } })
-    );
-  };
-
-  // Already home → smooth-scroll to top (a normal <Link to="/"> click does nothing when the path
-  // doesn't change). Anywhere else → let the Link navigate home normally; RouteScrollManager's
-  // existing instant reset-to-top on route change already handles that case consistently with
-  // every other nav link, so it's deliberately left alone here.
+  // Already home → smooth-scroll to top (a <Link to="/"> does nothing when the path is the same).
   const handleLogoClick = (e: React.MouseEvent) => {
     if (location.pathname === '/') {
       e.preventDefault();
@@ -121,39 +134,8 @@ export default function Header() {
     }
   };
 
-  const handleNavClick = (e: React.MouseEvent, to: string) => {
-    if (!to.startsWith('/#')) return;
-    e.preventDefault();
-    const hash = to.slice(1);
-    if (location.pathname === '/') {
-      smoothScrollTo(hash);
-    } else {
-      navigate('/' + hash);
-    }
-  };
-
-  const goTo = (to: string) => {
-    if (to.startsWith('/#')) {
-      const hash = to.slice(1);
-      if (location.pathname === '/') smoothScrollTo(hash);
-      else navigate('/' + hash);
-    } else {
-      navigate(to);
-    }
-  };
-
-  const handleShuffle = () => {
-    const pick = SHUFFLE_DESTINATIONS[Math.floor(Math.random() * SHUFFLE_DESTINATIONS.length)];
-    goTo(pick);
-  };
-
-  // Closes the drawer first, then navigates only after its exit fade has finished — see
-  // DRAWER_EXIT_MS. Handles both hash-scroll links and normal routes, unlike handleNavClick (which
-  // only intercepts hash links and otherwise defers to <Link>'s default, immediate navigation).
-  const handleMobileNavClick = (e: React.MouseEvent, to: string) => {
-    e.preventDefault();
-    setMobileOpen(false);
-    window.setTimeout(() => {
+  const goTo = useCallback(
+    (to: string) => {
       if (to.startsWith('/#')) {
         const hash = to.slice(1);
         if (location.pathname === '/') smoothScrollTo(hash);
@@ -161,243 +143,328 @@ export default function Header() {
       } else {
         navigate(to);
       }
-    }, DRAWER_EXIT_MS);
+    },
+    [location.pathname, navigate]
+  );
+
+  const handleNavClick = (e: React.MouseEvent, to: string) => {
+    if (!to.startsWith('/#')) return;
+    e.preventDefault();
+    goTo(to);
   };
 
-  // Lock background scroll while the drawer is open — it's now a fully opaque h-dvh overlay, so a
-  // stray touch on it shouldn't be able to scroll the page behind it.
-  // Shared, reference-counted — see useBodyScrollLock for why a local
-  // save/restore of body.style.overflow permanently locked the page when overlays
-  // overlapped.
+  const shuffle = () => goTo(SHUFFLE_DESTINATIONS[Math.floor(Math.random() * SHUFFLE_DESTINATIONS.length)]);
+
+  // Closes the menu first and acts only after its exit has finished (see DRAWER_EXIT_MS).
+  const afterDrawer = (fn: () => void) => {
+    setMobileOpen(false);
+    window.setTimeout(fn, DRAWER_EXIT_MS);
+  };
+
   useBodyScrollLock(mobileOpen);
   // The glyph field steps back behind the nav row so its words never run through the links.
   const quietBar = useFieldQuiet();
 
+  // ── the cursor under the links ────────────────────────────────────────────────────────────────
+  const navRef = useRef<HTMLElement>(null);
+  const itemRefs = useRef(new Map<string, HTMLElement>());
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  const activeKey = navLinks.find((l) => isCurrent(location.pathname, l.to))?.name ?? null;
+  const targetKey = hoverKey ?? activeKey;
+  const [caret, setCaret] = useState<{ x: number; w: number } | null>(null);
+  const measure = useCallback(() => {
+    const el = targetKey ? itemRefs.current.get(targetKey) : null;
+    setCaret(el ? { x: el.offsetLeft, w: el.offsetWidth } : null);
+  }, [targetKey]);
+  useLayoutEffect(measure, [measure, scrolled]);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(nav);
+    document.fonts?.ready.then(() => measure());
+    return () => ro.disconnect();
+  }, [measure]);
+
+  // ── the more panel ────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (morePanelRef.current?.contains(t) || moreBtnRef.current?.contains(t)) return;
+      setMoreOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setMoreOpen(false);
+      moreBtnRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [moreOpen]);
+
+  const fromMore = (fn: () => void) => () => {
+    setMoreOpen(false);
+    fn();
+  };
+
   return (
     <motion.header
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      className={`fixed inset-x-0 z-40 pt-safe border-none outline-none transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        scrolled
-          ? 'bg-ground border-b border-dotted border-[var(--color-rule)] py-2 lg:bg-transparent lg:border-transparent lg:py-4'
-          : 'bg-transparent py-6 md:py-8'
-      }`}
-      style={{ top: tickerOffset, willChange: 'transform, opacity, background-color' }}
+      ref={headerRef}
+      initial={{ y: -90 }}
+      animate={{ y: hidden ? '-115%' : 0 }}
+      transition={SLIDE}
+      className={`site-header ${scrolled ? 'is-scrolled' : ''}`}
+      style={{ top: tickerOffset }}
     >
-      <div className="container-wide">
-        {/* Desktop-only: on scroll this row condenses from a full-width bar into a floating
-            glassmorphism capsule (w-fit + rounded-none + its own bg/border/glow) — the outer
-            <header> above sheds its own background at the lg breakpoint so the capsule reads as
-            a detached floating island rather than a bar-within-a-bar. Below lg, none of the
-            capsule classes apply and this is just the existing full-width scrolled bar. */}
-        <div
-          ref={quietBar}
-          className={`flex items-center justify-between gap-3 outline-none lg:border lg:rounded-none transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
-            scrolled
-              ? 'lg:w-fit lg:mx-auto lg:gap-5 lg:bg-ground lg:border-dotted lg:border-[var(--color-rule)] lg:py-2 lg:px-6'
-              : 'lg:border-transparent'
-          }`}
-          style={{ willChange: 'transform, opacity, background-color' }}
-        >
-          <Link
-            to="/"
-            onClick={handleLogoClick}
-            className={`relative flex items-center shrink-0 group z-50 rounded-lg ${FOCUS_SAFE_CLASS}`}
-            style={{ willChange: 'transform, opacity' }}
-          >
-            <Logo
-              className="relative group-hover:scale-105 transition-transform duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
-              iconClassName={scrolled ? 'h-8 lg:h-7' : 'h-9 md:h-10'}
-              textClassName={`text-base md:text-lg ${scrolled ? 'hidden lg:inline' : 'hidden sm:inline'}`}
-            />
-          </Link>
+      <div ref={quietBar} className="container-wide site-header__row">
+        <Link to="/" onClick={handleLogoClick} className="site-header__logo" aria-label="MR. DANIEL, לעמוד הבית">
+          <Logo iconClassName={scrolled ? 'h-7 md:h-8' : 'h-8 md:h-10'} textClassName="text-base md:text-lg" />
+        </Link>
 
-          <nav className={`hidden lg:flex items-center shrink-0 transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${scrolled ? 'gap-4 xl:gap-5' : 'gap-5 xl:gap-8'}`}>
-            {navLinks.map((link) =>
-              link.action === 'contact' ? (
-                <button
-                  key={link.name}
-                  type="button"
-                  onClick={openContact}
-                  className={`nav-link cursor-pointer ${FOCUS_SAFE_CLASS}`}
-                >
-                  {link.name}
-                </button>
-              ) : (
-                <Link
-                  key={link.name}
-                  to={link.to!}
-                  onClick={(e) => handleNavClick(e, link.to!)}
-                  aria-current={location.pathname === link.to ? 'page' : undefined}
-                  className={`nav-link ${FOCUS_SAFE_CLASS}`}
-                >
-                  {link.name}
-                </Link>
-              )
-            )}
-          </nav>
+        <nav ref={navRef} className="site-nav" aria-label="ניווט ראשי" onMouseLeave={() => setHoverKey(null)}>
+          {navLinks.map((link) => {
+            const common = {
+              ref: (el: HTMLElement | null) => {
+                if (el) itemRefs.current.set(link.name, el);
+                else itemRefs.current.delete(link.name);
+              },
+              onMouseEnter: () => setHoverKey(link.name),
+              onFocus: () => setHoverKey(link.name),
+              onBlur: () => setHoverKey(null),
+              className: 'nav-link',
+            };
+            return link.action === 'contact' ? (
+              <button key={link.name} type="button" onClick={openContact} {...common}>
+                {link.name}
+              </button>
+            ) : (
+              <Link
+                key={link.name}
+                to={link.to!}
+                onClick={(e) => handleNavClick(e, link.to!)}
+                aria-current={isCurrent(location.pathname, link.to) ? 'page' : undefined}
+                {...common}
+              >
+                {link.name}
+              </Link>
+            );
+          })}
+          <motion.span
+            className="site-nav__caret"
+            aria-hidden="true"
+            initial={false}
+            animate={caret ? { x: caret.x, width: caret.w, opacity: 1 } : { opacity: 0 }}
+            transition={CARET}
+          />
+        </nav>
 
-          <div className={`flex items-center shrink-0 transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${scrolled ? 'gap-2' : 'gap-2 md:gap-3'}`}>
-            {/* Geektime-style utility toolbar */}
-            <div className="hidden sm:flex items-center gap-1">
-              <motion.button
-                onClick={handleShuffle}
-                whileHover={{ rotate: 15, scale: 1.08 }}
-                whileTap={{ scale: 0.9, rotate: -15 }}
-                className={DESKTOP_ICON_CLASS}
-                aria-label="גלישה אקראית"
-                title="הפתעה אקראית"
-              >
-                <Shuffle className="w-4 h-4" />
-              </motion.button>
-              <motion.button
-                onClick={() => window.dispatchEvent(new CustomEvent('open-command-palette'))}
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.9 }}
-                className={DESKTOP_ICON_CLASS}
-                aria-label="חיפוש מהיר"
-                title="חיפוש מהיר (Ctrl+K)"
-              >
-                <Search className="w-4 h-4" />
-              </motion.button>
-              <SocialLinks iconClassName={DESKTOP_ICON_CLASS} channels={[...HEADER_SOCIAL_CHANNELS]} />
-            </div>
-            {/* The header's one emphasised action. Square, one ink, no glow or sparkle (2026-10-01). */}
-            <div className="hidden lg:block relative">
-              <WebButton
-                variant="ghost"
-                onClick={handleCtaClick}
-                className="!min-h-9 !px-4 !text-xs"
-              >
-                <ListChecks size={14} aria-hidden="true" />
-                סוכן התאמה אישי
-              </WebButton>
-            </div>
+        <div className="site-header__tools">
+          <button type="button" className="hdr-search" onClick={openPalette} aria-keyshortcuts={isMac ? 'Meta+K' : 'Control+K'}>
+            <Search size={15} aria-hidden="true" />
+            <span className="hdr-search__label">חיפוש</span>
+            <kbd className="hdr-search__kbd" dir="ltr">
+              {isMac ? '⌘K' : 'Ctrl K'}
+            </kbd>
+          </button>
 
-            {/* `>_ CLI` — desktop only (>= lg). Wrapped in a `hidden lg:block` div rather than
-                putting `hidden` on the WebButton itself: WebButton hardcodes `inline-flex` in its
-                base class, which fought `hidden` and let the pill leak into the mobile header.
-                Directly LEFT of the personal-agent CTA (RTL: next in DOM); mirrors its pill shape
-                via <WebButton variant="ghost"> in the brand ink (one ink in the header since 2026-10-01). */}
-            <div className="hidden lg:block">
-              <WebButton
-                variant="ghost"
-                onClick={() => window.dispatchEvent(new CustomEvent('open-cli'))}
-                aria-label="מצב טרמינל · CLI"
-                className="!min-h-9 !px-4 !text-xs"
-              >
-                <SquareTerminal size={14} />
-                {'>_ CLI'}
-              </WebButton>
-            </div>
-
-            {/* Mobile quick-action — opens the personal-agent qualifier. Compact pill that sits to
-                the side of the hamburger (which is pulled to the edge via -mr-2) so it never
-                crowds the logo or the menu icon. */}
+          <div className="hdr-more">
             <button
+              ref={moreBtnRef}
               type="button"
-              onClick={openAgent}
-              aria-label="פתיחת סוכן אישי"
-              className={`lg:hidden inline-flex items-center gap-1.5 rounded-none border border-[#76B900]/40 bg-[#76B900]/10 px-3 py-1.5 text-xs font-semibold text-[#9FE870] whitespace-nowrap transition-colors hover:bg-[#76B900]/20 active:scale-95 ${FOCUS_SAFE_CLASS}`}
+              className="hdr-icon-btn"
+              aria-label="עוד"
+              aria-expanded={moreOpen}
+              aria-controls="header-more"
+              onClick={() => setMoreOpen((v) => !v)}
             >
-              <ListChecks size={13} aria-hidden="true" />
-              סוכן אישי
+              <Ellipsis size={18} aria-hidden="true" />
             </button>
-
-            <button className={`lg:hidden text-white z-50 p-2 -mr-2 rounded-lg ${FOCUS_SAFE_CLASS}`} onClick={() => setMobileOpen(!mobileOpen)} aria-label="תפריט">
-              {mobileOpen ? <X size={28} /> : <Menu size={28} />}
-            </button>
+            <AnimatePresence>
+              {moreOpen && (
+                <motion.div
+                  ref={morePanelRef}
+                  id="header-more"
+                  className="hdr-more__panel"
+                  initial={{ opacity: 0, y: -6, clipPath: 'inset(0 0 100% 0)' }}
+                  animate={{ opacity: 1, y: 0, clipPath: 'inset(-12px -12px -12px -12px)', transition: { default: CARET, clipPath: { duration: 0.32, ease: [0.16, 1, 0.3, 1] } } }}
+                  exit={{ opacity: 0, y: -4, transition: { duration: 0.14 } }}
+                >
+                  <button type="button" className="hdr-more__row" onClick={fromMore(shuffle)}>
+                    <Shuffle size={16} aria-hidden="true" />
+                    <span>עמוד אקראי</span>
+                    <span className="hdr-more__hint">הפתעה</span>
+                  </button>
+                  <button type="button" className="hdr-more__row" onClick={fromMore(openCli)}>
+                    <SquareTerminal size={16} aria-hidden="true" />
+                    <span>מצב טרמינל</span>
+                    <span className="hdr-more__hint" dir="ltr">
+                      {'>_ CLI'}
+                    </span>
+                  </button>
+                  <div className="hdr-more__social">
+                    <span>עוקבים</span>
+                    <SocialLinks iconClassName="hdr-icon-btn" channels={[...HEADER_SOCIAL_CHANNELS]} />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+
+          <div className="site-header__action">
+            <GlyphButton variant="line" onClick={openAgent} className="glyph-btn--compact">
+              <ListChecks size={15} aria-hidden="true" />
+              {/* One label everywhere; narrower bars carry its first two words. */}
+              <span className="hidden xl:inline">סוכן התאמה אישי</span>
+              <span className="xl:hidden">סוכן התאמה</span>
+            </GlyphButton>
+          </div>
+
+          <button
+            ref={menuBtnRef}
+            type="button"
+            className="hdr-icon-btn site-header__menu"
+            onClick={() => setMobileOpen(true)}
+            aria-label="פתיחת התפריט"
+            aria-expanded={mobileOpen}
+          >
+            <Menu size={24} aria-hidden="true" />
+          </button>
         </div>
       </div>
 
-      {/* Mobile drawer — a fully self-contained h-dvh view with its own header (logo + close) and
-          footer (social links), rather than relying on the real header row peeking through above
-          it: that row's z-50 turned out to be trapped inside a nested stacking context (its parent
-          has `will-change: transform, opacity`, which itself creates a stacking context per the
-          CSS spec), so it was actually losing to this drawer's z-40 — the logo/close button were
-          being visually covered despite the z-index numbers suggesting otherwise. Self-contained
-          sidesteps that fragility entirely instead of chasing z-index further. */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            {...panelMotion}
-            className="fixed inset-0 h-dvh w-full max-w-full overflow-x-hidden bg-ground lg:hidden z-40 flex flex-col"
-          >
-            {/* Top: logo + close, pt-safe clears the notch/status bar */}
-            <div className="shrink-0 flex items-center justify-between px-6 pt-safe pt-6 pb-4">
-              <Logo iconClassName="h-9" textClassName="text-base hidden sm:inline" />
-              <button
-                onClick={() => setMobileOpen(false)}
-                className={`text-white p-2 -mr-2 rounded-lg ${FOCUS_SAFE_CLASS}`}
-                aria-label="סגירת תפריט"
-              >
-                <X size={28} />
-              </button>
-            </div>
-
-            {/* Nav links: vertically centered in the remaining space. overflow-y-auto is a safety
-                net for a very short viewport (e.g. landscape) — normally 8 links at this size fit
-                a single dvh with no scrolling needed. */}
-            <nav className="flex-1 min-h-0 overflow-y-auto momentum-scroll flex flex-col justify-center gap-1 px-6">
-              {/* Personal-agent quick action, highlighted above the plain nav list. */}
-              <button
-                type="button"
-                onClick={() => {
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {mobileOpen && (
+              <MobileMenu
+                pathname={location.pathname}
+                onClose={() => {
                   setMobileOpen(false);
-                  window.setTimeout(openAgent, DRAWER_EXIT_MS);
+                  window.setTimeout(() => menuBtnRef.current?.focus(), DRAWER_EXIT_MS);
                 }}
-                className={`mb-3 flex items-center justify-center gap-2 rounded-none bg-brand-500 py-3.5 font-sans text-lg font-bold text-ground ${FOCUS_SAFE_CLASS}`}
-              >
-                <ListChecks size={18} aria-hidden="true" />
-                סוכן אישי · התאמה מיידית
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileOpen(false);
-                  window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-cli')), DRAWER_EXIT_MS);
-                }}
-                className={`mb-4 flex items-center justify-center gap-2 rounded-none border border-brand-400/40 bg-brand-400/10 py-3 font-mono text-base font-semibold text-brand-300 transition-all active:scale-[0.98] hover:border-brand-400/70 ${FOCUS_SAFE_CLASS}`}
-              >
-                <SquareTerminal size={17} />
-                {'>_ CLI · מצב טרמינל'}
-              </button>
-              {navLinks.map((link) =>
-                link.action === 'contact' ? (
-                  <button
-                    key={link.name}
-                    type="button"
-                    onClick={() => {
-                      setMobileOpen(false);
-                      window.setTimeout(openContact, DRAWER_EXIT_MS);
-                    }}
-                    className={`text-right font-sans text-xl font-bold text-ink-paper border-b border-dotted border-[var(--color-rule)] py-3 ${FOCUS_SAFE_CLASS}`}
-                  >
-                    {link.name}
-                  </button>
-                ) : (
-                  <Link
-                    key={link.name}
-                    to={link.to!}
-                    onClick={(e) => handleMobileNavClick(e, link.to!)}
-                    aria-current={location.pathname === link.to ? 'page' : undefined}
-                    className={`font-sans text-xl font-bold text-ink-paper border-b border-dotted border-[var(--color-rule)] py-3 aria-[current=page]:text-brand-400 ${FOCUS_SAFE_CLASS}`}
-                  >
-                    {link.name}
-                  </Link>
-                )
-              )}
-            </nav>
-
-            {/* Bottom: social links, anchored with safe-area clearance for the home indicator */}
-            <div className="shrink-0 flex items-center justify-center gap-3 px-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] border-t border-dotted border-[var(--color-rule)]">
-              <SocialLinks channels={[...HEADER_SOCIAL_CHANNELS]} />
-            </div>
-          </motion.div>
+                onNavigate={(to) => afterDrawer(() => goTo(to))}
+                onContact={() => afterDrawer(openContact)}
+                onAgent={() => afterDrawer(openAgent)}
+                onSearch={() => afterDrawer(openPalette)}
+                onShuffle={() => afterDrawer(shuffle)}
+                onCli={() => afterDrawer(openCli)}
+              />
+            )}
+          </AnimatePresence>,
+          document.body
         )}
-      </AnimatePresence>
     </motion.header>
+  );
+}
+
+const list = {
+  hidden: {},
+  shown: { transition: { staggerChildren: 0.045, delayChildren: 0.12 } },
+};
+const item = {
+  hidden: { opacity: 0, x: 28 },
+  shown: { opacity: 1, x: 0, transition: { type: 'spring' as const, stiffness: 420, damping: 34 } },
+};
+
+/**
+ * The phone and tablet menu: a full screen of its own, portalled to <body> so no transformed or
+ * stacking ancestor can trap it. The sections are set large in the poster face and arrive one
+ * after another from the reading start; the page you are on carries the caret.
+ */
+function MobileMenu({
+  pathname,
+  onClose,
+  onNavigate,
+  onContact,
+  onAgent,
+  onSearch,
+  onShuffle,
+  onCli,
+}: {
+  pathname: string;
+  onClose: () => void;
+  onNavigate: (to: string) => void;
+  onContact: () => void;
+  onAgent: () => void;
+  onSearch: () => void;
+  onShuffle: () => void;
+  onCli: () => void;
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <motion.div {...panelMotion} className="mobile-menu" role="dialog" aria-modal="true" aria-label="תפריט" dir="rtl">
+      <div className="mobile-menu__top">
+        <Logo iconClassName="h-8" textClassName="text-base" />
+        <button ref={closeRef} type="button" className="hdr-icon-btn" onClick={onClose} aria-label="סגירת התפריט">
+          <X size={24} aria-hidden="true" />
+        </button>
+      </div>
+
+      <button type="button" className="mobile-menu__search" onClick={onSearch}>
+        <Search size={17} aria-hidden="true" />
+        <span>חיפוש באתר</span>
+      </button>
+
+      <motion.nav className="mobile-menu__nav" aria-label="ניווט ראשי" variants={list} initial="hidden" animate="shown">
+        {navLinks.map((link) => {
+          const current = isCurrent(pathname, link.to);
+          return (
+            <motion.div key={link.name} variants={item}>
+              {link.action === 'contact' ? (
+                <button type="button" className="mobile-menu__link" onClick={onContact}>
+                  {link.name}
+                </button>
+              ) : (
+                <a
+                  href={link.to}
+                  className="mobile-menu__link"
+                  aria-current={current ? 'page' : undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onNavigate(link.to!);
+                  }}
+                >
+                  {link.name}
+                  {current && <span className="mobile-menu__caret" aria-hidden="true" />}
+                </a>
+              )}
+            </motion.div>
+          );
+        })}
+      </motion.nav>
+
+      <div className="mobile-menu__foot">
+        <GlyphButton variant="primary" onClick={onAgent} className="w-full">
+          <ListChecks size={17} aria-hidden="true" />
+          סוכן התאמה אישי
+        </GlyphButton>
+        <div className="mobile-menu__utils">
+          <button type="button" className="mobile-menu__util" onClick={onShuffle}>
+            <Shuffle size={15} aria-hidden="true" />
+            עמוד אקראי
+          </button>
+          <button type="button" className="mobile-menu__util" onClick={onCli}>
+            <SquareTerminal size={15} aria-hidden="true" />
+            מצב טרמינל
+          </button>
+        </div>
+        <div className="mobile-menu__social">
+          <SocialLinks iconClassName="hdr-icon-btn" channels={[...HEADER_SOCIAL_CHANNELS]} />
+          <SiteBot shape="circle" tone="hi" mood="happy" size={46} hop="view" hopDelay={420} />
+        </div>
+      </div>
+    </motion.div>
   );
 }

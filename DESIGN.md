@@ -189,9 +189,9 @@ components:
 
 The public site is the AI world as a learner actually meets it: a full-bleed wall of real words, and one person typing it into a readable page. Behind every page runs a live WebGL2 field rendered as typewriter characters; its brightest cells are letters taken from the week's real AI headlines and tool names, its tone is made by glyph density (blank → `.` → `:` → `-` → `=` → `+` → `*`), and it is drawn in a single green ink on warm carbon. Over it, the page speaks in two voices: the machine in monospace (the field, captions, labels, jargon terms, buttons) and people in proportional Hebrew (Heebo for prose, a condensed poster face for the glyph-built promise and titles), while every main headline carries the site's one terminal voice, Rubik Lines. As the visitor scrolls, the field calms and sorts; under the pointer it stops and becomes readable words; a click ripples through it. One handwritten note, never more than two per page, speaks over the machine grid.
 
-The system spans three surfaces. The **public site** (`src/`) is The Sorted Noise; its homepage hero and story beats (`Hero`, `NoiseBeat`, `OrderBeat`, `PathBeat`, `StartBeat`), the shared `GlyphButton`, the cookie notice and the background field are built in it. The **operator dashboard** (`dashboard/`) and the **canvas-rendered carousels and 9:16 videos** (`dashboard/src/lib/*Renderer.ts`, `designAssets.ts`) remain **"The Annotated Workbench"**: dark carbon, one green signal, real tools on the table, a person's handwriting in the margin. The two share the green hue, condensed Noto Sans Hebrew headlines, the Playpen hand and the no-invented-facts stance, so they read as one product.
+The system spans three surfaces. The **public site** (`src/`) is The Sorted Noise; its homepage hero and story beats (`Hero`, `NoiseBeat`, `OrderBeat`, `PathBeat`, `StartBeat`), the shared `GlyphButton`, the header, the cookie notice and the background field are built in it. The **operator dashboard** (`dashboard/`) and the **canvas-rendered carousels and 9:16 videos** (`dashboard/src/lib/*Renderer.ts`, `designAssets.ts`) remain **"The Annotated Workbench"**: dark carbon, one green signal, real tools on the table, a person's handwriting in the margin. The two share the green hue, condensed Noto Sans Hebrew headlines, the Playpen hand and the no-invented-facts stance, so they read as one product.
 
-**Known gap.** Since 2026-10-06 the lower homepage sections (the three pillars, today's AI words, the process line, the services catalogue), the inner-page primitives (`ContentPrimitives`: page hero, section heading, frames, CTA), the cookie notice, the footer and the 404 page are in The Sorted Noise too. Still pending: the header/ticker chrome, the JARVIS page's own hero and cards, the AI page's agent cards and the magazines hero. Their old neon/glass/pill look is not current site guidance; the harmony layer (below) keeps them in step until they move.
+**Known gap.** Since 2026-10-06 the lower homepage sections (the three pillars, today's AI words, the process line, the services catalogue), the inner-page primitives (`ContentPrimitives`: page hero, section heading, frames, CTA), the cookie notice, the footer and the 404 page are in The Sorted Noise too; since 2026-10-07 so are the header and the /jarvis page. Still pending: the AI page's agent cards and the magazines hero. Their old neon/glass/pill look is not current site guidance; the harmony layer (below) keeps them in step until they move.
 
 **Key Characteristics:**
 - One green ink on warm carbon (`ground`); tone made by glyph density, not by gradients or glow.
@@ -246,7 +246,7 @@ Site: one green ink on warm carbon, with a green-tinted paper ramp for text. Das
 **Character:** on the site, scanline headlines give every page its terminal voice, a tall condensed poster face carries the glyph-built promise and the titles, and a typewriter mono speaks for the machine; Heebo keeps the prose plain and eye-to-eye. On slides the same condensed face sets every headline, Assistant carries the body, and the Playpen hand supplies the one human aside.
 
 ### Hierarchy
-- **Site display** (900 condensed, `min(clamp(6.6rem, 1.6rem + 10vw, 11rem), 17.5vh)`, 0.98, nowrap): the hero's promise line only. Built out of glyphs by the field where each letter gets at least 9 glyph rows (two lines from `sm` up, three on phones); solid Field Green otherwise.
+- **Site display** (900 condensed, `min(clamp(6.6rem, 1.6rem + 10vw, 11rem), 17.5vh)`, 0.98, nowrap): the hero's promise line only. Built out of glyphs by the field where each letter gets at least 9 glyph rows (two lines from `sm` up, three on phones); solid Field Green otherwise. A ring mark of Latin capitals (below) needs only 7 rows, a dot-matrix display's height.
 - **Site lead** (Rubik Lines 400, `clamp(1.55rem, 0.95rem + 1.7vw, 2.55rem)`, 1.22, max 22ch): the hero's first line, in paper ink.
 - **Site headline** (Rubik Lines 400, `clamp(2rem, 1rem + 2.6vw, 3.5rem)`, 1.14, balanced): every section heading on every page. A global unlayered `h1, h2` rule applies the face, so it beats `font-display` / `font-black` utilities; `.headline-plain` opts a long informational title back into the condensed display face.
 - **Site title** (900 condensed, `clamp(1.6rem, 1.15rem + 1.3vw, 2.3rem)`, 1.1): stair steps and card titles.
@@ -272,7 +272,7 @@ Site: one green ink on warm carbon, with a green-tinted paper ramp for text. Das
 
 ## Layout
 
-**Site.** A fixed, full-viewport glyph field (`100lvh`, so the mobile URL bar never resizes it) sits behind a wide container (max 1760px, gutter `clamp(1rem, 4vw, 3rem)`) on a 12-column grid from `lg`. The hero is `100dvh` (minus the ticker from `md`): the human column takes the right ~7/12 (RTL start), the left side is left open for the noise and the pointer lens, and a dotted-rule mono caption sits at the hero's foot. Story beats breathe on `clamp(6rem, 15vh, 11rem)` vertical padding and set prose at a 34rem measure. Order is shown by layout, not numbers: the path is a staircase whose steps indent one tread further each (1.1rem per step on phones, `min(6vw, 5.5rem)` from `md`). Field cells are 7×12 CSS px from 768px up and 5×9 below. The field steps back (goes quiet) behind every text block it would otherwise run through, and behind the header row. Mobile: no section-level sticky or pinning (they break in Instagram/Facebook webviews), `100dvh` not `100vh`, the hero button is never full-width so it clears the floating accessibility button, and the hero hand note is desktop-only.
+**Site.** A fixed, full-viewport glyph field (`100lvh`, so the mobile URL bar never resizes it) sits behind a wide container (max 1760px, gutter `clamp(1rem, 4vw, 3rem)`) on a 12-column grid from `lg`. The hero is `100dvh` (minus the ticker from `md`): the human column takes the right ~7/12 (RTL start), the left side is left open for the noise and the pointer lens, and a dotted-rule mono caption sits at the hero's foot. Story beats breathe on `clamp(6rem, 15vh, 11rem)` vertical padding and set prose at a 34rem measure. Order is shown by layout, not numbers: the path is a staircase whose steps indent one tread further each (1.1rem per step on phones, `min(6vw, 5.5rem)` from `md`). Field cells are 7×12 CSS px from 768px up and 5×9 below. The field steps back (goes quiet) behind every text block it would otherwise run through, and behind the header row. The header is fixed, not sticky, and glued under the desktop news ticker, so the ticker scrolls away and only the header row stays. Mobile: no section-level sticky or pinning (they break in Instagram/Facebook webviews), `100dvh` not `100vh`, the hero button is never full-width so it clears the floating accessibility button, and the hero hand note is desktop-only.
 
 **Dashboard.** A dense single-page operator tool: a tab rail, `.dash-card` panels, everything right-aligned RTL.
 
@@ -304,6 +304,7 @@ A sharp rectangle that fills with type.
 - **Line:** transparent with a 1px Field Green outline and green label; on hover a Field Green fill springs in from the right (the reading start) and the label turns ground-coloured.
 - **Press:** sinks 2px on a stiff spring and sends a ripple through the glyph field from the pointer (from the centre on keyboard activation).
 - **Focus:** 2px `field-ink-hi` outline, 5px offset.
+- **Sizes:** compact (min-height 2.6rem, `0 1rem`, 0.875rem) for the header action; mini (min-height 2.25rem, `0 0.95rem`, 0.875rem) for approval buttons inside a conversation turn.
 - Exactly one primary button per decision; the hero's never runs full width.
 
 ### Links (site)
@@ -320,6 +321,14 @@ The Grok Bot deck's characters live on the site too (`src/components/bots/SiteBo
 
 ### Glyph field (signature)
 A two-pass WebGL2 renderer: a per-cell scene pass, then a per-pixel glyph pass from an atlas of Hebrew, Latin, digits and a little punctuation. Ink `brand-green-light`, highlights `field-ink-hi`, ground `ground`. The story drives five sprung parameters (chaos, order, calm, lens, dim); the pointer is a lens that calms the noise into readable words; clicks ripple. It fades in over 1.2s once the page is idle and is never needed to read anything.
+
+### The glyph-ring mark and the headline handoff (signature, since 2026-10-07)
+A short Latin mark inside a ring (the J.A.R.V.I.S mark on /jarvis, `data-glyph-ring`): the field draws the ring into its mask first, then clears the band the name runs through, so the ring breaks where the name crosses it. The ring is a true circle (a mark, not a control). Masks are drawn in the element's own CSS direction, so an LTR mark keeps its punctuation at the right end.
+- **One mark at a time.** The field draws a single headline; a page may hand it from one element to another (/jarvis hands it from the hero mark to the parts-sheet ring while that ring is at least 35% on screen). The new element assembles out of the noise again; only the element being drawn carries `data-glyph-live` and goes transparent, the other keeps its solid look.
+- **Solid fallback.** Where the letters would get fewer than 7 glyph rows (a 1x screen in a narrow or short window, the mark shrinks below 860px of height to keep the hero exchange in the first screen), and under reduced motion where the field does not mount, the mark is solid Field Green in a CSS ring broken the same way. It is a finished look, not a loading state.
+
+### Conversation (since 2026-10-07)
+A page told as an exchange (/jarvis): a dotted frame with a Cousine bar that labels the exchange as an example (`דוגמה`), because it is an illustration, not a transcript. Request turns sit on the reading start behind a dotted rule, tagged `אתם`; the other side's turns are indented on phones and stand on the far side from 768px, tagged in Cousine (green for the agent). Completed steps are drawn check lines in Field Green, and the exchange ends on a blinking block caret. A turn that asks for approval carries miniature GlyphButtons (one primary, one line). No bubbles. An FAQ in this pattern makes the questions request turns inside disclosure buttons; an answer is tagged with whoever actually speaks it (on /jarvis, `דניאל`).
 
 ### Jargon decoder
 Rows of `term` (Cousine 700, faint, green on hover) → dotted leader → plain-Hebrew meaning (Heebo 500, paper). Stacks on phones; the leader appears from `md`.
@@ -339,8 +348,16 @@ Dark fill `rgba(11,13,18,0.92)`, title bar with window dots, language label, cop
 ### Hand-drawn marks (slides)
 `scribbleUnderline`, `markerHighlight`, `scribbleCircle`, `doodleArrow`. One mark per slide.
 
-### Navigation
-Site: an RTL header row over the field (which goes quiet behind it), with the news ticker above from `md`. Its chrome is pending migration into The Sorted Noise. Dashboard: the pill tab rail.
+### Navigation (site: Header, since 2026-10-07)
+One line of chrome over the field, which goes quiet behind it.
+- **States:** transparent at the top of a page; once scrolled, a carbon bar (`ground` at 90%) with a dotted bottom rule and a shorter row. It steps away while the visitor reads down and returns on the first scroll up, never while its menu or panel is open or a keyboard focus is inside it.
+- **Top level:** the logo, the six section links (Heebo 500, muted; paper on hover; the current page in Field Green), a search prompt (a dotted field with a Cousine `Ctrl K` / `⌘K` hint) that opens the command palette, and one action: a compact line GlyphButton, `סוכן התאמה אישי`, shortened to `סוכן התאמה` on narrower bars.
+- **The cursor:** a 2px Field Green bar under the links springs to the hovered or focused link and rests under the current page.
+- **More panel:** everything else (random page, terminal mode, Instagram/LinkedIn/mail) sits one click away behind a square icon button, in a dotted frame of rows with drawn icons and Cousine hints. Keeping the row to what a visitor reaches for is the point.
+- **Phones and tablets (below 1024px):** a full-screen menu portalled to `<body>` (a dialog): the sections in the condensed poster face at the site-headline size on dotted treads, the current page in green with a blinking block caret, a search row, the action as a full-width primary GlyphButton, two dotted utility buttons, social icons and one crew bot.
+- **Reading progress:** a 2px green bar at the very top that fills from the right, the reading start.
+
+Dashboard: the pill tab rail.
 
 ## Motion (site)
 
@@ -384,4 +401,4 @@ Site: an RTL header row over the field (which goes quiet behind it), with the ne
 - **Don't** put a stock photo behind a prompt, code or workflow slide.
 - **Don't** add a light theme to the site or dashboard; they are dark-only by decision.
 - **Don't** invent numbers, clients or results in any visual, including a handwritten note.
-- **Don't** treat the legacy neon/glass/pill sections as site guidance; they are pending migration.
+- **Don't** treat the legacy neon/glass/pill sections (the AI page's agent cards, the magazines hero) as site guidance; they are pending migration.

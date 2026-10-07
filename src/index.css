@@ -2266,32 +2266,372 @@ html.motion-reduced .glass-chip__dot {
   text-decoration-color: rgba(143, 212, 0, 0.55);
 }
 
-/* Header nav: people's words in the body face; the current page carries the signal colour and a
-   caret under it, like the cursor sitting on the line you are on. */
+/* ── Header (glyph world, 2026-10-07; Header.tsx) ─────────────────────────────────────────────
+   One line of chrome over the field: transparent at the top of a page, a carbon bar with a dotted
+   rule once you scroll. Nav labels are people's words in the body face; a Field Green bar under
+   them is the cursor (it springs to the hovered link and rests under the current page). */
+.site-header {
+  position: fixed;
+  inset-inline: 0;
+  z-index: 40;
+  padding-top: env(safe-area-inset-top, 0px);
+  border-bottom: 1px dotted transparent;
+  transition: background-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s;
+}
+.site-header.is-scrolled {
+  background-color: color-mix(in srgb, var(--color-ground) 90%, transparent);
+  border-bottom-color: var(--color-rule);
+}
+.site-header__row {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.75rem, 1.6vw, 2.25rem);
+  min-height: 4.5rem;
+}
+.site-header.is-scrolled .site-header__row {
+  min-height: 3.6rem;
+}
+.site-header__logo {
+  display: inline-flex;
+  flex: none;
+  outline: none;
+}
+.site-header__logo:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 6px;
+}
+.site-nav {
+  position: relative;
+  display: none;
+  align-items: center;
+  gap: clamp(1rem, 1.7vw, 2rem);
+}
+@media (min-width: 1024px) {
+  .site-nav {
+    display: flex;
+  }
+}
 .nav-link {
   position: relative;
   white-space: nowrap;
-  padding-block: 0.5rem;
+  padding-block: 0.6rem;
   font-family: var(--font-sans);
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--color-ink-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  outline: none;
   transition: color 0.2s;
 }
-.nav-link:hover {
+.nav-link:hover,
+.nav-link:focus-visible {
   color: var(--color-ink-paper);
 }
 .nav-link[aria-current='page'] {
   color: var(--color-brand-400);
 }
-.nav-link[aria-current='page']::after {
-  content: '';
+.nav-link:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 4px;
+}
+.site-nav__caret {
   position: absolute;
-  inset-inline-start: 0;
-  bottom: 0.15rem;
-  width: 0.5rem;
+  left: 0;
+  bottom: 0.2rem;
+  width: 0;
   height: 2px;
   background: var(--color-brand-400);
+  pointer-events: none;
+}
+.site-header__tools {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+/* Square icon buttons: the more panel, the menu, the social links inside them. */
+.hdr-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  color: var(--color-ink-muted);
+  background: none;
+  border: 1px dotted transparent;
+  border-radius: 0;
+  cursor: pointer;
+  outline: none;
+  transition: color 0.2s, border-color 0.2s;
+}
+.hdr-icon-btn:hover,
+.hdr-icon-btn[aria-expanded='true'] {
+  color: var(--color-brand-400);
+  border-color: var(--color-rule);
+}
+.hdr-icon-btn:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 2px;
+}
+/* Search reads as the machine's prompt: a dotted field with its shortcut. */
+.hdr-search {
+  display: none;
+  align-items: center;
+  gap: 0.55rem;
+  height: 2.6rem;
+  padding-inline: 0.8rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--color-ink-faint);
+  background: color-mix(in srgb, var(--color-ground) 70%, transparent);
+  border: 1px dotted var(--color-rule);
+  border-radius: 0;
+  cursor: pointer;
+  outline: none;
+  transition: color 0.2s, border-color 0.2s;
+}
+.hdr-search:hover {
+  color: var(--color-ink-paper);
+  border-color: var(--color-brand-400);
+}
+.hdr-search:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 2px;
+}
+.hdr-search__label,
+.hdr-search__kbd {
+  display: none;
+}
+.hdr-search__kbd {
+  font-family: var(--font-type);
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  padding-inline-start: 0.55rem;
+  border-inline-start: 1px dotted var(--color-rule);
+}
+@media (min-width: 640px) {
+  .hdr-search {
+    display: inline-flex;
+  }
+}
+@media (min-width: 1280px) {
+  .hdr-search__label,
+  .hdr-search__kbd {
+    display: inline;
+  }
+  .hdr-search {
+    padding-inline: 0.9rem 0.7rem;
+  }
+}
+.hdr-more {
+  position: relative;
+  display: none;
+}
+@media (min-width: 1024px) {
+  .hdr-more {
+    display: block;
+  }
+}
+.hdr-more__panel {
+  position: absolute;
+  top: calc(100% + 0.7rem);
+  inset-inline-end: 0;
+  z-index: 2;
+  min-width: 16rem;
+  padding-block: 0.35rem;
+  background: color-mix(in srgb, var(--color-ground) 96%, transparent);
+  border: 1px dotted var(--color-rule);
+}
+.hdr-more__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  color: var(--color-ink-paper);
+  background: none;
+  border: 0;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+  transition: color 0.15s, background-color 0.15s;
+}
+.hdr-more__row svg {
+  color: var(--color-brand-400);
+  flex: none;
+}
+.hdr-more__row:hover,
+.hdr-more__row:focus-visible {
+  color: var(--color-brand-400);
+  background: rgba(143, 212, 0, 0.07);
+}
+.hdr-more__hint {
+  margin-inline-start: auto;
+  font-family: var(--font-type);
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+.hdr-more__social {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  padding: 0.5rem 1rem 0.2rem;
+  border-top: 1px dotted var(--color-rule);
+  font-family: var(--font-type);
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+.hdr-more__social > div,
+.mobile-menu__social > div:first-child {
+  display: flex;
+  gap: 0.15rem;
+}
+.site-header__action {
+  display: none;
+}
+@media (min-width: 350px) {
+  .site-header__action {
+    display: block;
+  }
+}
+.glyph-btn.glyph-btn--compact {
+  min-height: 2.6rem;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+/* A phone's bar holds the logo, this button and the menu: the label stays on one line, and the
+   icon steps aside to make the room. */
+@media (max-width: 479px) {
+  .site-header__action .glyph-btn--compact {
+    padding: 0 0.8rem;
+  }
+  .site-header__action .glyph-btn--compact svg {
+    display: none;
+  }
+}
+.site-header__menu {
+  margin-inline-end: -0.4rem;
+}
+@media (min-width: 1024px) {
+  .site-header__menu {
+    display: none;
+  }
+}
+
+/* The phone and tablet menu: its own full screen, the sections in the poster face. */
+.mobile-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: calc(env(safe-area-inset-top, 0px) + 0.9rem) clamp(1rem, 5vw, 2rem) calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--color-ground);
+}
+.mobile-menu__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3rem;
+}
+.mobile-menu__search {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  min-height: 3rem;
+  padding-inline: 1rem;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  color: var(--color-ink-faint);
+  background: none;
+  border: 1px dotted var(--color-rule);
+  border-radius: 0;
+  text-align: start;
+}
+.mobile-menu__nav {
+  display: flex;
+  flex-direction: column;
+  margin-block: 1.4rem auto;
+}
+.mobile-menu__link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding-block: 0.7rem;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(2rem, 1rem + 2.6vw, 3.5rem);
+  line-height: 1.1;
+  color: var(--color-ink-paper);
+  background: none;
+  border: 0;
+  border-bottom: 1px dotted var(--color-rule);
+  text-align: start;
+  text-decoration: none;
+  outline: none;
+}
+.mobile-menu__link[aria-current='page'] {
+  color: var(--color-brand-400);
+}
+.mobile-menu__link:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: -2px;
+}
+.mobile-menu__caret {
+  width: 0.32em;
+  height: 0.62em;
+  background: var(--color-brand-400);
+  animation: caret-blink 1.05s steps(1) infinite;
+}
+.mobile-menu__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.6rem;
+}
+.mobile-menu__utils {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+.mobile-menu__util {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.9rem;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  color: var(--color-ink-muted);
+  background: none;
+  border: 1px dotted var(--color-rule);
+  border-radius: 0;
+}
+.mobile-menu__util svg {
+  color: var(--color-brand-400);
+}
+.mobile-menu__social {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.6rem;
+  border-top: 1px dotted var(--color-rule);
+}
+html.motion-reduced .mobile-menu__caret {
+  animation: none;
 }
 
 /* Process rail in the glyph world: a dotted rule instead of a glowing green→cyan bar, square nodes
@@ -3483,4 +3823,559 @@ html.live-on [data-live='decode'] {
 html.live-on [data-live='stagger'] > * {
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1), linear(0, 0.0839 4.2%, 0.2657 8.3%, 0.4706 12.5%, 0.6565 16.7%, 0.8045 20.8%, 0.9106 25%, 0.9789 29.2%, 1.0174 33.3%, 1.0347 37.5%, 1.0384 41.7%, 1.0345 45.8%, 1.0272 50%, 1.0194 54.2%, 1.0124 58.3%, 1.0069 62.5%, 1.003 66.7%, 1.0006 70.8%, 0.9992 75%, 0.9986 79.2%, 0.9985 83.3%, 0.999 91.7%, 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   /jarvis (2026-10-07; JarvisPage.tsx): the page as one conversation with JARVIS. The mark is
+   built out of field glyphs when the field can draw it (data-glyph-ring); otherwise it is a solid
+   green name in a ring broken where the name crosses it. Requests sit on the reading start behind
+   a dotted rule; from 768px the answers stand on the other side (on phones, indented). No bubbles.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+.jv-hero {
+  position: relative;
+  padding-block: clamp(7rem, 15vh, 10rem) clamp(3.5rem, 8vh, 6rem);
+}
+@media (min-width: 768px) {
+  .jv-hero {
+    padding-top: clamp(7rem, 13vh, 10rem);
+  }
+}
+.jv-hero__grid {
+  display: grid;
+  gap: clamp(2.5rem, 5vw, 4.5rem);
+  align-items: center;
+}
+@media (min-width: 1024px) {
+  .jv-hero__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  }
+}
+.jv-hero__copy {
+  min-width: 0;
+}
+.jv-title {
+  margin: 0;
+  /* The inner pages' title size (.page-hero__title). */
+  font-size: clamp(2.3rem, 1.2rem + 3.4vw, 4.4rem);
+  line-height: 1.08;
+  text-wrap: balance;
+  color: var(--color-ink-paper);
+}
+.jv-lead {
+  margin-top: 1.6rem;
+  max-width: 34rem;
+  font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.22rem);
+  line-height: 1.75;
+  color: var(--color-ink-muted);
+  text-wrap: pretty;
+}
+.jv-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.1rem 1.75rem;
+  margin-top: 2.2rem;
+}
+.jv-hero__stage {
+  container-type: inline-size;
+  display: grid;
+  justify-items: center;
+  gap: clamp(1rem, 2vw, 1.5rem);
+  min-width: 0;
+}
+/* A short desktop window (a 1366x768 laptop) keeps the whole exchange, approval row included, in
+   the first screen: the mark gives up size there, and on a 1x screen its glyph build with it. */
+@media (min-width: 1024px) and (max-height: 860px) {
+  .jv-hero {
+    padding-top: 6.5rem;
+  }
+  .jv-hero .jv-mark {
+    font-size: min(5rem, calc(100cqi / 4.9));
+  }
+}
+#jarvis-does {
+  scroll-margin-top: 4.5rem;
+}
+
+/* The J.A.R.V.I.S mark: the ring's diameter is the box's height, three quarters of its width, so
+   the name runs out past the ring on both sides as in the original mark. It is sized from the
+   column it stands in: at 6.6rem every letter gets the seven glyph rows a ring mark needs even on
+   a 1x screen, and it shrinks to fit a narrower column (where a 1x screen shows the solid mark). */
+.jv-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  padding-inline: 0.06em;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-size: min(6.6rem, calc((100vw - 2rem) / 4.9));
+  font-size: min(6.6rem, calc(100cqi / 4.9));
+  line-height: 1;
+  color: var(--color-brand-400);
+  user-select: none;
+  transition: color 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.jv-mark__name {
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.jv-mark::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  aspect-ratio: 1;
+  translate: -50% 0;
+  border: 0.07em solid currentColor;
+  /* A true circle, not a control: the square-corner rule is for buttons and frames. */
+  border-radius: 50%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) top / 100% calc(50% - 0.525em) no-repeat,
+    linear-gradient(#000 0 0) bottom / 100% calc(50% - 0.525em) no-repeat;
+  mask:
+    linear-gradient(#000 0 0) top / 100% calc(50% - 0.525em) no-repeat,
+    linear-gradient(#000 0 0) bottom / 100% calc(50% - 0.525em) no-repeat;
+}
+/* Only the mark the field is drawing right now gives up its solid look. */
+.jv-mark[data-glyph-live] {
+  color: transparent;
+}
+
+/* The exchanges */
+.jv-chat {
+  width: 100%;
+  max-width: 34rem;
+  padding: 0 1.1rem 1.15rem;
+  text-align: start;
+}
+.jv-chat--hero {
+  min-height: 20rem;
+}
+.jv-chat__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-inline: -1.1rem;
+  padding: 0.6rem 1.1rem;
+  border-bottom: 1px dotted var(--color-rule);
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.jv-turn {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+  margin-top: 0.8rem;
+}
+.jv-turn--you {
+  padding-inline-start: 0.9rem;
+  border-inline-start: 1px dotted rgba(143, 212, 0, 0.6);
+}
+.jv-turn--jarvis {
+  margin-inline-start: clamp(1.4rem, 5vw, 2.75rem);
+}
+@media (min-width: 768px) {
+  .jv-turn {
+    max-width: 82%;
+  }
+  /* The other side of the conversation: the turn and everything in it set against the far edge,
+     so even a one-line answer stands across from the request. */
+  .jv-turn--jarvis {
+    margin-inline-start: auto;
+    justify-items: end;
+  }
+  .jv-turn--jarvis .jv-ask {
+    justify-content: flex-end;
+  }
+}
+.jv-turn__who {
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.jv-turn--jarvis .jv-turn__who {
+  color: var(--color-brand-400);
+}
+.jv-turn__text {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-paper);
+}
+.jv-turn--jarvis .jv-turn__text {
+  color: var(--color-ink-muted);
+}
+.jv-done {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.jv-done li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--color-ink-paper);
+}
+.jv-done svg {
+  flex: none;
+  margin-top: 0.24rem;
+  color: var(--color-brand-400);
+}
+.jv-caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-inline-start: 0.2em;
+  vertical-align: -0.15em;
+  background: var(--color-brand-400);
+  animation: caret-blink 1.05s steps(1) infinite;
+}
+html.motion-reduced .jv-caret {
+  animation: none;
+}
+/* The question and its two answers on one line where they fit. */
+.jv-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.1rem;
+  margin-top: 0.6rem;
+}
+.jv-ask__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  padding-block: 0.3rem;
+}
+/* The approval buttons are the site's glyph buttons, in miniature. */
+.glyph-btn.glyph-btn--mini {
+  min-height: 2.25rem;
+  padding: 0 0.95rem;
+  font-size: 0.875rem;
+}
+.jv-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+  padding: 0;
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.jv-replay:hover {
+  color: var(--color-brand-400);
+}
+.jv-replay:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 3px;
+}
+
+/* What it does: a zigzag of capability and exchange */
+.jv-note {
+  margin: 1rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+}
+.jv-abilities {
+  display: grid;
+  gap: clamp(3.5rem, 7vw, 6rem);
+  margin-top: clamp(3rem, 6vw, 4.5rem);
+}
+.jv-ability {
+  display: grid;
+  gap: 1.5rem 3.5rem;
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .jv-ability {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  }
+  .jv-ability:nth-child(even) .jv-ability__copy {
+    order: 2;
+  }
+}
+.jv-ability__title {
+  margin: 0;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.6rem, 1.15rem + 1.3vw, 2.3rem);
+  line-height: 1.1;
+  color: var(--color-ink-paper);
+  text-wrap: balance;
+}
+.jv-ability__points {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 32rem;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.jv-ability__points li {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--color-ink-muted);
+}
+.jv-ability__points b {
+  font-weight: 700;
+  color: var(--color-ink-paper);
+}
+.jv-ability .jv-chat {
+  max-width: none;
+}
+
+/* Inside: the ring returns at the middle of a sheet, its four parts on leaders around it */
+.jv-inside__head {
+  max-width: 46rem;
+}
+.jv-schema {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+}
+.jv-schema__core {
+  container-type: inline-size;
+  display: grid;
+  justify-items: center;
+  order: -1;
+  min-width: 0;
+}
+.jv-schema__side {
+  display: grid;
+  gap: 1.5rem;
+  margin: 0;
+}
+.jv-schema__part {
+  position: relative;
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 1rem;
+  border-top: 1px dotted var(--color-rule);
+}
+.jv-schema__term {
+  font-family: var(--font-type);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-brand-400);
+}
+.jv-schema__text {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--color-ink-paper);
+}
+@media (min-width: 1024px) {
+  .jv-schema {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 3rem;
+  }
+  .jv-schema__core {
+    order: 0;
+  }
+  .jv-schema__side {
+    gap: 3.5rem;
+  }
+  .jv-schema__part {
+    padding-top: 0;
+    border-top: 0;
+  }
+  /* The leader: a dotted line from each part to the ring. */
+  .jv-schema__part::after {
+    content: '';
+    position: absolute;
+    top: 0.75rem;
+    width: 2.4rem;
+    border-top: 1px dotted rgba(143, 212, 0, 0.65);
+  }
+  .jv-schema__side--start .jv-schema__part::after {
+    inset-inline-end: -2.8rem;
+  }
+  .jv-schema__side--end .jv-schema__part::after {
+    inset-inline-start: -2.8rem;
+  }
+}
+
+/* Where it runs: two install sheets */
+.jv-sheets {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+}
+@media (min-width: 900px) {
+  .jv-sheets {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.jv-sheet {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.6rem 0.4rem;
+}
+.jv-sheet--lead {
+  border-style: solid;
+  border-color: rgba(143, 212, 0, 0.55);
+}
+.jv-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--color-brand-400);
+}
+.jv-sheet__title {
+  margin: 0;
+  font-family: var(--font-poster);
+  font-weight: 900;
+  font-stretch: 75%;
+  font-size: clamp(1.6rem, 1.15rem + 1.3vw, 2.3rem);
+  line-height: 1.1;
+  color: var(--color-ink-paper);
+}
+.jv-sheet__tag {
+  margin: 0.8rem 0 0;
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-brand-400);
+}
+.jv-sheet__text {
+  margin: 0.75rem 0 1.2rem;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--color-ink-muted);
+}
+.jv-sheet__rows {
+  margin: auto 0 0;
+}
+.jv-sheet__row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 1rem;
+  padding-block: 0.85rem;
+  border-top: 1px dotted var(--color-rule);
+}
+.jv-sheet__row dt {
+  font-family: var(--font-type);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+.jv-sheet__row dd {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--color-ink-paper);
+}
+
+/* Questions, asked and answered: the frame stands on the far side of the heading */
+.jv-faq-sec__head {
+  max-width: 40rem;
+}
+.jv-faq {
+  max-width: 54rem;
+  margin-top: clamp(2rem, 4vw, 3rem);
+  margin-inline-start: auto;
+}
+.jv-faq__item + .jv-faq__item {
+  margin-top: 0.95rem;
+  border-top: 1px dotted var(--color-rule);
+}
+.jv-faq__q {
+  width: 100%;
+  max-width: none;
+  font: inherit;
+  text-align: start;
+  background: none;
+  border-top: 0;
+  border-bottom: 0;
+  border-inline-end: 0;
+  cursor: pointer;
+}
+.jv-faq__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+.jv-faq__q .jv-turn__text {
+  font-weight: 700;
+  transition: color 0.15s;
+}
+.jv-faq__q:hover .jv-turn__text {
+  color: var(--color-brand-400);
+}
+.jv-faq__q:focus-visible {
+  outline: 2px solid #c8f46e;
+  outline-offset: 3px;
+}
+.jv-faq__icon {
+  flex: none;
+  margin-top: 0.25rem;
+  color: var(--color-brand-400);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.jv-faq__icon.is-open {
+  transform: rotate(45deg);
+}
+.jv-faq__a {
+  padding-bottom: 0.35rem;
+}
+
+/* Close */
+.jv-close {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+.jv-close .story-body {
+  margin-inline: auto;
+}
+.jv-close__bot {
+  margin-bottom: 1.75rem;
+}
+.jv-gains {
+  display: grid;
+  gap: 0.7rem 2.5rem;
+  max-width: 46rem;
+  margin: 2.2rem auto 0;
+  padding: 0;
+  list-style: none;
+  text-align: start;
+}
+@media (min-width: 768px) {
+  .jv-gains {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.jv-gains li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-ink-paper);
+}
+.jv-gains svg {
+  flex: none;
+  margin-top: 0.3rem;
+  color: var(--color-brand-400);
 }
